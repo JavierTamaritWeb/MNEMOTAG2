@@ -1,0 +1,25 @@
+<!-- Icono de error -->
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+  <defs>
+    <linearGradient id="errorGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#EF4444;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#DC2626;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Círculo de fondo -->
+  <circle cx="12" cy="12" r="10" fill="url(#errorGradient)" opacity="0.1"/>
+  
+  <!-- Círculo principal -->
+  <circle cx="12" cy="12" r="8" fill="none" stroke="url(#errorGradient)" stroke-width="2"/>
+  
+  <!-- X de error -->
+  <line x1="8" y1="8" x2="16" y2="16" stroke="url(#errorGradient)" stroke-width="2" stroke-linecap="round"/>
+  <line x1="16" y1="8" x2="8" y2="16" stroke="url(#errorGradient)" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- Punto de exclamación alternativo (comentado) -->
+  <!-- 
+  <line x1="12" y1="8" x2="12" y2="12" stroke="url(#errorGradient)" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="12" cy="15" r="1" fill="url(#errorGradient)"/>
+  -->
+</svg>

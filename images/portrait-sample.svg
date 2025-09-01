@@ -1,0 +1,56 @@
+<!-- Imagen de retrato de ejemplo -->
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300" viewBox="0 0 200 300">
+  <defs>
+    <radialGradient id="faceGradient" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" style="stop-color:#F4C2A1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E6A876;stop-opacity:1" />
+    </radialGradient>
+    <linearGradient id="hairGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B4513;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#654321;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="backgroundGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#E8F4FD;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#B3D9FF;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Fondo -->
+  <rect width="200" height="300" fill="url(#backgroundGradient)"/>
+  
+  <!-- Cuello y hombros -->
+  <ellipse cx="100" cy="280" rx="50" ry="30" fill="#4A90E2"/>
+  <rect x="50" y="250" width="100" height="50" fill="#4A90E2"/>
+  
+  <!-- Cuello -->
+  <rect x="85" y="220" width="30" height="40" fill="url(#faceGradient)"/>
+  
+  <!-- Cara -->
+  <ellipse cx="100" cy="180" rx="45" ry="55" fill="url(#faceGradient)"/>
+  
+  <!-- Cabello -->
+  <ellipse cx="100" cy="140" rx="50" ry="40" fill="url(#hairGradient)"/>
+  <path d="M 50 160 Q 75 120 100 140 Q 125 120 150 160" fill="url(#hairGradient)"/>
+  
+  <!-- Ojos -->
+  <ellipse cx="85" cy="170" rx="8" ry="5" fill="white"/>
+  <ellipse cx="115" cy="170" rx="8" ry="5" fill="white"/>
+  <circle cx="85" cy="170" r="3" fill="#2C3E50"/>
+  <circle cx="115" cy="170" r="3" fill="#2C3E50"/>
+  <circle cx="86" cy="169" r="1" fill="white"/>
+  <circle cx="116" cy="169" r="1" fill="white"/>
+  
+  <!-- Cejas -->
+  <path d="M 78 165 Q 85 163 92 165" stroke="#654321" stroke-width="2" fill="none"/>
+  <path d="M 108 165 Q 115 163 122 165" stroke="#654321" stroke-width="2" fill="none"/>
+  
+  <!-- Nariz -->
+  <path d="M 100 175 L 98 185 L 102 185 Z" fill="#E6A876"/>
+  
+  <!-- Boca -->
+  <ellipse cx="100" cy="195" rx="8" ry="3" fill="#D97B93"/>
+  
+  <!-- Mejillas -->
+  <ellipse cx="75" cy="185" rx="6" ry="4" fill="#F5B7A8" opacity="0.6"/>
+  <ellipse cx="125" cy="185" rx="6" ry="4" fill="#F5B7A8" opacity="0.6"/>
+</svg>

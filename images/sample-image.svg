@@ -1,0 +1,27 @@
+<!-- Placeholder para imágenes de ejemplo -->
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <defs>
+    <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+      <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#E5E7EB" stroke-width="1"/>
+    </pattern>
+  </defs>
+  
+  <!-- Fondo con patrón -->
+  <rect width="400" height="300" fill="#F9FAFB"/>
+  <rect width="400" height="300" fill="url(#grid)"/>
+  
+  <!-- Marco -->
+  <rect x="20" y="20" width="360" height="260" fill="white" stroke="#D1D5DB" stroke-width="2" rx="8"/>
+  
+  <!-- Icono de imagen central -->
+  <g transform="translate(200, 150)">
+    <circle cx="0" cy="0" r="40" fill="#F3F4F6"/>
+    <rect x="-25" y="-15" width="50" height="30" rx="4" fill="#9CA3AF"/>
+    <circle cx="15" cy="-5" r="5" fill="#F3F4F6"/>
+    <polygon points="-25,15 -15,5 -5,8 25,0 25,15" fill="#F3F4F6"/>
+  </g>
+  
+  <!-- Texto -->
+  <text x="200" y="220" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" fill="#6B7280">Imagen de ejemplo</text>
+  <text x="200" y="240" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#9CA3AF">400 × 300 píxeles</text>
+</svg>

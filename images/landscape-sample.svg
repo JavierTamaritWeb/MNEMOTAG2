@@ -1,0 +1,40 @@
+<!-- Imagen de ejemplo para filtros -->
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200">
+  <defs>
+    <linearGradient id="skyGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#87CEEB;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E0F6FF;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="mountainGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B7355;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#5D4E37;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Cielo -->
+  <rect width="300" height="120" fill="url(#skyGradient)"/>
+  
+  <!-- Sol -->
+  <circle cx="250" cy="40" r="20" fill="#FFD700"/>
+  
+  <!-- Montañas -->
+  <polygon points="0,120 80,60 160,120" fill="url(#mountainGradient)"/>
+  <polygon points="120,120 200,70 280,120" fill="url(#mountainGradient)"/>
+  
+  <!-- Agua -->
+  <rect x="0" y="120" width="300" height="80" fill="#4682B4"/>
+  
+  <!-- Reflejo del sol -->
+  <ellipse cx="250" cy="160" rx="8" ry="20" fill="#FFD700" opacity="0.6"/>
+  
+  <!-- Ondas en el agua -->
+  <path d="M 0 140 Q 50 135 100 140 T 200 140 T 300 140" stroke="#87CEEB" stroke-width="2" fill="none" opacity="0.7"/>
+  <path d="M 0 160 Q 30 155 60 160 T 120 160 T 180 160 T 240 160 T 300 160" stroke="#87CEEB" stroke-width="1" fill="none" opacity="0.5"/>
+  
+  <!-- Árboles -->
+  <ellipse cx="50" cy="110" rx="15" ry="20" fill="#228B22"/>
+  <rect x="47" y="110" width="6" height="15" fill="#8B4513"/>
+  
+  <ellipse cx="150" cy="105" rx="12" ry="18" fill="#228B22"/>
+  <rect x="147" y="105" width="6" height="12" fill="#8B4513"/>
+</svg>

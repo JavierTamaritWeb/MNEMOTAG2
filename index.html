@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mnemotag - Editor de metadatos e imágenes</title>
+  <link rel="icon" type="image/svg+xml" href="images/favicon.svg">
+  <link rel="icon" type="image/x-icon" href="images/favicon.ico">
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-gray-50 min-h-screen">
+  <!-- Theme Toggle Button -->
+  <button id="theme-toggle" class="theme-toggle" aria-label="Cambiar tema">
+    <i id="theme-icon" class="fas fa-moon" aria-hidden="true"></i>
+  </button>
+
+  <noscript>
+    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+      <strong class="font-bold">JavaScript desactivado:</strong>
+      <span>Esta aplicación requiere JavaScript para funcionar correctamente. Por favor, habilítalo en tu navegador.</span>
+    </div>
+  </noscript>
+
+  <div class="container mx-auto px-4 py-8 max-w-7xl">
+    <header class="mb-8">
+      <h1 class="text-3xl font-bold text-center text-blue-600 header-title app-title">ImageMetadataPro</h1>
+      <p class="text-center text-gray-600 mt-2 header-subtitle app-subtitle">Edita metadatos y añade marcas de agua a tus imágenes</p>
+    </header>
+
+    <main>
+      <!-- Upload Zone -->
+      <section class="mb-8">
+        <div class="bg-white rounded-lg shadow-md p-6 card">
+          <h2 class="text-xl font-semibold mb-4">1. Selecciona una imagen</h2>
+          <div id="drop-area" class="upload__dropzone rounded-lg cursor-pointer">
+            <div class="text-center p-6">
+              <i class="fas fa-cloud-upload-alt text-4xl upload__icon" aria-hidden="true"></i>
+              <p class="text-gray-700 mb-2 upload-text">Arrastra y suelta tu imagen o</p>
+              <button id="file-selector"
+                      class="upload__button"
+                      aria-label="Seleccionar archivo">
+                <i class="fas fa-folder-open" aria-hidden="true"></i>
+                Seleccionar archivo
+              </button>
+              <p class="text-sm text-gray-500 mt-2 upload-info">Formatos: JPG, JPEG, PNG, WEBP, AVIF</p>
+              <p class="text-sm text-gray-500 upload-info">Tamaño máximo: 25 MB</p>
+              <input type="file" id="file-input"
+                     accept=".jpg,.jpeg,.png,.webp,.avif"
+                     class="hidden"
+                     aria-label="Seleccionar archivo de imagen">
+            </div>
+          </div>
+          <div id="file-info" class="file-info file-info--hidden">
+            <div class="file-info__content">
+              <i class="fas fa-file-image file-info__icon" aria-hidden="true"></i>
+              <span id="file-name" class="file-info__name"></span>
+              <button id="remove-file"
+                      class="file-info__remove"
+                      aria-label="Eliminar imagen seleccionada">
+                <i class="fas fa-times" aria-hidden="true"></i>
+              </button>
+            </div>
+          </div>
+          <div id="error-message"
+               class="error error--hidden"
+               aria-live="assertive"></div>
+        </div>
+      </section>
+
+      <div id="editor-container" class="editor-container--hidden">
+        <div class="grid--large mb-8">
+          <!-- Metadata Section -->
+          <section class="mb-8">
+            <div class="bg-white rounded-lg shadow-md p-6 card">
+              <div id="metadata-header"
+                   class="section__header"
+                   role="button"
+                   tabindex="0"
+                   aria-expanded="true"
+                   aria-controls="metadata-content">
+                <h2 class="text-xl font-semibold">2. Metadatos y Copyright</h2>
+                <i class="fas fa-chevron-down section__icon" aria-hidden="true"></i>
+              </div>
+              <div id="metadata-content"
+                   class="section__content section__content--open"
+                   aria-hidden="false">
+                <div class="section__inner">
+                  <form id="metadata-form">
+                  <!-- Metadatos básicos -->
+                  <div class="metadata-grid">
+                    <div class="metadata-field">
+                      <label for="metaTitle">Título</label>
+                      <input type="text" id="metaTitle" name="metaTitle"
+                             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
+                             placeholder="Título de la imagen">
+                      <div class="char-counter" id="title-counter">0/60 caracteres</div>
+                    </div>
+                    <div class="metadata-field">
+                      <label for="metaAuthor">Autor</label>
+                      <input type="text" id="metaAuthor" name="metaAuthor"
+                             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
+                             placeholder="Nombre del autor">
+                    </div>
+                  </div>
+                  
+                  <!-- Copyright y Licencia -->
+                  <div class="metadata-grid">
+                    <div class="metadata-field">
+                      <label for="metaCopyright">Copyright</label>
+                      <div class="copyright-input-group">
+                        <input type="text" id="metaCopyright" name="metaCopyright"
+                               class="flex-1 px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
+                               placeholder="© 2025 Tu Nombre">
+                        <button type="button" class="copyright-generator border border-gray-300 px-3" id="autoCopyright" title="Generar copyright automático">
+                          <i class="fas fa-magic"></i>
+                        </button>
+                      </div>
+                    </div>
+                    <div class="metadata-field">
+                      <label for="metaLicense">Licencia</label>
+                      <select id="metaLicense" name="metaLicense"
+                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input">
+                        <option value="">Seleccionar licencia...</option>
+                        <option value="all-rights-reserved">Todos los derechos reservados</option>
+                        <option value="cc-by">Creative Commons - Atribución</option>
+                        <option value="cc-by-sa">Creative Commons - Atribución-CompartirIgual</option>
+                        <option value="cc-by-nc">Creative Commons - Atribución-NoComercial</option>
+                        <option value="cc0">Creative Commons Zero (Dominio Público)</option>
+                        <option value="royalty-free">Libre de regalías</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <!-- Geolocalización -->
+                  <div class="mb-6">
+                    <label class="block text-gray-700 font-medium mb-2 form-label">
+                      <i class="fas fa-map-marker-alt mr-1"></i>Geolocalización
+                      <button type="button" class="gps-button ml-2" id="getCurrentLocation" title="Obtener ubicación actual">
+                        <i class="fas fa-crosshairs"></i> Ubicación actual
+                      </button>
+                    </label>
+                    <div class="geo-grid">
+                      <input type="number" id="metaLatitude" name="metaLatitude"
+                             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
+                             placeholder="Latitud" step="any">
+                      <input type="number" id="metaLongitude" name="metaLongitude"
+                             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
+                             placeholder="Longitud" step="any">
+                      <input type="number" id="metaAltitude" name="metaAltitude"
+                             class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
+                             placeholder="Altitud (m)" step="any">
+                    </div>
+                    <small class="location-status gps-status" id="locationStatus">
+                      Haz clic en "Ubicación actual" para obtener coordenadas GPS
+                    </small>
+                  </div>
+                  
+                  <!-- Descripción y palabras clave -->
+                  <div class="mb-4">
+                    <label for="description" class="block text-gray-700 font-medium mb-2 form-label">Descripción</label>
+                    <textarea id="description" name="description" rows="3"
+                              placeholder="Describe brevemente el contenido de la imagen: paisaje, retrato, evento, objeto, etc. Esta información ayudará a catalogar y encontrar la imagen más fácilmente."
+                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-textarea"></textarea>
+                    <div class="char-counter" id="description-counter">0/160 caracteres</div>
+                  </div>
+                  <div class="mb-4">
+                    <label for="keywords" class="block text-gray-700 font-medium mb-2 form-label">Palabras clave (separadas por comas)</label>
+                    <input type="text" id="keywords" name="keywords"
+                           placeholder="naturaleza, paisaje, montaña, fotografía, viaje, aventura, cielo, nubes"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input">
+                    <div class="char-counter" id="keywords-counter">0/200 caracteres</div>
+                  </div>
+                  <div>
+                    <button type="submit"
+                            class="btn btn-primary button--action">
+                      <i class="fas fa-save" aria-hidden="true"></i>
+                      Guardar metadatos
+                    </button>
+                  </div>
+                </form>
+                
+                <!-- Previsualización de metadatos -->
+                <div id="metadata-preview" class="metadata-preview--hidden">
+                  <div class="mt-6 p-4 bg-gray-50 rounded-lg border-l-4 border-blue-500">
+                    <div class="flex justify-between items-center mb-3">
+                      <h4 class="text-sm font-semibold text-gray-700 flex items-center">
+                        <i class="fas fa-eye mr-2 text-blue-500"></i>
+                        Metadatos guardados
+                      </h4>
+                      <button onclick="hideMetadataPreview()" 
+                              class="text-gray-400 hover:text-gray-600 transition-colors"
+                              aria-label="Ocultar previsualización">
+                        <i class="fas fa-times"></i>
+                      </button>
+                    </div>
+                    <div class="space-y-2 text-sm">
+                      <div id="preview-title" class="preview-field--hidden">
+                        <span class="font-medium text-gray-600">Título:</span>
+                        <span class="text-gray-800 ml-2" id="preview-title-value"></span>
+                      </div>
+                      <div id="preview-author" class="preview-field--hidden">
+                        <span class="font-medium text-gray-600">Autor:</span>
+                        <span class="text-gray-800 ml-2" id="preview-author-value"></span>
+                      </div>
+                      <div id="preview-copyright" class="preview-field--hidden">
+                        <span class="font-medium text-gray-600">Copyright:</span>
+                        <span class="text-gray-800 ml-2" id="preview-copyright-value"></span>
+                      </div>
+                      <div id="preview-license" class="preview-field--hidden">
+                        <span class="font-medium text-gray-600">Licencia:</span>
+                        <span class="text-gray-800 ml-2" id="preview-license-value"></span>
+                      </div>
+                      <div id="preview-location" class="preview-field--hidden">
+                        <span class="font-medium text-gray-600">Ubicación:</span>
+                        <span class="text-gray-800 ml-2" id="preview-location-value"></span>
+                      </div>
+                      <div id="preview-description" class="preview-field--hidden">
+                        <span class="font-medium text-gray-600">Descripción:</span>
+                        <span class="text-gray-800 ml-2" id="preview-description-value"></span>
+                      </div>
+                      <div id="preview-keywords" class="preview-field--hidden">
+                        <span class="font-medium text-gray-600">Palabras clave:</span>
+                        <span class="text-gray-800 ml-2" id="preview-keywords-value"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Watermark Section -->
+          <section class="mb-4">
+            <div class="bg-white rounded-lg shadow-md p-6 card">
+              <div id="watermark-header"
+                   class="section__header"
+                   role="button"
+                   tabindex="0"
+                   aria-expanded="true"
+                   aria-controls="watermark-content">
+                <h2 class="text-xl font-semibold">3. Añadir marca de agua</h2>
+                <i class="fas fa-chevron-down section__icon" aria-hidden="true"></i>
+              </div>
+              <div id="watermark-content"
+                   class="section__content section__content--open"
+                   aria-hidden="false">
+                <div class="section__inner">
+                  <form id="watermark-form">
+                  <div class="mb-4">
+                    <label class="block text-gray-700 font-medium mb-2 form-label">Tipo de marca</label>
+                    <div class="flex space-x-4">
+                      <label class="inline-flex items-center">
+                        <input type="checkbox" id="watermark-text-enabled" name="watermark-text-enabled" checked
+                               class="form-checkbox text-blue-500">
+                        <span class="ml-2 text-content">Texto</span>
+                      </label>
+                      <label class="inline-flex items-center">
+                        <input type="checkbox" id="watermark-image-enabled" name="watermark-image-enabled"
+                               class="form-checkbox text-blue-500">
+                        <span class="ml-2 text-content">Imagen</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div id="text-watermark-options" class="watermark-options__text">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div class="mb-4">
+                        <label for="watermark-text" class="block text-gray-700 font-medium mb-2 form-label">Texto</label>
+                        <input type="text" id="watermark-text" name="watermark-text"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input">
+                      </div>
+                      <div class="mb-4">
+                        <label for="watermark-font" class="block text-gray-700 font-medium mb-2 form-label">Fuente</label>
+                        <select id="watermark-font" name="watermark-font"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-select">
+                          <option value="Arial">Arial</option>
+                          <option value="Helvetica">Helvetica</option>
+                          <option value="Times New Roman">Times New Roman</option>
+                          <option value="Courier New">Courier New</option>
+                          <option value="Georgia">Georgia</option>
+                        </select>
+                      </div>
+                      <div class="mb-4">
+                        <label for="watermark-color" class="block text-gray-700 font-medium mb-2 form-label">Color</label>
+                        <input type="color" id="watermark-color" name="watermark-color" value="#000000"
+                               class="w-full h-10 cursor-pointer">
+                      </div>
+                      <div class="mb-4">
+                        <label for="watermark-position" class="block text-gray-700 font-medium mb-2 form-label">Posición</label>
+                        <select id="watermark-position" name="watermark-position"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-select">
+                          <option value="top-left">Superior izquierda</option>
+                          <option value="top-center">Superior centro</option>
+                          <option value="top-right">Superior derecha</option>
+                          <option value="center-left">Centro izquierda</option>
+                          <option value="center">Centro</option>
+                          <option value="center-right">Centro derecha</option>
+                          <option value="bottom-left">Inferior izquierda</option>
+                          <option value="bottom-center">Inferior centro</option>
+                          <option value="bottom-right">Inferior derecha</option>
+                        </select>
+                      </div>
+                      <div class="mb-4">
+                        <label for="watermark-size" class="block text-gray-700 font-medium mb-2 form-label">Tamaño</label>
+                        <input type="range" id="watermark-size" name="watermark-size" min="10" max="100" value="30"
+                               class="w-full">
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                          <span class="range-label">Pequeño</span>
+                          <span class="range-label">Grande</span>
+                        </div>
+                      </div>
+                      <div class="mb-4">
+                        <label for="watermark-opacity" class="block text-gray-700 font-medium mb-2 form-label">Opacidad</label>
+                        <input type="range" id="watermark-opacity" name="watermark-opacity" min="0" max="100" value="50"
+                               class="w-full">
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                          <span class="range-label">Transparente</span>
+                          <span class="range-label">Opaco</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div id="image-watermark-options" class="watermark-options__image">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div class="mb-4">
+                        <label for="watermark-image" class="block text-gray-700 font-medium mb-2 form-label">Imagen de marca</label>
+                        <input type="file" id="watermark-image" name="watermark-image" accept=".png,.jpg,.jpeg"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input">
+                      </div>
+                      <div class="mb-4">
+                        <label for="watermark-image-size" class="block text-gray-700 font-medium mb-2 form-label">Tamaño</label>
+                        <select id="watermark-image-size" name="watermark-image-size"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-select">
+                          <option value="small">Pequeño</option>
+                          <option value="medium" selected>Mediano</option>
+                          <option value="large">Grande</option>
+                          <option value="custom">Personalizado</option>
+                        </select>
+                      </div>
+                      <div class="mb-4">
+                        <label for="watermark-image-opacity" class="block text-gray-700 font-medium mb-2 form-label">Opacidad</label>
+                        <input type="range" id="watermark-image-opacity" name="watermark-image-opacity" min="0" max="100" value="50"
+                               class="w-full">
+                        <div class="flex justify-between text-xs text-gray-500 mt-1">
+                          <span class="range-label">Transparente</span>
+                          <span class="range-label">Opaco</span>
+                        </div>
+                      </div>
+                      <div class="mb-4">
+                        <label for="watermark-image-position" class="block text-gray-700 font-medium mb-2 form-label">Posición</label>
+                        <select id="watermark-image-position" name="watermark-image-position"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-select">
+                          <option value="top-left">Superior izquierda</option>
+                          <option value="top-center">Superior centro</option>
+                          <option value="top-right">Superior derecha</option>
+                          <option value="center-left">Centro izquierda</option>
+                          <option value="center">Centro</option>
+                          <option value="center-right">Centro derecha</option>
+                          <option value="bottom-left">Inferior izquierda</option>
+                          <option value="bottom-center">Inferior centro</option>
+                          <option value="bottom-right">Inferior derecha</option>
+                          <option value="custom">Posición personalizada (clic en imagen)</option>
+                        </select>
+                      </div>
+                      <div id="custom-position-info" class="mb-4" style="display: none;">
+                        <div class="bg-blue-50 border border-blue-200 rounded-md p-3">
+                          <p class="text-sm text-blue-700">
+                            <i class="fas fa-info-circle mr-2"></i>
+                            Haz clic en la imagen de vista previa para posicionar la marca de agua donde quieras.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div id="watermark-image-custom-size" class="watermark-options__custom-size">
+                      <label class="block text-gray-700 font-medium mb-2 form-label">Tamaño personalizado</label>
+                      <div class="grid grid-cols-2 gap-4">
+                        <div>
+                          <label for="watermark-image-width" class="block text-sm text-gray-600 mb-1 form-label">Ancho (px)</label>
+                          <input type="number" id="watermark-image-width" name="watermark-image-width" min="10" max="1000"
+                                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input">
+                        </div>
+                        <div>
+                          <label for="watermark-image-height" class="block text-sm text-gray-600 mb-1 form-label">Alto (px)</label>
+                          <input type="number" id="watermark-image-height" name="watermark-image-height" min="10" max="1000"
+                                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input">
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <button type="submit"
+                            class="btn btn-primary button--action">
+                      <i class="fas fa-paint-brush" aria-hidden="true"></i>
+                      Aplicar marca de agua
+                    </button>
+                  </div>
+                </form>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Filters Section -->
+        <section class="mb-8">
+          <div class="bg-white rounded-lg shadow-md p-6 card">
+            <div id="filters-header"
+                 class="section__header"
+                 role="button"
+                 tabindex="0"
+                 aria-expanded="true"
+                 aria-controls="filters-content">
+              <h2 class="text-xl font-semibold">4. Filtros y Ajustes</h2>
+              <i class="fas fa-chevron-down section__icon" aria-hidden="true"></i>
+            </div>
+            <div id="filters-content"
+                 class="section__content section__content--open"
+                 aria-hidden="false">
+              <div class="section__inner">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <!-- Ajustes Básicos -->
+                  <div class="space-y-4">
+                    <h3 class="text-lg font-medium text-gray-800">Ajustes Básicos</h3>
+                    
+                    <div class="space-y-3">
+                      <div>
+                        <label for="brightness" class="block text-gray-700 font-medium mb-2 form-label">
+                          Brillo: <span id="brightness-value">0</span>
+                        </label>
+                        <input type="range" id="brightness" name="brightness" min="-100" max="100" value="0" 
+                               class="w-full slider">
+                      </div>
+                      
+                      <div>
+                        <label for="contrast" class="block text-gray-700 font-medium mb-2 form-label">
+                          Contraste: <span id="contrast-value">0</span>
+                        </label>
+                        <input type="range" id="contrast" name="contrast" min="-100" max="100" value="0" 
+                               class="w-full slider">
+                      </div>
+                      
+                      <div>
+                        <label for="saturation" class="block text-gray-700 font-medium mb-2 form-label">
+                          Saturación: <span id="saturation-value">0</span>
+                        </label>
+                        <input type="range" id="saturation" name="saturation" min="-100" max="100" value="0" 
+                               class="w-full slider">
+                      </div>
+                      
+                      <div>
+                        <label for="blur" class="block text-gray-700 font-medium mb-2 form-label">
+                          Desenfoque: <span id="blur-value">0</span>px
+                        </label>
+                        <input type="range" id="blur" name="blur" min="0" max="20" value="0" 
+                               class="w-full slider">
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- Filtros Preestablecidos -->
+                  <div class="space-y-4">
+                    <h3 class="text-lg font-medium text-gray-800">Filtros Preestablecidos</h3>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                      <button type="button" class="btn btn-outline filter-preset" data-filter="none">
+                        Original
+                      </button>
+                      <button type="button" class="btn btn-outline filter-preset" data-filter="sepia">
+                        Sepia
+                      </button>
+                      <button type="button" class="btn btn-outline filter-preset" data-filter="grayscale">
+                        Blanco y Negro
+                      </button>
+                      <button type="button" class="btn btn-outline filter-preset" data-filter="vintage">
+                        Vintage
+                      </button>
+                      <button type="button" class="btn btn-outline filter-preset" data-filter="cold">
+                        Frío
+                      </button>
+                      <button type="button" class="btn btn-outline filter-preset" data-filter="warm">
+                        Cálido
+                      </button>
+                    </div>
+                    
+                    <div class="mt-4">
+                      <button type="button" id="resetFilters" class="reset-filters-btn">
+                        <i class="fas fa-undo" aria-hidden="true"></i>
+                        RESETEAR FILTROS
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Output Settings Section -->
+        <section class="mb-8">
+          <div class="bg-white rounded-lg shadow-md p-6 card">
+            <div id="output-header"
+                 class="section__header"
+                 role="button"
+                 tabindex="0"
+                 aria-expanded="true"
+                 aria-controls="output-content">
+              <h2 class="text-xl font-semibold">5. Configuración de salida</h2>
+              <i class="fas fa-chevron-down section__icon" aria-hidden="true"></i>
+            </div>
+            <div id="output-content"
+                 class="section__content section__content--open"
+                 aria-hidden="false">
+              <div class="section__inner">
+                <div class="grid grid-cols-1 gap-6">
+                  <!-- Configuración de Calidad y Formato -->
+                  <div class="config-grid">
+                    <!-- Quality Control -->
+                    <div class="config-section">
+                      <h4 class="config-title">
+                        <i class="fas fa-adjust"></i>Calidad de imagen
+                      </h4>
+                      <div class="flex gap-3 items-center mb-4">
+                        <input type="range" 
+                               id="output-quality" 
+                               name="output-quality"
+                               min="1" 
+                               max="100" 
+                               value="80"
+                               step="1"
+                               class="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider">
+                        <div class="flex items-center gap-2">
+                          <input type="number" 
+                                 id="quality-number" 
+                                 name="quality-number"
+                                 min="1" 
+                                 max="100" 
+                                 value="80"
+                                 class="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-center">
+                          <span class="text-sm font-medium text-gray-600">%</span>
+                        </div>
+                      </div>
+                      <div class="flex justify-between text-xs text-gray-500 mb-4">
+                        <span>Baja (1%)</span>
+                        <span>Media (50%)</span>
+                        <span>Alta (100%)</span>
+                      </div>
+                      
+                      <!-- Quality Progress Bar -->
+                      <div class="quality-progress">
+                        <div class="flex justify-between items-center mb-2">
+                          <span class="text-sm font-medium text-gray-700">Calidad seleccionada:</span>
+                          <span id="quality-percentage" class="text-sm font-bold text-blue-600">80%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden border border-gray-300">
+                          <div id="quality-bar" 
+                               class="h-full transition-all duration-500 rounded-full relative overflow-hidden"
+                               style="width: 80%; background: linear-gradient(90deg, #ef4444 0%, #f59e0b 30%, #22c55e 70%, #16a34a 100%);">
+                            <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-30 animate-pulse"></div>
+                          </div>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-500 mt-2">
+                          <span class="flex flex-col items-center">
+                            <span class="w-2 h-2 bg-red-500 rounded-full mb-1"></span>
+                            <span>Baja</span>
+                          </span>
+                          <span class="flex flex-col items-center">
+                            <span class="w-2 h-2 bg-yellow-500 rounded-full mb-1"></span>
+                            <span>Media</span>
+                          </span>
+                          <span class="flex flex-col items-center">
+                            <span class="w-2 h-2 bg-green-500 rounded-full mb-1"></span>
+                            <span>Alta</span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Image Resize Section -->
+                    <div class="config-section">
+                      <h4 class="config-title">
+                        <i class="fas fa-expand-arrows-alt"></i>Redimensionar imagen
+                      </h4>
+                      
+                      <!-- Current size display -->
+                      <div id="current-size-display" class="mb-3 p-2 bg-gray-50 rounded text-sm hidden">
+                        <span class="text-gray-600">Tamaño actual: </span>
+                        <span id="current-dimensions" class="font-medium">-</span>
+                      </div>
+                      
+                      <!-- Resize controls -->
+                      <div class="space-y-3">
+                        <!-- Maintain aspect ratio -->
+                        <div class="flex items-center">
+                          <input type="checkbox" id="maintain-aspect-ratio" class="mr-2" checked>
+                          <label for="maintain-aspect-ratio" class="text-sm cursor-pointer">Mantener proporción</label>
+                        </div>
+                        
+                        <!-- Dimension inputs -->
+                        <div class="grid grid-cols-2 gap-3">
+                          <div>
+                            <label for="resize-width" class="block text-sm font-medium mb-1">Ancho (px)</label>
+                            <input type="number" id="resize-width" min="1" max="8192" 
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input">
+                          </div>
+                          <div>
+                            <label for="resize-height" class="block text-sm font-medium mb-1">Alto (px)</label>
+                            <input type="number" id="resize-height" min="1" max="8192"
+                                   class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input">
+                          </div>
+                        </div>
+                        
+                        <!-- Size presets -->
+                        <div>
+                          <label class="block text-sm font-medium mb-2">Tamaños predefinidos</label>
+                          <div class="grid grid-cols-2 gap-2">
+                            <button type="button" class="preset-btn btn-sm" data-width="1920" data-height="1080">
+                              Full HD<br><span class="text-xs opacity-75">1920×1080</span>
+                            </button>
+                            <button type="button" class="preset-btn btn-sm" data-width="1280" data-height="720">
+                              HD<br><span class="text-xs opacity-75">1280×720</span>
+                            </button>
+                            <button type="button" class="preset-btn btn-sm" data-width="800" data-height="600">
+                              SVGA<br><span class="text-xs opacity-75">800×600</span>
+                            </button>
+                            <button type="button" class="preset-btn btn-sm" data-width="1024" data-height="1024">
+                              Cuadrado<br><span class="text-xs opacity-75">1024×1024</span>
+                            </button>
+                            <button type="button" class="preset-btn btn-sm" data-width="1080" data-height="1080">
+                              Instagram<br><span class="text-xs opacity-75">1080×1080</span>
+                            </button>
+                            <button type="button" class="preset-btn btn-sm" data-width="1200" data-height="630">
+                              Facebook<br><span class="text-xs opacity-75">1200×630</span>
+                            </button>
+                          </div>
+                        </div>
+                        
+                        <!-- Resize actions -->
+                        <div class="flex gap-2">
+                          <button type="button" id="apply-resize" class="btn btn-primary flex-1">
+                            <i class="fas fa-check"></i>
+                            Aplicar redimensión
+                          </button>
+                          <button type="button" id="reset-original-size" class="btn btn-secondary">
+                            <i class="fas fa-undo"></i>
+                            Original
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Image Rotation Section -->
+                    <div class="config-section">
+                      <h4 class="config-title">
+                        <i class="fas fa-redo"></i>Rotación de imagen
+                      </h4>
+                      
+                      <!-- Rotation controls -->
+                      <div class="space-y-3">
+                        <!-- Current rotation display -->
+                        <div id="current-rotation-display" class="p-2 bg-gray-50 rounded text-sm hidden">
+                          <span class="text-gray-600">Rotación actual: </span>
+                          <span id="current-rotation" class="font-medium">0°</span>
+                        </div>
+                        
+                        <!-- Rotation buttons -->
+                        <div class="grid grid-cols-2 gap-2 rotation-controls">
+                          <button type="button" id="rotate-90" class="btn btn-secondary">
+                            <i class="fas fa-redo"></i>
+                            90° ↻
+                          </button>
+                          <button type="button" id="rotate-180" class="btn btn-secondary">
+                            <i class="fas fa-sync"></i>
+                            180° ↻
+                          </button>
+                          <button type="button" id="rotate-270" class="btn btn-secondary">
+                            <i class="fas fa-undo"></i>
+                            270° ↻
+                          </button>
+                          <button type="button" id="reset-rotation" class="btn btn-outline">
+                            <i class="fas fa-compass"></i>
+                            Original
+                          </button>
+                        </div>
+                        
+                        <!-- Quick actions -->
+                        <div class="flex gap-2 button-group">
+                          <button type="button" id="flip-horizontal" class="btn btn-outline flex-1">
+                            <i class="fas fa-arrows-alt-h"></i>
+                            Voltear H
+                          </button>
+                          <button type="button" id="flip-vertical" class="btn btn-outline flex-1">
+                            <i class="fas fa-arrows-alt-v"></i>
+                            Voltear V
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Format Selection -->
+                    <div class="config-section">
+                      <h4 class="config-title">
+                        <i class="fas fa-file-image"></i>Formato de salida
+                      </h4>
+                      <select id="output-format" name="output-format"
+                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input mb-4">
+                        <option value="jpeg">JPEG (.jpg)</option>
+                        <option value="png">PNG (.png)</option>
+                        <option value="webp">WebP (.webp)</option>
+                        <option value="avif">AVIF (.avif)</option>
+                      </select>
+                      
+                      <!-- Format Info -->
+                      <div id="format-info" class="format-info p-3 bg-blue-50 border border-blue-200 rounded-md format-jpeg">
+                        <div class="flex items-start">
+                          <i class="fas fa-info-circle text-blue-600 mt-1 mr-2"></i>
+                          <div>
+                            <p id="format-title" class="text-sm font-medium text-blue-800 mb-1">JPEG (.jpg)</p>
+                            <p id="format-description" class="text-xs text-blue-600">Ideal para fotografías, menor tamaño de archivo.</p>
+                            <p id="format-compatibility" class="text-xs text-green-600 mt-1">✓ Compatible con todos los navegadores</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Preview Section - Now below the grid -->
+        <section class="mb-8">
+          <div class="bg-white rounded-lg shadow-md p-6 card">
+            <div class="flex justify-between items-center mb-4">
+              <h2 class="text-xl font-semibold">6. Vista previa</h2>
+              <div class="flex gap-2">
+                <button id="fullscreen-btn" class="btn btn-primary button--action">
+                  <i class="fas fa-expand" aria-hidden="true"></i>
+                  Pantalla completa
+                </button>
+              </div>
+            </div>
+            
+            <!-- Image Info Section -->
+            <div id="image-info" class="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4 hidden image-info">
+              <div class="flex items-start">
+                <i class="fas fa-info-circle text-blue-600 mt-1 mr-2"></i>
+                <div class="flex-1">
+                  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm image-info">
+                    <div class="image-info-item">
+                      <span class="text-blue-800 font-medium">Dimensiones:</span>
+                      <div id="image-dimensions" class="text-blue-600">-</div>
+                    </div>
+                    <div>
+                      <span class="text-blue-800 font-medium">Tamaño:</span>
+                      <div id="image-size" class="text-blue-600">-</div>
+                    </div>
+                    <div>
+                      <span class="text-blue-800 font-medium">Formato:</span>
+                      <div id="image-format" class="text-blue-600">-</div>
+                    </div>
+                    <div>
+                      <span class="text-blue-800 font-medium">Píxeles:</span>
+                      <div id="image-pixels" class="text-blue-600">-</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="preview__container preview-container relative">
+              <canvas id="preview-canvas" class="preview__canvas"></canvas>
+              
+              <!-- Controles de Zoom -->
+              <div id="zoom-controls" class="zoom-controls hidden">
+                <button id="zoom-out-btn" class="zoom-btn" title="Alejar (-)">
+                  <i class="fas fa-minus"></i>
+                </button>
+                <span id="zoom-level" class="zoom-level">100%</span>
+                <button id="zoom-in-btn" class="zoom-btn" title="Acercar (+)">
+                  <i class="fas fa-plus"></i>
+                </button>
+                <button id="zoom-reset-btn" class="zoom-btn zoom-reset" title="Restablecer zoom (Ctrl+0)">
+                  <i class="fas fa-search"></i>
+                </button>
+              </div>
+            </div>
+            <div class="mt-4 flex justify-between gap-3">
+              <div class="flex gap-2">
+                <button id="undo-btn" class="btn btn-primary button--action" disabled>
+                  <i class="fas fa-undo-alt" aria-hidden="true"></i>
+                  Deshacer
+                </button>
+                <button id="redo-btn" class="btn btn-primary button--action" disabled>
+                  <i class="fas fa-redo-alt" aria-hidden="true"></i>
+                  Rehacer
+                </button>
+              </div>
+              <div class="flex gap-2 flex-wrap action-buttons">
+                <button id="reset-changes" class="btn btn-primary button--action">
+                  <i class="fas fa-refresh" aria-hidden="true"></i>
+                  Restablecer
+                </button>
+                <button id="download-image" class="btn btn-primary button--action">
+                  <i class="fas fa-download" aria-hidden="true"></i>
+                  Descargar imagen
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer class="mt-12 text-center text-gray-500 text-sm">
+      <p class="footer-text">© 2025 Mnemotag. Todos los derechos reservados.</p>
+    </footer>
+  </div>
+    <!-- Scripts -->
+  <script src="js/utils/app-config.js"></script>
+  <script src="js/utils/helpers.js"></script>
+  <script src="js/utils/smart-debounce.js"></script>
+  <script src="js/utils/filter-cache.js"></script>
+  <script src="js/utils/fallback-processor.js"></script>
+  <script src="js/managers/security-manager.js"></script>
+  <script src="js/managers/worker-manager.js"></script>
+  <script src="js/managers/history-manager.js"></script>
+  <script src="js/managers/metadata-manager.js"></script>
+  <script src="js/managers/filter-loading-manager.js"></script>
+  <script src="js/managers/filter-manager.js"></script>
+  <script src="js/managers/ui-manager.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
