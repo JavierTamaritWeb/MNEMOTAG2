@@ -2363,6 +2363,9 @@
       // Limpiar historial
       historyManager.clear();
       
+      // Resetear zoom al 100%
+      resetZoom();
+      
       // Actualizar vista previa
       updatePreview();
       
