@@ -713,7 +713,23 @@
         controls.forEach(({ id, event }) => {
           const element = document.getElementById(id);
           if (element) {
-            element.addEventListener(event, debouncedUpdatePreview);
+            // Verificar si este elemento es un slider que necesita sincronización
+            const sliderIds = ['watermark-size', 'watermark-opacity', 'watermark-image-opacity'];
+            if (sliderIds.includes(id) && event === 'input') {
+              // Crear listener personalizado que sincroniza con el campo numérico
+              element.addEventListener(event, (e) => {
+                // Actualizar el campo numérico correspondiente
+                const numberInput = document.getElementById(`${id}-num`);
+                if (numberInput) {
+                  numberInput.value = e.target.value;
+                }
+                // Llamar a la función de actualización original
+                debouncedUpdatePreview(e);
+              });
+            } else {
+              // Usar el listener original para otros elementos
+              element.addEventListener(event, debouncedUpdatePreview);
+            }
           }
         });
         
@@ -814,9 +830,125 @@
         // Keyboard shortcuts
         document.addEventListener('keydown', handleKeyboardShortcuts);
         
+        // Setup bidirectional sync for watermark sliders
+        setupWatermarkSliderSync();
+        
       } catch (error) {
         console.error('Error configurando event listeners:', error);
       }
+    }
+
+    // Configurar sincronización bidireccional para sliders de marca de agua
+    function setupWatermarkSliderSync() {
+      console.log('🔧 Configurando sincronización bidireccional para sliders de marca de agua...');
+      
+      // Definir los sliders que necesitan sincronización
+      const sliderConfigs = [
+        { sliderId: 'watermark-size', numberId: 'watermark-size-num' },
+        { sliderId: 'watermark-opacity', numberId: 'watermark-opacity-num' },
+        { sliderId: 'watermark-image-opacity', numberId: 'watermark-image-opacity-num' }
+      ];
+      
+      sliderConfigs.forEach(({ sliderId, numberId }) => {
+        const slider = document.getElementById(sliderId);
+        const numberInput = document.getElementById(numberId);
+        
+        if (slider && numberInput) {
+          console.log(`✅ Configurando sincronización para ${sliderId}`);
+          
+          // Copiar atributos del slider al input numérico
+          numberInput.min = slider.min;
+          numberInput.max = slider.max;
+          numberInput.step = slider.step || 1;
+          
+          // Sincronizar valores iniciales
+          numberInput.value = slider.value;
+          
+          // Función para validar y clamp valores
+          const validateAndClamp = (value, min, max, step = 1) => {
+            const numValue = parseFloat(value);
+            if (isNaN(numValue)) return null;
+            
+            // Clamp al rango
+            const clampedValue = Math.max(min, Math.min(max, numValue));
+            
+            // Redondear al step más cercano
+            const stepValue = Math.round(clampedValue / step) * step;
+            
+            return Math.max(min, Math.min(max, stepValue));
+          };
+          
+          // Crear debounced update function para el input numérico
+          const debouncedNumberUpdate = SmartDebounce.intelligent(`${sliderId}-number-update`, () => {
+            updatePreview();
+          }, 150);
+          
+          // Slider → Number input
+          slider.addEventListener('input', (e) => {
+            numberInput.value = e.target.value;
+          });
+          
+          // Number input → Slider
+          numberInput.addEventListener('input', (e) => {
+            const value = e.target.value;
+            
+            // Si el campo está vacío, no hacer nada hasta que sea válido
+            if (value === '') return;
+            
+            const validatedValue = validateAndClamp(
+              value,
+              parseFloat(slider.min),
+              parseFloat(slider.max),
+              parseFloat(slider.step || 1)
+            );
+            
+            if (validatedValue !== null) {
+              slider.value = validatedValue;
+              e.target.value = validatedValue;
+              
+              // Aplicar cambios con debounce
+              debouncedNumberUpdate();
+            }
+          });
+          
+          // Validación en blur para corregir valores inválidos
+          numberInput.addEventListener('blur', (e) => {
+            const value = e.target.value;
+            
+            if (value === '' || isNaN(parseFloat(value))) {
+              // Si está vacío o inválido, restaurar al valor del slider
+              e.target.value = slider.value;
+              return;
+            }
+            
+            const validatedValue = validateAndClamp(
+              value,
+              parseFloat(slider.min),
+              parseFloat(slider.max),
+              parseFloat(slider.step || 1)
+            );
+            
+            if (validatedValue !== null && validatedValue != value) {
+              e.target.value = validatedValue;
+              slider.value = validatedValue;
+              updatePreview();
+            }
+          });
+          
+          // Manejar Enter key
+          numberInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+              e.target.blur();
+            }
+          });
+          
+        } else {
+          console.warn(`❌ No se pudo configurar sincronización para ${sliderId}:`, {
+            slider: !!slider,
+            numberInput: !!numberInput
+          });
+        }
+      });
     }
 
     // Configurar listeners de filtros con retraso para asegurar que el DOM esté listo
@@ -2329,6 +2461,21 @@
       // Limpiar formularios
       document.getElementById('metadata-form').reset();
       document.getElementById('watermark-form').reset();
+      
+      // Sincronizar campos numéricos con valores por defecto de los sliders
+      const sliderConfigs = [
+        { sliderId: 'watermark-size', numberId: 'watermark-size-num' },
+        { sliderId: 'watermark-opacity', numberId: 'watermark-opacity-num' },
+        { sliderId: 'watermark-image-opacity', numberId: 'watermark-image-opacity-num' }
+      ];
+      
+      sliderConfigs.forEach(({ sliderId, numberId }) => {
+        const slider = document.getElementById(sliderId);
+        const numberInput = document.getElementById(numberId);
+        if (slider && numberInput) {
+          numberInput.value = slider.value;
+        }
+      });
       
       // Resetear tipo de marca de agua
       document.getElementById('watermark-text-enabled').checked = true;

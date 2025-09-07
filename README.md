@@ -495,6 +495,7 @@ Si MnemoTag te ha sido útil, considera:
 - [x] ✅ **Vista previa en tiempo real**: Aplicación instantánea de filtros
 - [x] ✅ **Redimensionado inteligente**: Presets y dimensiones personalizadas
 - [x] ✅ **Rotación y volteo**: Herramientas completas de transformación
+- [x] ✅ **Campos numéricos editables**: Controles numéricos para Tamaño (texto), Opacidad (texto) y Opacidad (imagen de marca) con sincronización bidireccional
 
 ### **v3.1 (Q4 2025)** 🚧 EN DESARROLLO
 

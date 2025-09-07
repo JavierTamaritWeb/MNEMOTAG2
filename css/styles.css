@@ -3384,6 +3384,24 @@
       box-shadow: 0 2px 6px rgba(96, 165, 250, 0.3);
     }
 
+    /* Dark mode number inputs - Campos numéricos de watermark */
+    [data-theme="dark"] input[type="number"] {
+      background-color: var(--bg-tertiary) !important;
+      border-color: var(--border-color) !important;
+      color: var(--text-primary) !important;
+    }
+
+    [data-theme="dark"] input[type="number"]:hover {
+      border-color: var(--border-hover) !important;
+      background-color: var(--bg-secondary) !important;
+    }
+
+    [data-theme="dark"] input[type="number"]:focus {
+      border-color: var(--accent-primary) !important;
+      box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2) !important;
+      background-color: var(--bg-secondary) !important;
+    }
+
     /* Enhanced error/success states */
     [data-theme="dark"] .error {
       background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.05));

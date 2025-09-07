@@ -178,6 +178,21 @@ const historyManager = {
           }
         });
         
+        // Sincronizar campos numéricos después de restaurar valores
+        const sliderConfigs = [
+          { sliderId: 'watermark-size', numberId: 'watermark-size-num' },
+          { sliderId: 'watermark-opacity', numberId: 'watermark-opacity-num' },
+          { sliderId: 'watermark-image-opacity', numberId: 'watermark-image-opacity-num' }
+        ];
+        
+        sliderConfigs.forEach(({ sliderId, numberId }) => {
+          const slider = document.getElementById(sliderId);
+          const numberInput = document.getElementById(numberId);
+          if (slider && numberInput) {
+            numberInput.value = slider.value;
+          }
+        });
+        
         if (config.customPosition && typeof customImagePosition !== 'undefined') {
           customImagePosition = config.customPosition;
         }
