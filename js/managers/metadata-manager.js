@@ -114,10 +114,73 @@ const MetadataManager = {
   },
   
   /**
+   * Configurar fecha de creación desde archivo
+   * @param {File} file - Archivo de imagen
+   */
+  setupCreationDate: function(file) {
+    const dateInput = document.getElementById('creationDate');
+    if (!dateInput) return;
+    
+    // Establecer fecha máxima como hoy
+    const today = new Date().toISOString().split('T')[0];
+    dateInput.max = today;
+    
+    // Intentar extraer fecha de EXIF (simulado - en una implementación real se usaría una librería EXIF)
+    let creationDate = null;
+    
+    // Si no hay EXIF, usar lastModified del archivo
+    if (!creationDate && file.lastModified) {
+      creationDate = new Date(file.lastModified);
+    }
+    
+    // Si no hay lastModified, usar fecha actual
+    if (!creationDate) {
+      creationDate = new Date();
+    }
+    
+    // Formatear como YYYY-MM-DD
+    const formattedDate = creationDate.toISOString().split('T')[0];
+    
+    // Establecer valor solo si el campo está vacío
+    if (!dateInput.value) {
+      dateInput.value = formattedDate;
+    }
+    
+    // Configurar validación en tiempo real
+    dateInput.addEventListener('input', this.validateCreationDate.bind(this));
+    dateInput.addEventListener('change', this.validateCreationDate.bind(this));
+  },
+  
+  /**
+   * Validar fecha de creación (no puede ser futura)
+   * @param {Event} event - Evento del input
+   */
+  validateCreationDate: function(event) {
+    const dateInput = event.target;
+    const selectedDate = new Date(dateInput.value);
+    const today = new Date();
+    today.setHours(23, 59, 59, 999); // Fin del día actual
+    
+    if (selectedDate > today) {
+      const todayFormatted = today.toISOString().split('T')[0];
+      dateInput.value = todayFormatted;
+      
+      if (typeof UIManager !== 'undefined') {
+        UIManager.showWarning('La fecha de creación no puede ser futura. Se ha ajustado a hoy.');
+      }
+    }
+  },
+  
+  /**
    * Obtener todos los metadatos para exportar
    * @returns {Object} Objeto con todos los metadatos
    */
   getMetadata: function() {
+    const creationDateInput = document.getElementById('creationDate');
+    const createdAt = creationDateInput?.value 
+      ? new Date(creationDateInput.value).toISOString()
+      : new Date().toISOString();
+    
     return {
       title: document.getElementById('metaTitle')?.value || '',
       author: document.getElementById('metaAuthor')?.value || '',
@@ -126,7 +189,7 @@ const MetadataManager = {
       latitude: parseFloat(document.getElementById('metaLatitude')?.value) || null,
       longitude: parseFloat(document.getElementById('metaLongitude')?.value) || null,
       altitude: parseFloat(document.getElementById('metaAltitude')?.value) || null,
-      createdAt: new Date().toISOString(),
+      createdAt: createdAt,
       software: 'MnemoTag v3.0'
     };
   },

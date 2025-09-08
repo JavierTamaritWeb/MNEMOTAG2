@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mnemotag - Editor de metadatos e imágenes</title>
+  <title>MnemoTag - Editor de metadatos e imágenes</title>
   <link rel="icon" type="image/svg+xml" href="images/favicon.svg">
   <link rel="icon" type="image/x-icon" href="images/favicon.ico">
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
@@ -25,7 +25,7 @@
 
   <div class="container mx-auto px-4 py-8 max-w-7xl">
     <header class="mb-8">
-      <h1 class="text-3xl font-bold text-center text-blue-600 header-title app-title">ImageMetadataPro</h1>
+      <h1 class="text-3xl font-bold text-center text-blue-600 header-title app-title">MnemoTag</h1>
       <p class="text-center text-gray-600 mt-2 header-subtitle app-subtitle">Edita metadatos y añade marcas de agua a tus imágenes</p>
     </header>
 
@@ -45,7 +45,7 @@
                 Seleccionar archivo
               </button>
               <p class="text-sm text-gray-500 mt-2 upload-info">Formatos: JPG, JPEG, PNG, WEBP, AVIF</p>
-              <p class="text-sm text-gray-500 upload-info">Tamaño máximo: 25 MB</p>
+              <p class="text-sm text-gray-500 upload-info">Tamaño máximo: <span id="max-file-size">25 MB</span></p>
               <input type="file" id="file-input"
                      accept=".jpg,.jpeg,.png,.webp,.avif"
                      class="hidden"
@@ -131,6 +131,20 @@
                         <option value="royalty-free">Libre de regalías</option>
                       </select>
                     </div>
+                  </div>
+                  
+                  <!-- Fecha de creación -->
+                  <div class="mb-6">
+                    <label for="creationDate" class="block text-gray-700 font-medium mb-2 form-label">
+                      <i class="fas fa-calendar-alt mr-1"></i>Fecha de creación
+                    </label>
+                    <input type="date" id="creationDate" name="creationDate"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
+                           placeholder="YYYY-MM-DD">
+                    <small class="text-xs text-gray-600 mt-1 block">
+                      <i class="fas fa-info-circle mr-1"></i>
+                      Se usa la fecha de captura de la imagen. No puede ser futura.
+                    </small>
                   </div>
                   
                   <!-- Geolocalización -->
@@ -338,8 +352,12 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div class="mb-4">
                         <label for="watermark-image" class="block text-gray-700 font-medium mb-2 form-label">Imagen de marca</label>
-                        <input type="file" id="watermark-image" name="watermark-image" accept=".png,.jpg,.jpeg"
+                        <input type="file" id="watermark-image" name="watermark-image" accept=".png,.webp"
                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input">
+                        <small class="text-xs text-blue-600 mt-1 block">
+                          <i class="fas fa-info-circle mr-1"></i>
+                          Se priorizan PNG y WebP por soporte de transparencia
+                        </small>
                       </div>
                       <div class="mb-4">
                         <label for="watermark-image-size" class="block text-gray-700 font-medium mb-2 form-label">Tamaño</label>
@@ -735,8 +753,9 @@
                           <i class="fas fa-info-circle text-blue-600 mt-1 mr-2"></i>
                           <div>
                             <p id="format-title" class="text-sm font-medium text-blue-800 mb-1">JPEG (.jpg)</p>
-                            <p id="format-description" class="text-xs text-blue-600">Ideal para fotografías, menor tamaño de archivo.</p>
+                            <p id="format-description" class="text-xs text-blue-600">Ideal para fotografías, menor tamaño de archivo. No soporta transparencia.</p>
                             <p id="format-compatibility" class="text-xs text-green-600 mt-1">✓ Compatible con todos los navegadores</p>
+                            <p id="format-fallback" class="text-xs text-amber-600 mt-1" style="display: none;"></p>
                           </div>
                         </div>
                       </div>
@@ -832,7 +851,7 @@
     </main>
 
     <footer class="mt-12 text-center text-gray-500 text-sm">
-      <p class="footer-text">© 2025 Mnemotag. Todos los derechos reservados.</p>
+      <p class="footer-text">© 2025 MnemoTag. Todos los derechos reservados.</p>
     </footer>
   </div>
     <!-- Scripts -->

@@ -173,6 +173,164 @@ function canvasToBlob_fallback(canvas, mimeType, quality = 0.9) {
   });
 }
 
+// ===== DETECCIÓN DE SOPORTE DE FORMATOS =====
+
+/**
+ * Cache para resultados de detección de soporte
+ */
+const formatSupportCache = new Map();
+
+/**
+ * Detectar soporte de decodificación de formato de imagen
+ * @param {string} mimeType - Tipo MIME a verificar
+ * @returns {Promise<boolean>} True si el formato es soportado para decodificación
+ */
+async function supportsDecode(mimeType) {
+  const cacheKey = `decode_${mimeType}`;
+  if (formatSupportCache.has(cacheKey)) {
+    return formatSupportCache.get(cacheKey);
+  }
+
+  try {
+    // Crear una imagen test muy pequeña
+    const testDataUrls = {
+      'image/avif': 'data:image/avif;base64,AAAAIGZ0eXBhdmlmAAAAAGF2aWZtaWYxbWlhZk1BMUIAAADybWV0YQAAAAAAAAAoaGRscgAAAAAAAAAAcGljdAAAAAAAAAAAAAAAAGxpYmF2aWYAAAAADnBpdG0AAAAAAAEAAAAeaWxvYwAAAABEAAABAAEAAAABAAABGgAAAB0AAAAoaWluZgAAAAAAAQAAABppbmZlAgAAAAABAABhdjAxQ29sb3IAAAAAamlwcnAAAABLaXBjbwAAABRpc3BlAAAAAAAAAAIAAAACAAAAEHBpeGkAAAAAAwgICAAAAAxhdjFDgQ0MAAAAABNjb2xybmNseAACAAIAAYAAAAAXaXBtYQAAAAAAAAABAAEEAQKDBAAAACVtZGF0EgAKCBgABogQEAwgMg8f8D///8WfhwB8+ErK42A=',
+      'image/webp': 'data:image/webp;base64,UklGRhYAAABXRUJQVlA4WAoAAAAQAAAAAAAAAAAAQUxQSAwAAAARBxAR/Q9ERP8DAABWUDggGAAAABQBAJ0BKgEAAQAAAP4AAA3AAP7mtQAAAA==',
+      'image/jpeg': 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/2wBDAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQH/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAv/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwA/8A8='
+    };
+
+    const testDataUrl = testDataUrls[mimeType];
+    if (!testDataUrl) {
+      formatSupportCache.set(cacheKey, false);
+      return false;
+    }
+
+    return new Promise((resolve) => {
+      const img = new Image();
+      const timeout = setTimeout(() => {
+        img.onload = img.onerror = null;
+        formatSupportCache.set(cacheKey, false);
+        resolve(false);
+      }, 2000);
+
+      img.onload = () => {
+        clearTimeout(timeout);
+        const supported = img.width > 0 && img.height > 0;
+        formatSupportCache.set(cacheKey, supported);
+        resolve(supported);
+      };
+
+      img.onerror = () => {
+        clearTimeout(timeout);
+        formatSupportCache.set(cacheKey, false);
+        resolve(false);
+      };
+
+      img.src = testDataUrl;
+    });
+  } catch (error) {
+    formatSupportCache.set(cacheKey, false);
+    return false;
+  }
+}
+
+/**
+ * Detectar soporte de codificación de formato de imagen
+ * @param {string} mimeType - Tipo MIME a verificar
+ * @returns {Promise<boolean>} True si el formato es soportado para codificación
+ */
+async function supportsEncode(mimeType) {
+  const cacheKey = `encode_${mimeType}`;
+  if (formatSupportCache.has(cacheKey)) {
+    return formatSupportCache.get(cacheKey);
+  }
+
+  try {
+    // Crear un canvas pequeño para test
+    const testCanvas = document.createElement('canvas');
+    testCanvas.width = 1;
+    testCanvas.height = 1;
+    const ctx = testCanvas.getContext('2d');
+    ctx.fillStyle = 'red';
+    ctx.fillRect(0, 0, 1, 1);
+
+    // Test toDataURL
+    const dataUrl = testCanvas.toDataURL(mimeType);
+    const supported = dataUrl.startsWith(`data:${mimeType}`);
+    
+    formatSupportCache.set(cacheKey, supported);
+    return supported;
+  } catch (error) {
+    formatSupportCache.set(cacheKey, false);
+    return false;
+  }
+}
+
+/**
+ * Determinar formato de fallback basado en transparencia y soporte DE EXPORTACIÓN
+ * @param {boolean} hasAlpha - Si la imagen tiene canal alpha
+ * @param {string} preferredFormat - Formato preferido
+ * @returns {Promise<string>} Formato final a usar
+ */
+async function determineFallbackFormat(hasAlpha, preferredFormat = 'image/jpeg') {
+  // Primero verificar si el formato preferido soporta EXPORTACIÓN
+  const supportsExport = await supportsEncode(preferredFormat);
+  
+  // Si el formato preferido NO se puede exportar, buscar alternativas
+  if (!supportsExport) {
+    console.info(`Formato ${preferredFormat} no soporta exportación, buscando alternativa...`);
+    
+    // Cadena de fallback para exportación
+    if (preferredFormat === 'image/avif') {
+      // AVIF → WebP → PNG/JPEG
+      if (await supportsEncode('image/webp')) {
+        console.info('AVIF no soportado, usando WebP como fallback');
+        return 'image/webp';
+      } else {
+        console.info('AVIF y WebP no soportados, usando PNG/JPEG según transparencia');
+        return hasAlpha ? 'image/png' : 'image/jpeg';
+      }
+    } else if (preferredFormat === 'image/webp') {
+      // WebP → PNG/JPEG
+      console.info('WebP no soportado, usando PNG/JPEG según transparencia');
+      return hasAlpha ? 'image/png' : 'image/jpeg';
+    }
+  }
+
+  // Si necesita alpha y el formato no lo soporta, usar PNG
+  if (hasAlpha && (preferredFormat === 'image/jpeg')) {
+    console.info('JPEG no soporta transparencia, usando PNG');
+    return 'image/png';
+  }
+
+  // Si llegamos aquí, el formato preferido es viable
+  return preferredFormat;
+}
+
+/**
+ * Verificar si la imagen tiene canal alpha
+ * @param {HTMLCanvasElement} canvas - Canvas con la imagen
+ * @returns {boolean} True si tiene transparencia
+ */
+function hasImageAlphaChannel(canvas) {
+  const ctx = canvas.getContext('2d');
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+
+  // Verificar canal alpha en una muestra de píxeles
+  const sampleSize = Math.min(1000, data.length / 4);
+  const step = Math.floor((data.length / 4) / sampleSize);
+
+  for (let i = 0; i < sampleSize; i++) {
+    const alphaIndex = (i * step * 4) + 3;
+    if (alphaIndex < data.length && data[alphaIndex] < 255) {
+      return true; // Encontró transparencia
+    }
+  }
+
+  return false; // No hay transparencia
+}
+
 // Export para uso modular
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
@@ -183,6 +341,10 @@ if (typeof module !== 'undefined' && module.exports) {
     getFileExtension,
     getMimeType,
     canvasToBlob,
-    canvasToBlob_fallback
+    canvasToBlob_fallback,
+    supportsDecode,
+    supportsEncode,
+    determineFallbackFormat,
+    hasImageAlphaChannel
   };
 }

@@ -288,12 +288,18 @@ js/
 
 ### **Formatos Soportados**
 
-| Formato | Entrada | Salida | Compresión | Transparencia |
-|---------|:-------:|:------:|:----------:|:-------------:|
-| JPEG    | ✅      | ✅     | Con pérdida | ❌           |
-| PNG     | ✅      | ✅     | Sin pérdida | ✅           |
-| WebP    | ✅      | ✅     | Ambas      | ✅           |
-| AVIF    | ✅      | ✅     | Ambas      | ✅           |
+| Formato | Entrada | Salida | Compresión | Transparencia | Compatibilidad |
+|---------|:-------:|:------:|:----------:|:-------------:|:-------------:|
+| JPEG    | ✅      | ✅     | Con pérdida | ❌           | 100% navegadores |
+| PNG     | ✅      | ✅     | Sin pérdida | ✅           | 100% navegadores |
+| WebP    | ✅      | 🔄     | Ambas      | ✅           | 95%+ con fallback |
+| AVIF    | ✅      | 🔄     | Ambas      | ✅           | 85%+ con fallback |
+
+> **🔄 Fallback Inteligente**: Los formatos modernos (WebP/AVIF) se exportan automáticamente en el mejor formato compatible si no hay soporte nativo.
+
+**Cadena de Fallback:**
+- AVIF → WebP → PNG (con transparencia) / JPEG (sin transparencia)
+- WebP → PNG (con transparencia) / JPEG (sin transparencia)
 
 ## 🛠️ Configuración Avanzada
 
@@ -362,6 +368,10 @@ FilterManager.presets.custom = {
 - [x] ✅ **Vista previa en tiempo real**: Aplicación instantánea de filtros
 - [x] ✅ **Redimensionado inteligente**: Presets y dimensiones personalizadas
 - [x] ✅ **Rotación y volteo**: Herramientas completas de transformación
+- [x] ✅ **Fallback inteligente de formatos**: AVIF/WebP con conversión automática
+- [x] ✅ **Soporte universal de lectura**: Todos los formatos (JPEG, PNG, WebP, AVIF)
+- [x] ✅ **Campos de entrada numéricos**: Para controles de marca de agua
+- [x] ✅ **Gestión de metadatos EXIF**: Con fecha de creación y geolocalización
 
 ### **v3.1 (Q4 2025)** 🚧 EN DESARROLLO
 

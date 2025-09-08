@@ -197,6 +197,9 @@
       console.log('Aplicación cargada');
       
       try {
+        // Inicializar UI dinámica desde AppConfig
+        initializeUIFromConfig();
+        
         // Obtener elementos del DOM
         canvas = document.getElementById('preview-canvas');
         if (!canvas) {
@@ -403,20 +406,31 @@
       const formatSelect = document.getElementById('output-format');
       if (!formatSelect) return;
       
-      const formats = ['webp', 'avif'];
+      const formats = [
+        { value: 'webp', mimeType: 'image/webp' },
+        { value: 'avif', mimeType: 'image/avif' }
+      ];
       
       for (const format of formats) {
-        const isSupported = await checkFormatSupport(format);
-        const option = formatSelect.querySelector(`option[value="${format}"]`);
+        const isEncodeSupported = await supportsEncode(format.mimeType);
+        const option = formatSelect.querySelector(`option[value="${format.value}"]`);
         
         if (option) {
-          if (!isSupported) {
-            option.disabled = true;
-            option.textContent += ' (No soportado)';
-            option.style.color = '#9ca3af';
+          if (!isEncodeSupported) {
+            // NO deshabilitar la opción, solo agregar información
+            if (!option.textContent.includes('(Fallback automático)')) {
+              option.textContent = option.textContent.replace(' (No soportado)', '') + ' (Fallback automático)';
+            }
+            option.style.color = '#f59e0b'; // Color ámbar para indicar fallback
+            option.title = `${format.value.toUpperCase()} no es soportado nativamente. Se exportará en el mejor formato compatible disponible.`;
+          } else {
+            option.style.color = ''; // Restaurar color original
+            option.title = `Formato ${format.value.toUpperCase()} disponible nativamente`;
           }
         }
       }
+      
+      console.log('Verificación de soporte de formatos completada - todas las opciones habilitadas con fallback');
     }
 
     // Funciones del tema oscuro
@@ -838,6 +852,16 @@
       }
     }
 
+    // Inicializar UI dinámica desde AppConfig
+    function initializeUIFromConfig() {
+      // Actualizar texto de tamaño máximo dinámicamente
+      const maxFileSizeElement = document.getElementById('max-file-size');
+      if (maxFileSizeElement && AppConfig) {
+        const maxSizeMB = Math.round(AppConfig.maxFileSize / (1024 * 1024));
+        maxFileSizeElement.textContent = `${maxSizeMB} MB`;
+      }
+    }
+
     // Configurar sincronización bidireccional para sliders de marca de agua
     function setupWatermarkSliderSync() {
       console.log('🔧 Configurando sincronización bidireccional para sliders de marca de agua...');
@@ -1109,12 +1133,13 @@
       slider.style.setProperty('--slider-color', `hsl(${currentHue}, ${saturation}%, ${lightness}%)`);
     }
 
-    function handleFormatChange() {
+    async function handleFormatChange() {
       const formatSelect = document.getElementById('output-format');
       const formatInfo = document.getElementById('format-info');
       const formatTitle = document.getElementById('format-title');
       const formatDescription = document.getElementById('format-description');
       const formatCompatibility = document.getElementById('format-compatibility');
+      const formatFallback = document.getElementById('format-fallback');
       
       if (!formatSelect || !formatInfo || !formatTitle || !formatDescription || !formatCompatibility) return;
       
@@ -1125,67 +1150,80 @@
       formatInfo.classList.add('p-3', 'border', 'rounded-md', `format-${outputFormat}`);
       
       // Update format information
-      const formatData = getFormatInfo(outputFormat);
+      const formatData = await getFormatInfo(outputFormat);
       formatTitle.textContent = formatData.title;
       formatDescription.textContent = formatData.description;
       formatCompatibility.textContent = formatData.compatibility;
       formatCompatibility.className = `text-xs mt-1 font-medium ${formatData.compatibilityClass}`;
       
+      // Show fallback information if applicable
+      if (formatFallback) {
+        if (formatData.fallbackMessage) {
+          formatFallback.textContent = formatData.fallbackMessage;
+          formatFallback.style.display = 'block';
+        } else {
+          formatFallback.style.display = 'none';
+        }
+      }
+      
       console.log('Format changed to:', outputFormat);
     }
 
-    function getFormatInfo(format) {
-      const formatInfo = {
+    async function getFormatInfo(format) {
+      const baseFormatInfo = {
         jpeg: {
           title: 'JPEG (.jpg)',
-          description: 'Ideal para fotografías, menor tamaño de archivo.',
+          description: 'Ideal para fotografías, menor tamaño de archivo. No soporta transparencia.',
           compatibility: '✓ Compatible con todos los navegadores',
-          compatibilityClass: 'text-green-600'
+          compatibilityClass: 'text-green-600',
+          fallbackMessage: null
         },
         png: {
           title: 'PNG (.png)',
           description: 'Ideal para imágenes con transparencia, sin pérdida de calidad.',
           compatibility: '✓ Compatible con todos los navegadores',
-          compatibilityClass: 'text-green-600'
+          compatibilityClass: 'text-green-600',
+          fallbackMessage: null
         },
         webp: {
           title: 'WebP (.webp)',
-          description: 'Mejor compresión que JPEG/PNG, menor tamaño de archivo.',
+          description: 'Mejor compresión que JPEG/PNG, soporta transparencia.',
           compatibility: '✓ Compatible con navegadores modernos (95%+)',
-          compatibilityClass: 'text-blue-600'
+          compatibilityClass: 'text-blue-600',
+          fallbackMessage: null
         },
         avif: {
           title: 'AVIF (.avif)',
-          description: 'Nueva generación, máxima compresión y calidad.',
-          compatibility: '⚠ Compatible con navegadores recientes (80%+)',
-          compatibilityClass: 'text-orange-600'
+          description: 'Nueva generación, máxima compresión y calidad, soporta transparencia.',
+          compatibility: '⚠ Compatible con navegadores recientes (85%+)',
+          compatibilityClass: 'text-orange-600',
+          fallbackMessage: null
         }
       };
       
-      return formatInfo[format] || formatInfo.jpeg;
+      const formatData = baseFormatInfo[format] || baseFormatInfo.jpeg;
+      
+      // Check actual browser support for modern formats
+      if (format === 'webp') {
+        const isSupported = await supportsEncode('image/webp');
+        if (!isSupported) {
+          formatData.compatibility = '🔄 Fallback automático disponible';
+          formatData.compatibilityClass = 'text-amber-600';
+          formatData.fallbackMessage = 'ℹ️ Se exportará automáticamente en PNG o JPEG según la transparencia';
+        }
+      } else if (format === 'avif') {
+        const isSupported = await supportsEncode('image/avif');
+        if (!isSupported) {
+          formatData.compatibility = '🔄 Fallback automático disponible';
+          formatData.compatibilityClass = 'text-amber-600';
+          formatData.fallbackMessage = 'ℹ️ Se exportará automáticamente en WebP, PNG o JPEG según disponibilidad';
+        }
+      }
+      
+      return formatData;
     }
 
     // Function to check format support
-    function checkFormatSupport(format) {
-      return new Promise((resolve) => {
-        const canvas = document.createElement('canvas');
-        canvas.width = 1;
-        canvas.height = 1;
-        
-        try {
-          const mimeType = `image/${format}`;
-          canvas.toBlob((blob) => {
-            resolve(blob !== null);
-          }, mimeType, 1);
-        } catch (error) {
-          resolve(false);
-        }
-        
-        // Timeout fallback
-        setTimeout(() => resolve(false), 100);
-      });
-    }
-
     function handleKeyboardShortcuts(e) {
       // Ctrl+S or Cmd+S to download
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
@@ -1622,6 +1660,11 @@
 
             // Proceder con la carga normal
             loadImage(e.target.result, file.name);
+            
+            // Configurar fecha de creación desde el archivo
+            if (typeof MetadataManager !== 'undefined') {
+              MetadataManager.setupCreationDate(file);
+            }
           };
 
           img.onerror = function() {
@@ -2565,6 +2608,22 @@
       }
       
       try {
+        // Detectar si la imagen tiene transparencia
+        const hasAlpha = hasImageAlphaChannel(canvas);
+        
+        // Determinar formato final con fallback
+        const requestedMimeType = getMimeType(outputFormat);
+        const finalMimeType = await determineFallbackFormat(hasAlpha, requestedMimeType);
+        const finalFormat = finalMimeType.split('/')[1];
+        
+        // Si el formato cambió, mostrar notificación informativa
+        if (finalMimeType !== requestedMimeType) {
+          const requestedFormat = outputFormat.toUpperCase();
+          const actualFormat = finalFormat.toUpperCase();
+          console.info(`Usando fallback: ${requestedFormat} → ${actualFormat} (mejor compatibilidad)`);
+          UIManager.showInfo(`📄 Exportando en ${actualFormat} para máxima compatibilidad (solicitado: ${requestedFormat})`);
+        }
+        
         // Obtener metadatos antes de la descarga
         const metadata = MetadataManager.getMetadata();
         const exifData = MetadataManager.applyMetadataToImage(canvas);
@@ -2591,12 +2650,9 @@
         let filename = metadata.title || titleInput.value.trim() || 'imagen_editada';
         filename = sanitizeFilename(filename);
         
-        // Usar el formato seleccionado en lugar de la extensión original
-        const extension = getFileExtension(outputFormat);
+        // Usar el formato final determinado por el sistema de fallback
+        const extension = getFileExtension(finalFormat);
         const fullFilename = `${filename}.${extension}`;
-        
-        // Obtener el tipo MIME basado en el formato seleccionado
-        const mimeType = getMimeType(outputFormat);
         
         // Usar la API File System Access si está disponible (Chrome/Edge modernos)
         if ('showSaveFilePicker' in window) {
@@ -2605,7 +2661,7 @@
             types: [{
               description: 'Imágenes',
               accept: {
-                [mimeType]: [`.${extension}`]
+                [finalMimeType]: [`.${extension}`]
               }
             }],
             startIn: lastDownloadDirectory || 'desktop'
@@ -2616,12 +2672,12 @@
             lastDownloadDirectory = await handle.queryPermission({ mode: 'readwrite' });
             
             const writable = await handle.createWritable();
-            const blob = await canvasToBlob(canvas, mimeType, outputQuality);
+            const blob = await canvasToBlob(canvas, finalMimeType, outputQuality);
             await writable.write(blob);
             await writable.close();
             
-            const qualityText = outputFormat === 'png' ? '' : ` (calidad: ${Math.round(outputQuality * 100)}%)`;
-            showSuccess(`Imagen guardada exitosamente en formato ${outputFormat.toUpperCase()}${qualityText}!`);
+            const qualityText = finalFormat === 'png' ? '' : ` (calidad: ${Math.round(outputQuality * 100)}%)`;
+            showSuccess(`Imagen guardada exitosamente en formato ${finalFormat.toUpperCase()}${qualityText}!`);
             return;
           } catch (saveError) {
             // Si el usuario cancela, no mostrar error
@@ -2635,15 +2691,15 @@
         // Fallback para navegadores que no soportan la API o si falla
         const link = document.createElement('a');
         link.download = fullFilename;
-        link.href = canvas.toDataURL(mimeType, outputQuality);
+        link.href = canvas.toDataURL(finalMimeType, outputQuality);
         
         // Simular click
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         
-        const qualityText = outputFormat === 'png' ? '' : ` (calidad: ${Math.round(outputQuality * 100)}%)`;
-        showSuccess(`Imagen descargada en formato ${outputFormat.toUpperCase()}${qualityText}!`);
+        const qualityText = finalFormat === 'png' ? '' : ` (calidad: ${Math.round(outputQuality * 100)}%)`;
+        showSuccess(`Imagen descargada en formato ${finalFormat.toUpperCase()}${qualityText}!`);
         
       } catch (error) {
         console.error('Error al descargar:', error);

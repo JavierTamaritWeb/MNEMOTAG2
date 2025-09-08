@@ -13,8 +13,8 @@
  */
 const AppConfig = {
   // File validation settings
-  maxFileSize: 10 * 1024 * 1024, // 10MB
-  allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
+  maxFileSize: 25 * 1024 * 1024, // 25MB
+  allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'],
   
   // Canvas settings
   maxCanvasWidth: 800,

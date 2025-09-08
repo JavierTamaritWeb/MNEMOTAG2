@@ -40,7 +40,7 @@ const SecurityManager = {
   // Validación de archivos de imagen mejorada
   validateImageFile: function(file) {
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/avif'];
-    const maxSize = 25 * 1024 * 1024; // 25MB
+    const maxSize = AppConfig.maxFileSize; // Usar AppConfig como fuente única
     
     const validation = {
       isValid: true,
