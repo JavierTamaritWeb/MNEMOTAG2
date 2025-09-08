@@ -1,7 +1,28 @@
-<!-- Favicon SVG simple para MnemoTag -->
-<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-  <rect width="32" height="32" fill="#3B82F6"/>
-  <circle cx="16" cy="16" r="10" fill="#FFFFFF"/>
-  <rect x="11" y="11" width="10" height="6" fill="#3B82F6"/>
-  <rect x="13" y="13" width="6" height="2" fill="#FFFFFF"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+  <!-- Background circle -->
+  <circle cx="50" cy="50" r="48" fill="#20b2aa" stroke="#ffffff" stroke-width="2"/>
+  
+  <!-- Brain section with pink fill -->
+  <path d="M20 35 C20 25, 28 20, 36 20 C42 18, 48 19, 54 22 C58 20, 64 21, 68 24 C68 32, 66 38, 62 42 C60 47, 56 50, 52 52 C48 53, 44 52, 40 50 C36 49, 33 45, 32 40 Z" 
+        fill="#ff9eb5" stroke="#ffffff" stroke-width="1.5" fill-opacity="0.9"/>
+  
+  <!-- Brain internal patterns -->
+  <path d="M28 30 C32 29, 36 30, 40 32 C44 31, 48 32, 52 34" stroke="#ffffff" stroke-width="1.5" fill="none"/>
+  <path d="M30 38 C34 37, 38 38, 42 40 C46 39, 50 40, 54 42" stroke="#ffffff" stroke-width="1.5" fill="none"/>
+  
+  <!-- Tag/Shield section -->
+  <path d="M72 20 L85 20 C87 20, 88 22, 88 24 L88 38 C88 40, 87 42, 85 44 L78 51 L72 44 C70 42, 70 40, 70 38 L70 24 C70 22, 72 20, 72 20 Z" 
+        fill="#ffffff" stroke="#20b2aa" stroke-width="1.5"/>
+  
+  <!-- Camera/eye icon in tag -->
+  <circle cx="79" cy="27" r="2.5" fill="#20b2aa"/>
+  
+  <!-- Checkmark in tag -->
+  <path d="M74 33 L77 36 L84 29" stroke="#20b2aa" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Connection line between brain and tag -->
+  <path d="M68 32 L70 32" stroke="#ffffff" stroke-width="2"/>
+  
+  <!-- Bottom text indicator -->
+  <text x="50" y="75" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle">MT</text>
 </svg>
