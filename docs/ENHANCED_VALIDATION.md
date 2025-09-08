@@ -1,23 +1,28 @@
-# MnemoTag v3.0 - Validación Mejorada de Archivos
+# 📊 Validación Avanzada MnemoTag v3.0
 
-## 🎯 **Características Implementadas**
+## Descripción General
 
-### ✅ **Función validateImageFile() Mejorada**
+El sistema de validación avanzada de MnemoTag v3.0 proporciona múltiples capas de verificación para garantizar la seguridad, integridad y calidad de las imágenes procesadas, incorporando las últimas mejoras de formato fallback y validación de contenido.
 
-La nueva función `validateImageFile()` incluye validaciones exhaustivas con mensajes de error específicos y detallados:
+## 🎯 Características Implementadas en v3.0
 
-#### **Tipos de Validación:**
+### ✅ Sistema de Validación Multi-capa
 
-1. **Validación de Existencia**
-   - Verifica que se haya seleccionado un archivo
+La arquitectura de validación de MnemoTag v3.0 incluye validaciones exhaustivas con retroalimentación específica y detallada:
+
+#### **Capas de Validación:**
+
+1. **Validación de Entrada (Input Layer)**
+   - Verifica existencia de archivo
    - Error: `MISSING_FILE` con instrucciones claras
 
 2. **Validación de Formato MIME**
-   - Soporta: JPG, JPEG, PNG, WEBP, AVIF
+   - Soporta: JPG, JPEG, PNG, WEBP, AVIF, GIF, BMP, SVG
+   - Integración con sistema de fallback automático
    - Error: `INVALID_FORMAT` con formato detectado y formatos permitidos
 
-3. **Validación de Tamaño**
-   - Límite: 25MB máximo
+3. **Validación de Tamaño Adaptativo**
+   - Límite configurable: 50MB por defecto (25MB modo estricto, 100MB modo permisivo)
    - Error: `FILE_TOO_LARGE` con tamaño actual vs máximo permitido
 
 4. **Validación de Nombre de Archivo**

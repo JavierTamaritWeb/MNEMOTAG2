@@ -1,50 +1,42 @@
-# 🏗️ Arquitectura Modular - MnemoTag v3.0
+# 🔧 Arquitectura Modular MnemoTag v3.0
 
-## 📋 Índice
-- [Resumen Ejecutivo](#-resumen-ejecutivo)
-- [Estructura del Proyecto](#-estructura-del-proyecto)
-- [Módulos Extraídos](#-módulos-extraídos)
-- [Proceso de Modularización](#-proceso-de-modularización)
-- [Beneficios](#-beneficios)
-- [Próximos Pasos](#-próximos-pasos)
+## Descripción General
 
-## 🎯 Resumen Ejecutivo
+MnemoTag v3.0 implementa una arquitectura modular robusta que separa responsabilidades, facilita el mantenimiento y permite escalabilidad futura. El sistema está diseñado siguiendo principios SOLID y patrones de diseño modernos, incorporando las últimas mejoras visuales y funcionales.
 
-### Estado Actual
-- **main.js original**: 6,095 líneas
-- **main.js modularizado**: 5,297 líneas (-798 líneas, -13.1%)
-- **Módulos extraídos**: 5 (SecurityManager, AppConfig, Helpers, HistoryManager, MetadataManager)
+## Estructura del Proyecto Actualizada
 
-### Objetivo
-Transformar MnemoTag de una aplicación monolítica a una arquitectura modular para mejorar:
-- ✅ **Mantenibilidad**: Código organizado por responsabilidades
-- ✅ **Escalabilidad**: Fácil agregar nuevas funcionalidades
-- ✅ **Testabilidad**: Módulos independientes
-- ✅ **Colaboración**: Múltiples desarrolladores trabajando en paralelo
-
-## 📁 Estructura del Proyecto
-
-### Estructura Actual
 ```
-MnemoTag/
-├── index.html                     → HTML principal
+mnemotag-v3/
+├── index.html                 # Punto de entrada con hero section
 ├── css/
-│   └── styles.css                 → Estilos CSS
+│   └── styles.css            # Estilos centralizados + hero styling
 ├── js/
-│   ├── main.js                    → Lógica principal (5,297 líneas)
-│   ├── managers/
-│   │   ├── security-manager.js    → Validación y seguridad (378 líneas)
-│   │   ├── history-manager.js     → Sistema de deshacer/rehacer (221 líneas)
-│   │   └── metadata-manager.js    → Metadatos EXIF y GPS (305 líneas)
-│   └── utils/
-│       ├── app-config.js          → Configuración global (46 líneas)
-│       └── helpers.js             → Funciones utilitarias (188 líneas)
-├── workers/
-│   └── image-processor.js         → Web Workers (207 líneas)
-└── docs/
-    ├── ENHANCED_VALIDATION.md
-    ├── FILTER_OPTIMIZATION.md
-    ├── WORKER_INTEGRATION.md
+│   ├── main.js               # Orquestador principal
+│   ├── image-processor.js    # Procesamiento de imágenes
+│   ├── managers/             # Gestores especializados
+│   │   ├── ui-manager.js         # Interfaz de usuario + hero
+│   │   ├── filter-manager.js     # Gestión de filtros
+│   │   ├── metadata-manager.js   # Metadatos de imagen
+│   │   ├── history-manager.js    # Historial de acciones
+│   │   ├── security-manager.js   # Validación y seguridad
+│   │   ├── worker-manager.js     # Web Workers
+│   │   └── filter-loading-manager.js # Carga dinámica
+│   └── utils/                # Utilidades compartidas
+│       ├── app-config.js         # Configuración global
+│       ├── helpers.js            # Funciones auxiliares
+│       ├── smart-debounce.js     # Control de eventos
+│       ├── filter-cache.js       # Cache de filtros
+│       └── fallback-processor.js # Procesamiento fallback
+├── images/                   # Recursos visuales + favicon system
+│   ├── favicon.svg              # Favicon principal
+│   ├── favicon.ico              # Fallback ICO
+│   ├── logo.svg                 # Logo para hero section
+│   └── icons/                   # PWA icons
+└── docs/                    # Documentación técnica actualizada
+    ├── HERO_VISUAL.md
+    ├── FAVICON_PWA_SYSTEM.md
+    ├── FORMAT_FALLBACK_SYSTEM.md
     └── MODULAR_ARCHITECTURE.md
 ```
 
