@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <!-- Background -->
+  <rect width="800" height="600" fill="#f8fafc"/>
+  
+  <!-- Brain section with pink fill -->
+  <path d="M70 220 C70 180, 110 150, 150 150 C180 140, 220 145, 250 160 C280 150, 320 155, 350 170 C350 200, 340 230, 320 250 C310 280, 290 300, 260 310 C230 320, 200 315, 170 300 C140 290, 120 260, 110 230 Z" fill="#ff9eb5" stroke="#20b2aa" stroke-width="8" fill-opacity="0.8"/>
+  
+  <!-- Brain internal patterns -->
+  <path d="M120 180 C140 175, 160 180, 180 190 C200 185, 220 190, 240 200" stroke="#20b2aa" stroke-width="4" fill="none"/>
+  <path d="M130 220 C150 215, 170 220, 190 230 C210 225, 230 230, 250 240" stroke="#20b2aa" stroke-width="4" fill="none"/>
+  <path d="M140 260 C160 255, 180 260, 200 270 C220 265, 240 270, 260 280" stroke="#20b2aa" stroke-width="4" fill="none"/>
+  
+  <!-- Tag/Shield section -->
+  <path d="M380 150 L480 150 C490 150, 500 160, 500 170 L500 250 C500 260, 490 270, 480 280 L430 330 L380 280 C370 270, 370 260, 370 250 L370 170 C370 160, 380 150, 380 150 Z" fill="none" stroke="#20b2aa" stroke-width="8"/>
+  
+  <!-- Camera/eye icon in tag -->
+  <circle cx="440" cy="180" r="12" fill="#20b2aa"/>
+  
+  <!-- Checkmark in tag -->
+  <path d="M410 220 L425 235 L460 200" stroke="#20b2aa" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Connection line between brain and tag -->
+  <path d="M350 210 L370 210" stroke="#20b2aa" stroke-width="6"/>
+  
+  <!-- Text: MnemoTag -->
+  <text x="450" y="400" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="#20b2aa">Mnemo</text>
+  <text x="450" y="480" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="#20b2aa">Tag</text>
+</svg>
