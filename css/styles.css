@@ -258,70 +258,7 @@
       left: 100%;
     }
 
-    /* Enhanced tooltips with dark mode support - DISABLED
-    [data-tooltip] {
-      position: relative;
-    }
-
-    [data-tooltip]::after {
-      content: attr(data-tooltip);
-      position: absolute;
-      bottom: 125%;
-      left: 50%;
-      transform: translateX(-50%);
-      background: var(--bg-tooltip);
-      color: var(--text-inverse);
-      padding: 10px 14px;
-      border-radius: var(--radius);
-      font-size: 0.875rem;
-      white-space: nowrap;
-      opacity: 0;
-      visibility: hidden;
-      transition: all var(--transition-slow) ease;
-      z-index: 1000;
-      pointer-events: none;
-      box-shadow: var(--shadow-lg);
-      backdrop-filter: blur(10px);
-      max-width: 250px;
-      white-space: normal;
-      text-align: center;
-      line-height: 1.4;
-    }
-
-    [data-tooltip]::before {
-      content: '';
-      position: absolute;
-      bottom: 117%;
-      left: 50%;
-      transform: translateX(-50%);
-      border: 6px solid transparent;
-      border-top-color: var(--bg-tooltip);
-      opacity: 0;
-      visibility: hidden;
-      transition: all var(--transition-slow) ease;
-      z-index: 1000;
-    }
-
-    [data-tooltip]:hover::after,
-    [data-tooltip]:hover::before {
-      opacity: 1;
-      visibility: visible;
-      transform: translateX(-50%) translateY(-5px);
-    }
-    */
-
-    /* Dark mode specific tooltips - DISABLED
-    [data-theme="dark"] [data-tooltip]::after {
-      background: var(--bg-tooltip);
-      color: var(--text-primary);
-      border: 1px solid var(--border-color);
-      box-shadow: var(--shadow-xl);
-    }
-
-    [data-theme="dark"] [data-tooltip]::before {
-      border-top-color: var(--bg-tooltip);
-    }
-    */
+    
 
     /* Enhanced focus states */
     .form-input:focus,
@@ -333,16 +270,6 @@
       transform: translateY(-1px);
     }
 
-    /* Dark mode specific enhancements - DISABLED
-    .dark [data-tooltip]::after {
-      --bg-tooltip: rgba(55, 65, 81, 0.95);
-    }
-
-    .dark [data-tooltip]::before {
-      --bg-tooltip: rgba(55, 65, 81, 0.95);
-      border-top-color: rgba(55, 65, 81, 0.95);
-    }
-    */
 
     /* Performance optimizations */
     .card {
