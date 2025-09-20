@@ -355,6 +355,55 @@ const SecurityManager = {
     }
 
     return validation;
+  },
+
+  // ===== VALIDACIÓN DE NOMBRES DE ARCHIVO =====
+
+  /**
+   * Valida un nombre base de archivo (sin extensión)
+   * @param {string} basename - Nombre base a validar
+   * @returns {boolean} true si es válido
+   */
+  isValidFileBaseName: function(basename) {
+    if (!basename || typeof basename !== 'string') return false;
+    
+    // Verificar longitud
+    if (basename.length < 1 || basename.length > 60) return false;
+    
+    // No debe empezar o terminar con puntos
+    if (/^\.+|\.+$/.test(basename)) return false;
+    
+    // Solo caracteres permitidos
+    const validPattern = /^[A-Za-z0-9 _\-.áéíóúÁÉÍÓÚñÑüÜ]+$/;
+    if (!validPattern.test(basename)) return false;
+    
+    // Verificar nombres reservados en Windows
+    const reservedNames = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
+    if (reservedNames.test(basename.trim())) return false;
+    
+    return true;
+  },
+
+  /**
+   * Obtiene mensaje de error específico para nombre de archivo inválido
+   * @param {string} basename - Nombre base que falló la validación
+   * @returns {string} Mensaje de error descriptivo
+   */
+  getFileBaseNameError: function(basename) {
+    if (!basename) return "El nombre no puede estar vacío";
+    
+    if (basename.length > 60) return "El nombre es demasiado largo (máx. 60 caracteres)";
+    
+    if (/^\.+|\.+$/.test(basename)) return "El nombre no puede empezar o terminar con puntos";
+    
+    const reservedNames = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/i;
+    if (reservedNames.test(basename.trim())) return "Nombre reservado del sistema no permitido";
+    
+    if (!/^[A-Za-z0-9 _\-.áéíóúÁÉÍÓÚñÑüÜ]+$/.test(basename)) {
+      return "Solo se permiten letras, números, espacios, guiones y guiones bajos";
+    }
+    
+    return "Nombre de archivo no válido";
   }
 };
 

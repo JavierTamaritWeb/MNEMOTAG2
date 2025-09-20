@@ -5,6 +5,7 @@
     let currentFile = null;
     let originalExtension = 'jpg';
     let lastDownloadDirectory = null;
+    let fileBaseName = 'imagen'; // Nombre base del archivo (sin extensión)
     
     // Variables para redimensionado
     let originalImageDimensions = { width: 0, height: 0 };
@@ -831,6 +832,13 @@
           outputFormatSelect.addEventListener('change', handleFormatChange);
         }
         
+        // File basename editor
+        const fileBasenameInput = document.getElementById('file-basename');
+        if (fileBasenameInput) {
+          fileBasenameInput.addEventListener('input', handleFileBaseNameInput);
+          fileBasenameInput.addEventListener('blur', handleFileBaseNameBlur);
+        }
+        
         if (outputHeader) {
           outputHeader.addEventListener('click', () => toggleCollapsible('output'));
           outputHeader.addEventListener('keydown', (e) => {
@@ -1221,6 +1229,125 @@
       }
       
       return formatData;
+    }
+
+    // ===== FUNCIONES DE MANEJO DE NOMBRE DE ARCHIVO =====
+
+    /**
+     * Maneja la entrada de texto en el campo de nombre de archivo
+     * @param {Event} event - Evento input
+     */
+    function handleFileBaseNameInput(event) {
+      const rawValue = event.target.value;
+      const sanitized = sanitizeFileBaseName(rawValue);
+      
+      // Actualizar valor si fue sanitizado
+      if (sanitized !== rawValue) {
+        event.target.value = sanitized;
+      }
+      
+      // Validar y actualizar estado
+      validateAndUpdateFileBaseName(sanitized);
+      
+      // Actualizar preview del nombre final
+      updateFilenamePreview();
+    }
+
+    /**
+     * Maneja cuando el campo pierde el foco
+     * @param {Event} event - Evento blur
+     */
+    function handleFileBaseNameBlur(event) {
+      const value = event.target.value.trim();
+      
+      if (!value) {
+        // Si está vacío, usar fallback
+        event.target.value = 'imagen';
+        fileBaseName = 'imagen';
+        validateAndUpdateFileBaseName('imagen');
+      }
+    }
+
+    /**
+     * Valida y actualiza el nombre base del archivo
+     * @param {string} basename - Nombre base a validar
+     */
+    function validateAndUpdateFileBaseName(basename) {
+      const errorElement = document.getElementById('file-basename-error');
+      const downloadBtn = document.getElementById('download-image');
+      
+      const isValid = SecurityManager.isValidFileBaseName(basename);
+      
+      if (isValid) {
+        // Nombre válido
+        fileBaseName = basename;
+        if (errorElement) {
+          errorElement.classList.add('hidden');
+          errorElement.textContent = '';
+        }
+        
+        // Habilitar descarga si hay imagen
+        if (downloadBtn && currentImage) {
+          downloadBtn.disabled = false;
+        }
+        
+      } else {
+        // Nombre inválido
+        const errorMsg = SecurityManager.getFileBaseNameError(basename);
+        if (errorElement) {
+          errorElement.textContent = errorMsg;
+          errorElement.classList.remove('hidden');
+        }
+        
+        // Usar fallback para evitar bloquear completamente
+        fileBaseName = 'imagen';
+      }
+      
+      // Actualizar preview del nombre final
+      updateFilenamePreview();
+    }
+
+    /**
+     * Actualiza la previsualización del nombre final del archivo
+     */
+    function updateFilenamePreview() {
+      const previewElement = document.getElementById('filename-preview');
+      const previewTextElement = document.getElementById('filename-preview-text');
+      
+      if (!previewElement || !previewTextElement) return;
+      
+      if (currentImage) {
+        const extension = getFileExtension(outputFormat);
+        const finalName = `${fileBaseName}.${extension}`;
+        
+        previewTextElement.textContent = finalName;
+        previewElement.classList.remove('hidden');
+      } else {
+        previewElement.classList.add('hidden');
+      }
+    }
+
+    /**
+     * Configura el nombre base inicial del archivo
+     * @param {File} file - Archivo cargado
+     */
+    function setupInitialFileBaseName(file) {
+      if (!file || !file.name) return;
+      
+      const originalBaseName = extractFileBaseName(file.name);
+      const sanitizedBaseName = sanitizeFileBaseName(originalBaseName);
+      
+      fileBaseName = sanitizedBaseName;
+      
+      // Actualizar input del nombre
+      const basenameInput = document.getElementById('file-basename');
+      if (basenameInput) {
+        basenameInput.value = sanitizedBaseName;
+        basenameInput.placeholder = sanitizedBaseName;
+      }
+      
+      // Validar el nombre inicial
+      validateAndUpdateFileBaseName(sanitizedBaseName);
     }
 
     // Function to check format support
@@ -1660,6 +1787,9 @@
 
             // Proceder con la carga normal
             loadImage(e.target.result, file.name);
+            
+            // Configurar nombre base del archivo
+            setupInitialFileBaseName(file);
             
             // Configurar fecha de creación desde el archivo
             if (typeof MetadataManager !== 'undefined') {
@@ -2646,9 +2776,16 @@
         }
         
         // Obtener el título y sanitizar el nombre del archivo
+        // Usar fileBaseName personalizado o fallback a metadata/título
         const titleInput = document.getElementById('metaTitle');
-        let filename = metadata.title || titleInput.value.trim() || 'imagen_editada';
-        filename = sanitizeFilename(filename);
+        const isValidBaseName = SecurityManager.isValidFileBaseName(fileBaseName);
+        let filename = isValidBaseName ? fileBaseName : 
+                      (metadata.title || titleInput.value.trim() || 'imagen');
+        
+        // Sanitizar solo si no usamos fileBaseName (que ya está sanitizado)
+        if (!isValidBaseName) {
+          filename = sanitizeFilename(filename);
+        }
         
         // Usar el formato final determinado por el sistema de fallback
         const extension = getFileExtension(finalFormat);

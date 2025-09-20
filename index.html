@@ -818,6 +818,44 @@
                         </div>
                       </div>
                     </div>
+
+                    <!-- File Name Editor -->
+                    <div class="config-section">
+                      <h4 class="config-title">
+                        <i class="fas fa-signature"></i>Nombre de archivo
+                      </h4>
+                      <div class="space-y-3">
+                        <div>
+                          <label for="file-basename" class="block text-sm font-medium text-gray-700 mb-2">
+                            Nombre de archivo (sin extensión)
+                          </label>
+                          <input type="text" 
+                                 id="file-basename" 
+                                 name="file-basename"
+                                 maxlength="60" 
+                                 autocomplete="off"
+                                 placeholder="imagen"
+                                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
+                                 aria-describedby="file-basename-help file-basename-error">
+                          
+                          <div id="file-basename-help" class="text-xs text-gray-600 mt-1">
+                            <i class="fas fa-info-circle mr-1"></i>
+                            Usa letras, números, espacios, guiones y guiones bajos. Máx. 60 caracteres.
+                          </div>
+                          
+                          <div id="file-basename-error" 
+                               class="text-xs text-red-600 mt-1 hidden" 
+                               aria-live="polite">
+                          </div>
+                        </div>
+                        
+                        <!-- Preview del nombre final -->
+                        <div id="filename-preview" class="bg-gray-50 border border-gray-200 rounded-md p-2 text-sm hidden">
+                          <span class="text-gray-600">Archivo final: </span>
+                          <span id="filename-preview-text" class="font-medium text-gray-800">imagen.jpg</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

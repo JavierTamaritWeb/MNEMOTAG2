@@ -31,6 +31,7 @@ const historyManager = {
       imageData: canvas.toDataURL(),
       metadata: this.getCurrentMetadata(),
       watermarkConfig: this.getCurrentWatermarkConfig(),
+      fileBaseName: fileBaseName || 'imagen', // Incluir nombre de archivo
       timestamp: Date.now()
     };
     
@@ -195,6 +196,23 @@ const historyManager = {
         
         if (config.customPosition && typeof customImagePosition !== 'undefined') {
           customImagePosition = config.customPosition;
+        }
+      }
+      
+      // Restaurar nombre base del archivo
+      if (state.fileBaseName) {
+        if (typeof fileBaseName !== 'undefined') {
+          fileBaseName = state.fileBaseName;
+        }
+        
+        const basenameInput = document.getElementById('file-basename');
+        if (basenameInput) {
+          basenameInput.value = state.fileBaseName;
+        }
+        
+        // Actualizar preview del nombre final si la función existe
+        if (typeof updateFilenamePreview === 'function') {
+          updateFilenamePreview();
         }
       }
       

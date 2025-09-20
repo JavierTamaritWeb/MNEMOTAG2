@@ -5018,4 +5018,211 @@
       background: var(--bg-secondary);
       border-color: var(--accent-primary);
     }
+
+    /* ========================================
+       FILENAME EDITOR STYLES
+       ======================================== */
+
+    /* Filename Editor Container */
+    .filename-editor {
+      background-color: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 1rem;
+      margin-bottom: 1rem;
+      box-shadow: var(--shadow-sm);
+      transition: var(--transition);
+    }
+
+    .filename-editor:hover {
+      border-color: var(--border-hover);
+      box-shadow: var(--shadow);
+    }
+
+    /* Filename Input Field */
+    .filename-editor #file-basename {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background-color: var(--bg-secondary);
+      border: 1.5px solid var(--border-color);
+      border-radius: var(--radius);
+      color: var(--text-primary);
+      font-size: 0.875rem;
+      font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
+      transition: var(--transition);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .filename-editor #file-basename:hover {
+      border-color: var(--border-hover);
+      box-shadow: var(--shadow);
+    }
+
+    .filename-editor #file-basename:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      transform: scale(1.01);
+      outline: none;
+    }
+
+    /* Validation States */
+    .filename-editor #file-basename.valid {
+      border-color: var(--success);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+    }
+
+    .filename-editor #file-basename.invalid {
+      border-color: var(--error);
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+    }
+
+    /* Error Messages */
+    .filename-error {
+      margin-top: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      background-color: rgba(239, 68, 68, 0.1);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+      border-radius: var(--radius);
+      color: var(--error);
+      font-size: 0.75rem;
+      font-weight: 500;
+      animation: slideUp 0.3s ease-out;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .filename-error::before {
+      content: "⚠️";
+      font-size: 0.875rem;
+    }
+
+    .filename-error.hidden {
+      display: none;
+    }
+
+    /* Filename Preview */
+    .filename-preview {
+      margin-top: 0.75rem;
+      padding: 0.5rem 0.75rem;
+      background-color: var(--bg-accent);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .filename-preview::before {
+      content: "📄";
+      font-size: 0.875rem;
+    }
+
+    .filename-preview strong {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    /* Labels */
+    .filename-editor .form-label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    /* Dark Mode Styles */
+    [data-theme="dark"] .filename-editor {
+      background-color: var(--bg-tertiary);
+      border-color: var(--border-color);
+      box-shadow: var(--shadow);
+    }
+
+    [data-theme="dark"] .filename-editor:hover {
+      border-color: var(--border-hover);
+      background-color: var(--bg-secondary);
+    }
+
+    [data-theme="dark"] .filename-editor #file-basename {
+      background-color: var(--bg-secondary);
+      border-color: var(--border-color);
+      color: var(--text-primary);
+      box-shadow: var(--shadow);
+    }
+
+    [data-theme="dark"] .filename-editor #file-basename:hover {
+      border-color: var(--border-hover);
+      background-color: var(--bg-primary);
+    }
+
+    [data-theme="dark"] .filename-editor #file-basename:focus {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+      background-color: var(--bg-primary);
+    }
+
+    [data-theme="dark"] .filename-editor #file-basename.valid {
+      border-color: var(--success);
+      box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.2);
+    }
+
+    [data-theme="dark"] .filename-editor #file-basename.invalid {
+      border-color: var(--error);
+      box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.2);
+    }
+
+    [data-theme="dark"] .filename-error {
+      background-color: rgba(248, 113, 113, 0.15);
+      border-color: rgba(248, 113, 113, 0.3);
+      color: var(--error);
+    }
+
+    [data-theme="dark"] .filename-preview {
+      background-color: var(--bg-secondary);
+      border-color: var(--border-color);
+      color: var(--text-tertiary);
+    }
+
+    [data-theme="dark"] .filename-preview strong {
+      color: var(--text-primary);
+    }
+
+    /* Mobile Responsive */
+    @media (max-width: 767px) {
+      .filename-editor {
+        padding: 0.75rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .filename-editor #file-basename {
+        font-size: 16px; /* Prevents zoom on iOS */
+        padding: 0.75rem;
+      }
+
+      .filename-error {
+        font-size: 0.875rem;
+        padding: 0.75rem;
+      }
+
+      .filename-preview {
+        font-size: 0.75rem;
+        padding: 0.75rem;
+      }
+    }
+
+    /* Animation for error messages */
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
     

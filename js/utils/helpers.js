@@ -76,6 +76,56 @@ function formatNumber(num) {
   return num.toLocaleString('es-ES') + ' px';
 }
 
+// ===== MANEJO DE NOMBRES DE ARCHIVO =====
+
+/**
+ * Sanitiza el nombre base del archivo (sin extensión)
+ * @param {string} name - Nombre a sanitizar
+ * @returns {string} Nombre sanitizado
+ */
+function sanitizeFileBaseName(name) {
+  if (!name || typeof name !== 'string') return "imagen";
+  
+  // Normalizar Unicode para consistencia
+  let s = name.normalize("NFC");
+  
+  // Quitar extensión si la trae
+  s = s.replace(/\.[A-Za-z0-9]+$/i, "");
+  
+  // Colapsar espacios múltiples
+  s = s.replace(/\s+/g, " ");
+  
+  // Quitar puntos al inicio y fin
+  s = s.trim().replace(/^\.+|\.+$/g, "");
+  
+  // Permitir solo caracteres válidos: letras, números, espacio, _, -, . y tildes/ñ
+  const allowed = /[^A-Za-z0-9 _\-.áéíóúÁÉÍÓÚñÑüÜ]/g;
+  s = s.replace(allowed, "");
+  
+  // Si queda vacío tras sanitizar, usar fallback
+  if (!s) s = "imagen";
+  
+  // Limitar longitud máxima
+  return s.slice(0, 60);
+}
+
+/**
+ * Extrae el nombre base de un archivo (sin extensión)
+ * @param {string} filename - Nombre del archivo completo
+ * @returns {string} Nombre base sin extensión
+ */
+function extractFileBaseName(filename) {
+  if (!filename) return "imagen";
+  
+  // Obtener solo el nombre del archivo (sin path)
+  const baseName = filename.split('/').pop().split('\\').pop();
+  
+  // Quitar extensión
+  const nameWithoutExt = baseName.replace(/\.[^.]*$/, '');
+  
+  return sanitizeFileBaseName(nameWithoutExt);
+}
+
 // ===== MANEJO DE FORMATOS =====
 
 /**
