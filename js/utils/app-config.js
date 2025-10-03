@@ -16,9 +16,9 @@ const AppConfig = {
   maxFileSize: 25 * 1024 * 1024, // 25MB
   allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'],
   
-  // Canvas settings
-  maxCanvasWidth: 800,
-  maxCanvasHeight: 600,
+  // Canvas settings - Aumentado para mantener calidad original
+  maxCanvasWidth: 2400,  // Aumentado de 800 a 2400 para alta resolución
+  maxCanvasHeight: 2400, // Aumentado de 600 a 2400 para mantener calidad
   
   // Validation limits
   maxTextLength: {

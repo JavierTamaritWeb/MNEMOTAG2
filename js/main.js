@@ -207,10 +207,17 @@
           throw new Error('Canvas element not found');
         }
         
-        ctx = canvas.getContext('2d');
+        ctx = canvas.getContext('2d', { 
+          alpha: true,
+          willReadFrequently: false // Optimizar para escritura, no lectura frecuente
+        });
         if (!ctx) {
           throw new Error('Canvas context not available');
         }
+        
+        // Configurar renderizado de alta calidad
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         
         // Configurar event listeners
         setupEventListeners();
@@ -1954,37 +1961,60 @@
     function setupCanvas() {
       if (!currentImage) return;
       
-      // Ajustar dimensiones máximas según el tamaño de pantalla
-      let maxWidth = 800;
-      let maxHeight = 600;
-      
-      // Para pantallas pequeñas, ajustar los límites
-      if (window.innerWidth <= 480) {
-        maxWidth = Math.min(window.innerWidth - 32, 400); // 32px de padding
-        maxHeight = Math.min(window.innerHeight * 0.6, 400); // 60% de altura de ventana
-      } else if (window.innerWidth <= 768) {
-        maxWidth = Math.min(window.innerWidth - 48, 600); // 48px de padding
-        maxHeight = Math.min(window.innerHeight * 0.7, 500);
-      }
+      // Usar dimensiones originales de la imagen para mantener calidad máxima
+      // Solo limitar en casos extremos (imágenes muy grandes)
+      const maxWidth = AppConfig.maxCanvasWidth || 2400;
+      const maxHeight = AppConfig.maxCanvasHeight || 2400;
       
       let { width, height } = currentImage;
       
-      // Calcular nuevas dimensiones manteniendo proporción
+      // Guardar dimensiones originales
+      originalImageDimensions = { width: currentImage.width, height: currentImage.height };
+      
+      // Solo redimensionar si la imagen es extremadamente grande
+      // Esto mantiene la calidad original en la mayoría de casos
+      let needsResize = false;
+      let ratio = 1;
+      
       if (width > maxWidth || height > maxHeight) {
-        const ratio = Math.min(maxWidth / width, maxHeight / height);
-        width *= ratio;
-        height *= ratio;
+        needsResize = true;
+        ratio = Math.min(maxWidth / width, maxHeight / height);
+        width = Math.round(width * ratio);
+        height = Math.round(height * ratio);
       }
       
+      // Configurar canvas con dimensiones calculadas
       canvas.width = width;
       canvas.height = height;
-      canvas.style.width = width + 'px';
-      canvas.style.height = height + 'px';
       
-      // Asegurar que el canvas mantenga sus proporciones
+      // Para pantallas pequeñas, ajustar solo la visualización CSS, no el canvas interno
+      // Esto mantiene la calidad mientras se adapta a la pantalla
+      if (window.innerWidth <= 768) {
+        const maxDisplayWidth = window.innerWidth - 48;
+        if (width > maxDisplayWidth) {
+          const displayRatio = maxDisplayWidth / width;
+          canvas.style.width = maxDisplayWidth + 'px';
+          canvas.style.height = Math.round(height * displayRatio) + 'px';
+        } else {
+          canvas.style.width = width + 'px';
+          canvas.style.height = height + 'px';
+        }
+      } else {
+        // En pantallas grandes, mostrar tamaño real del canvas
+        canvas.style.width = width + 'px';
+        canvas.style.height = height + 'px';
+      }
+      
+      // Configuración para mantener calidad de renderizado
       canvas.style.objectFit = 'contain';
       canvas.style.maxWidth = '100%';
       canvas.style.height = 'auto';
+      
+      // Mejorar calidad de renderizado del canvas
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      
+      console.log(`📐 Canvas configurado: ${width}x${height}px (Original: ${originalImageDimensions.width}x${originalImageDimensions.height}px, Ratio: ${ratio.toFixed(2)})`);
       
       // Configurar zoom con rueda del ratón en el canvas
       canvas.addEventListener('wheel', function(e) {
@@ -3216,9 +3246,17 @@
       
       const ctx = canvas.getContext('2d');
       
+      // Configurar renderizado de alta calidad
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      
       // Create a temporary canvas with original image
       const tempCanvas = document.createElement('canvas');
       const tempCtx = tempCanvas.getContext('2d');
+      
+      // Configurar alta calidad también en canvas temporal
+      tempCtx.imageSmoothingEnabled = true;
+      tempCtx.imageSmoothingQuality = 'high';
       
       // Use original dimensions for source
       tempCanvas.width = originalWidth;
@@ -3306,6 +3344,11 @@
         const canvas = document.getElementById('preview-canvas');
         if (canvas) {
           const ctx = canvas.getContext('2d');
+          
+          // Configurar alta calidad
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          
           canvas.width = currentImage.width;
           canvas.height = currentImage.height;
           ctx.clearRect(0, 0, canvas.width, canvas.height);

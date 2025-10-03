@@ -7,6 +7,7 @@
 **Nuevo Sistema `SmartDebounce`:**
 
 #### **Características Principales:**
+
 - **Debounce Inteligente**: 150ms optimizado con `requestAnimationFrame`
 - **Cancelación Automática**: Limpia timers y frames anteriores
 - **Doble Estrategia**: Debounce + AnimationFrame para máximo rendimiento
@@ -15,17 +16,21 @@
 #### **Tipos de Debounce:**
 
 1. **Intelligent Debounce (150ms)**
+
    ```javascript
    SmartDebounce.intelligent('preview-update', updatePreview, 150)
    ```
+
    - Usado para filtros individuales
    - Combina setTimeout + requestAnimationFrame
    - Optimizado para interacciones de usuario
 
 2. **Immediate Debounce (50ms)**
+
    ```javascript
    SmartDebounce.immediate('preview-immediate', updatePreview, 50)
    ```
+
    - Usado para presets (respuesta inmediata)
    - Solo requestAnimationFrame
    - Máxima responsividad
@@ -35,12 +40,14 @@
 **Sistema `FilterCache` Inteligente:**
 
 #### **Funcionalidades:**
+
 - **Hash de Estados**: Detección automática de cambios
 - **Timestamp Tracking**: Limpieza automática (5 minutos)
 - **Estado Dirty**: Optimización de aplicaciones innecesarias
 - **Memory Management**: Cleanup automático de cache antiguo
 
 #### **Métodos Principales:**
+
 ```javascript
 FilterCache.saveState(key, filterState)     // Guardar estado
 FilterCache.hasChanged(currentState)        // Detectar cambios
@@ -49,6 +56,7 @@ FilterCache.cleanup()                       // Limpiar cache antiguo
 ```
 
 #### **Optimizaciones Logradas:**
+
 - **Evita aplicaciones redundantes** si el estado no cambió
 - **Detección instantánea** de cambios mediante hash
 - **Memoria optimizada** con cleanup automático
@@ -59,6 +67,7 @@ FilterCache.cleanup()                       // Limpiar cache antiguo
 **Integración Completa con RAF:**
 
 #### **En FilterManager:**
+
 ```javascript
 // Aplicación inmediata con RAF
 this.applyFiltersImmediate = function() {
@@ -72,6 +81,7 @@ this.scheduleFilterUpdate = function() {
 ```
 
 #### **En updatePreview():**
+
 ```javascript
 requestAnimationFrame(() => {
   try {
@@ -87,6 +97,7 @@ requestAnimationFrame(() => {
 ```
 
 #### **En applyCanvasFilters():**
+
 ```javascript
 requestAnimationFrame(() => {
   canvas.style.transition = 'filter 0.2s ease';
@@ -105,22 +116,27 @@ requestAnimationFrame(() => {
 #### **Tipos de Loading:**
 
 1. **Loading Individual por Filtro**
+
    ```javascript
    FilterLoadingManager.showFilterLoading('brightness')
    ```
+
    - Indicador junto al control específico
    - Deshabilitación temporal del control
    - Animación de entrada/salida suave
 
 2. **Loading Global**
+
    ```javascript
    FilterLoadingManager.showFilterLoading() // Sin parámetro
    ```
+
    - Indicador en posición fija superior
    - Deshabilitación de todos los controles
    - Para presets y operaciones complejas
 
 #### **Funcionalidades del Loading:**
+
 - **Indicadores Visuales**: Spinners animados con texto
 - **Control Disabling**: Previene interacciones durante procesamiento
 - **Animaciones Suaves**: Transiciones de entrada/salida
@@ -128,6 +144,7 @@ requestAnimationFrame(() => {
 - **Responsive Design**: Adaptable a móviles
 
 #### **Estructura del Indicador:**
+
 ```html
 <div class="filter-loading-indicator">
   <div class="filter-spinner"></div>
@@ -140,6 +157,7 @@ requestAnimationFrame(() => {
 #### **Flujo Optimizado:**
 
 1. **Aplicación de Filtro Individual:**
+
    ```javascript
    applyFilter(filterName, value) {
      // 1. Verificar cambio real
@@ -158,6 +176,7 @@ requestAnimationFrame(() => {
    ```
 
 2. **Aplicación de Preset:**
+
    ```javascript
    applyPreset(presetName) {
      // 1. Verificar con cache
@@ -181,11 +200,13 @@ requestAnimationFrame(() => {
 ### 📊 **Métricas de Rendimiento**
 
 #### **Función de Debug:**
+
 ```javascript
 getFilterPerformanceMetrics() // En consola del navegador
 ```
 
 #### **Métricas Monitoreadas:**
+
 - **Cache Size**: Número de estados guardados
 - **Cache Dirty**: Si necesita actualización
 - **Active Loadings**: Loading states activos
@@ -195,6 +216,7 @@ getFilterPerformanceMetrics() // En consola del navegador
 ### 🎭 **Animaciones y Transiciones**
 
 #### **CSS Agregado para Loading:**
+
 ```css
 .filter-loading-indicator {
   display: flex;
@@ -215,6 +237,7 @@ getFilterPerformanceMetrics() // En consola del navegador
 ```
 
 #### **Transiciones Suaves:**
+
 - **Filtros CSS**: `transition: filter 0.2s ease`
 - **Controles**: Opacity y transform animados
 - **Indicadores**: Entrada/salida con escalado
@@ -223,6 +246,7 @@ getFilterPerformanceMetrics() // En consola del navegador
 ### 🧹 **Cleanup y Gestión de Memoria**
 
 #### **Limpieza Automática:**
+
 ```javascript
 // Cada 5 minutos
 setInterval(() => {
@@ -237,6 +261,7 @@ window.addEventListener('beforeunload', () => {
 ```
 
 #### **Prevención de Memory Leaks:**
+
 - **Timers**: Cancelación automática de timeouts
 - **Animation Frames**: Cancelación de RAF pendientes
 - **Event Listeners**: Cleanup en beforeunload
@@ -245,6 +270,7 @@ window.addEventListener('beforeunload', () => {
 ### 📱 **Responsive Design**
 
 #### **Adaptación Móvil:**
+
 ```css
 @media (max-width: 768px) {
   .filter-loading-indicator {
@@ -274,16 +300,19 @@ window.addEventListener('beforeunload', () => {
 ### 🔧 **Configuración Optimizada**
 
 #### **Tiempos de Debounce:**
+
 - **Filtros Individuales**: 150ms (equilibrio perfecto)
 - **Presets**: 50ms (respuesta inmediata)
 - **Historia**: 1000ms (evita spam)
 
 #### **Cache Settings:**
+
 - **TTL**: 5 minutos auto-cleanup
 - **Hash Algorithm**: JSON.stringify optimizado
 - **Max Size**: Ilimitado con cleanup temporal
 
 #### **Loading Thresholds:**
+
 - **Mostrar**: Inmediato en cambio
 - **Ocultar**: 200ms después de aplicar
 - **Transición**: 200ms suave
