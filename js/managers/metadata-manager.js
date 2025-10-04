@@ -22,18 +22,40 @@ const MetadataManager = {
   ],
   
   /**
-   * Generar copyright automático
+   * Generar copyright automático según la licencia seleccionada
    * @param {string} author - Nombre del autor
+   * @param {string} license - Tipo de licencia seleccionada
    * @returns {string} Copyright generado
    */
-  generateCopyright: function(author = '') {
+  generateCopyright: function(author = '', license = '') {
     const year = new Date().getFullYear();
     const authorName = author || document.getElementById('metaAuthor')?.value || 'Autor';
-    const template = this.copyrightTemplates[0]; // Usar plantilla por defecto
+    const selectedLicense = license || document.getElementById('metaLicense')?.value || '';
     
-    return template
-      .replace('{year}', year)
-      .replace('{author}', authorName);
+    // Generar copyright según el tipo de licencia
+    switch(selectedLicense) {
+      case 'all-rights-reserved':
+        return `© ${year} ${authorName}. Todos los derechos reservados.`;
+        
+      case 'cc-by':
+        return `© ${year} ${authorName}. Licencia Creative Commons Atribución 4.0 Internacional (CC BY 4.0)`;
+        
+      case 'cc-by-sa':
+        return `© ${year} ${authorName}. Licencia Creative Commons Atribución-CompartirIgual 4.0 Internacional (CC BY-SA 4.0)`;
+        
+      case 'cc-by-nc':
+        return `© ${year} ${authorName}. Licencia Creative Commons Atribución-NoComercial 4.0 Internacional (CC BY-NC 4.0)`;
+        
+      case 'cc0':
+        return `Dominio Público - ${authorName} renuncia a todos los derechos (CC0 1.0 Universal)`;
+        
+      case 'royalty-free':
+        return `© ${year} ${authorName}. Imagen libre de regalías.`;
+        
+      default:
+        // Si no hay licencia seleccionada, usar plantilla por defecto
+        return `© ${year} ${authorName}. Todos los derechos reservados.`;
+    }
   },
   
   /**
@@ -238,10 +260,11 @@ const MetadataManager = {
           const authorField = document.getElementById('metaAuthor');
           if (authorField) authorField.value = metadata.author;
         }
-        if (metadata.license) {
-          const licenseField = document.getElementById('metaLicense');
-          if (licenseField) licenseField.value = metadata.license;
-        }
+        // NO restaurar licencia automáticamente - dejar que el usuario la seleccione cada vez
+        // if (metadata.license) {
+        //   const licenseField = document.getElementById('metaLicense');
+        //   if (licenseField) licenseField.value = metadata.license;
+        // }
         
         // No restaurar ubicación automáticamente por privacidad
       }
@@ -341,6 +364,7 @@ const MetadataManager = {
  */
 function generateAutoCopyright() {
   const authorInput = document.getElementById('metaAuthor');
+  const licenseSelect = document.getElementById('metaLicense');
   const copyrightInput = document.getElementById('metaCopyright');
   
   // Si no hay autor, pedirlo
@@ -352,7 +376,8 @@ function generateAutoCopyright() {
     return;
   }
   
-  const autoCopyright = MetadataManager.generateCopyright(authorInput.value);
+  const selectedLicense = licenseSelect ? licenseSelect.value : '';
+  const autoCopyright = MetadataManager.generateCopyright(authorInput.value, selectedLicense);
   if (copyrightInput) {
     copyrightInput.value = autoCopyright;
   }

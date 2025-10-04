@@ -178,9 +178,8 @@
                     </div>
                     <div class="metadata-field">
                       <label for="metaLicense">Licencia</label>
-                      <select id="metaLicense" name="metaLicense"
-                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input">
-                        <option value="">Seleccionar licencia...</option>
+                      <select id="metaLicense" name="metaLicense" class="form-select">
+                        <option value="" selected>Seleccionar licencia...</option>
                         <option value="all-rights-reserved">Todos los derechos reservados</option>
                         <option value="cc-by">Creative Commons - Atribución</option>
                         <option value="cc-by-sa">Creative Commons - Atribución-CompartirIgual</option>
@@ -353,6 +352,17 @@
                           <option value="Times New Roman">Times New Roman</option>
                           <option value="Courier New">Courier New</option>
                           <option value="Georgia">Georgia</option>
+                          <option value="Roboto">Roboto</option>
+                          <option value="Montserrat">Montserrat</option>
+                          <option value="Montserrat Alternates">Montserrat Alternates</option>
+                          <option value="Open Sans">Open Sans</option>
+                          <option value="Lato">Lato</option>
+                          <option value="Poppins">Poppins</option>
+                          <option value="Inter">Inter</option>
+                          <option value="Playfair Display">Playfair Display</option>
+                          <option value="Bebas Neue">Bebas Neue</option>
+                          <option value="Dancing Script">Dancing Script</option>
+                          <option value="Lobster">Lobster</option>
                         </select>
                       </div>
                       <div class="mb-4">
@@ -410,8 +420,17 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div class="mb-4">
                         <label for="watermark-image" class="block text-gray-700 font-medium mb-2 form-label">Imagen de marca</label>
-                        <input type="file" id="watermark-image" name="watermark-image" accept=".png,.webp"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input">
+                        <div class="relative">
+                          <input type="file" id="watermark-image" name="watermark-image" accept=".png,.webp"
+                                 class="hidden">
+                          <label for="watermark-image" 
+                                 class="flex items-center justify-center gap-2 w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium rounded-lg cursor-pointer hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-md hover:shadow-lg">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                            <span id="watermark-file-label">Seleccionar archivo</span>
+                          </label>
+                        </div>
                         <small class="text-xs text-blue-600 mt-1 block">
                           <i class="fas fa-info-circle mr-1"></i>
                           Se priorizan PNG y WebP por soporte de transparencia
@@ -753,9 +772,9 @@
                       <!-- Rotation controls -->
                       <div class="space-y-3">
                         <!-- Current rotation display -->
-                        <div id="current-rotation-display" class="p-2 bg-gray-50 rounded text-sm hidden">
-                          <span class="text-gray-600">Rotación actual: </span>
-                          <span id="current-rotation" class="font-medium">0°</span>
+                        <div id="current-rotation-display" class="p-3 bg-white border border-blue-200 rounded-lg text-sm shadow-sm hidden">
+                          <span class="text-gray-700">Rotación actual: </span>
+                          <span id="current-rotation" class="font-semibold text-blue-600">0°</span>
                         </div>
                         
                         <!-- Rotation buttons -->
@@ -850,9 +869,9 @@
                         </div>
                         
                         <!-- Preview del nombre final -->
-                        <div id="filename-preview" class="bg-gray-50 border border-gray-200 rounded-md p-2 text-sm hidden">
-                          <span class="text-gray-600">Archivo final: </span>
-                          <span id="filename-preview-text" class="font-medium text-gray-800">imagen.jpg</span>
+                        <div id="filename-preview" class="bg-white border border-blue-200 rounded-lg p-3 text-sm shadow-sm hidden">
+                          <span class="text-gray-700">Archivo final: </span>
+                          <span id="filename-preview-text" class="font-semibold text-blue-600">imagen.jpg</span>
                         </div>
                       </div>
                     </div>
@@ -921,23 +940,49 @@
             </div>
             <div class="mt-4 flex justify-between gap-3">
               <div class="flex gap-2">
-                <button id="undo-btn" class="btn btn-primary button--action" disabled>
+                <button id="undo-btn" class="btn btn-primary button--action" disabled title="⏪ Deshacer última acción&#10;Atajo: ⌘Z">
                   <i class="fas fa-undo-alt" aria-hidden="true"></i>
                   Deshacer
                 </button>
-                <button id="redo-btn" class="btn btn-primary button--action" disabled>
+                <button id="redo-btn" class="btn btn-primary button--action" disabled title="⏩ Rehacer acción deshecha&#10;Atajo: ⌘⇧Z o ⌘Y">
                   <i class="fas fa-redo-alt" aria-hidden="true"></i>
                   Rehacer
                 </button>
               </div>
               <div class="flex gap-2 flex-wrap action-buttons">
-                <button id="reset-changes" class="btn btn-primary button--action">
+                <button id="reset-changes" class="btn btn-primary button--action" title="Restablecer cambios&#10;Atajo: ⌘⇧R">
                   <i class="fas fa-refresh" aria-hidden="true"></i>
                   Restablecer
                 </button>
-                <button id="download-image" class="btn btn-primary button--action">
+                <button id="download-image" class="btn btn-primary button--action" title="Descargar imagen&#10;Atajo: ⌘S">
                   <i class="fas fa-download" aria-hidden="true"></i>
                   Descargar imagen
+                </button>
+              </div>
+            </div>
+            
+            <!-- Nuevas Funcionalidades v3.1 -->
+            <div class="advanced-tools-container">
+              <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2 uppercase">
+                <i class="fas fa-sparkles text-purple-500"></i>
+                Herramientas Avanzadas
+              </h3>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <button id="batch-mode-btn" class="btn btn-secondary button--feature" title="📦 Procesar múltiples imágenes&#10;Atajo: ⌘B">
+                  <i class="fas fa-layer-group"></i>
+                  <span>Lote</span>
+                </button>
+                <button id="text-layers-btn" class="btn btn-secondary button--feature" title="📝 Agregar capas de texto personalizadas&#10;Atajo: ⌘T">
+                  <i class="fas fa-text-height"></i>
+                  <span>Texto</span>
+                </button>
+                <button id="crop-mode-btn" class="btn btn-secondary button--feature" title="✂️ Recortar y redimensionar imagen&#10;Atajo: ⌘R">
+                  <i class="fas fa-crop-alt"></i>
+                  <span>Recortar</span>
+                </button>
+                <button id="shortcuts-help-btn" class="btn btn-secondary button--feature" title="⌨️ Ver todos los atajos de teclado&#10;Atajo: ⌘⇧?">
+                  <i class="fas fa-keyboard"></i>
+                  <span>Atajos</span>
                 </button>
               </div>
             </div>
@@ -946,16 +991,453 @@
       </div>
     </main>
 
+    <!-- ============================== -->
+    <!-- MODALES Y PANELES v3.1         -->
+    <!-- ============================== -->
+    
+    <!-- Modal: Batch Processing -->
+    <div id="batch-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-container modal-large">
+        <div class="modal-header">
+          <h2 class="modal-title">
+            <i class="fas fa-layer-group text-purple-500"></i>
+            Procesamiento por Lotes
+          </h2>
+          <button class="modal-close" onclick="closeBatchModal()">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        
+        <div class="modal-body">
+          <!-- Drop Zone -->
+          <div id="batch-dropzone" class="dropzone">
+            <input type="file" id="batch-file-input" multiple accept="image/*" style="display: none;">
+            <i class="fas fa-cloud-upload-alt text-6xl text-gray-400 mb-4"></i>
+            <p class="text-lg font-semibold text-gray-700 dark:text-gray-300">Arrastra imágenes aquí</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">o haz clic para seleccionar</p>
+            <p class="text-xs text-gray-400 dark:text-gray-500 mt-2">Hasta 50 imágenes • Máx 50MB cada una</p>
+          </div>
+          
+          <!-- Lista de imágenes -->
+          <div id="batch-images-list" class="mt-4" style="display: none;">
+            <div class="flex justify-between items-center mb-3">
+              <h3 class="font-semibold text-gray-700 dark:text-gray-300">
+                <span id="batch-count">0</span> imágenes cargadas
+              </h3>
+              <button onclick="clearBatchQueue()" class="text-sm text-red-600 hover:text-red-700">
+                <i class="fas fa-trash"></i> Limpiar todo
+              </button>
+            </div>
+            <div id="batch-items" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-64 overflow-y-auto">
+              <!-- Items se agregarán dinámicamente -->
+            </div>
+          </div>
+          
+          <!-- Configuración -->
+          <div id="batch-config" class="mt-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg" style="display: none;">
+            <h3 class="font-semibold text-gray-700 dark:text-gray-300 mb-3">Aplicar a todas las imágenes:</h3>
+            <div class="space-y-2">
+              <label class="flex items-center gap-2">
+                <input type="checkbox" id="batch-apply-filters" checked class="form-checkbox">
+                <span>Filtros actuales</span>
+              </label>
+              <label class="flex items-center gap-2">
+                <input type="checkbox" id="batch-apply-watermarks" checked class="form-checkbox">
+                <span>Marcas de agua</span>
+              </label>
+              <label class="flex items-center gap-2">
+                <input type="checkbox" id="batch-apply-text-layers" checked class="form-checkbox">
+                <span>Capas de texto</span>
+              </label>
+              <label class="flex items-center gap-2">
+                <input type="checkbox" id="batch-apply-metadata" class="form-checkbox">
+                <span>Metadatos</span>
+              </label>
+            </div>
+          </div>
+          
+          <!-- Progress -->
+          <div id="batch-progress" class="mt-4" style="display: none;">
+            <div class="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
+              <span id="batch-progress-text">Procesando...</span>
+              <span id="batch-progress-percent">0%</span>
+            </div>
+            <div class="progress-bar-container">
+              <div id="batch-progress-bar" class="progress-bar-fill" style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="modal-footer">
+          <button onclick="closeBatchModal()" class="px-6 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-semibold rounded-lg transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg">
+            <i class="fas fa-times"></i> 
+            <span>Cancelar</span>
+          </button>
+          <button id="batch-process-btn" onclick="processBatch()" class="px-6 py-3 bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-semibold rounded-lg transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+            <i class="fas fa-play"></i> 
+            <span>Procesar</span>
+          </button>
+          <button id="batch-download-btn" onclick="downloadBatchZip()" class="px-6 py-3 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-semibold rounded-lg transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg" style="display: none;">
+            <i class="fas fa-download"></i> 
+            <span>Descargar ZIP</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Panel: Capas de Texto -->
+    <div id="text-layers-panel" class="side-panel" style="display: none;">
+      <div class="side-panel-header">
+        <h2 class="side-panel-title">
+          <i class="fas fa-text-height text-blue-500"></i>
+          Capas de Texto
+        </h2>
+        <button class="side-panel-close" onclick="closeTextLayersPanel()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <div class="side-panel-body">
+        <!-- Plantillas Rápidas -->
+        <div class="mb-4">
+          <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Plantillas Rápidas</h3>
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="applyTextTemplate('modern')" class="template-btn">
+              <span class="template-name">Moderno</span>
+            </button>
+            <button onclick="applyTextTemplate('elegant')" class="template-btn">
+              <span class="template-name">Elegante</span>
+            </button>
+            <button onclick="applyTextTemplate('neon')" class="template-btn">
+              <span class="template-name">Neon</span>
+            </button>
+            <button onclick="applyTextTemplate('vintage')" class="template-btn">
+              <span class="template-name">Vintage</span>
+            </button>
+            <button onclick="applyTextTemplate('minimal')" class="template-btn">
+              <span class="template-name">Minimal</span>
+            </button>
+            <button onclick="applyTextTemplate('dramatic')" class="template-btn">
+              <span class="template-name">Dramático</span>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Lista de Capas -->
+        <div class="mb-4">
+          <div class="flex justify-between items-center mb-2">
+            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">
+              Capas (<span id="text-layers-count">0</span>/10)
+            </h3>
+            <button onclick="addNewTextLayer()" class="btn-icon-small" title="Nueva capa">
+              <i class="fas fa-plus"></i>
+            </button>
+          </div>
+          <div id="text-layers-list" class="space-y-2 max-h-48 overflow-y-auto">
+            <p class="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+              No hay capas de texto
+            </p>
+          </div>
+        </div>
+        
+        <!-- Editor de Capa Activa -->
+        <div id="text-layer-editor" class="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg" style="display: none;">
+          <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Editar Capa</h3>
+          
+          <div class="space-y-3">
+            <!-- Texto -->
+            <div>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Texto</label>
+              <textarea id="text-layer-text" rows="2" class="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"></textarea>
+            </div>
+            
+            <!-- Fuente -->
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Fuente</label>
+                <select id="text-layer-font" class="w-full px-2 py-1 border rounded-md dark:bg-gray-700 dark:border-gray-600 text-sm">
+                  <option>Roboto</option>
+                  <option>Montserrat</option>
+                  <option>Montserrat Alternates</option>
+                  <option>Bebas Neue</option>
+                  <option>Playfair Display</option>
+                  <option>Dancing Script</option>
+                  <option>Poppins</option>
+                  <option>Inter</option>
+                  <option>Lobster</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Tamaño</label>
+                <input type="number" id="text-layer-size" min="10" max="200" value="40" class="w-full px-2 py-1 border rounded-md dark:bg-gray-700 dark:border-gray-600">
+              </div>
+            </div>
+            
+            <!-- Color -->
+            <div>
+              <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Color</label>
+              <input type="color" id="text-layer-color" value="#ffffff" class="w-full h-10 border rounded-md">
+            </div>
+            
+            <!-- Posición -->
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">X</label>
+                <input type="number" id="text-layer-x" min="0" value="50" class="w-full px-2 py-1 border rounded-md dark:bg-gray-700 dark:border-gray-600">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Y</label>
+                <input type="number" id="text-layer-y" min="0" value="50" class="w-full px-2 py-1 border rounded-md dark:bg-gray-700 dark:border-gray-600">
+              </div>
+            </div>
+            
+            <!-- Efectos -->
+            <div>
+              <label class="flex items-center gap-2 mb-2">
+                <input type="checkbox" id="text-layer-shadow" class="form-checkbox">
+                <span class="text-xs font-medium">Sombra</span>
+              </label>
+              <label class="flex items-center gap-2">
+                <input type="checkbox" id="text-layer-stroke" class="form-checkbox">
+                <span class="text-xs font-medium">Borde</span>
+              </label>
+            </div>
+            
+            <!-- Botones -->
+            <div class="flex gap-2 pt-2">
+              <button onclick="updateActiveTextLayer()" class="btn btn-primary btn-sm flex-1">
+                <i class="fas fa-check"></i> Aplicar
+              </button>
+              <button onclick="deleteActiveTextLayer()" class="btn btn-danger btn-sm">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Panel: Crop -->
+    <div id="crop-panel" class="side-panel" style="display: none;">
+      <div class="side-panel-header">
+        <h2 class="side-panel-title">
+          <i class="fas fa-crop-alt text-green-500"></i>
+          Recortar Imagen
+        </h2>
+        <button class="side-panel-close" onclick="closeCropPanel()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      
+      <div class="side-panel-body">
+        <!-- Proporción -->
+        <div class="mb-4">
+          <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Proporción</label>
+          <select id="crop-aspect-ratio" onchange="changeCropAspectRatio()" class="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600">
+            <option value="free">Libre</option>
+            <option value="1:1">Cuadrado (1:1)</option>
+            <option value="16:9">Horizontal (16:9)</option>
+            <option value="9:16">Vertical (9:16)</option>
+            <option value="4:3">Clásico (4:3)</option>
+            <option value="3:2">Fotografía (3:2)</option>
+            <option value="21:9">Cinemático (21:9)</option>
+          </select>
+        </div>
+        
+        <!-- Dimensiones -->
+        <div id="crop-info" class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg mb-4">
+          <div class="text-sm space-y-1">
+            <div class="flex justify-between">
+              <span class="text-gray-600 dark:text-gray-400">Ancho:</span>
+              <span class="font-semibold text-gray-800 dark:text-gray-200" id="crop-width">-</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-600 dark:text-gray-400">Alto:</span>
+              <span class="font-semibold text-gray-800 dark:text-gray-200" id="crop-height">-</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-gray-600 dark:text-gray-400">Proporción:</span>
+              <span class="font-semibold text-gray-800 dark:text-gray-200" id="crop-ratio">-</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Grid -->
+        <div class="mb-4">
+          <label class="flex items-center gap-2">
+            <input type="checkbox" id="crop-show-grid" checked onchange="toggleCropGrid()" class="form-checkbox">
+            <span class="text-sm">Mostrar grid de tercios</span>
+          </label>
+        </div>
+        
+        <!-- Sugerencias -->
+        <div class="mb-4">
+          <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Sugerencias Automáticas</h3>
+          <div class="space-y-2">
+            <button onclick="applyCropSuggestion(0)" class="w-full btn btn-outline btn-sm text-left">
+              <i class="fas fa-crosshairs"></i> Centrado
+            </button>
+            <button onclick="applyCropSuggestion(1)" class="w-full btn btn-outline btn-sm text-left">
+              <i class="fas fa-th"></i> Regla de Tercios
+            </button>
+            <button onclick="applyCropSuggestion(2)" class="w-full btn btn-outline btn-sm text-left">
+              <i class="fas fa-magic"></i> Contenido Inteligente
+            </button>
+          </div>
+        </div>
+        
+        <!-- Botones de acción -->
+        <div class="space-y-2">
+          <button onclick="applyCrop()" class="w-full btn btn-success">
+            <i class="fas fa-check"></i> Aplicar Recorte
+          </button>
+          <button onclick="cancelCrop()" class="w-full btn btn-secondary">
+            <i class="fas fa-times"></i> Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Modal: Atajos de Teclado -->
+    <div id="shortcuts-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-container">
+        <div class="modal-header">
+          <h2 class="modal-title">
+            <i class="fas fa-keyboard text-indigo-500"></i>
+            Atajos de Teclado
+          </h2>
+          <button class="modal-close" onclick="closeShortcutsModal()">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        
+        <div class="modal-body">
+          <div class="shortcuts-grid">
+            <!-- Edición -->
+            <div class="shortcut-section">
+              <h3 class="shortcut-section-title">Edición</h3>
+              <div class="shortcut-item">
+                <kbd class="shortcut-keys"><span class="mod-key">⌘</span> + Z</kbd>
+                <span class="shortcut-desc">Deshacer</span>
+              </div>
+              <div class="shortcut-item">
+                <kbd class="shortcut-keys"><span class="mod-key">⌘</span> + ⇧ + Z</kbd>
+                <span class="shortcut-desc">Rehacer</span>
+              </div>
+              <div class="shortcut-item">
+                <kbd class="shortcut-keys"><span class="mod-key">⌘</span> + D</kbd>
+                <span class="shortcut-desc">Duplicar capa</span>
+              </div>
+              <div class="shortcut-item">
+                <kbd class="shortcut-keys">Delete</kbd>
+                <span class="shortcut-desc">Eliminar capa</span>
+              </div>
+              <div class="shortcut-item">
+                <kbd class="shortcut-keys"><span class="mod-key">⌘</span> + ⇧ + R</kbd>
+                <span class="shortcut-desc">Restablecer filtros</span>
+              </div>
+            </div>
+            
+            <!-- Archivo -->
+            <div class="shortcut-section">
+              <h3 class="shortcut-section-title">Archivo</h3>
+              <div class="shortcut-item">
+                <kbd class="shortcut-keys"><span class="mod-key">⌘</span> + S</kbd>
+                <span class="shortcut-desc">Guardar imagen</span>
+              </div>
+              <div class="shortcut-item">
+                <kbd class="shortcut-keys"><span class="mod-key">⌘</span> + ⇧ + C</kbd>
+                <span class="shortcut-desc">Copiar imagen al portapapeles</span>
+              </div>
+              <div class="shortcut-item">
+                <kbd class="shortcut-keys"><span class="mod-key">⌘</span> + ⇧ + V</kbd>
+                <span class="shortcut-desc">Pegar imagen desde portapapeles</span>
+              </div>
+              <div class="shortcut-item">
+                <kbd class="shortcut-keys"><span class="mod-key">⌘</span> + ⇧ + X</kbd>
+                <span class="shortcut-desc">Exportar como...</span>
+              </div>
+            </div>
+            
+            <!-- Herramientas -->
+            <div class="shortcut-section">
+              <h3 class="shortcut-section-title">Herramientas</h3>
+              <div class="shortcut-item">
+                <kbd class="shortcut-keys"><span class="mod-key">⌘</span> + B</kbd>
+                <span class="shortcut-desc">Procesamiento por lotes</span>
+              </div>
+              <div class="shortcut-item">
+                <kbd class="shortcut-keys"><span class="mod-key">⌘</span> + T</kbd>
+                <span class="shortcut-desc">Capas de texto</span>
+              </div>
+              <div class="shortcut-item">
+                <kbd class="shortcut-keys"><span class="mod-key">⌘</span> + R</kbd>
+                <span class="shortcut-desc">Activar recorte</span>
+              </div>
+              <div class="shortcut-item">
+                <kbd class="shortcut-keys"><span class="mod-key">⌘</span> + ⇧ + ?</kbd>
+                <span class="shortcut-desc">Mostrar atajos</span>
+              </div>
+            </div>
+            
+            <!-- Vista -->
+            <div class="shortcut-section">
+              <h3 class="shortcut-section-title">Vista</h3>
+              <div class="shortcut-item">
+                <kbd class="shortcut-keys">Espacio</kbd>
+                <span class="shortcut-desc">Ver original (mantener)</span>
+              </div>
+              <div class="shortcut-item">
+                <kbd class="shortcut-keys">+</kbd>
+                <span class="shortcut-desc">Zoom in</span>
+              </div>
+              <div class="shortcut-item">
+                <kbd class="shortcut-keys">-</kbd>
+                <span class="shortcut-desc">Zoom out</span>
+              </div>
+              <div class="shortcut-item">
+                <kbd class="shortcut-keys">0</kbd>
+                <span class="shortcut-desc">Zoom 100%</span>
+              </div>
+            </div>
+            
+            <!-- General -->
+            <div class="shortcut-section">
+              <h3 class="shortcut-section-title">General</h3>
+              <div class="shortcut-item">
+                <kbd class="shortcut-keys">Esc</kbd>
+                <span class="shortcut-desc">Cancelar operación</span>
+              </div>
+            </div>
+          </div>
+          
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-4 text-center">
+            <i class="fas fa-info-circle"></i>
+            Los atajos nativos de Mac (⌘+C, ⌘+V, ⌘+X) funcionan normalmente en campos de texto
+          </p>
+        </div>
+      </div>
+    </div>
+
     <footer class="mt-12 text-center text-gray-500 text-sm">
       <p class="footer-text">© 2025 MnemoTag. Todos los derechos reservados.</p>
     </footer>
   </div>
+    <!-- External Dependencies -->
+    <!-- JSZip para batch processing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
+    <!-- Google Fonts API para text layers -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
     <!-- Scripts -->
   <script src="js/utils/app-config.js"></script>
   <script src="js/utils/helpers.js"></script>
   <script src="js/utils/smart-debounce.js"></script>
   <script src="js/utils/filter-cache.js"></script>
   <script src="js/utils/fallback-processor.js"></script>
+  <script src="js/utils/keyboard-shortcuts.js"></script>
   <script src="js/managers/security-manager.js"></script>
   <script src="js/managers/worker-manager.js"></script>
   <script src="js/managers/history-manager.js"></script>
@@ -963,6 +1445,9 @@
   <script src="js/managers/filter-loading-manager.js"></script>
   <script src="js/managers/filter-manager.js"></script>
   <script src="js/managers/ui-manager.js"></script>
+  <script src="js/managers/batch-manager.js"></script>
+  <script src="js/managers/text-layer-manager.js"></script>
+  <script src="js/managers/crop-manager.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

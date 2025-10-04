@@ -41,6 +41,12 @@
     let isPositioningMode = false;
     let watermarkImagePreview = null;
     
+    // Managers Avanzados (Nuevos)
+    let keyboardShortcuts = null;
+    let batchManager = null;
+    let textLayerManager = null;
+    let cropManager = null;
+    
     // HistoryManager extraído a js/managers/history-manager.js
     
     // Cache para optimización de rendimiento - MEJORADO
@@ -266,6 +272,12 @@
           // Inicializar controles de salida
           initializeOutputControls();
         }, 100);
+        
+        // Inicializar managers avanzados
+        initializeAdvancedManagers();
+        
+        // Configurar atajos de teclado
+        setupKeyboardShortcuts();
         
         console.log('Aplicación inicializada correctamente');
         
@@ -654,6 +666,19 @@
           });
         }
         
+        // Auto-actualizar copyright cuando cambia la licencia
+        const licenseSelect = document.getElementById('metaLicense');
+        if (licenseSelect) {
+          licenseSelect.addEventListener('change', () => {
+            const copyrightInput = document.getElementById('metaCopyright');
+            const authorInput = document.getElementById('metaAuthor');
+            if (authorInput && authorInput.value) {
+              // Regenerar copyright con la nueva licencia
+              generateAutoCopyright();
+            }
+          });
+        }
+        
         // Upload de archivos con optimización
         const dropArea = document.getElementById('drop-area');
         const fileInput = document.getElementById('file-input');
@@ -748,6 +773,31 @@
                 // Llamar a la función de actualización original
                 debouncedUpdatePreview(e);
               });
+            } else if (id === 'watermark-font') {
+              // Cargar fuente de Google Fonts si es necesaria
+              element.addEventListener(event, async (e) => {
+                const fontFamily = e.target.value;
+                const googleFonts = ['Roboto', 'Montserrat', 'Montserrat Alternates', 'Open Sans', 'Lato', 'Poppins', 'Inter', 'Playfair Display', 'Bebas Neue', 'Dancing Script', 'Lobster'];
+                
+                if (googleFonts.includes(fontFamily)) {
+                  try {
+                    const fontUrl = `https://fonts.googleapis.com/css2?family=${fontFamily.replace(/ /g, '+')}:wght@300;400;600;700&display=swap`;
+                    const existingLink = document.querySelector(`link[href*="${fontFamily.replace(/ /g, '+')}"]`);
+                    
+                    if (!existingLink) {
+                      const link = document.createElement('link');
+                      link.rel = 'stylesheet';
+                      link.href = fontUrl;
+                      document.head.appendChild(link);
+                      await document.fonts.load(`16px "${fontFamily}"`);
+                      console.log(`✅ Google Font cargada para marca de agua: ${fontFamily}`);
+                    }
+                  } catch (error) {
+                    console.warn(`Error cargando fuente ${fontFamily}:`, error);
+                  }
+                }
+                debouncedUpdatePreview(e);
+              });
             } else {
               // Usar el listener original para otros elementos
               element.addEventListener(event, debouncedUpdatePreview);
@@ -792,6 +842,56 @@
         
         if (redoBtn) {
           redoBtn.addEventListener('click', () => historyManager.redo());
+        }
+        
+        // Advanced Tools buttons (v3.1)
+        const batchModeBtn = document.getElementById('batch-mode-btn');
+        const textLayersBtn = document.getElementById('text-layers-btn');
+        const cropModeBtn = document.getElementById('crop-mode-btn');
+        const shortcutsHelpBtn = document.getElementById('shortcuts-help-btn');
+        
+        if (batchModeBtn) {
+          batchModeBtn.addEventListener('click', () => {
+            if (typeof window.openBatchModal === 'function') {
+              window.openBatchModal();
+            } else {
+              console.error('❌ openBatchModal no está definida. Verifica que initializeAdvancedUI() se haya ejecutado.');
+            }
+          });
+          console.log('✅ Event listener de Batch Mode configurado');
+        }
+        
+        if (textLayersBtn) {
+          textLayersBtn.addEventListener('click', () => {
+            if (typeof window.openTextLayersPanel === 'function') {
+              window.openTextLayersPanel();
+            } else {
+              console.error('❌ openTextLayersPanel no está definida. Verifica que initializeAdvancedUI() se haya ejecutado.');
+            }
+          });
+          console.log('✅ Event listener de Text Layers configurado');
+        }
+        
+        if (cropModeBtn) {
+          cropModeBtn.addEventListener('click', () => {
+            if (typeof window.openCropPanel === 'function') {
+              window.openCropPanel();
+            } else {
+              console.error('❌ openCropPanel no está definida. Verifica que initializeAdvancedUI() se haya ejecutado.');
+            }
+          });
+          console.log('✅ Event listener de Crop Mode configurado');
+        }
+        
+        if (shortcutsHelpBtn) {
+          shortcutsHelpBtn.addEventListener('click', () => {
+            if (typeof window.openShortcutsModal === 'function') {
+              window.openShortcutsModal();
+            } else {
+              console.error('❌ openShortcutsModal no está definida. Verifica que initializeAdvancedUI() se haya ejecutado.');
+            }
+          });
+          console.log('✅ Event listener de Shortcuts configurado');
         }
         
         // Compare and fullscreen buttons
@@ -1056,6 +1156,21 @@
       // Clear cache when new image is selected
       cache.watermarkImage = null;
       cache.lastWatermarkConfig = null;
+      
+      // Update button label with filename
+      const watermarkInput = document.getElementById('watermark-image');
+      const labelSpan = document.getElementById('watermark-file-label');
+      
+      if (watermarkInput && labelSpan) {
+        if (watermarkInput.files && watermarkInput.files[0]) {
+          const fileName = watermarkInput.files[0].name;
+          const shortName = fileName.length > 25 ? fileName.substring(0, 22) + '...' : fileName;
+          labelSpan.textContent = shortName;
+        } else {
+          labelSpan.textContent = 'Seleccionar archivo';
+        }
+      }
+      
       debouncedUpdatePreview();
     }
 
@@ -1253,11 +1368,16 @@
         event.target.value = sanitized;
       }
       
+      // Actualizar variable global inmediatamente
+      fileBaseName = sanitized || 'imagen';
+      
       // Validar y actualizar estado
       validateAndUpdateFileBaseName(sanitized);
       
       // Actualizar preview del nombre final
       updateFilenamePreview();
+      
+      console.log('✅ Nombre de archivo actualizado a:', fileBaseName);
     }
 
     /**
@@ -2807,14 +2927,26 @@
         
         // Obtener el título y sanitizar el nombre del archivo
         // Usar fileBaseName personalizado o fallback a metadata/título
+        const basenameInput = document.getElementById('file-basename');
+        const customBaseName = basenameInput ? basenameInput.value.trim() : '';
         const titleInput = document.getElementById('metaTitle');
-        const isValidBaseName = SecurityManager.isValidFileBaseName(fileBaseName);
-        let filename = isValidBaseName ? fileBaseName : 
-                      (metadata.title || titleInput.value.trim() || 'imagen');
         
-        // Sanitizar solo si no usamos fileBaseName (que ya está sanitizado)
-        if (!isValidBaseName) {
-          filename = sanitizeFilename(filename);
+        // Prioridad: 1) Input personalizado (ya sanitizado), 2) fileBaseName actual, 3) Metadata, 4) Fallback
+        let filename = customBaseName || fileBaseName;
+        
+        // Solo si no hay nombre personalizado, usar metadata o fallback
+        if (!filename || filename === 'imagen') {
+          filename = metadata.title || titleInput.value.trim() || 'imagen';
+          // Sanitizar solo si viene de metadata/título
+          filename = sanitizeFileBaseName(filename);
+        }
+        
+        console.log('📥 Descargando con nombre:', filename, '(Input:', customBaseName, ', Variable:', fileBaseName, ')');
+        
+        // Validar que el nombre sea válido (ya está sanitizado por sanitizeFileBaseName)
+        if (!SecurityManager.isValidFileBaseName(filename)) {
+          console.warn('⚠️ Nombre inválido, usando fallback:', filename);
+          filename = 'imagen'; // Fallback seguro
         }
         
         // Usar el formato final determinado por el sistema de fallback
@@ -3516,17 +3648,32 @@
         // Wait for more progress
         await new Promise(resolve => setTimeout(resolve, 800));
         
-        // Generar nombre del archivo basado en el título o usar uno por defecto
-        let filename = 'imagen-editada';
+        // Generar nombre del archivo usando el campo personalizado o fallback
+        const basenameInput = document.getElementById('file-basename');
+        const customBaseName = basenameInput ? basenameInput.value.trim() : '';
         
-        if (metadata.title && metadata.title.trim()) {
-          filename = metadata.title.trim();
-        } else if (currentFile && currentFile.name) {
-          filename = currentFile.name.replace(/\.[^/.]+$/, '');
+        // Prioridad: 1) Input personalizado, 2) fileBaseName, 3) Metadata.title, 4) Nombre original, 5) Fallback
+        let filename = customBaseName || fileBaseName;
+        
+        if (!filename || filename === 'imagen') {
+          if (metadata.title && metadata.title.trim()) {
+            filename = metadata.title.trim();
+            filename = sanitizeFileBaseName(filename);
+          } else if (currentFile && currentFile.name) {
+            filename = currentFile.name.replace(/\.[^/.]+$/, '');
+            filename = sanitizeFileBaseName(filename);
+          } else {
+            filename = 'imagen-editada';
+          }
         }
         
-        // Limpiar el nombre de archivo
-        filename = sanitizeFilename(filename);
+        console.log('📥 Descarga con progreso - nombre:', filename, '(Input:', customBaseName, ', Variable:', fileBaseName, ')');
+        
+        // Validar que el nombre sea válido
+        if (!SecurityManager.isValidFileBaseName(filename)) {
+          console.warn('⚠️ Nombre inválido en descarga con progreso, usando fallback');
+          filename = 'imagen-editada';
+        }
         
         // Usar el formato seleccionado en lugar de la extensión original
         const extension = getFileExtension(outputFormat);
@@ -4500,6 +4647,917 @@
       });
       return metrics;
     };
+
+    // ===== ADVANCED MANAGERS INITIALIZATION =====
     
+    /**
+     * Inicializar managers avanzados
+     */
+    function initializeAdvancedManagers() {
+      try {
+        // Inicializar Keyboard Shortcuts
+        keyboardShortcuts = new KeyboardShortcutManager();
+        console.log('✅ KeyboardShortcutManager inicializado');
+        
+        // Inicializar Batch Manager
+        batchManager = new BatchManager();
+        console.log('✅ BatchManager inicializado');
+        
+        // Inicializar Text Layer Manager
+        textLayerManager = new TextLayerManager();
+        console.log('✅ TextLayerManager inicializado');
+        
+        // Inicializar Crop Manager con el canvas
+        if (canvas) {
+          cropManager = new CropManager(canvas);
+          console.log('✅ CropManager inicializado');
+        } else {
+          console.warn('⚠️ Canvas no disponible, CropManager no inicializado');
+        }
+        
+        console.log('✅ Managers avanzados listos');
+        
+      } catch (error) {
+        console.error('Error inicializando managers avanzados:', error);
+      }
+    }
+    
+    /**
+     * Configurar atajos de teclado
+     */
+    function setupKeyboardShortcuts() {
+      if (!keyboardShortcuts) return;
+      
+      try {
+        // Ctrl/Cmd + Z: Deshacer
+        keyboardShortcuts.register('z', ['ctrl'], () => {
+          if (historyManager && historyManager.canUndo()) {
+            historyManager.undo();
+            UIManager.showSuccess('Deshecho');
+          }
+        }, { description: 'Deshacer última acción' });
+        
+        // Ctrl/Cmd + Shift + Z o Ctrl/Cmd + Y: Rehacer
+        keyboardShortcuts.register('z', ['ctrl', 'shift'], () => {
+          if (historyManager && historyManager.canRedo()) {
+            historyManager.redo();
+            UIManager.showSuccess('Rehecho');
+          }
+        }, { description: 'Rehacer acción' });
+        
+        keyboardShortcuts.register('y', ['ctrl'], () => {
+          if (historyManager && historyManager.canRedo()) {
+            historyManager.redo();
+            UIManager.showSuccess('Rehecho');
+          }
+        }, { description: 'Rehacer acción' });
+        
+        // Ctrl/Cmd + S: Guardar/Exportar (solo cuando NO estés en un input)
+        keyboardShortcuts.register('s', ['ctrl'], async () => {
+          if (currentImage) {
+            await downloadImage();
+          }
+        }, { description: 'Guardar imagen' });
+        
+        // Ctrl/Cmd + Shift + C: Copiar imagen al portapapeles
+        keyboardShortcuts.register('c', ['ctrl', 'shift'], async () => {
+          if (canvas && currentImage) {
+            try {
+              await copyCanvasToClipboard();
+              UIManager.showSuccess('✅ Imagen copiada al portapapeles');
+            } catch (err) {
+              UIManager.showError('❌ Error al copiar imagen');
+            }
+          } else {
+            UIManager.showInfo('ℹ️ Carga una imagen primero');
+          }
+        }, { description: 'Copiar imagen al portapapeles' });
+        
+        // Ctrl/Cmd + Shift + V: Pegar imagen desde portapapeles
+        keyboardShortcuts.register('v', ['ctrl', 'shift'], async () => {
+          try {
+            const items = await navigator.clipboard.read();
+            for (const item of items) {
+              for (const type of item.types) {
+                if (type.startsWith('image/')) {
+                  const blob = await item.getType(type);
+                  const file = new File([blob], 'pasted-image.png', { type });
+                  await loadImageFromFile(file);
+                  UIManager.showSuccess('✅ Imagen pegada desde portapapeles');
+                  return;
+                }
+              }
+            }
+            UIManager.showInfo('ℹ️ No hay imagen en el portapapeles');
+          } catch (err) {
+            UIManager.showError('❌ Error al pegar imagen. Usa Cmd+V nativo en un campo de carga.');
+          }
+        }, { description: 'Pegar imagen desde portapapeles' });
+        
+        // Ctrl/Cmd + Shift + X: Exportar con ajustes actuales
+        keyboardShortcuts.register('x', ['ctrl', 'shift'], async () => {
+          if (currentImage) {
+            await downloadImageWithProgress();
+            UIManager.showSuccess('✅ Imagen exportada');
+          } else {
+            UIManager.showInfo('ℹ️ Carga una imagen primero');
+          }
+        }, { description: 'Exportar imagen con ajustes' });
+        
+        // Espacio: Vista antes/después (mantener presionado)
+        let originalCanvas = null;
+        keyboardShortcuts.register(' ', [], (e) => {
+          if (!currentImage || !canvas) return;
+          
+          if (e.type === 'keydown' && !originalCanvas) {
+            // Guardar estado actual y mostrar original
+            originalCanvas = canvas.toDataURL();
+            showOriginalImage();
+            UIManager.showInfo('👁️ Mostrando imagen original');
+          }
+        }, { description: 'Ver imagen original (mantener presionado)', preventDefault: false });
+        
+        // Esc: Cancelar operación actual
+        keyboardShortcuts.register('escape', [], () => {
+          if (cropManager && cropManager.isActive) {
+            cropManager.deactivate();
+            UIManager.showInfo('❌ Modo recorte cancelado');
+          }
+        }, { description: 'Cancelar operación actual', preventDefault: false });
+        
+        // Delete: Eliminar capa seleccionada (solo cuando NO estés en un input)
+        keyboardShortcuts.register('delete', [], () => {
+          if (textLayerManager && textLayerManager.activeLayerId) {
+            const layer = textLayerManager.getActiveLayer();
+            if (layer && confirm(`¿Eliminar capa "${layer.text}"?`)) {
+              textLayerManager.removeLayer(textLayerManager.activeLayerId);
+              updatePreview();
+              UIManager.showSuccess('🗑️ Capa eliminada');
+            }
+          }
+        }, { description: 'Eliminar capa seleccionada', preventDefault: false });
+        
+        // Ctrl/Cmd + D: Duplicar capa
+        keyboardShortcuts.register('d', ['ctrl'], async () => {
+          if (textLayerManager && textLayerManager.activeLayerId) {
+            const duplicate = await textLayerManager.duplicateLayer(textLayerManager.activeLayerId);
+            updatePreview();
+            UIManager.showSuccess(`📋 Capa duplicada: ${duplicate.text}`);
+          } else {
+            UIManager.showInfo('ℹ️ Selecciona una capa de texto primero');
+          }
+        }, { description: 'Duplicar capa de texto actual' });
+        
+        // Ctrl/Cmd + Shift + R: Reiniciar todos los ajustes
+        keyboardShortcuts.register('r', ['ctrl', 'shift'], () => {
+          if (confirm('¿Reiniciar todos los filtros y ajustes?')) {
+            resetFilters();
+            UIManager.showSuccess('🔄 Ajustes reiniciados');
+          }
+        }, { description: 'Reiniciar filtros y ajustes' });
+        
+        // Ctrl/Cmd + B: Abrir procesamiento por lotes
+        keyboardShortcuts.register('b', ['ctrl'], () => {
+          if (typeof window.openBatchModal === 'function') {
+            window.openBatchModal();
+            UIManager.showInfo('📦 Modo lote activado');
+          }
+        }, { description: 'Abrir procesamiento por lotes' });
+        
+        // Ctrl/Cmd + T: Abrir panel de capas de texto
+        keyboardShortcuts.register('t', ['ctrl'], () => {
+          if (typeof window.openTextLayersPanel === 'function') {
+            window.openTextLayersPanel();
+            UIManager.showInfo('📝 Panel de texto activado');
+          }
+        }, { description: 'Abrir panel de capas de texto' });
+        
+        // Ctrl/Cmd + R: Abrir modo recorte
+        keyboardShortcuts.register('r', ['ctrl'], () => {
+          if (typeof window.openCropPanel === 'function') {
+            window.openCropPanel();
+            UIManager.showInfo('✂️ Modo recorte activado');
+          }
+        }, { description: 'Abrir modo recorte' });
+        
+        // Ctrl/Cmd + ?: Ver atajos de teclado
+        keyboardShortcuts.register('/', ['ctrl', 'shift'], () => {
+          if (typeof window.openShortcutsModal === 'function') {
+            window.openShortcutsModal();
+          }
+        }, { description: 'Ver atajos de teclado' });
+        
+        // +: Zoom in
+        keyboardShortcuts.register('+', [], () => {
+          zoomIn();
+        }, { description: 'Aumentar zoom', preventDefault: false });
+        
+        // -: Zoom out
+        keyboardShortcuts.register('-', [], () => {
+          zoomOut();
+        }, { description: 'Reducir zoom', preventDefault: false });
+        
+        // 0: Zoom 100%
+        keyboardShortcuts.register('0', [], () => {
+          resetZoom();
+        }, { description: 'Restaurar zoom 100%', preventDefault: false });
+        
+        console.log('⌨️ Atajos de teclado configurados');
+        console.log('📖 Atajos disponibles:', keyboardShortcuts.getAllShortcuts());
+        
+      } catch (error) {
+        console.error('Error configurando atajos de teclado:', error);
+      }
+    }
+    
+    /**
+     * Copiar canvas al portapapeles
+     */
+    async function copyCanvasToClipboard() {
+      try {
+        if (!navigator.clipboard || !navigator.clipboard.write) {
+          throw new Error('API de portapapeles no disponible');
+        }
+        
+        // Convertir canvas a blob
+        const blob = await new Promise(resolve => {
+          canvas.toBlob(resolve, 'image/png');
+        });
+        
+        // Escribir al portapapeles
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob })
+        ]);
+        
+        UIManager.showSuccess('✅ Imagen copiada al portapapeles');
+        console.log('📋 Imagen copiada al portapapeles');
+        
+      } catch (error) {
+        console.error('Error copiando al portapapeles:', error);
+        UIManager.showError('No se pudo copiar al portapapeles. Intenta usar la función de descarga.');
+      }
+    }
+    
+    /**
+     * Mostrar imagen original (sin filtros)
+     */
+    function showOriginalImage() {
+      if (!currentImage || !canvas || !ctx) return;
+      
+      // Limpiar canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Configurar alta calidad
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      
+      // Dibujar imagen original sin filtros
+      ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
+    }
+    
+    // Exponer funciones globales para debugging
+    window.keyboardShortcuts = keyboardShortcuts;
+    window.batchManager = batchManager;
+    window.textLayerManager = textLayerManager;
+    window.cropManager = cropManager;
+
+    // ============================================
+    // FUNCIONES DE INTEGRACIÓN UI v3.1
+    // ============================================
+
+    /**
+     * ====================================
+     * BATCH PROCESSING UI
+     * ====================================
+     */
+    
+    let batchImages = [];
+    
+    function openBatchModal() {
+      const modal = document.getElementById('batch-modal');
+      if (modal) {
+        modal.style.display = 'flex';
+        setupBatchDropzone();
+      }
+    }
+
+    function closeBatchModal() {
+      const modal = document.getElementById('batch-modal');
+      if (modal) {
+        modal.style.display = 'none';
+        batchImages = [];
+        updateBatchImagesList();
+      }
+    }
+
+    function setupBatchDropzone() {
+      const dropzone = document.getElementById('batch-dropzone');
+      const fileInput = document.getElementById('batch-file-input');
+      
+      if (!dropzone || !fileInput) return;
+
+      // Click to select files
+      dropzone.onclick = (e) => {
+        if (e.target === dropzone || e.target.closest('.dropzone-content')) {
+          fileInput.click();
+        }
+      };
+
+      // File input change
+      fileInput.onchange = (e) => {
+        const files = Array.from(e.target.files);
+        addBatchImages(files);
+        fileInput.value = ''; // Reset input
+      };
+
+      // Drag and drop
+      dropzone.ondragover = (e) => {
+        e.preventDefault();
+        dropzone.classList.add('drag-over');
+      };
+
+      dropzone.ondragleave = (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('drag-over');
+      };
+
+      dropzone.ondrop = (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('drag-over');
+        const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+        addBatchImages(files);
+      };
+    }
+
+    function addBatchImages(files) {
+      // Validar límite de imágenes
+      if (batchImages.length + files.length > 50) {
+        UIManager.showError('Máximo 50 imágenes por lote');
+        return;
+      }
+
+      files.forEach(file => {
+        if (file.type.startsWith('image/')) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            batchImages.push({
+              id: Date.now() + Math.random(),
+              file: file,
+              name: file.name,
+              size: file.size,
+              dataUrl: e.target.result
+            });
+            updateBatchImagesList();
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+
+    function removeBatchImage(imageId) {
+      batchImages = batchImages.filter(img => img.id !== imageId);
+      updateBatchImagesList();
+    }
+
+    function updateBatchImagesList() {
+      const container = document.getElementById('batch-images-list');
+      if (!container) return;
+
+      if (batchImages.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-500 text-center py-4">No hay imágenes agregadas</p>';
+        return;
+      }
+
+      container.innerHTML = batchImages.map(img => `
+        <div class="batch-item">
+          <img src="${img.dataUrl}" alt="${img.name}" class="batch-item-thumbnail">
+          <div class="batch-item-info">
+            <div class="batch-item-name">${img.name}</div>
+            <div class="batch-item-size">${formatFileSize(img.size)}</div>
+          </div>
+          <button class="batch-item-remove" onclick="removeBatchImage(${img.id})">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    async function processBatch() {
+      if (batchImages.length === 0) {
+        UIManager.showError('Agrega imágenes al lote primero');
+        return;
+      }
+
+      const progressBar = document.getElementById('batch-progress-bar');
+      const progressText = document.getElementById('batch-progress-text');
+      const processBtn = document.getElementById('batch-process-btn');
+      const downloadBtn = document.getElementById('batch-download-btn');
+      
+      if (!progressBar || !progressText || !processBtn) return;
+
+      // Obtener configuración
+      const config = {
+        applyFilters: document.getElementById('batch-apply-filters').checked,
+        applyBorder: document.getElementById('batch-apply-border').checked,
+        applyMetadata: document.getElementById('batch-apply-metadata').checked,
+        applyWatermark: document.getElementById('batch-apply-watermark').checked
+      };
+
+      // UI feedback
+      processBtn.disabled = true;
+      processBtn.classList.add('loading');
+      progressBar.style.width = '0%';
+      progressText.textContent = 'Procesando 0/0 (0%)';
+
+      try {
+        // Preparar imágenes para BatchManager
+        const imagesToProcess = [];
+        
+        for (const img of batchImages) {
+          const imageObj = await loadImageFromFile(img.file);
+          imagesToProcess.push({
+            image: imageObj,
+            name: img.name
+          });
+        }
+
+        // Procesar con BatchManager
+        await batchManager.processQueue(
+          imagesToProcess,
+          (current, total, percentage) => {
+            progressBar.style.width = `${percentage}%`;
+            progressText.textContent = `Procesando ${current}/${total} (${percentage}%)`;
+          }
+        );
+
+        // Mostrar botón de descarga
+        downloadBtn.classList.remove('hidden');
+        UIManager.showSuccess(`✅ ${batchImages.length} imágenes procesadas`);
+
+      } catch (error) {
+        console.error('Error procesando lote:', error);
+        UIManager.showError('Error al procesar el lote de imágenes');
+      } finally {
+        processBtn.disabled = false;
+        processBtn.classList.remove('loading');
+      }
+    }
+
+    async function downloadBatchZip() {
+      try {
+        const blob = await batchManager.exportToZip();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `mnemotag-batch-${Date.now()}.zip`;
+        link.click();
+        URL.revokeObjectURL(url);
+        
+        UIManager.showSuccess('✅ ZIP descargado correctamente');
+      } catch (error) {
+        console.error('Error descargando ZIP:', error);
+        UIManager.showError('Error al descargar el archivo ZIP');
+      }
+    }
+
+    function loadImageFromFile(file) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = URL.createObjectURL(file);
+      });
+    }
+
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    /**
+     * ====================================
+     * TEXT LAYERS UI
+     * ====================================
+     */
+
+    let activeLayerId = null;
+
+    function openTextLayersPanel() {
+      const panel = document.getElementById('text-layers-panel');
+      if (panel) {
+        panel.style.display = 'flex'; // Quitar display: none inline
+        setTimeout(() => {
+          panel.classList.add('active'); // Activar transición
+        }, 10);
+        updateTextLayersList();
+      }
+    }
+
+    function closeTextLayersPanel() {
+      const panel = document.getElementById('text-layers-panel');
+      if (panel) {
+        panel.classList.remove('active');
+        setTimeout(() => {
+          panel.style.display = 'none'; // Ocultar después de transición
+        }, 300);
+        activeLayerId = null;
+      }
+    }
+
+    function applyTextTemplate(templateName) {
+      if (!currentImage) {
+        UIManager.showError('Carga una imagen primero');
+        return;
+      }
+
+      try {
+        textLayerManager.applyTemplate(templateName, canvas.width, canvas.height);
+        updateTextLayersList();
+        renderCanvasWithLayers();
+        UIManager.showSuccess(`✅ Plantilla "${templateName}" aplicada`);
+      } catch (error) {
+        console.error('Error aplicando plantilla:', error);
+        UIManager.showError('Error al aplicar la plantilla');
+      }
+    }
+
+    function addNewTextLayer() {
+      if (!currentImage) {
+        UIManager.showError('Carga una imagen primero');
+        return;
+      }
+
+      const newLayer = textLayerManager.addLayer({
+        text: 'Nuevo texto',
+        x: canvas.width / 2,
+        y: canvas.height / 2
+      });
+
+      updateTextLayersList();
+      selectTextLayer(newLayer.id);
+      renderCanvasWithLayers();
+    }
+
+    function updateTextLayersList() {
+      const container = document.getElementById('text-layers-list');
+      if (!container) return;
+
+      const layers = textLayerManager.getAllLayers();
+
+      if (layers.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-500 text-center py-4">No hay capas de texto</p>';
+        return;
+      }
+
+      container.innerHTML = layers.map(layer => `
+        <div class="text-layer-item ${layer.id === activeLayerId ? 'active' : ''}" onclick="selectTextLayer('${layer.id}')">
+          <div class="text-layer-preview">
+            <div class="text-layer-text">${layer.text}</div>
+            <div class="text-layer-font">${layer.fontFamily} - ${layer.fontSize}px</div>
+          </div>
+          <button class="text-layer-visibility" onclick="event.stopPropagation(); toggleLayerVisibility('${layer.id}')">
+            <i class="fas fa-${layer.visible ? 'eye' : 'eye-slash'}"></i>
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function selectTextLayer(layerId) {
+      activeLayerId = layerId;
+      const layer = textLayerManager.getLayer(layerId);
+      
+      if (!layer) return;
+
+      // Actualizar lista
+      updateTextLayersList();
+
+      // Mostrar editor
+      const editor = document.getElementById('text-layer-editor');
+      if (editor) {
+        editor.classList.remove('hidden');
+      }
+
+      // Cargar valores en el editor
+      document.getElementById('layer-text').value = layer.text;
+      document.getElementById('layer-font').value = layer.fontFamily;
+      document.getElementById('layer-size').value = layer.fontSize;
+      document.getElementById('layer-color').value = layer.color;
+      document.getElementById('layer-x').value = Math.round(layer.x);
+      document.getElementById('layer-y').value = Math.round(layer.y);
+      document.getElementById('layer-rotation').value = layer.rotation;
+      document.getElementById('layer-opacity').value = Math.round(layer.opacity * 100);
+      document.getElementById('layer-shadow').checked = layer.shadow;
+      document.getElementById('layer-stroke').checked = layer.stroke;
+      document.getElementById('layer-gradient').checked = layer.gradient;
+    }
+
+    function updateActiveTextLayer() {
+      if (!activeLayerId) return;
+
+      const updates = {
+        text: document.getElementById('layer-text').value,
+        fontFamily: document.getElementById('layer-font').value,
+        fontSize: parseInt(document.getElementById('layer-size').value),
+        color: document.getElementById('layer-color').value,
+        x: parseInt(document.getElementById('layer-x').value),
+        y: parseInt(document.getElementById('layer-y').value),
+        rotation: parseInt(document.getElementById('layer-rotation').value),
+        opacity: parseInt(document.getElementById('layer-opacity').value) / 100,
+        shadow: document.getElementById('layer-shadow').checked,
+        stroke: document.getElementById('layer-stroke').checked,
+        gradient: document.getElementById('layer-gradient').checked
+      };
+
+      textLayerManager.updateLayer(activeLayerId, updates);
+      updateTextLayersList();
+      renderCanvasWithLayers();
+    }
+
+    function toggleLayerVisibility(layerId) {
+      const layer = textLayerManager.getLayer(layerId);
+      if (layer) {
+        textLayerManager.updateLayer(layerId, { visible: !layer.visible });
+        updateTextLayersList();
+        renderCanvasWithLayers();
+      }
+    }
+
+    function deleteActiveTextLayer() {
+      if (!activeLayerId) return;
+
+      textLayerManager.removeLayer(activeLayerId);
+      activeLayerId = null;
+      
+      const editor = document.getElementById('text-layer-editor');
+      if (editor) {
+        editor.classList.add('hidden');
+      }
+
+      updateTextLayersList();
+      renderCanvasWithLayers();
+      UIManager.showSuccess('✅ Capa eliminada');
+    }
+
+    function renderCanvasWithLayers() {
+      if (!currentImage || !canvas || !ctx) return;
+
+      // Redibujar imagen base
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
+
+      // Aplicar filtros actuales si existen
+      applyFilters();
+
+      // Renderizar capas de texto
+      textLayerManager.renderLayers(ctx);
+    }
+
+    /**
+     * ====================================
+     * CROP UI
+     * ====================================
+     */
+
+    let cropActive = false;
+
+    function openCropPanel() {
+      if (!currentImage) {
+        UIManager.showError('Carga una imagen primero');
+        return;
+      }
+      
+      if (!cropManager) {
+        console.error('❌ CropManager no inicializado');
+        UIManager.showError('El sistema de recorte no está disponible');
+        return;
+      }
+
+      const panel = document.getElementById('crop-panel');
+      if (panel) {
+        panel.classList.add('active');
+        cropActive = true;
+        
+        // Inicializar crop mode
+        cropManager.initCropMode(currentImage);
+        
+        // Actualizar info
+        updateCropInfo();
+      }
+    }
+
+    function closeCropPanel() {
+      const panel = document.getElementById('crop-panel');
+      if (panel) {
+        panel.classList.remove('active');
+        cropActive = false;
+        if (cropManager) {
+          cropManager.cancelCrop();
+        }
+      }
+    }
+
+    function changeCropAspectRatio() {
+      const select = document.getElementById('crop-aspect-ratio');
+      if (!select) return;
+
+      const value = select.value;
+      
+      if (value === 'free') {
+        cropManager.setAspectRatio(null);
+      } else {
+        const [w, h] = value.split(':').map(Number);
+        cropManager.setAspectRatio(w / h);
+      }
+
+      updateCropInfo();
+    }
+
+    function updateCropInfo() {
+      if (!cropManager || !cropManager.cropArea) return;
+      
+      const cropData = cropManager.cropArea;
+
+      const widthEl = document.getElementById('crop-width');
+      const heightEl = document.getElementById('crop-height');
+      const ratioEl = document.getElementById('crop-ratio');
+
+      if (widthEl) widthEl.textContent = Math.round(cropData.width);
+      if (heightEl) heightEl.textContent = Math.round(cropData.height);
+      if (ratioEl) {
+        const ratio = (cropData.width / cropData.height).toFixed(2);
+        ratioEl.textContent = ratio;
+      }
+    }
+
+    function toggleCropGrid() {
+      if (!cropManager) return;
+      
+      const btn = document.getElementById('crop-grid-btn');
+      cropManager.showGrid = !cropManager.showGrid;
+      
+      if (btn) {
+        btn.textContent = cropManager.showGrid ? 'Ocultar Cuadrícula' : 'Mostrar Cuadrícula';
+      }
+      
+      // Redibujar si está activo
+      if (cropManager.isActive) {
+        cropManager.draw();
+      }
+    }
+
+    function applyCropSuggestion(type) {
+      if (!currentImage || !cropManager) return;
+
+      try {
+        const suggestions = cropManager.suggestCrops();
+        const suggestion = suggestions.find(s => s.name === type);
+
+        if (suggestion) {
+          cropManager.applySuggestion(suggestion);
+          updateCropInfo();
+          UIManager.showSuccess(`✅ Sugerencia "${suggestion.name}" aplicada`);
+        }
+      } catch (error) {
+        console.error('Error aplicando sugerencia:', error);
+        UIManager.showError('No se pudo aplicar la sugerencia de recorte');
+      }
+    }
+
+    function applyCrop() {
+      try {
+        const croppedCanvas = cropManager.applyCrop();
+        
+        if (croppedCanvas) {
+          // Actualizar canvas principal con la imagen recortada
+          canvas.width = croppedCanvas.width;
+          canvas.height = croppedCanvas.height;
+          ctx.drawImage(croppedCanvas, 0, 0);
+          
+          // Crear nueva imagen del resultado
+          const croppedImage = new Image();
+          croppedImage.onload = () => {
+            currentImage = croppedImage;
+            closeCropPanel();
+            UIManager.showSuccess('✅ Imagen recortada correctamente');
+          };
+          croppedImage.src = croppedCanvas.toDataURL();
+        }
+      } catch (error) {
+        console.error('Error aplicando crop:', error);
+        UIManager.showError('Error al recortar la imagen');
+      }
+    }
+
+    function cancelCrop() {
+      closeCropPanel();
+      // Redibujar imagen original
+      if (currentImage && canvas && ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
+        applyFilters();
+      }
+    }
+
+    /**
+     * ====================================
+     * SHORTCUTS UI
+     * ====================================
+     */
+
+    function openShortcutsModal() {
+      const modal = document.getElementById('shortcuts-modal');
+      if (modal) {
+        modal.style.display = 'flex';
+      }
+    }
+
+    function closeShortcutsModal() {
+      const modal = document.getElementById('shortcuts-modal');
+      if (modal) {
+        modal.style.display = 'none';
+      }
+    }
+
+    /**
+     * ====================================
+     * INICIALIZACIÓN UI
+     * ====================================
+     */
+
+    function initializeAdvancedUI() {
+      console.log('🎨 Inicializando UI avanzada v3.1...');
+
+      // Exponer funciones globalmente para onclick handlers
+      window.openBatchModal = openBatchModal;
+      window.closeBatchModal = closeBatchModal;
+      window.removeBatchImage = removeBatchImage;
+      window.processBatch = processBatch;
+      window.downloadBatchZip = downloadBatchZip;
+
+      window.openTextLayersPanel = openTextLayersPanel;
+      window.closeTextLayersPanel = closeTextLayersPanel;
+      window.applyTextTemplate = applyTextTemplate;
+      window.addNewTextLayer = addNewTextLayer;
+      window.selectTextLayer = selectTextLayer;
+      window.updateActiveTextLayer = updateActiveTextLayer;
+      window.toggleLayerVisibility = toggleLayerVisibility;
+      window.deleteActiveTextLayer = deleteActiveTextLayer;
+
+      window.openCropPanel = openCropPanel;
+      window.closeCropPanel = closeCropPanel;
+      window.changeCropAspectRatio = changeCropAspectRatio;
+      window.toggleCropGrid = toggleCropGrid;
+      window.applyCropSuggestion = applyCropSuggestion;
+      window.applyCrop = applyCrop;
+      window.cancelCrop = cancelCrop;
+
+      window.openShortcutsModal = openShortcutsModal;
+      window.closeShortcutsModal = closeShortcutsModal;
+
+      // Agregar event listeners para inputs de texto (con debounce)
+      const textInput = document.getElementById('layer-text');
+      if (textInput) {
+        textInput.addEventListener('input', debounce(updateActiveTextLayer, 300));
+      }
+
+      // Event listeners para otros controles de texto
+      ['layer-font', 'layer-size', 'layer-color', 'layer-x', 'layer-y', 
+       'layer-rotation', 'layer-opacity', 'layer-shadow', 'layer-stroke', 'layer-gradient'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('change', updateActiveTextLayer);
+        }
+      });
+
+      // Event listener para aspect ratio
+      const aspectRatioSelect = document.getElementById('crop-aspect-ratio');
+      if (aspectRatioSelect) {
+        aspectRatioSelect.addEventListener('change', changeCropAspectRatio);
+      }
+
+      console.log('✅ UI avanzada inicializada correctamente');
+    }
+
+    function debounce(func, wait) {
+      let timeout;
+      return function executedFunction(...args) {
+        const later = () => {
+          clearTimeout(timeout);
+          func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+      };
+    }
+
+    // Inicializar UI avanzada cuando el DOM esté listo
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initializeAdvancedUI);
+    } else {
+      initializeAdvancedUI();
+    }
+    
+
     console.log('🎨 Sistema de filtros optimizado inicializado');
     console.log('💡 Usa getFilterPerformanceMetrics() para ver métricas de rendimiento');
