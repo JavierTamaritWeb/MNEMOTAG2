@@ -4862,6 +4862,11 @@
           resetZoom();
         }, { description: 'Restaurar zoom 100%', preventDefault: false });
         
+        // K: Toggle comparison mode
+        keyboardShortcuts.register('k', ['ctrl'], () => {
+          toggleComparisonMode();
+        }, { description: 'Activar/desactivar modo comparación', preventDefault: true });
+        
         console.log('⌨️ Atajos de teclado configurados');
         console.log('📖 Atajos disponibles:', keyboardShortcuts.getAllShortcuts());
         
@@ -5539,6 +5544,247 @@
       console.log('✅ UI avanzada inicializada correctamente');
     }
 
+    // ===== COMPARISON MODE - ANTES/DESPUÉS CON SLIDER =====
+
+    let comparisonMode = false;
+    let comparisonSliderPosition = 50; // Porcentaje (0-100)
+    let comparisonOriginalCanvas = null; // Canvas de imagen original
+    let isDraggingSlider = false;
+
+    /**
+     * Inicializa el modo de comparación
+     */
+    function initializeComparisonMode() {
+      const toggleBtn = document.getElementById('compare-toggle-btn');
+      const overlay = document.getElementById('comparison-overlay');
+      const slider = document.getElementById('comparison-slider');
+      
+      if (!toggleBtn || !overlay || !slider) {
+        console.error('❌ Elementos de comparación no encontrados');
+        return;
+      }
+      
+      // Event: Toggle button
+      toggleBtn.addEventListener('click', toggleComparisonMode);
+      
+      // Event: Slider drag
+      slider.addEventListener('mousedown', startDraggingSlider);
+      slider.addEventListener('touchstart', startDraggingSlider, { passive: false });
+      
+      // Event: Click en overlay para mover slider
+      overlay.addEventListener('click', (e) => {
+        if (e.target === slider || slider.contains(e.target)) return;
+        moveSliderToClick(e);
+      });
+      
+      // Event: Doble click en handle para resetear
+      const handle = slider.querySelector('.comparison-slider-handle');
+      if (handle) {
+        handle.addEventListener('dblclick', (e) => {
+          e.stopPropagation();
+          comparisonSliderPosition = 50;
+          updateSliderPosition();
+        });
+      }
+      
+      // Event: Teclado (flechas)
+      document.addEventListener('keydown', (e) => {
+        if (!comparisonMode) return;
+        
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          comparisonSliderPosition = Math.max(0, comparisonSliderPosition - 5);
+          updateSliderPosition();
+        } else if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          comparisonSliderPosition = Math.min(100, comparisonSliderPosition + 5);
+          updateSliderPosition();
+        } else if (e.key === 'Escape') {
+          if (comparisonMode) toggleComparisonMode();
+        }
+      });
+      
+      // Event: Mouse/Touch move global
+      document.addEventListener('mousemove', dragSlider);
+      document.addEventListener('touchmove', dragSlider, { passive: false });
+      document.addEventListener('mouseup', stopDraggingSlider);
+      document.addEventListener('touchend', stopDraggingSlider);
+      
+      console.log('✅ Modo de comparación inicializado');
+    }
+
+    /**
+     * Toggle entre modo normal y modo comparación
+     */
+    function toggleComparisonMode() {
+      if (!currentImage) {
+        UIManager.showError('CARGA UNA IMAGEN PRIMERO');
+        return;
+      }
+      
+      comparisonMode = !comparisonMode;
+      const overlay = document.getElementById('comparison-overlay');
+      const toggleBtn = document.getElementById('compare-toggle-btn');
+      const mainCanvas = document.getElementById('preview-canvas');
+      
+      if (comparisonMode) {
+        // Activar modo comparación
+        
+        // 1. Guardar copia de imagen original
+        saveOriginalImageForComparison();
+        
+        // 2. Renderizar ambos canvas
+        renderComparisonCanvases();
+        
+        // 3. Mostrar overlay
+        overlay.style.display = 'block';
+        
+        // 4. Actualizar botón
+        toggleBtn.classList.add('active');
+        toggleBtn.innerHTML = `
+          <i class="fas fa-times" aria-hidden="true"></i>
+          CERRAR
+        `;
+        
+        // 5. Ocultar canvas principal
+        if (mainCanvas) mainCanvas.style.opacity = '0';
+        
+        UIManager.showSuccess('MODO COMPARACIÓN ACTIVADO - USA ← → PARA MOVER EL SLIDER');
+        
+      } else {
+        // Desactivar modo comparación
+        
+        overlay.style.display = 'none';
+        toggleBtn.classList.remove('active');
+        toggleBtn.innerHTML = `
+          <i class="fas fa-sliders-h" aria-hidden="true"></i>
+          COMPARAR
+        `;
+        
+        // Mostrar canvas principal
+        if (mainCanvas) mainCanvas.style.opacity = '1';
+        
+        UIManager.showSuccess('MODO COMPARACIÓN DESACTIVADO');
+      }
+    }
+
+    /**
+     * Guarda copia de la imagen original sin ediciones
+     */
+    function saveOriginalImageForComparison() {
+      if (!currentImage) return;
+      
+      // Crear canvas temporal con imagen original
+      comparisonOriginalCanvas = document.createElement('canvas');
+      comparisonOriginalCanvas.width = currentImage.width;
+      comparisonOriginalCanvas.height = currentImage.height;
+      const ctx = comparisonOriginalCanvas.getContext('2d');
+      ctx.drawImage(currentImage, 0, 0);
+    }
+
+    /**
+     * Renderiza ambos canvas (original y editado)
+     */
+    function renderComparisonCanvases() {
+      const originalCanvas = document.getElementById('comparison-canvas-original');
+      const editedCanvas = document.getElementById('comparison-canvas-edited');
+      const mainCanvas = document.getElementById('preview-canvas');
+      
+      if (!originalCanvas || !editedCanvas || !mainCanvas || !currentImage) return;
+      
+      // Canvas original (sin filtros)
+      originalCanvas.width = comparisonOriginalCanvas.width;
+      originalCanvas.height = comparisonOriginalCanvas.height;
+      const ctxOriginal = originalCanvas.getContext('2d');
+      ctxOriginal.drawImage(comparisonOriginalCanvas, 0, 0);
+      
+      // Canvas editado (con todos los filtros y ediciones)
+      editedCanvas.width = mainCanvas.width;
+      editedCanvas.height = mainCanvas.height;
+      const ctxEdited = editedCanvas.getContext('2d');
+      ctxEdited.drawImage(mainCanvas, 0, 0);
+      
+      // Aplicar clipping según posición del slider
+      updateSliderPosition();
+    }
+
+    /**
+     * Actualiza la posición visual del slider
+     */
+    function updateSliderPosition() {
+      const slider = document.getElementById('comparison-slider');
+      const editedCanvas = document.getElementById('comparison-canvas-edited');
+      const overlay = document.getElementById('comparison-overlay');
+      
+      if (!slider || !editedCanvas || !overlay) return;
+      
+      // Mover slider
+      slider.style.left = `${comparisonSliderPosition}%`;
+      
+      // Aplicar clipping al canvas editado
+      const overlayWidth = overlay.offsetWidth;
+      const clipWidth = (comparisonSliderPosition / 100) * overlayWidth;
+      editedCanvas.style.clipPath = `inset(0 ${overlayWidth - clipWidth}px 0 0)`;
+    }
+
+    /**
+     * Inicia el arrastre del slider
+     */
+    function startDraggingSlider(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      isDraggingSlider = true;
+      document.body.style.cursor = 'ew-resize';
+    }
+
+    /**
+     * Detiene el arrastre del slider
+     */
+    function stopDraggingSlider() {
+      isDraggingSlider = false;
+      document.body.style.cursor = '';
+    }
+
+    /**
+     * Arrastra el slider según posición del mouse/touch
+     */
+    function dragSlider(e) {
+      if (!isDraggingSlider || !comparisonMode) return;
+      
+      e.preventDefault();
+      
+      const overlay = document.getElementById('comparison-overlay');
+      if (!overlay) return;
+      
+      const rect = overlay.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const x = clientX - rect.left;
+      
+      comparisonSliderPosition = (x / rect.width) * 100;
+      comparisonSliderPosition = Math.max(0, Math.min(100, comparisonSliderPosition));
+      
+      updateSliderPosition();
+    }
+
+    /**
+     * Mueve el slider a la posición del click
+     */
+    function moveSliderToClick(e) {
+      const overlay = document.getElementById('comparison-overlay');
+      if (!overlay) return;
+      
+      const rect = overlay.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const x = clientX - rect.left;
+      
+      comparisonSliderPosition = (x / rect.width) * 100;
+      comparisonSliderPosition = Math.max(0, Math.min(100, comparisonSliderPosition));
+      
+      updateSliderPosition();
+    }
+
+    // ===== FIN COMPARISON MODE =====
+
     function debounce(func, wait) {
       let timeout;
       return function executedFunction(...args) {
@@ -5553,9 +5799,13 @@
 
     // Inicializar UI avanzada cuando el DOM esté listo
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initializeAdvancedUI);
+      document.addEventListener('DOMContentLoaded', () => {
+        initializeAdvancedUI();
+        initializeComparisonMode();
+      });
     } else {
       initializeAdvancedUI();
+      initializeComparisonMode();
     }
     
 

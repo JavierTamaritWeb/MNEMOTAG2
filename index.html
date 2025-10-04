@@ -924,6 +924,27 @@
             <div class="preview__container preview-container relative">
               <canvas id="preview-canvas" class="preview__canvas"></canvas>
               
+              <!-- Overlay de comparación antes/después -->
+              <div id="comparison-overlay" class="comparison-overlay" style="display: none;">
+                <!-- Canvas original (lado izquierdo) -->
+                <canvas id="comparison-canvas-original" class="comparison-canvas"></canvas>
+                
+                <!-- Canvas editado (lado derecho) -->
+                <canvas id="comparison-canvas-edited" class="comparison-canvas"></canvas>
+                
+                <!-- Slider divisor -->
+                <div id="comparison-slider" class="comparison-slider">
+                  <div class="comparison-slider-line"></div>
+                  <div class="comparison-slider-handle">
+                    <i class="fas fa-arrows-alt-h"></i>
+                  </div>
+                </div>
+                
+                <!-- Labels -->
+                <div class="comparison-label comparison-label-left">ORIGINAL</div>
+                <div class="comparison-label comparison-label-right">EDITADO</div>
+              </div>
+              
               <!-- Controles de Zoom -->
               <div id="zoom-controls" class="zoom-controls hidden">
                 <button id="zoom-out-btn" class="zoom-btn" title="Alejar (-)">
@@ -953,6 +974,10 @@
                 <button id="reset-changes" class="btn btn-primary button--action" title="Restablecer cambios&#10;Atajo: ⌘⇧R">
                   <i class="fas fa-refresh" aria-hidden="true"></i>
                   Restablecer
+                </button>
+                <button id="compare-toggle-btn" class="btn btn-outline button--action" title="Comparar Antes/Después&#10;Atajo: ⌘K">
+                  <i class="fas fa-adjust" aria-hidden="true"></i>
+                  Antes/Después
                 </button>
                 <button id="download-image" class="btn btn-primary button--action" title="Descargar imagen&#10;Atajo: ⌘S">
                   <i class="fas fa-download" aria-hidden="true"></i>
@@ -1373,6 +1398,10 @@
               <div class="shortcut-item">
                 <kbd class="shortcut-keys"><span class="mod-key">⌘</span> + R</kbd>
                 <span class="shortcut-desc">Activar recorte</span>
+              </div>
+              <div class="shortcut-item">
+                <kbd class="shortcut-keys"><span class="mod-key">⌘</span> + K</kbd>
+                <span class="shortcut-desc">Comparar antes/después</span>
               </div>
               <div class="shortcut-item">
                 <kbd class="shortcut-keys"><span class="mod-key">⌘</span> + ⇧ + ?</kbd>
