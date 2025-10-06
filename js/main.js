@@ -1691,26 +1691,31 @@
           }
           
           .preview-overlay {
-            position: absolute;
+            position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
             background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
           }
           
           .preview-container {
             position: relative;
             background: var(--bg-card, #ffffff);
             border-radius: 12px;
+            width: 90%;
             max-width: 600px;
-            max-height: 80vh;
-            margin: 20px;
+            max-height: 85vh;
             box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
             overflow: hidden;
             display: flex;
             flex-direction: column;
+            z-index: 10000;
           }
           
           .preview-header {
@@ -1732,11 +1737,13 @@
           .preview-close {
             background: none;
             border: none;
-            font-size: 24px;
+            font-size: 20px;
             cursor: pointer;
             color: var(--text-secondary, #64748b);
-            padding: 4px;
+            padding: 4px 8px;
             line-height: 1;
+            transition: color 0.2s ease;
+            flex-shrink: 0;
           }
           
           .preview-close:hover {
@@ -1812,7 +1819,7 @@
           
           @media (max-width: 768px) {
             .preview-container {
-              margin: 10px;
+              width: 95%;
               max-height: 90vh;
             }
             
@@ -1821,8 +1828,53 @@
               padding: 15px;
             }
             
+            .preview-header {
+              padding: 10px 12px;
+            }
+            
+            .preview-header h3 {
+              font-size: 0.875rem;
+              line-height: 1.2;
+              margin: 0;
+            }
+            
+            .preview-close {
+              font-size: 14px;
+              padding: 2px 4px;
+              margin-left: 8px;
+              flex-shrink: 0;
+            }
+            
+            .preview-actions {
+              padding: 12px;
+              flex-direction: column;
+            }
+            
+            .preview-actions button {
+              width: 100%;
+            }
+            
             .preview-info {
               min-width: auto;
+            }
+            
+            .preview-info h4 {
+              font-size: 0.875rem;
+            }
+            
+            .preview-info li {
+              font-size: 0.75rem;
+              padding: 4px 0;
+            }
+          }
+          
+          @media (max-width: 480px) {
+            .preview-header h3 {
+              font-size: 0.8rem;
+            }
+            
+            .preview-close {
+              font-size: 12px;
             }
           }
         `;
