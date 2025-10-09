@@ -1160,14 +1160,42 @@
       // Update button label with filename
       const watermarkInput = document.getElementById('watermark-image');
       const labelSpan = document.getElementById('watermark-file-label');
+      const uploadLabel = document.getElementById('watermark-upload-label');
+      const thumbnailElement = document.getElementById('watermark-preview-thumb');
       
       if (watermarkInput && labelSpan) {
         if (watermarkInput.files && watermarkInput.files[0]) {
           const fileName = watermarkInput.files[0].name;
           const shortName = fileName.length > 25 ? fileName.substring(0, 22) + '...' : fileName;
           labelSpan.textContent = shortName;
+          
+          // Cambiar botón a verde
+          if (uploadLabel) {
+            uploadLabel.classList.add('watermark-loaded');
+          }
+          
+          // Mostrar miniatura
+          if (thumbnailElement) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+              thumbnailElement.src = e.target.result;
+              thumbnailElement.style.display = 'block';
+            };
+            reader.readAsDataURL(watermarkInput.files[0]);
+          }
         } else {
           labelSpan.textContent = 'Seleccionar archivo';
+          
+          // Restaurar botón a rojo
+          if (uploadLabel) {
+            uploadLabel.classList.remove('watermark-loaded');
+          }
+          
+          // Ocultar miniatura
+          if (thumbnailElement) {
+            thumbnailElement.style.display = 'none';
+            thumbnailElement.src = '';
+          }
         }
       }
       
@@ -2044,6 +2072,19 @@
             fileInfoElement.classList.remove('file-info--hidden');
           }
           
+          // Cambiar botón a verde y mostrar miniatura
+          const uploadButton = document.getElementById('file-selector');
+          if (uploadButton) {
+            uploadButton.classList.add('image-loaded');
+          }
+          
+          // Mostrar miniatura de la imagen
+          const thumbnailElement = document.getElementById('file-preview-thumbnail');
+          if (thumbnailElement) {
+            thumbnailElement.src = src;
+            thumbnailElement.style.display = 'block';
+          }
+          
           // Establecer título inicial si está vacío
           const titleInput = document.getElementById('metaTitle');
           if (titleInput && !titleInput.value.trim()) {
@@ -2856,6 +2897,24 @@
       document.getElementById('watermark-text-enabled').checked = true;
       document.getElementById('watermark-image-enabled').checked = false;
       toggleWatermarkType();
+      
+      // Restaurar botón de marca de agua a rojo y ocultar miniatura
+      const watermarkUploadLabel = document.getElementById('watermark-upload-label');
+      const watermarkThumbnail = document.getElementById('watermark-preview-thumb');
+      const watermarkFileLabel = document.getElementById('watermark-file-label');
+      
+      if (watermarkUploadLabel) {
+        watermarkUploadLabel.classList.remove('watermark-loaded');
+      }
+      
+      if (watermarkThumbnail) {
+        watermarkThumbnail.style.display = 'none';
+        watermarkThumbnail.src = '';
+      }
+      
+      if (watermarkFileLabel) {
+        watermarkFileLabel.textContent = 'Seleccionar archivo';
+      }
       
       // Limpiar posicionamiento personalizado
       customImagePosition = null;
@@ -3789,9 +3848,40 @@
       document.getElementById('metadata-form').reset();
       document.getElementById('watermark-form').reset();
       
+      // Restaurar botón de marca de agua a rojo y ocultar miniatura
+      const watermarkUploadLabel = document.getElementById('watermark-upload-label');
+      const watermarkThumbnail = document.getElementById('watermark-preview-thumb');
+      const watermarkFileLabel = document.getElementById('watermark-file-label');
+      
+      if (watermarkUploadLabel) {
+        watermarkUploadLabel.classList.remove('watermark-loaded');
+      }
+      
+      if (watermarkThumbnail) {
+        watermarkThumbnail.style.display = 'none';
+        watermarkThumbnail.src = '';
+      }
+      
+      if (watermarkFileLabel) {
+        watermarkFileLabel.textContent = 'Seleccionar archivo';
+      }
+      
       // Ocultar elementos
       document.getElementById('file-info').classList.add('file-info--hidden');
       document.getElementById('editor-container').classList.add('editor-container--hidden');
+      
+      // Restaurar botón a rojo y ocultar miniatura
+      const uploadButton = document.getElementById('file-selector');
+      if (uploadButton) {
+        uploadButton.classList.remove('image-loaded');
+      }
+      
+      // Ocultar miniatura
+      const thumbnailElement = document.getElementById('file-preview-thumbnail');
+      if (thumbnailElement) {
+        thumbnailElement.style.display = 'none';
+        thumbnailElement.src = '';
+      }
       
       // Ocultar controles de zoom
       const zoomControls = document.getElementById('zoom-controls');

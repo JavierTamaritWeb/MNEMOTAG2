@@ -112,6 +112,7 @@
           </div>
           <div id="file-info" class="file-info file-info--hidden">
             <div class="file-info__content">
+              <img id="file-preview-thumbnail" class="file-info__preview" style="display: none;" alt="Vista previa">
               <i class="fas fa-file-image file-info__icon" aria-hidden="true"></i>
               <span id="file-name" class="file-info__name"></span>
               <button id="remove-file"
@@ -152,14 +153,14 @@
                       <label for="metaTitle">Título</label>
                       <input type="text" id="metaTitle" name="metaTitle"
                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
-                             placeholder="Título de la imagen">
+                             placeholder="TÍTULO DE LA IMAGEN">
                       <div class="char-counter" id="title-counter">0/60 caracteres</div>
                     </div>
                     <div class="metadata-field">
                       <label for="metaAuthor">Autor</label>
                       <input type="text" id="metaAuthor" name="metaAuthor"
                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
-                             placeholder="Nombre del autor">
+                             placeholder="NOMBRE DEL AUTOR">
                     </div>
                   </div>
                   
@@ -170,7 +171,7 @@
                       <div class="copyright-input-group">
                         <input type="text" id="metaCopyright" name="metaCopyright"
                                class="flex-1 px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
-                               placeholder="© 2025 Tu Nombre">
+                               placeholder="© 2025 TU NOMBRE">
                         <button type="button" class="copyright-generator border border-gray-300 px-3" id="autoCopyright" title="Generar copyright automático">
                           <i class="fas fa-magic"></i>
                         </button>
@@ -215,13 +216,13 @@
                     <div class="geo-grid">
                       <input type="number" id="metaLatitude" name="metaLatitude"
                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
-                             placeholder="Latitud" step="any">
+                             placeholder="LATITUD" step="any">
                       <input type="number" id="metaLongitude" name="metaLongitude"
                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
-                             placeholder="Longitud" step="any">
+                             placeholder="LONGITUD" step="any">
                       <input type="number" id="metaAltitude" name="metaAltitude"
                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
-                             placeholder="Altitud (m)" step="any">
+                             placeholder="ALTITUD (M)" step="any">
                     </div>
                     <small class="location-status gps-status" id="locationStatus">
                       Haz clic en "Ubicación actual" para obtener coordenadas GPS
@@ -232,14 +233,14 @@
                   <div class="mb-4">
                     <label for="description" class="block text-gray-700 font-medium mb-2 form-label">Descripción</label>
                     <textarea id="description" name="description" rows="3"
-                              placeholder="Describe brevemente el contenido de la imagen: paisaje, retrato, evento, objeto, etc. Esta información ayudará a catalogar y encontrar la imagen más fácilmente."
+                              placeholder="DESCRIBE BREVEMENTE EL CONTENIDO DE LA IMAGEN: PAISAJE, RETRATO, EVENTO, OBJETO, ETC. ESTA INFORMACIÓN AYUDARÁ A CATALOGAR Y ENCONTRAR LA IMAGEN MÁS FÁCILMENTE."
                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-textarea"></textarea>
                     <div class="char-counter" id="description-counter">0/160 caracteres</div>
                   </div>
                   <div class="mb-4">
                     <label for="keywords" class="block text-gray-700 font-medium mb-2 form-label">Palabras clave (separadas por comas)</label>
                     <input type="text" id="keywords" name="keywords"
-                           placeholder="naturaleza, paisaje, montaña, fotografía, viaje, aventura, cielo, nubes"
+                           placeholder="NATURALEZA, PAISAJE, MONTAÑA, FOTOGRAFÍA, VIAJE, AVENTURA, CIELO, NUBES"
                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input">
                     <div class="char-counter" id="keywords-counter">0/200 caracteres</div>
                   </div>
@@ -424,11 +425,13 @@
                           <input type="file" id="watermark-image" name="watermark-image" accept=".png,.webp"
                                  class="hidden">
                           <label for="watermark-image" 
-                                 class="flex items-center justify-center gap-2 w-full px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium rounded-lg cursor-pointer hover:from-blue-600 hover:to-blue-700 transition-all duration-200 shadow-md hover:shadow-lg">
+                                 id="watermark-upload-label"
+                                 class="watermark-upload-button">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                             </svg>
                             <span id="watermark-file-label">Seleccionar archivo</span>
+                            <img id="watermark-preview-thumb" class="watermark-preview-thumbnail" style="display: none;" alt="Marca de agua">
                           </label>
                         </div>
                         <small class="text-xs text-blue-600 mt-1 block">
@@ -490,12 +493,12 @@
                       <div class="grid grid-cols-2 gap-4">
                         <div>
                           <label for="watermark-image-width" class="block text-sm text-gray-600 mb-1 form-label">Ancho (px)</label>
-                          <input type="number" id="watermark-image-width" name="watermark-image-width" min="10" max="1000"
+                          <input type="number" id="watermark-image-width" name="watermark-image-width" min="10" max="1000" placeholder="ANCHO"
                                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input">
                         </div>
                         <div>
                           <label for="watermark-image-height" class="block text-sm text-gray-600 mb-1 form-label">Alto (px)</label>
-                          <input type="number" id="watermark-image-height" name="watermark-image-height" min="10" max="1000"
+                          <input type="number" id="watermark-image-height" name="watermark-image-height" min="10" max="1000" placeholder="ALTO"
                                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input">
                         </div>
                       </div>
@@ -714,12 +717,12 @@
                         <div class="grid grid-cols-2 gap-3">
                           <div>
                             <label for="resize-width" class="block text-sm font-medium mb-1">Ancho (px)</label>
-                            <input type="number" id="resize-width" min="1" max="8192" 
+                            <input type="number" id="resize-width" min="1" max="8192" placeholder="ANCHO"
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input">
                           </div>
                           <div>
                             <label for="resize-height" class="block text-sm font-medium mb-1">Alto (px)</label>
-                            <input type="number" id="resize-height" min="1" max="8192"
+                            <input type="number" id="resize-height" min="1" max="8192" placeholder="ALTO"
                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input">
                           </div>
                         </div>
@@ -853,7 +856,7 @@
                                  name="file-basename"
                                  maxlength="60" 
                                  autocomplete="off"
-                                 placeholder="imagen"
+                                 placeholder="IMAGEN"
                                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
                                  aria-describedby="file-basename-help file-basename-error">
                           
@@ -1173,7 +1176,7 @@
             <!-- Texto -->
             <div>
               <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Texto</label>
-              <textarea id="text-layer-text" rows="2" class="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"></textarea>
+              <textarea id="text-layer-text" rows="2" placeholder="ESCRIBE TU TEXTO AQUÍ" class="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600"></textarea>
             </div>
             
             <!-- Fuente -->
@@ -1194,7 +1197,7 @@
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Tamaño</label>
-                <input type="number" id="text-layer-size" min="10" max="200" value="40" class="w-full px-2 py-1 border rounded-md dark:bg-gray-700 dark:border-gray-600">
+                <input type="number" id="text-layer-size" min="10" max="200" value="40" placeholder="40" class="w-full px-2 py-1 border rounded-md dark:bg-gray-700 dark:border-gray-600">
               </div>
             </div>
             
@@ -1208,11 +1211,11 @@
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">X</label>
-                <input type="number" id="text-layer-x" min="0" value="50" class="w-full px-2 py-1 border rounded-md dark:bg-gray-700 dark:border-gray-600">
+                <input type="number" id="text-layer-x" min="0" value="50" placeholder="50" class="w-full px-2 py-1 border rounded-md dark:bg-gray-700 dark:border-gray-600">
               </div>
               <div>
                 <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Y</label>
-                <input type="number" id="text-layer-y" min="0" value="50" class="w-full px-2 py-1 border rounded-md dark:bg-gray-700 dark:border-gray-600">
+                <input type="number" id="text-layer-y" min="0" value="50" placeholder="50" class="w-full px-2 py-1 border rounded-md dark:bg-gray-700 dark:border-gray-600">
               </div>
             </div>
             

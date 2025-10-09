@@ -402,8 +402,8 @@
 
     /* Mis Botones - Upload Button con estilo premium */
     .upload__button {
-      /* Base azul mejorada con gradiente sutil */
-      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      /* Base roja cuando no hay imagen cargada */
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
       color: #ffffff;
       border: none;
       border-radius: 12px;
@@ -430,7 +430,7 @@
       margin: 0 auto;
       
       /* Sombra elegante */
-      box-shadow: 0 4px 14px rgba(59, 130, 246, 0.25), 0 2px 6px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 4px 14px rgba(239, 68, 68, 0.25), 0 2px 6px rgba(0, 0, 0, 0.1);
       transform: none !important;
       animation: none !important;
       position: relative;
@@ -438,12 +438,24 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* Hover con color celeste único para upload */
+    /* Estado verde cuando la imagen está cargada correctamente */
+    .upload__button.image-loaded {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      box-shadow: 0 4px 14px rgba(16, 185, 129, 0.25), 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Hover - rojo más oscuro cuando no hay imagen */
     .upload__button:hover {
-      background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+      background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
       color: #ffffff;
-      box-shadow: 0 8px 25px rgba(6, 182, 212, 0.4), 0 4px 12px rgba(0, 0, 0, 0.15);
+      box-shadow: 0 8px 25px rgba(220, 38, 38, 0.4), 0 4px 12px rgba(0, 0, 0, 0.15);
       transform: translateY(-3px) scale(1.02);
+    }
+
+    /* Hover - verde más oscuro cuando hay imagen cargada */
+    .upload__button.image-loaded:hover {
+      background: linear-gradient(135deg, #059669 0%, #047857 100%);
+      box-shadow: 0 8px 25px rgba(5, 150, 105, 0.4), 0 4px 12px rgba(0, 0, 0, 0.15);
     }
 
     /* Efecto de brillo en hover */
@@ -459,12 +471,18 @@
       left: 100%;
     }
 
-    /* Estado activo */
+    /* Estado activo - rojo cuando no hay imagen */
     .upload__button:active {
-      background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
+      background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%);
       color: #ffffff;
-      box-shadow: 0 4px 12px rgba(8, 145, 178, 0.5), 0 2px 6px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 4px 12px rgba(185, 28, 28, 0.5), 0 2px 6px rgba(0, 0, 0, 0.2);
       transform: translateY(-1px) scale(0.98);
+    }
+
+    /* Estado activo - verde cuando hay imagen */
+    .upload__button.image-loaded:active {
+      background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+      box-shadow: 0 4px 12px rgba(4, 120, 87, 0.5), 0 2px 6px rgba(0, 0, 0, 0.2);
     }
 
     /* Focus con ring azul elegante */
@@ -494,23 +512,39 @@
       transform: scale(1.05);
     }
 
-    /* Modo oscuro */
+    /* Modo oscuro - rojo por defecto */
     [data-theme="dark"] .upload__button {
-      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
       color: #ffffff;
-      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3), 0 2px 6px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 4px 14px rgba(220, 38, 38, 0.3), 0 2px 6px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Modo oscuro - verde cuando imagen cargada */
+    [data-theme="dark"] .upload__button.image-loaded {
+      background: linear-gradient(135deg, #059669 0%, #047857 100%);
+      box-shadow: 0 4px 14px rgba(5, 150, 105, 0.3), 0 2px 6px rgba(0, 0, 0, 0.2);
     }
 
     [data-theme="dark"] .upload__button:hover {
-      background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+      background: linear-gradient(135deg, #b91c1c 0%, #991b1b 100%);
       color: #ffffff;
-      box-shadow: 0 8px 25px rgba(6, 182, 212, 0.5), 0 4px 12px rgba(0, 0, 0, 0.25);
+      box-shadow: 0 8px 25px rgba(185, 28, 28, 0.5), 0 4px 12px rgba(0, 0, 0, 0.25);
       transform: translateY(-3px) scale(1.02);
     }
 
+    [data-theme="dark"] .upload__button.image-loaded:hover {
+      background: linear-gradient(135deg, #047857 0%, #065f46 100%);
+      box-shadow: 0 8px 25px rgba(4, 120, 87, 0.5), 0 4px 12px rgba(0, 0, 0, 0.25);
+    }
+
     [data-theme="dark"] .upload__button:active {
-      background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
-      box-shadow: 0 4px 12px rgba(8, 145, 178, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+      background: linear-gradient(135deg, #991b1b 0%, #7f1d1d 100%);
+      box-shadow: 0 4px 12px rgba(153, 27, 27, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
+    }
+
+    [data-theme="dark"] .upload__button.image-loaded:active {
+      background: linear-gradient(135deg, #065f46 0%, #064e3b 100%);
+      box-shadow: 0 4px 12px rgba(6, 95, 70, 0.5), 0 2px 6px rgba(0, 0, 0, 0.3);
     }
     
     /* File Info Block - Enhanced */
@@ -555,6 +589,98 @@
       background-color: rgba(239, 68, 68, 0.1);
       color: #dc2626;
       transform: scale(1.1);
+    }
+
+    /* Preview de imagen en file-info */
+    .file-info__preview {
+      width: 48px;
+      height: 48px;
+      margin-right: 0.75rem;
+      border-radius: 6px;
+      object-fit: cover;
+      border: 2px solid var(--border-color);
+      box-shadow: var(--shadow-sm);
+      transition: var(--transition);
+    }
+
+    .file-info__preview:hover {
+      transform: scale(1.1);
+      box-shadow: var(--shadow-md);
+    }
+
+    /* ===== BOTÓN DE MARCA DE AGUA ===== */
+    /* Estado base - rojo cuando no hay marca de agua cargada */
+    .watermark-upload-button {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      width: 100%;
+      padding: 0.75rem 1rem;
+      background: linear-gradient(to right, #ef4444, #dc2626);
+      color: #ffffff;
+      font-weight: 500;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 6px -1px rgba(239, 68, 68, 0.25), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Estado verde cuando la marca de agua está cargada */
+    .watermark-upload-button.watermark-loaded {
+      background: linear-gradient(to right, #10b981, #059669);
+      box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.25), 0 2px 4px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Hover - rojo más oscuro cuando no hay marca de agua */
+    .watermark-upload-button:hover {
+      background: linear-gradient(to right, #dc2626, #b91c1c);
+      box-shadow: 0 10px 15px -3px rgba(220, 38, 38, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Hover - verde más oscuro cuando hay marca de agua */
+    .watermark-upload-button.watermark-loaded:hover {
+      background: linear-gradient(to right, #059669, #047857);
+      box-shadow: 0 10px 15px -3px rgba(5, 150, 105, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Modo oscuro */
+    [data-theme="dark"] .watermark-upload-button {
+      background: linear-gradient(to right, #dc2626, #b91c1c);
+      box-shadow: 0 4px 6px -1px rgba(220, 38, 38, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+    }
+
+    [data-theme="dark"] .watermark-upload-button.watermark-loaded {
+      background: linear-gradient(to right, #059669, #047857);
+      box-shadow: 0 4px 6px -1px rgba(5, 150, 105, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+    }
+
+    [data-theme="dark"] .watermark-upload-button:hover {
+      background: linear-gradient(to right, #b91c1c, #991b1b);
+      box-shadow: 0 10px 15px -3px rgba(185, 28, 28, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.25);
+    }
+
+    [data-theme="dark"] .watermark-upload-button.watermark-loaded:hover {
+      background: linear-gradient(to right, #047857, #065f46);
+      box-shadow: 0 10px 15px -3px rgba(4, 120, 87, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.25);
+    }
+
+    /* Miniatura de marca de agua */
+    .watermark-preview-thumbnail {
+      width: 40px;
+      height: 40px;
+      margin-left: 0.5rem;
+      border-radius: 4px;
+      object-fit: contain;
+      border: 2px solid var(--border-color);
+      background: var(--bg-tertiary);
+      box-shadow: var(--shadow-sm);
+      transition: var(--transition);
+    }
+
+    .watermark-preview-thumbnail:hover {
+      transform: scale(1.15);
+      box-shadow: var(--shadow-md);
     }
     
     /* Error Block - Enhanced */
@@ -5919,13 +6045,18 @@
     }
 
     /* Texto en mayúsculas para todo el proyecto */
-    body, button, input, textarea, select, label, h1, h2, h3, h4, h5, h6, p, span, div, a {
+    body, button, select, label, h1, h2, h3, h4, h5, h6, p, span, div, a {
       text-transform: uppercase;
     }
 
-    /* Mantener normal para placeholders y algunos elementos específicos */
+    /* Permitir que inputs y textareas tengan mayúsculas/minúsculas libremente */
+    input, textarea {
+      text-transform: none !important;
+    }
+
+    /* Placeholders en mayúsculas (ya están en mayúsculas en el HTML) */
     input::placeholder, textarea::placeholder {
-      text-transform: none;
+      text-transform: uppercase;
     }
 
     /* ============================================ */
