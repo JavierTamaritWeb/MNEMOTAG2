@@ -4,10 +4,19 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos.
 
-![Version](https://img.shields.io/badge/version-3.1.0-blue.svg)
+![Version](https://img.shields.io/badge/version-3.1.2-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
+![Status](https://img.shields.io/badge/status-stable-success.svg)
 
 ---
+
+## 🚀 CARACTERÍSTICAS v3.1.2
+
+### 🎨 FEEDBACK VISUAL DE ESTADO (NUEVO)
+- 🔴🟢 Botones con indicadores de color dinámicos
+- Vista previa de imágenes cargadas en miniatura
+- Confirmación visual inmediata de acciones
+- Consistencia en toda la interfaz
 
 ## 🚀 CARACTERÍSTICAS v3.1
 

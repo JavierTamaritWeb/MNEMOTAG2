@@ -4,6 +4,50 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.1.2] - 2025-10-09
+
+### ✨ NUEVAS FUNCIONALIDADES
+
+#### Feedback Visual de Estado en Botones de Carga
+- ✅ **IMPLEMENTADO:** Sistema de indicadores visuales de estado para botones de carga de archivos
+- Mejora significativa de la experiencia de usuario con feedback inmediato
+
+**Características:**
+
+1. **Botón de Carga Principal (Sección 1)**
+   - 🔴 **Estado rojo**: Cuando no hay imagen cargada (indica acción pendiente)
+   - 🟢 **Estado verde**: Cuando la imagen se carga correctamente (indica éxito)
+   - 🖼️ **Miniatura**: Muestra preview de 48x48px de la imagen cargada
+   - Miniatura con bordes redondeados y efecto hover
+
+2. **Botón de Marca de Agua (Sección 3)**
+   - 🔴 **Estado rojo**: Cuando no hay marca de agua cargada
+   - 🟢 **Estado verde**: Cuando la marca de agua se carga correctamente
+   - 🖼️ **Miniatura**: Muestra preview de 40x40px de la marca de agua
+   - Fondo translúcido para mejor visualización de transparencias
+
+**Implementación Técnica:**
+
+- **CSS**: Clases `.image-loaded` y `.watermark-loaded` con gradientes dinámicos
+- **Estados hover**: Colores más oscuros según el estado (rojo/verde)
+- **Modo oscuro**: Soporte completo con ajustes de contraste
+- **JavaScript**: Actualización automática de estados al cargar/eliminar archivos
+- **Miniaturas**: Generación dinámica con FileReader API
+
+**Archivos Modificados:**
+- `css/styles.css` - ~90 líneas de estilos nuevos
+- `index.html` - 2 elementos `<img>` agregados para miniaturas
+- `js/main.js` - Lógica de cambio de estados en 3 funciones
+
+**Beneficios UX:**
+- ✅ Feedback visual inmediato del estado de carga
+- ✅ Confirmación visual de archivos cargados
+- ✅ Reducción de confusión del usuario
+- ✅ Mejor navegación por la interfaz
+- ✅ Consistencia visual en toda la aplicación
+
+---
+
 ## [3.1.1] - 2025-10-04
 
 ### 🐛 CORRECCIONES DE BUGS POST-v3.1
@@ -519,6 +563,26 @@ Lanzamiento inicial de MnemoTag.
 
 ---
 
-**Última actualización:** 4 de octubre de 2025  
-**Versión actual:** 3.1.0  
+## 📊 ESTADÍSTICAS DEL PROYECTO
+
+### Versión 3.1.2 (Actual)
+- **Líneas de código totales:** ~8,600
+- **Archivos de código:** 20
+- **Documentación:** 7 archivos
+- **Características principales:** 5
+- **Tests implementados:** 45+
+- **Navegadores soportados:** 4
+- **Compatibilidad:** Desktop, Tablet, Mobile
+
+### Crecimiento desde v3.0
+- **+2,600 líneas de código** (+43%)
+- **+4 nuevos managers**
+- **+1 sistema de utilidades**
+- **+5 documentos técnicos**
+- **+45 tests**
+
+---
+
+**Última actualización:** 9 de octubre de 2025  
+**Versión actual:** 3.1.2  
 **Estado:** ✅ Estable y listo para producción

@@ -1,6 +1,6 @@
 # 📦 MNEMOTAG V3.1 - NUEVAS CARACTERÍSTICAS
 
-**Versión:** 3.1.0  
+**Versión:** 3.1.2  
 **Fecha:** Octubre 2025  
 **Autor:** Javier Tamarit
 
@@ -8,12 +8,45 @@
 
 ## 🎯 RESUMEN EJECUTIVO
 
-La versión 3.1 de MnemoTag introduce 4 nuevas características principales que transforman la aplicación en una herramienta profesional completa:
+La versión 3.1 de MnemoTag introduce 5 características principales que transforman la aplicación en una herramienta profesional completa:
 
 1. **Sistema de Atajos de Teclado** - Navegación rápida optimizada para Mac
 2. **Batch Processing** - Procesamiento por lotes de hasta 50 imágenes
 3. **Capas de Texto Avanzadas** - Sistema completo de text layers
 4. **Recorte Inteligente** - Crop tool con sugerencias automáticas
+5. **Feedback Visual de Estado** ⭐ NUEVO v3.1.2 - Indicadores visuales en botones de carga
+
+---
+
+## 🎨 FEEDBACK VISUAL DE ESTADO (v3.1.2)
+
+### CARACTERÍSTICAS
+
+- **Indicadores de color dinámicos** en botones de carga
+- **Miniaturas de preview** para archivos cargados
+- **Estados visuales claros**: Rojo (pendiente) → Verde (completado)
+- **Soporte completo** para modo claro y oscuro
+- **Animaciones suaves** y transiciones profesionales
+
+### BOTONES CON FEEDBACK
+
+#### 1. Botón de Carga Principal (Sección 1)
+- 🔴 **Rojo**: Sin imagen cargada
+- 🟢 **Verde**: Imagen cargada correctamente
+- 🖼️ **Miniatura**: Preview de 48x48px con bordes redondeados
+
+#### 2. Botón de Marca de Agua (Sección 3)
+- 🔴 **Rojo**: Sin marca de agua
+- 🟢 **Verde**: Marca de agua cargada
+- 🖼️ **Miniatura**: Preview de 40x40px con fondo translúcido
+
+### BENEFICIOS
+
+✅ Confirmación visual inmediata de acciones  
+✅ Reducción de confusión del usuario  
+✅ Mejor navegación por la interfaz  
+✅ Consistencia visual en toda la aplicación  
+✅ Feedback sin necesidad de texto adicional
 
 ---
 
