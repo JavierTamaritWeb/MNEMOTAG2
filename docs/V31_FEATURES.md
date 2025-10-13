@@ -8,13 +8,15 @@
 
 ## 🎯 RESUMEN EJECUTIVO
 
-La versión 3.1 de MnemoTag introduce 5 características principales que transforman la aplicación en una herramienta profesional completa:
+La versión 3.1 de MnemoTag introduce 7 características principales que transforman la aplicación en una herramienta profesional completa:
 
 1. **Sistema de Atajos de Teclado** - Navegación rápida optimizada para Mac
 2. **Batch Processing** - Procesamiento por lotes de hasta 50 imágenes
 3. **Capas de Texto Avanzadas** - Sistema completo de text layers
 4. **Recorte Inteligente** - Crop tool con sugerencias automáticas
-5. **Feedback Visual de Estado** ⭐ NUEVO v3.1.2 - Indicadores visuales en botones de carga
+5. **Feedback Visual de Estado** ⭐ v3.1.2 - Indicadores visuales en botones de carga
+6. **Secciones Colapsables** ⭐ v3.1.2 - Sistema de minimización de secciones con delegación de eventos
+7. **Geolocalización Mejorada** ⭐ v3.1.2 - GPS con feedback contextual no intrusivo
 
 ---
 
@@ -563,7 +565,80 @@ Todos los botones incluyen tooltips con información y atajos:
 
 ---
 
+## 📂 SECCIONES COLAPSABLES (v3.1.2)
+
+### CARACTERÍSTICAS
+
+- **4 secciones colapsables:** Metadatos, Marca de agua, Filtros, Configuración de salida
+- **Minimización completa del card:** El marco se reduce automáticamente
+- **Delegación de eventos:** Implementada para máxima compatibilidad
+- **Event capture:** Captura eventos ANTES que otros listeners
+- **Soporte para teclado:** Enter y Space
+- **Animaciones suaves:** Transiciones CSS optimizadas
+
+### IMPLEMENTACIÓN TÉCNICA
+
+**Estrategia:** Delegación de eventos en `document` con `capture: true`
+
+```javascript
+document.addEventListener('click', (e) => {
+  const header = e.target.closest('.section__header');
+  if (!header) return;
+  
+  const section = header.id.replace('-header', '');
+  if (sections.includes(section)) {
+    e.preventDefault();
+    e.stopPropagation();
+    toggleCollapsible(section);
+  }
+}, true);
+```
+
+### BENEFICIOS
+
+✅ Mejor organización visual  
+✅ Workflow más eficiente  
+✅ Resistente a conflictos con otros scripts  
+✅ Captura eventos antes que cualquier otro listener
+
+---
+
+## 📍 GEOLOCALIZACIÓN MEJORADA (v3.1.2)
+
+### CARACTERÍSTICAS
+
+- **Obtención automática de GPS:** Botón "Ubicación actual"
+- **3 estados visuales:** Loading (azul), Success (verde), Error (rojo)
+- **Feedback contextual:** Mensajes debajo de los campos (no toasts flotantes)
+- **Manejo de errores:** Mensajes específicos según el tipo de error
+- **Soporte modo oscuro:** Estilos adaptados
+
+### ERRORES MANEJADOS
+
+- `PERMISSION_DENIED` - Ayuda para activar permisos
+- `POSITION_UNAVAILABLE` - Verificación de servicios
+- `TIMEOUT` - Sugerencia de verificar conexión
+- Error desconocido - Verificación de HTTPS/localhost
+
+### BENEFICIOS
+
+✅ UX no intrusiva (sin toasts flotantes)  
+✅ Feedback contextual inmediato  
+✅ Precisión de 6 decimales  
+✅ CSS forzado con `!important` para evitar conflictos
+
+---
+
 ## 🐛 BUGS CONOCIDOS SOLUCIONADOS
+
+### Versión 3.1.2
+
+9. ✅ **Secciones no minimizaban marco** - Clase `.card--collapsed` con `!important`
+10. ✅ **Sección 2 no se podía abrir** - Simplificado event listeners
+11. ✅ **Toast flotante de geolocalización** - Comentado `UIManager.showSuccess()` + CSS forzado
+12. ✅ **Sección 5 no respondía a clicks** - Delegación de eventos con `capture: true`
+
+### Versión 3.1.0/3.1.1
 
 1. ✅ **Selector de licencia** - Copyright dinámico implementado
 2. ✅ **Fuente Montserrat Alternates** - Agregada a todos los selectores

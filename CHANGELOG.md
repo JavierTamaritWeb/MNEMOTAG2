@@ -4,9 +4,50 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
-## [3.1.2] - 2025-10-09
+## [3.1.2] - 2025-10-13
 
 ### ✨ NUEVAS FUNCIONALIDADES
+
+#### 🎯 Secciones Colapsables/Expandibles
+- ✅ **IMPLEMENTADO:** Sistema completo de secciones colapsables para mejor organización
+- Las 4 secciones principales ahora se pueden minimizar/expandir con un click
+- Animaciones suaves y transiciones CSS optimizadas
+- Soporte completo para navegación por teclado (Enter/Space)
+- Iconos rotativos (▼/▶) que indican el estado actual
+- Minimización automática del marco del card cuando está colapsado
+- Mejora significativa de la organización visual y workflow
+- **DELEGACIÓN DE EVENTOS:** Implementada para máxima compatibilidad y robustez
+
+**Características:**
+- **JavaScript:** Función `setupCollapsibles()` con delegación de eventos en `document`
+- **Event Capture:** Usa `capture: true` para interceptar eventos ANTES que otros listeners
+- **CSS:** Transiciones con `max-height`, `opacity` y rotación de iconos
+- **Accesibilidad:** Atributos ARIA (`aria-expanded`, `aria-hidden`)
+- **Keyboard Support:** Enter y Space para toggle
+- **Estado inicial:** Todas las secciones abiertas por defecto
+- **Robustez:** Resistente a conflictos con otros scripts y event listeners
+
+#### 📍 Geolocalización Mejorada
+- ✅ **IMPLEMENTADO:** Sistema de obtención de coordenadas GPS con feedback contextual
+- Botón "Ubicación actual" con icono de crosshairs
+- Mensajes de estado **no intrusivos** (sin toasts flotantes)
+- Indicadores visuales debajo de los campos de entrada
+- Soporte para Latitud, Longitud y Altitud
+- Gestión inteligente de permisos con mensajes informativos
+- Manejo de errores con ayuda contextual
+
+**Características:**
+- **Estados:** Loading (azul), Success (verde), Error (rojo)
+- **Permisos:** Mensajes específicos según el tipo de error
+- **UX:** Feedback inmediato sin interrupciones
+- **Precisión:** 6 decimales para coordenadas, metros para altitud
+- **CSS forzado:** `position: static !important` para evitar desplazamientos
+
+**Errores manejados:**
+- `PERMISSION_DENIED` - Ayuda para activar permisos en el navegador
+- `POSITION_UNAVAILABLE` - Verificación de servicios de ubicación
+- `TIMEOUT` - Sugerencia de verificar conexión
+- Error desconocido - Verificación de HTTPS/localhost
 
 #### Feedback Visual de Estado en Botones de Carga
 - ✅ **IMPLEMENTADO:** Sistema de indicadores visuales de estado para botones de carga de archivos
@@ -34,17 +75,43 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 - **JavaScript**: Actualización automática de estados al cargar/eliminar archivos
 - **Miniaturas**: Generación dinámica con FileReader API
 
-**Archivos Modificados:**
-- `css/styles.css` - ~90 líneas de estilos nuevos
-- `index.html` - 2 elementos `<img>` agregados para miniaturas
-- `js/main.js` - Lógica de cambio de estados en 3 funciones
+### 🐛 CORRECCIÓN DE BUGS
+
+#### Problema: Secciones no se minimizaban correctamente
+- **Descripción:** Las secciones 2, 3 y 5 no minimizaban el marco del card
+- **Causa:** El `.card` tenía una `min-height` que impedía la minimización
+- **Solución:** Clase `.card--collapsed` con `!important` para sobrescribir `min-height`
+
+#### Problema: Sección 2 no se podía abrir
+- **Descripción:** Al hacer clic en el header de la sección 2, no respondía
+- **Causa:** Event listeners duplicados y conflictos con `stopPropagation()`
+- **Solución:** Simplificado a un solo listener con `dataset.collapsibleConfigured`
+
+#### Problema: Toast flotante de geolocalización
+- **Descripción:** El mensaje aparecía como toast arriba a la derecha
+- **Causa:** `UIManager.showSuccess()` activo + CSS incorrecto + caché del navegador
+- **Solución:** Comentado `UIManager.showSuccess()` + CSS con `position: static !important` + cache busting
+
+#### Problema: Sección 5 (Output) no respondía a clicks
+- **Descripción:** La sección 5 no se podía colapsar/expandir
+- **Causa:** Conflicto de event listeners con otros scripts
+- **Solución:** **DELEGACIÓN DE EVENTOS** con `capture: true` en `document`
+
+**Archivos Modificados en v3.1.2:**
+- `js/main.js` - Funciones `setupCollapsibles()` y `toggleCollapsible()` con delegación de eventos
+- `js/managers/metadata-manager.js` - Función `getCurrentLocation()` mejorada, toast comentado
+- `css/styles.css` - ~200 líneas de estilos nuevos (colapsables + geolocalización + fixes)
+- `index.html` - Headers colapsables, estructura de geolocalización, cache busting
 
 **Beneficios UX:**
+- ✅ Mejor organización visual con secciones colapsables
+- ✅ Workflow más eficiente al minimizar secciones no usadas
+- ✅ Feedback de geolocalización contextual (no intrusivo)
+- ✅ Mensajes de estado claros y visibles
+- ✅ Navegación por teclado accesible
+- ✅ Animaciones suaves y profesionales
 - ✅ Feedback visual inmediato del estado de carga
-- ✅ Confirmación visual de archivos cargados
 - ✅ Reducción de confusión del usuario
-- ✅ Mejor navegación por la interfaz
-- ✅ Consistencia visual en toda la aplicación
 
 ---
 
@@ -583,6 +650,6 @@ Lanzamiento inicial de MnemoTag.
 
 ---
 
-**Última actualización:** 9 de octubre de 2025  
+**Última actualización:** 13 de octubre de 2025  
 **Versión actual:** 3.1.2  
 **Estado:** ✅ Estable y listo para producción

@@ -1547,42 +1547,86 @@
     }
 
     function setupCollapsibles() {
-      const metadataHeader = document.getElementById('metadata-header');
-      const watermarkHeader = document.getElementById('watermark-header');
+      const sections = ['metadata', 'watermark', 'filters', 'output'];
       
-      metadataHeader.addEventListener('click', () => toggleCollapsible('metadata'));
-      watermarkHeader.addEventListener('click', () => toggleCollapsible('watermark'));
-      
-      metadataHeader.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+      // Usar delegación de eventos en el documento para capturar TODOS los clicks
+      document.addEventListener('click', (e) => {
+        // Buscar si el click fue en un header o dentro de uno
+        const header = e.target.closest('.section__header');
+        if (!header) return;
+        
+        // Obtener el ID del header y extraer el nombre de la sección
+        const headerId = header.id;
+        if (!headerId || !headerId.endsWith('-header')) return;
+        
+        const section = headerId.replace('-header', '');
+        if (sections.includes(section)) {
           e.preventDefault();
-          toggleCollapsible('metadata');
+          e.stopPropagation();
+          toggleCollapsible(section);
         }
-      });
+      }, true);
       
-      watermarkHeader.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          toggleCollapsible('watermark');
+      // Configurar estilos y estado inicial de cada sección
+      sections.forEach(section => {
+        const header = document.getElementById(`${section}-header`);
+        const content = document.getElementById(`${section}-content`);
+        
+        if (!header || !content) {
+          console.warn(`No se encontró header o content para sección: ${section}`);
+          return;
         }
+        
+        // Verificar estado inicial y sincronizar
+        const isOpen = content.classList.contains('section__content--open');
+        const icon = header.querySelector('.section__icon');
+        
+        // Sincronizar ícono con estado inicial
+        if (icon) {
+          if (isOpen) {
+            icon.classList.remove('section__icon--collapsed');
+          } else {
+            icon.classList.add('section__icon--collapsed');
+          }
+        }
+        
+        // Hacer que el header sea más interactivo
+        header.style.cursor = 'pointer';
+        header.style.position = 'relative';
+        header.style.zIndex = '100';
+        
+        // Keyboard support directo en el header
+        header.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggleCollapsible(section);
+          }
+        });
       });
     }
 
     function toggleCollapsible(section) {
       const header = document.getElementById(`${section}-header`);
       const content = document.getElementById(`${section}-content`);
-      const icon = header.querySelector('.section__icon');
       
+      if (!header || !content) {
+        return;
+      }
+      
+      const icon = header.querySelector('.section__icon');
+      const card = header.closest('.card');
       const isOpen = content.classList.contains('section__content--open');
       
       if (isOpen) {
         content.classList.remove('section__content--open');
-        icon.classList.add('section__icon--collapsed');
+        if (icon) icon.classList.add('section__icon--collapsed');
+        if (card) card.classList.add('card--collapsed');
         header.setAttribute('aria-expanded', 'false');
         content.setAttribute('aria-hidden', 'true');
       } else {
         content.classList.add('section__content--open');
-        icon.classList.remove('section__icon--collapsed');
+        if (icon) icon.classList.remove('section__icon--collapsed');
+        if (card) card.classList.remove('card--collapsed');
         header.setAttribute('aria-expanded', 'true');
         content.setAttribute('aria-hidden', 'false');
       }

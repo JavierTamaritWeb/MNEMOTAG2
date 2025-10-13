@@ -12,11 +12,25 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 
 ## 🚀 CARACTERÍSTICAS v3.1.2
 
-### 🎨 FEEDBACK VISUAL DE ESTADO (NUEVO)
+### 🎨 FEEDBACK VISUAL DE ESTADO
 - 🔴🟢 Botones con indicadores de color dinámicos
 - Vista previa de imágenes cargadas en miniatura
 - Confirmación visual inmediata de acciones
 - Consistencia en toda la interfaz
+
+### 📍 GEOLOCALIZACIÓN MEJORADA
+- Obtención automática de coordenadas GPS
+- Mensajes de estado contextuales (no intrusivos)
+- Indicadores de éxito/error debajo de los campos
+- Soporte para Latitud, Longitud y Altitud
+- Gestión de permisos con mensajes informativos
+
+### 🎯 SECCIONES COLAPSABLES
+- Todas las secciones principales son colapsables/expandibles
+- Animaciones suaves con transiciones CSS
+- Iconos rotativos que indican el estado
+- Soporte para navegación por teclado (Enter/Space)
+- Minimización automática del marco del card
 
 ## 🚀 CARACTERÍSTICAS v3.1
 
@@ -42,6 +56,18 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 - 7 proporciones predefinidas
 - Modo personalizado
 - Sugerencias automáticas
+
+### 📂 SECCIONES COLAPSABLES
+- 4 secciones principales: Metadatos, Marca de agua, Filtros, Configuración de salida
+- Minimización completa del marco del card
+- Delegación de eventos para máxima compatibilidad
+- Soporte para teclado (Enter/Space)
+
+### 📍 GEOLOCALIZACIÓN MEJORADA
+- Obtención automática de coordenadas GPS
+- Feedback contextual en 3 estados (loading, success, error)
+- Mensajes no intrusivos debajo de los campos
+- Soporte para modo oscuro
 
 ---
 

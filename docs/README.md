@@ -1,6 +1,6 @@
 # 📚 MNEMOTAG - DOCUMENTACIÓN TÉCNICA
 
-**Versión:** 3.1.0  
+**Versión:** 3.1.2  
 **Última actualización:** Octubre 2025
 
 ---
@@ -9,11 +9,14 @@
 
 ### 🎯 CARACTERÍSTICAS PRINCIPALES
 
-- **[V31_FEATURES.md](V31_FEATURES.md)** - Documentación completa de características v3.1
+- **[V31_FEATURES.md](V31_FEATURES.md)** - Documentación completa de características v3.1.2
   - Sistema de atajos de teclado (Mac optimizado)
   - Batch processing (procesamiento por lotes)
   - Capas de texto avanzadas
   - Recorte inteligente
+  - **Feedback visual de estado** ⭐ v3.1.2
+  - **Secciones colapsables** ⭐ v3.1.2
+  - **Geolocalización mejorada** ⭐ v3.1.2
 
 ### 🏗️ ARQUITECTURA Y ESTRUCTURA
 
@@ -45,6 +48,38 @@
 
 ---
 
+## ⭐ NOVEDADES v3.1.2 (Octubre 2025)
+
+### 1. 🎨 Feedback Visual de Estado
+- Botones con indicadores de color (rojo sin carga → verde cargado)
+- Miniaturas de preview (48x48px imagen principal, 40x40px marca de agua)
+- Transiciones suaves y efectos hover
+- Soporte completo para modo oscuro
+
+### 2. 📂 Secciones Colapsables
+- 4 secciones minimizables (Metadatos, Marca de agua, Filtros, Salida)
+- **Delegación de eventos** con `capture: true` para máxima robustez
+- Minimización completa del marco del card
+- Soporte para teclado (Enter/Space)
+- Animaciones CSS optimizadas
+
+### 3. 📍 Geolocalización Mejorada
+- Obtención automática de coordenadas GPS
+- 3 estados visuales (loading azul, success verde, error rojo)
+- Feedback contextual debajo de campos (sin toasts flotantes)
+- Manejo específico de errores (permisos, timeout, disponibilidad)
+- Precisión de 6 decimales
+
+### 🐛 Bugs Solucionados
+- ✅ Secciones no minimizaban marco del card
+- ✅ Sección 2 no se podía abrir
+- ✅ Toast flotante de geolocalización
+- ✅ Sección 5 no respondía a clicks (solucionado con delegación de eventos)
+
+**Ver [CHANGELOG.md](../CHANGELOG.md) para detalles completos**
+
+---
+
 ## 🚀 INICIO RÁPIDO PARA DESARROLLADORES
 
 ### REQUISITOS PREVIOS
@@ -73,11 +108,25 @@ MNEMOTAG2/
 
 ---
 
+## 📊 ESTADÍSTICAS DEL PROYECTO
+
+- **Versión:** 3.1.2
+- **Líneas de código:** ~20,500
+- **Archivos de código:** 20 (HTML, JS, CSS)
+- **Managers:** 10 módulos especializados
+- **Utilidades:** 6 archivos auxiliares
+- **Documentación:** 6 archivos técnicos
+- **Estado:** Producción, estable
+
+---
+
 ## 🔗 ENLACES ÚTILES
 
 - **Repositorio:** [GitHub - MNEMOTAG2](https://github.com/JavierTamaritWeb/MNEMOTAG2)
 - **Demo en vivo:** [MnemoTag App](https://javierTamaritWeb.github.io/MNEMOTAG2)
+- **CHANGELOG:** [Ver historial de cambios](../CHANGELOG.md)
 
 ---
 
-**Autor:** Javier Tamarit
+**Autor:** Javier Tamarit  
+**Última actualización:** 13 de octubre de 2025

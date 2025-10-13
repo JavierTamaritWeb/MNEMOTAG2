@@ -97,39 +97,64 @@ const MetadataManager = {
         }
         
         if (locationStatus) {
-          locationStatus.textContent = `Ubicación obtenida: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+          locationStatus.textContent = `✅ Ubicación obtenida: ${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
           locationStatus.className = 'location-status success';
         }
         
-        if (typeof UIManager !== 'undefined') {
-          UIManager.showSuccess('Ubicación GPS obtenida correctamente');
-        }
+        // No mostrar toast flotante, solo el mensaje estático debajo de los campos
+        // if (typeof UIManager !== 'undefined') {
+        //   UIManager.showSuccess('Ubicación GPS obtenida correctamente');
+        // }
       },
       (error) => {
-        let errorMessage = 'Error al obtener ubicación: ';
+        let errorMessage = '';
+        let helpMessage = '';
+        
         switch (error.code) {
           case error.PERMISSION_DENIED:
-            errorMessage += 'Permiso denegado por el usuario';
+            errorMessage = 'Permiso denegado por el usuario';
+            helpMessage = '🔒 Haz clic en el icono de candado en la barra de direcciones y permite el acceso a la ubicación. Luego recarga la página.';
             break;
           case error.POSITION_UNAVAILABLE:
-            errorMessage += 'Información de ubicación no disponible';
+            errorMessage = 'Información de ubicación no disponible';
+            helpMessage = '📡 Asegúrate de tener activados los servicios de ubicación en tu sistema y tener una conexión a internet.';
             break;
           case error.TIMEOUT:
-            errorMessage += 'Tiempo de espera agotado';
+            errorMessage = 'Tiempo de espera agotado';
+            helpMessage = '⏱️ La ubicación está tardando demasiado. Verifica tu conexión a internet e intenta de nuevo.';
             break;
           default:
-            errorMessage += 'Error desconocido';
+            errorMessage = 'Error desconocido al obtener ubicación';
+            helpMessage = '❓ Verifica que estés usando HTTPS o localhost, y que tu navegador soporte geolocalización.';
             break;
         }
         
         if (locationStatus) {
-          locationStatus.textContent = errorMessage;
-          locationStatus.className = 'location-status error';
+          locationStatus.innerHTML = `
+            <div class="text-red-600 font-medium">❌ ${errorMessage}</div>
+            <div class="text-gray-600 text-xs mt-1">${helpMessage}</div>
+          `;
+          locationStatus.className = 'location-status error mt-2';
         }
         
-        if (typeof UIManager !== 'undefined') {
-          UIManager.showError('No se pudo obtener la ubicación GPS');
-        }
+        // No mostrar toast flotante, solo el mensaje estático debajo de los campos
+        // if (typeof UIManager !== 'undefined') {
+        //   UIManager.showError(errorMessage, {
+        //     duration: 8000,
+        //     action: error.code === error.PERMISSION_DENIED ? {
+        //       label: 'Ver ayuda',
+        //       handler: 'window.open("https://support.google.com/chrome/answer/142065", "_blank")'
+        //     } : null
+        //   });
+        // }
+        
+        console.error('Error de geolocalización:', {
+          code: error.code,
+          message: error.message,
+          isHTTPS: window.location.protocol === 'https:',
+          isLocalhost: window.location.hostname === 'localhost',
+          userAgent: navigator.userAgent
+        });
       },
       options
     );
