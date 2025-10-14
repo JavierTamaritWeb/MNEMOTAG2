@@ -6295,6 +6295,129 @@
       }
     }
     
+/* ============================== */
+/* HERRAMIENTAS AVANZADAS - MODO OSCURO MEJORADO */
+/* ============================== */
+
+/* Botón LOTE - Púrpura */
+[data-theme="dark"] #batch-mode-btn {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+}
+
+[data-theme="dark"] #batch-mode-btn:hover {
+  background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+  box-shadow: 0 8px 25px rgba(139, 92, 246, 0.5), 0 4px 12px rgba(0, 0, 0, 0.2);
+  transform: translateY(-3px) scale(1.02);
+}
+
+[data-theme="dark"] #batch-mode-btn:active {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.5);
+  transform: translateY(-1px) scale(0.98);
+}
+
+/* Botón TEXTO - Azul */
+[data-theme="dark"] #text-layers-btn {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+}
+
+[data-theme="dark"] #text-layers-btn:hover {
+  background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.5), 0 4px 12px rgba(0, 0, 0, 0.2);
+  transform: translateY(-3px) scale(1.02);
+}
+
+[data-theme="dark"] #text-layers-btn:active {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.5);
+  transform: translateY(-1px) scale(0.98);
+}
+
+/* Botón RECORTAR - Verde */
+[data-theme="dark"] #crop-mode-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+}
+
+[data-theme="dark"] #crop-mode-btn:hover {
+  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+  box-shadow: 0 8px 25px rgba(16, 185, 129, 0.5), 0 4px 12px rgba(0, 0, 0, 0.2);
+  transform: translateY(-3px) scale(1.02);
+}
+
+[data-theme="dark"] #crop-mode-btn:active {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.5);
+  transform: translateY(-1px) scale(0.98);
+}
+
+/* Botón ATAJOS - Ámbar/Amarillo */
+[data-theme="dark"] #shortcuts-help-btn {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 4px 15px rgba(245, 158, 11, 0.4);
+}
+
+[data-theme="dark"] #shortcuts-help-btn:hover {
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  box-shadow: 0 8px 25px rgba(245, 158, 11, 0.5), 0 4px 12px rgba(0, 0, 0, 0.2);
+  transform: translateY(-3px) scale(1.02);
+}
+
+[data-theme="dark"] #shortcuts-help-btn:active {
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.5);
+  transform: translateY(-1px) scale(0.98);
+}
+
+/* Iconos blancos para todos los botones */
+[data-theme="dark"] #batch-mode-btn i,
+[data-theme="dark"] #text-layers-btn i,
+[data-theme="dark"] #crop-mode-btn i,
+[data-theme="dark"] #shortcuts-help-btn i {
+  color: #ffffff;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+  transition: all 0.3s ease;
+}
+
+/* Animación de iconos en hover */
+[data-theme="dark"] #batch-mode-btn:hover i,
+[data-theme="dark"] #text-layers-btn:hover i,
+[data-theme="dark"] #crop-mode-btn:hover i,
+[data-theme="dark"] #shortcuts-help-btn:hover i {
+  transform: scale(1.1);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
+}
+
+/* Focus para accesibilidad */
+[data-theme="dark"] #batch-mode-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.3), 0 4px 15px rgba(139, 92, 246, 0.4);
+}
+
+[data-theme="dark"] #text-layers-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3), 0 4px 15px rgba(59, 130, 246, 0.4);
+}
+
+[data-theme="dark"] #crop-mode-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.3), 0 4px 15px rgba(16, 185, 129, 0.4);
+}
+
+[data-theme="dark"] #shortcuts-help-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.3), 0 4px 15px rgba(245, 158, 11, 0.4);
+}
 
 
 
