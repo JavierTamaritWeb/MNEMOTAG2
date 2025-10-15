@@ -3592,6 +3592,32 @@
       animation: pulse 2s infinite;
     }
 
+    /* Mensajes específicos para cada modo */
+    .positioning-mode.positioning-image::after {
+      content: "🖼️ ARRASTRA la imagen (borde naranja) para moverla";
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      font-weight: 600;
+    }
+
+    .positioning-mode.positioning-text::after {
+      content: "📝 ARRASTRA el texto (borde azul) para moverlo";
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      font-weight: 600;
+    }
+
+    .positioning-mode.positioning-both::after {
+      content: "✋ ARRASTRA texto (azul) o imagen (naranja) para mover";
+      background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+      animation: pulse 2s infinite;
+      font-weight: 600;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(-50%) translateY(0); }
+      25% { transform: translateX(-48%) translateY(-2px); }
+      75% { transform: translateX(-52%) translateY(2px); }
+    }
+
     .custom-position-marker {
       position: absolute;
       width: 20px;
@@ -3617,6 +3643,12 @@
       transform: translate(-50%, -50%);
     }
 
+    /* Marcador específico para texto - color azul */
+    .custom-position-marker.text-marker {
+      background: #3b82f6;
+      border-color: white;
+    }
+
     @keyframes bounce {
       0%, 20%, 50%, 80%, 100% {
         transform: translate(-50%, -50%) scale(1);
@@ -3640,13 +3672,43 @@
       border-color: var(--bg-primary);
     }
 
-    [data-theme="dark"] #custom-position-info {
-      background-color: rgba(96, 165, 250, 0.1) !important;
-      border-color: var(--accent-primary) !important;
+    /* Modo oscuro para notificaciones de arrastre */
+    [data-theme="dark"] #custom-text-position-info > div {
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(99, 102, 241, 0.15) 100%) !important;
+      border-color: rgba(59, 130, 246, 0.4) !important;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+    }
+
+    [data-theme="dark"] #custom-text-position-info p {
+      color: #93c5fd !important;
+    }
+
+    [data-theme="dark"] #custom-text-position-info strong {
+      color: #bfdbfe !important;
+    }
+
+    [data-theme="dark"] #custom-position-info > div {
+      background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(251, 191, 36, 0.15) 100%) !important;
+      border-color: rgba(245, 158, 11, 0.4) !important;
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.1);
     }
 
     [data-theme="dark"] #custom-position-info p {
-      color: var(--accent-primary) !important;
+      color: #fcd34d !important;
+    }
+
+    [data-theme="dark"] #custom-position-info strong {
+      color: #fde68a !important;
+    }
+
+    [data-theme="dark"] #custom-text-position-info i,
+    [data-theme="dark"] #custom-position-info i {
+      opacity: 0.9;
+    }
+
+    [data-theme="dark"] .custom-position-marker.text-marker {
+      background: #60a5fa;
+      border-color: var(--bg-primary);
     }
 
     /* Estilos para previsualización de metadatos */

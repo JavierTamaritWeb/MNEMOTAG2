@@ -4,6 +4,48 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.1.3] - 2025-10-15
+
+### ✨ NUEVA FUNCIONALIDAD DESTACADA
+
+#### 🎯 Sistema Drag & Drop Ultra Intuitivo para Marcas de Agua
+- ✅ **IMPLEMENTADO:** Sistema completamente rediseñado para máxima claridad y facilidad de uso
+- **🎨 Bordes Visuales:** Texto con borde azul punteado, Imagen con borde naranja punteado
+- **✋ Arrastre Directo:** Simplemente haz clic y arrastra, sin pasos previos confusos
+- **💡 Mensajes Claros:** Instrucciones específicas en gradientes de colores según el elemento activo
+- **🔄 Sin Click Inicial:** El sistema antiguo de "click para posicionar" ha sido eliminado
+- **📍 Feedback Constante:** Mensajes en canvas que indican "ARRASTRA texto/imagen" en lugar de "Haz clic"
+
+**Características:**
+- **Feedback visual:** Cursor cambia a `grab` (sobre elemento) y `grabbing` (durante arrastre)
+- **Notificaciones:** Mensajes de confirmación al finalizar el reposicionamiento
+- **Soporte táctil:** Funciona perfectamente en móviles y tablets con gestos touch
+- **Área sensible:** Solo funciona cuando el cursor/dedo está sobre el elemento
+- **Actualización en tiempo real:** La vista previa se actualiza mientras arrastras
+- **Marcadores visuales:** Los círculos de posición se actualizan automáticamente
+
+**Implementación técnica:**
+- **Variables:** `isDragging`, `dragTarget`, `dragOffsetX/Y`, `textWatermarkBounds`, `imageWatermarkBounds`
+- **Funciones de detección:** `isPointInText()`, `isPointInImage()`
+- **Eventos Mouse:** `handleDragStart()`, `handleDragMove()`, `handleDragEnd()`
+- **Eventos Touch:** `handleTouchStart()`, `handleTouchMove()`, `handleTouchEnd()`
+- **Guardado de bounds:** En `applyTextWatermarkOptimized()` y `drawCachedWatermark()`
+- **Gestión de conflictos:** No interfiere con zoom/pan del canvas
+
+**Ventajas sobre el sistema anterior:**
+- ❌ **Antes:** Deseleccionar → Reseleccionar "Posición personalizada" → Click
+- ✅ **Ahora:** Simplemente arrastra el elemento cuando quieras
+
+**Compatibilidad:**
+- ✅ Chrome/Edge (Desktop y Mobile)
+- ✅ Firefox (Desktop y Mobile)
+- ✅ Safari (Desktop y Mobile)
+- ✅ iOS y Android
+
+**Documentación:** Ver `docs/DRAG_DROP_SYSTEM.md` para detalles completos
+
+---
+
 ## [3.1.2] - 2025-10-13
 
 ### ✨ NUEVAS FUNCIONALIDADES

@@ -1,7 +1,7 @@
 # 📚 MNEMOTAG - DOCUMENTACIÓN TÉCNICA
 
-**Versión:** 3.1.2  
-**Última actualización:** Octubre 2025
+**Versión:** 3.1.3  
+**Última actualización:** 15 Octubre 2025
 
 ---
 
@@ -9,14 +9,26 @@
 
 ### 🎯 CARACTERÍSTICAS PRINCIPALES
 
-- **[V31_FEATURES.md](V31_FEATURES.md)** - Documentación completa de características v3.1.2
+- **[GUIA_ARRASTRE.md](GUIA_ARRASTRE.md)** - ⭐ **NUEVO v3.1.3** Guía completa del sistema de arrastre
+  - Sistema drag & drop ultra intuitivo
+  - Bordes visuales de colores (azul/naranja)
+  - Modo claro y oscuro optimizado
+  - Uso en desktop y móvil
+
+- **[DRAG_DROP_SYSTEM.md](DRAG_DROP_SYSTEM.md)** - Documentación técnica del sistema drag & drop
+  - Implementación detallada
+  - Variables y funciones clave
+  - Eventos mouse y touch
+  - Gestión de conflictos
+
+- **[V31_FEATURES.md](V31_FEATURES.md)** - Características v3.1 completas
   - Sistema de atajos de teclado (Mac optimizado)
   - Batch processing (procesamiento por lotes)
   - Capas de texto avanzadas
   - Recorte inteligente
-  - **Feedback visual de estado** ⭐ v3.1.2
-  - **Secciones colapsables** ⭐ v3.1.2
-  - **Geolocalización mejorada** ⭐ v3.1.2
+  - Feedback visual de estado
+  - Secciones colapsables
+  - Geolocalización mejorada
 
 ### 🏗️ ARQUITECTURA Y ESTRUCTURA
 
@@ -48,35 +60,43 @@
 
 ---
 
-## ⭐ NOVEDADES v3.1.2 (Octubre 2025)
+## ⭐ NOVEDADES v3.1.3 (15 Octubre 2025)
 
-### 1. 🎨 Feedback Visual de Estado
-- Botones con indicadores de color (rojo sin carga → verde cargado)
-- Miniaturas de preview (48x48px imagen principal, 40x40px marca de agua)
-- Transiciones suaves y efectos hover
-- Soporte completo para modo oscuro
+### 🎯 Sistema Drag & Drop Ultra Intuitivo
 
-### 2. 📂 Secciones Colapsables
-- 4 secciones minimizables (Metadatos, Marca de agua, Filtros, Salida)
-- **Delegación de eventos** con `capture: true` para máxima robustez
-- Minimización completa del marco del card
-- Soporte para teclado (Enter/Space)
-- Animaciones CSS optimizadas
+**Sistema completamente rediseñado** para máxima claridad y facilidad de uso:
 
-### 3. 📍 Geolocalización Mejorada
-- Obtención automática de coordenadas GPS
-- 3 estados visuales (loading azul, success verde, error rojo)
-- Feedback contextual debajo de campos (sin toasts flotantes)
-- Manejo específico de errores (permisos, timeout, disponibilidad)
-- Precisión de 6 decimales
+#### Indicadores Visuales de Colores
+- 🔵 **Texto**: Borde azul punteado cuando está en modo arrastre
+- 🟠 **Imagen**: Borde naranja punteado cuando está en modo arrastre
+- 💡 **Banners informativos**: Gradientes de color con mensajes claros
+- 🌙 **Modo oscuro optimizado**: Colores de alto contraste
 
-### 🐛 Bugs Solucionados
-- ✅ Secciones no minimizaban marco del card
-- ✅ Sección 2 no se podía abrir
-- ✅ Toast flotante de geolocalización
-- ✅ Sección 5 no respondía a clicks (solucionado con delegación de eventos)
+#### Funcionamiento Simplificado
+1. Selecciona "🎯 Posición personalizada (arrastra para mover)"
+2. **Simplemente arrastra** el elemento (sin pasos adicionales)
+3. Arrastra cuantas veces quieras sin reconfigurar
 
-**Ver [CHANGELOG.md](../CHANGELOG.md) para detalles completos**
+#### Mejoras Técnicas
+- ✅ Eliminado el sistema confuso de "click inicial"
+- ✅ Bordes visuales siempre visibles en modo personalizado
+- ✅ Mensajes claros: "ARRASTRA" en lugar de "Haz clic"
+- ✅ Inicialización automática de posiciones
+- ✅ Soporte completo para modo oscuro
+
+**Documentación**: Ver [`GUIA_ARRASTRE.md`](GUIA_ARRASTRE.md) para guía completa
+
+---
+
+## 📝 Historial de Versiones
+
+### v3.1.2 (Octubre 2025)
+- 🎨 Feedback Visual de Estado (botones con indicadores de color)
+- 📂 Secciones Colapsables con delegación de eventos
+- 📍 Geolocalización Mejorada con feedback contextual
+
+### v3.1.1 y anteriores
+**Ver [CHANGELOG.md](../CHANGELOG.md) para historial completo**
 
 ---
 

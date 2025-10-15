@@ -36,10 +36,21 @@
     let outputQuality = 0.8; // Valor por defecto (80%)
     let outputFormat = 'jpeg'; // Formato por defecto
     
-    // Variables para posicionamiento interactivo de imagen
+    // Variables para posicionamiento interactivo de imagen y texto
     let customImagePosition = null;
+    let customTextPosition = null;
     let isPositioningMode = false;
+    let isTextPositioningMode = false;
     let watermarkImagePreview = null;
+    let lastPositioningModeActivated = null; // 'image' o 'text' - rastrea cuál se activó último
+    
+    // Variables para sistema Drag & Drop
+    let isDragging = false;
+    let dragTarget = null; // 'text' o 'image'
+    let dragOffsetX = 0;
+    let dragOffsetY = 0;
+    let textWatermarkBounds = null; // { x, y, width, height }
+    let imageWatermarkBounds = null; // { x, y, width, height }
     
     // Managers Avanzados (Nuevos)
     let keyboardShortcuts = null;
@@ -267,8 +278,10 @@
         // Inicializar estado de marcas de agua
         setTimeout(() => {
           toggleWatermarkType();
-          // Inicializar modo de posicionamiento
+          // Inicializar modo de posicionamiento de imagen
           togglePositioningMode();
+          // Inicializar modo de posicionamiento de texto
+          toggleTextPositioningMode();
           // Inicializar controles de salida
           initializeOutputControls();
         }, 100);
@@ -811,9 +824,27 @@
           watermarkImagePosition.addEventListener('change', togglePositioningMode);
         }
         
+        // Posicionamiento personalizado para texto
+        const watermarkTextPosition = document.getElementById('watermark-position');
+        if (watermarkTextPosition) {
+          watermarkTextPosition.addEventListener('change', toggleTextPositioningMode);
+        }
+        
         // Event listener para el canvas en modo posicionamiento
         if (canvas) {
           canvas.addEventListener('click', handleCanvasClick);
+          
+          // Event listeners para sistema Drag & Drop (Mouse)
+          canvas.addEventListener('mousedown', handleDragStart);
+          canvas.addEventListener('mousemove', handleDragMove);
+          canvas.addEventListener('mouseup', handleDragEnd);
+          canvas.addEventListener('mouseleave', handleDragEnd); // Finalizar drag si sale del canvas
+          
+          // Event listeners para sistema Drag & Drop (Touch)
+          canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+          canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+          canvas.addEventListener('touchend', handleTouchEnd);
+          canvas.addEventListener('touchcancel', handleTouchEnd);
         }
         
         // Image watermark controls
@@ -2386,6 +2417,33 @@
       }
     }
 
+    // Funciones de posicionamiento personalizado (deben estar antes de apply)
+    function getImageWatermarkPosition(position, width, height) {
+      // Si es posición personalizada, usar las coordenadas del clic
+      if (position === 'custom' && customImagePosition) {
+        return {
+          x: customImagePosition.x - width / 2,
+          y: customImagePosition.y - height / 2
+        };
+      }
+      
+      // Si no, usar la función estándar
+      return getWatermarkPosition(position, width, height);
+    }
+
+    function getTextWatermarkPosition(position, width, height) {
+      // Si es posición personalizada, usar las coordenadas del clic
+      if (position === 'custom' && customTextPosition) {
+        return {
+          x: customTextPosition.x - width / 2,
+          y: customTextPosition.y
+        };
+      }
+      
+      // Si no, usar la función estándar
+      return getWatermarkPosition(position, width, height);
+    }
+
     function applyWatermarkOptimized() {
       const textEnabled = document.getElementById('watermark-text-enabled').checked;
       const imageEnabled = document.getElementById('watermark-image-enabled').checked;
@@ -2403,7 +2461,10 @@
 
     function applyTextWatermarkOptimized() {
       const text = document.getElementById('watermark-text').value.trim();
-      if (!text) return;
+      if (!text) {
+        textWatermarkBounds = null; // No hay texto, limpiar bounds
+        return;
+      }
       
       const font = document.getElementById('watermark-font').value;
       const color = document.getElementById('watermark-color').value;
@@ -2428,10 +2489,34 @@
       const textWidth = textMetrics.width;
       const textHeight = size;
       
-      const positions = getWatermarkPosition(position, textWidth, textHeight);
+      // Usar función específica para texto que soporta posición personalizada
+      const positions = getTextWatermarkPosition(position, textWidth, textHeight);
+      
+      // Guardar bounds para detección de drag & drop
+      textWatermarkBounds = {
+        x: positions.x,
+        y: positions.y - textHeight, // Ajuste porque fillText dibuja desde la baseline
+        width: textWidth,
+        height: textHeight
+      };
       
       // Draw text with enhanced quality
       ctx.fillText(text, positions.x, positions.y);
+      
+      // Si está en modo personalizado, dibujar borde indicador
+      if (position === 'custom') {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(59, 130, 246, 0.5)'; // Azul semi-transparente
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]); // Línea punteada
+        ctx.strokeRect(
+          textWatermarkBounds.x - 5,
+          textWatermarkBounds.y - 5,
+          textWatermarkBounds.width + 10,
+          textWatermarkBounds.height + 10
+        );
+        ctx.restore();
+      }
       
       // Reset shadow and opacity
       ctx.shadowColor = 'transparent';
@@ -2491,6 +2576,14 @@
       // Calculate position usando la función específica para imagen
       const positions = getImageWatermarkPosition(position, width, height);
       
+      // Guardar bounds para detección de drag & drop
+      imageWatermarkBounds = {
+        x: positions.x,
+        y: positions.y,
+        width: width,
+        height: height
+      };
+      
       // Draw image with enhanced quality and shadow
       ctx.globalAlpha = opacity;
       ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
@@ -2499,6 +2592,22 @@
       ctx.shadowOffsetY = 2;
       
       ctx.drawImage(watermarkImg, positions.x, positions.y, width, height);
+      
+      // Si está en modo personalizado, dibujar borde indicador
+      if (position === 'custom') {
+        ctx.save();
+        ctx.globalAlpha = 1; // Opacidad completa para el borde
+        ctx.strokeStyle = 'rgba(245, 158, 11, 0.7)'; // Naranja semi-transparente
+        ctx.lineWidth = 3;
+        ctx.setLineDash([8, 4]); // Línea punteada
+        ctx.strokeRect(
+          imageWatermarkBounds.x - 5,
+          imageWatermarkBounds.y - 5,
+          imageWatermarkBounds.width + 10,
+          imageWatermarkBounds.height + 10
+        );
+        ctx.restore();
+      }
       
       // Reset effects
       ctx.shadowColor = 'transparent';
@@ -2591,18 +2700,6 @@
       return { x, y };
     }
 
-    function getImageWatermarkPosition(position, width, height) {
-      // Si es posición personalizada, usar las coordenadas del clic
-      if (position === 'custom' && customImagePosition) {
-        return {
-          x: customImagePosition.x - width / 2,
-          y: customImagePosition.y - height / 2
-        };
-      }
-      
-      // Si no, usar la función estándar
-      return getWatermarkPosition(position, width, height);
-    }
 
     function toggleWatermarkType() {
       const textOptions = document.getElementById('text-watermark-options');
@@ -2653,11 +2750,16 @@
       
       if (positionSelect.value === 'custom') {
         isPositioningMode = true;
+        lastPositioningModeActivated = 'image'; // Registrar que imagen fue la última activada
         customInfo.style.display = 'block';
         
         // Agregar clase al canvas para el cursor
         if (canvas) {
           canvas.classList.add('positioning-mode');
+          canvas.style.cursor = 'crosshair';
+          
+          // Actualizar clases según qué modos están activos
+          updatePositioningClasses();
         }
         
         // Si ya hay una posición personalizada, mostrar el marcador
@@ -2666,12 +2768,19 @@
         }
       } else {
         isPositioningMode = false;
+        // Si este era el modo activo, limpiarlo
+        if (lastPositioningModeActivated === 'image') {
+          lastPositioningModeActivated = isTextPositioningMode ? 'text' : null;
+        }
         customInfo.style.display = 'none';
         customImagePosition = null;
         
-        // Quitar clase del canvas
-        if (canvas) {
-          canvas.classList.remove('positioning-mode');
+        // Quitar clase del canvas si no hay modo de texto activo
+        if (canvas && !isTextPositioningMode) {
+          canvas.classList.remove('positioning-mode', 'positioning-image', 'positioning-text', 'positioning-both');
+          canvas.style.cursor = 'default';
+        } else if (canvas) {
+          updatePositioningClasses();
         }
         
         // Quitar marcador si existe
@@ -2681,8 +2790,77 @@
       debouncedUpdatePreview();
     }
 
+    // Función para posicionamiento personalizado de texto
+    function toggleTextPositioningMode() {
+      const positionSelect = document.getElementById('watermark-position');
+      const customInfo = document.getElementById('custom-text-position-info');
+      
+      if (positionSelect.value === 'custom') {
+        isTextPositioningMode = true;
+        lastPositioningModeActivated = 'text'; // Registrar que texto fue el último activado
+        customInfo.style.display = 'block';
+        
+        // Agregar clase al canvas para el cursor
+        if (canvas) {
+          canvas.classList.add('positioning-mode');
+          canvas.style.cursor = 'crosshair';
+          
+          // Actualizar clases según qué modos están activos
+          updatePositioningClasses();
+        }
+        
+        // Si ya hay una posición personalizada, mostrar el marcador
+        if (customTextPosition) {
+          showTextPositionMarker();
+        }
+      } else {
+        isTextPositioningMode = false;
+        // Si este era el modo activo, limpiarlo
+        if (lastPositioningModeActivated === 'text') {
+          lastPositioningModeActivated = isPositioningMode ? 'image' : null;
+        }
+        customInfo.style.display = 'none';
+        customTextPosition = null;
+        
+        // Quitar clase del canvas si no hay modo de imagen activo
+        if (canvas && !isPositioningMode) {
+          canvas.classList.remove('positioning-mode', 'positioning-image', 'positioning-text', 'positioning-both');
+          canvas.style.cursor = 'default';
+        } else if (canvas) {
+          updatePositioningClasses();
+        }
+        
+        // Quitar marcador si existe
+        removeTextPositionMarker();
+      }
+      
+      debouncedUpdatePreview();
+    }
+
+    // Función auxiliar para actualizar las clases del canvas según los modos activos
+    function updatePositioningClasses() {
+      if (!canvas) return;
+      
+      // Limpiar clases previas
+      canvas.classList.remove('positioning-image', 'positioning-text', 'positioning-both');
+      
+      // Añadir clase según el estado actual
+      if (isPositioningMode && isTextPositioningMode) {
+        canvas.classList.add('positioning-both');
+      } else if (isPositioningMode) {
+        canvas.classList.add('positioning-image');
+      } else if (isTextPositioningMode) {
+        canvas.classList.add('positioning-text');
+      }
+    }
+
     function handleCanvasClick(event) {
-      if (!isPositioningMode || !watermarkImagePreview) return;
+      // DESACTIVADO: El sistema drag & drop maneja todo automáticamente
+      // Este click inicial ya no es necesario
+      return;
+      
+      // Verificar si estamos en modo de posicionamiento (texto o imagen)
+      if (!isPositioningMode && !isTextPositioningMode) return;
       
       const rect = canvas.getBoundingClientRect();
       const scaleX = canvas.width / rect.width;
@@ -2691,16 +2869,301 @@
       const x = (event.clientX - rect.left) * scaleX;
       const y = (event.clientY - rect.top) * scaleY;
       
-      // Guardar la posición personalizada
-      customImagePosition = { x, y };
+      // SISTEMA INTUITIVO: Si ambos modos están activos, usar el último activado
+      if (isPositioningMode && isTextPositioningMode) {
+        // Usar el último modo que se activó
+        if (lastPositioningModeActivated === 'image') {
+          // Posicionar IMAGEN (último activado)
+          if (!watermarkImagePreview) {
+            UIManager.showError('Por favor, selecciona primero una imagen de marca de agua');
+            return;
+          }
+          customImagePosition = { x, y };
+          showPositionMarker();
+          updatePreview();
+          UIManager.showSuccess('🖼️ Posición de IMAGEN actualizada (modo activo)');
+        } else if (lastPositioningModeActivated === 'text') {
+          // Posicionar TEXTO (último activado)
+          customTextPosition = { x, y };
+          showTextPositionMarker();
+          updatePreview();
+          UIManager.showSuccess('📝 Posición de TEXTO actualizada (modo activo)');
+        } else {
+          // Fallback: si no hay último, posicionar imagen por defecto
+          if (watermarkImagePreview) {
+            customImagePosition = { x, y };
+            showPositionMarker();
+            updatePreview();
+            UIManager.showSuccess('🖼️ Posición de IMAGEN actualizada');
+          } else {
+            customTextPosition = { x, y };
+            showTextPositionMarker();
+            updatePreview();
+            UIManager.showSuccess('📝 Posición de TEXTO actualizada');
+          }
+        }
+        return;
+      }
       
-      // Mostrar marcador visual
-      showPositionMarker();
+      // Posicionamiento de imagen (solo modo imagen activo)
+      if (isPositioningMode && !isTextPositioningMode) {
+        if (!watermarkImagePreview) {
+          UIManager.showError('Por favor, selecciona primero una imagen de marca de agua');
+          return;
+        }
+        
+        customImagePosition = { x, y };
+        showPositionMarker();
+        updatePreview();
+        UIManager.showSuccess('🖼️ Posición de IMAGEN actualizada');
+      }
+      // Posicionamiento de texto (solo modo texto activo)
+      else if (isTextPositioningMode && !isPositioningMode) {
+        customTextPosition = { x, y };
+        showTextPositionMarker();
+        updatePreview();
+        UIManager.showSuccess('📝 Posición de TEXTO actualizada');
+      }
+    }
+    
+    // ========================================================================
+    // SISTEMA DRAG & DROP para marcas de agua
+    // ========================================================================
+    
+    /**
+     * Detecta si un punto está dentro del texto de marca de agua
+     */
+    function isPointInText(x, y) {
+      if (!textWatermarkBounds) return false;
+      const bounds = textWatermarkBounds;
+      return x >= bounds.x && x <= bounds.x + bounds.width &&
+             y >= bounds.y && y <= bounds.y + bounds.height;
+    }
+    
+    /**
+     * Detecta si un punto está dentro de la imagen de marca de agua
+     */
+    function isPointInImage(x, y) {
+      if (!imageWatermarkBounds) return false;
+      const bounds = imageWatermarkBounds;
+      return x >= bounds.x && x <= bounds.x + bounds.width &&
+             y >= bounds.y && y <= bounds.y + bounds.height;
+    }
+    
+    /**
+     * Maneja el inicio del arrastre (mousedown)
+     */
+    function handleDragStart(event) {
+      // No interferir con el pan del zoom
+      if (isZoomed) return;
       
-      // Actualizar vista previa
-      updatePreview();
+      // Verificar si hay elementos con posición personalizada
+      const textPosition = document.getElementById('watermark-position')?.value;
+      const imagePosition = document.getElementById('watermark-image-position')?.value;
       
-      UIManager.showSuccess('Posición de marca de agua actualizada');
+      const textInCustomMode = textPosition === 'custom';
+      const imageInCustomMode = imagePosition === 'custom';
+      
+      if (!textInCustomMode && !imageInCustomMode) return;
+      
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      
+      const x = (event.clientX - rect.left) * scaleX;
+      const y = (event.clientY - rect.top) * scaleY;
+      
+      // NUEVO: Si no hay posición personalizada definida, establecer una inicial
+      if (textInCustomMode && !customTextPosition && textWatermarkBounds) {
+        customTextPosition = {
+          x: textWatermarkBounds.x + textWatermarkBounds.width / 2,
+          y: textWatermarkBounds.y + textWatermarkBounds.height
+        };
+      }
+      
+      if (imageInCustomMode && !customImagePosition && imageWatermarkBounds) {
+        customImagePosition = {
+          x: imageWatermarkBounds.x + imageWatermarkBounds.width / 2,
+          y: imageWatermarkBounds.y + imageWatermarkBounds.height / 2
+        };
+      }
+      
+      // Detectar sobre qué elemento se hizo click (Prioridad: texto > imagen)
+      if (textInCustomMode && isPointInText(x, y)) {
+        isDragging = true;
+        dragTarget = 'text';
+        dragOffsetX = x - customTextPosition.x;
+        dragOffsetY = y - customTextPosition.y;
+        canvas.style.cursor = 'grabbing';
+        event.preventDefault();
+        event.stopPropagation();
+      } else if (imageInCustomMode && isPointInImage(x, y)) {
+        isDragging = true;
+        dragTarget = 'image';
+        dragOffsetX = x - customImagePosition.x;
+        dragOffsetY = y - customImagePosition.y;
+        canvas.style.cursor = 'grabbing';
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }
+    
+    /**
+     * Maneja el movimiento del arrastre (mousemove)
+     */
+    function handleDragMove(event) {
+      if (!isDragging) {
+        // Cambiar cursor si está sobre un elemento arrastrable
+        const textPosition = document.getElementById('watermark-position')?.value;
+        const imagePosition = document.getElementById('watermark-image-position')?.value;
+        
+        if (textPosition !== 'custom' && imagePosition !== 'custom') {
+          canvas.style.cursor = 'default';
+          return;
+        }
+        
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        
+        const x = (event.clientX - rect.left) * scaleX;
+        const y = (event.clientY - rect.top) * scaleY;
+        
+        if ((textPosition === 'custom' && isPointInText(x, y)) || 
+            (imagePosition === 'custom' && isPointInImage(x, y))) {
+          canvas.style.cursor = 'grab';
+        } else {
+          canvas.style.cursor = 'default';
+        }
+        return;
+      }
+      
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      
+      const x = (event.clientX - rect.left) * scaleX;
+      const y = (event.clientY - rect.top) * scaleY;
+      
+      if (dragTarget === 'text') {
+        customTextPosition = {
+          x: x - dragOffsetX,
+          y: y - dragOffsetY
+        };
+        showTextPositionMarker();
+        updatePreview();
+      } else if (dragTarget === 'image') {
+        customImagePosition = {
+          x: x - dragOffsetX,
+          y: y - dragOffsetY
+        };
+        showPositionMarker();
+        updatePreview();
+      }
+      
+      event.preventDefault();
+    }
+    
+    /**
+     * Maneja el fin del arrastre (mouseup)
+     */
+    function handleDragEnd(event) {
+      if (isDragging) {
+        isDragging = false;
+        const elementType = dragTarget === 'text' ? 'TEXTO' : 'IMAGEN';
+        const emoji = dragTarget === 'text' ? '📝' : '🖼️';
+        UIManager.showSuccess(`${emoji} ${elementType} reposicionado correctamente`);
+        dragTarget = null;
+        canvas.style.cursor = 'default';
+      }
+    }
+    
+    /**
+     * Maneja el inicio del arrastre táctil (touchstart)
+     */
+    function handleTouchStart(event) {
+      // No interferir con el pan del zoom
+      if (isZoomed && isPanning) return;
+      
+      // Solo si está en modo personalizado
+      const textPosition = document.getElementById('watermark-position')?.value;
+      const imagePosition = document.getElementById('watermark-image-position')?.value;
+      
+      const textInCustomMode = textPosition === 'custom';
+      const imageInCustomMode = imagePosition === 'custom';
+      
+      if (!textInCustomMode && !imageInCustomMode) return;
+      
+      const touch = event.touches[0];
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      
+      const x = (touch.clientX - rect.left) * scaleX;
+      const y = (touch.clientY - rect.top) * scaleY;
+      
+      // Prioridad: primero verificar texto, luego imagen
+      if (textInCustomMode && isPointInText(x, y)) {
+        isDragging = true;
+        dragTarget = 'text';
+        dragOffsetX = x - (customTextPosition?.x || textWatermarkBounds.x + textWatermarkBounds.width / 2);
+        dragOffsetY = y - (customTextPosition?.y || textWatermarkBounds.y + textWatermarkBounds.height);
+        event.preventDefault();
+        event.stopPropagation();
+      } else if (imageInCustomMode && isPointInImage(x, y)) {
+        isDragging = true;
+        dragTarget = 'image';
+        dragOffsetX = x - (customImagePosition?.x || imageWatermarkBounds.x + imageWatermarkBounds.width / 2);
+        dragOffsetY = y - (customImagePosition?.y || imageWatermarkBounds.y + imageWatermarkBounds.height / 2);
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    }
+    
+    /**
+     * Maneja el movimiento del arrastre táctil (touchmove)
+     */
+    function handleTouchMove(event) {
+      if (!isDragging) return;
+      
+      const touch = event.touches[0];
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      
+      const x = (touch.clientX - rect.left) * scaleX;
+      const y = (touch.clientY - rect.top) * scaleY;
+      
+      if (dragTarget === 'text') {
+        customTextPosition = {
+          x: x - dragOffsetX,
+          y: y - dragOffsetY
+        };
+        showTextPositionMarker();
+        updatePreview();
+      } else if (dragTarget === 'image') {
+        customImagePosition = {
+          x: x - dragOffsetX,
+          y: y - dragOffsetY
+        };
+        showPositionMarker();
+        updatePreview();
+      }
+      
+      event.preventDefault();
+    }
+    
+    /**
+     * Maneja el fin del arrastre táctil (touchend)
+     */
+    function handleTouchEnd(event) {
+      if (isDragging) {
+        isDragging = false;
+        const elementType = dragTarget === 'text' ? 'TEXTO' : 'IMAGEN';
+        const emoji = dragTarget === 'text' ? '📝' : '🖼️';
+        UIManager.showSuccess(`${emoji} ${elementType} reposicionado correctamente`);
+        dragTarget = null;
+      }
     }
 
     function showPositionMarker() {
@@ -2731,6 +3194,43 @@
 
     function removePositionMarker() {
       const marker = document.getElementById('position-marker');
+      if (marker) {
+        marker.remove();
+      }
+    }
+
+    // Funciones para marcadores de posición de texto
+    function showTextPositionMarker() {
+      if (!customTextPosition || !canvas) return;
+      
+      // Quitar marcador anterior si existe
+      removeTextPositionMarker();
+      
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = rect.width / canvas.width;
+      const scaleY = rect.height / canvas.height;
+      
+      const marker = document.createElement('div');
+      marker.className = 'custom-position-marker text-marker';
+      marker.id = 'text-position-marker';
+      marker.style.borderColor = '#3b82f6'; // Color azul para diferenciar del marcador de imagen
+      
+      const displayX = customTextPosition.x * scaleX;
+      const displayY = customTextPosition.y * scaleY;
+      
+      marker.style.left = displayX + 'px';
+      marker.style.top = displayY + 'px';
+      
+      // Agregar al contenedor del canvas
+      const container = canvas.parentElement;
+      if (container) {
+        container.style.position = 'relative';
+        container.appendChild(marker);
+      }
+    }
+
+    function removeTextPositionMarker() {
+      const marker = document.getElementById('text-position-marker');
       if (marker) {
         marker.remove();
       }
