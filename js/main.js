@@ -2304,18 +2304,8 @@
       
       console.log(`📐 Canvas configurado: ${width}x${height}px (Original: ${originalImageDimensions.width}x${originalImageDimensions.height}px, Ratio: ${ratio.toFixed(2)})`);
       
-      // Configurar zoom con rueda del ratón en el canvas
-      canvas.addEventListener('wheel', function(e) {
-        if (!currentImage) return;
-        e.preventDefault();
-        
-        const delta = e.deltaY;
-        if (delta < 0) {
-          zoomInWheel();
-        } else if (delta > 0) {
-          zoomOutWheel();
-        }
-      }, { passive: false });
+      // DESACTIVADO: El zoom con rueda del mouse se maneja solo en móviles (<768px)
+      // Ver initMouseWheelZoom() para la implementación con detección de dispositivo
     }
 
     function updatePreview() {
@@ -4884,6 +4874,13 @@
         // Solo hacer zoom si hay una imagen cargada
         if (!currentImage || !canvas) return;
         
+        // SOLO EN MÓVILES: Detectar si la pantalla es menor a 768px
+        const isMobile = window.innerWidth < 768;
+        if (!isMobile) {
+          // En desktop, no hacer nada (zoom solo con botones)
+          return;
+        }
+        
         // Prevenir el scroll normal de la página
         e.preventDefault();
         
@@ -4907,7 +4904,7 @@
         canvas.addEventListener('wheel', handleWheelZoom, { passive: false });
       }
       
-      console.log('Mouse wheel zoom initialized');
+      console.log('Mouse wheel zoom initialized (solo móvil <768px)');
     }
     
     // ===== PAN FUNCTIONALITY =====

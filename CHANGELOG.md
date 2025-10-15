@@ -16,6 +16,14 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 - **🔄 Sin Click Inicial:** El sistema antiguo de "click para posicionar" ha sido eliminado
 - **📍 Feedback Constante:** Mensajes en canvas que indican "ARRASTRA texto/imagen" en lugar de "Haz clic"
 
+### 🔧 MEJORAS DE USABILIDAD
+
+#### 🖱️ Zoom con Rueda del Mouse Optimizado
+- ✅ **Desktop (>767px)**: Zoom con rueda del mouse/trackpad **DESACTIVADO** para evitar cambios accidentales
+- ✅ **Desktop**: Solo zoom con botones +, -, y lupa (100%)
+- ✅ **Móvil (<768px)**: Mantiene gestos táctiles (pinch-to-zoom) y scroll wheel
+- **Motivo**: Evitar zoom accidental al mover el Magic Mouse o trackpad en desktop
+
 **Características:**
 - **Feedback visual:** Cursor cambia a `grab` (sobre elemento) y `grabbing` (durante arrastre)
 - **Notificaciones:** Mensajes de confirmación al finalizar el reposicionamiento
