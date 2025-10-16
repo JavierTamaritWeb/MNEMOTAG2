@@ -52,6 +52,19 @@
     let textWatermarkBounds = null; // { x, y, width, height }
     let imageWatermarkBounds = null; // { x, y, width, height }
     
+    // Variables para sistema de Reglas Métricas
+    let isRulerMode = false;
+    let currentMouseX = 0;
+    let currentMouseY = 0;
+    let rulerElements = {
+      horizontalRuler: null,
+      verticalRuler: null,
+      horizontalLine: null,
+      verticalLine: null,
+      coordinateDisplay: null,
+      container: null
+    };
+    
     // Managers Avanzados (Nuevos)
     let keyboardShortcuts = null;
     let batchManager = null;
@@ -728,11 +741,16 @@
         const zoomOutBtn = document.getElementById('zoom-out-btn');
         const zoomResetBtn = document.getElementById('zoom-reset-btn');
         const zoomLevel = document.getElementById('zoom-level');
+        const rulerToggleBtn = document.getElementById('ruler-toggle-btn');
 
         if (zoomInBtn && zoomOutBtn && zoomResetBtn) {
           zoomInBtn.addEventListener('click', zoomIn);
           zoomOutBtn.addEventListener('click', zoomOut);
           zoomResetBtn.addEventListener('click', resetZoom);
+        }
+        
+        if (rulerToggleBtn) {
+          rulerToggleBtn.addEventListener('click', toggleRulerMode);
         }
         
         // Watermark type toggle
@@ -3154,6 +3172,338 @@
         UIManager.showSuccess(`${emoji} ${elementType} reposicionado correctamente`);
         dragTarget = null;
       }
+    }
+    
+    // ========================================================================
+    // SISTEMA DE REGLAS MÉTRICAS Y COORDENADAS
+    // ========================================================================
+    
+    /**
+     * Toggle del sistema de reglas métricas
+     */
+    function toggleRulerMode() {
+      isRulerMode = !isRulerMode;
+      
+      if (isRulerMode) {
+        createRulers();
+        UIManager.showSuccess('📐 Reglas métricas activadas');
+      } else {
+        removeRulers();
+        UIManager.showSuccess('📐 Reglas métricas desactivadas');
+      }
+      
+      // Actualizar el botón
+      const rulerBtn = document.getElementById('ruler-toggle-btn');
+      if (rulerBtn) {
+        rulerBtn.classList.toggle('active', isRulerMode);
+      }
+    }
+    
+    /**
+     * Crear reglas métricas y elementos visuales
+     */
+    function createRulers() {
+      if (!canvas) return;
+      
+      const previewContainer = canvas.parentElement;
+      if (!previewContainer) return;
+      
+      // Asegurar que el contenedor tenga position relative
+      previewContainer.style.position = 'relative';
+      
+      // Crear contenedor para las reglas
+      const container = document.createElement('div');
+      container.id = 'ruler-system-container';
+      container.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 100;
+      `;
+      
+      // Crear regla horizontal (superior)
+      const horizontalRuler = document.createElement('div');
+      horizontalRuler.id = 'ruler-horizontal';
+      horizontalRuler.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 30px;
+        right: 0;
+        height: 30px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        font-size: 10px;
+        font-family: monospace;
+        display: flex;
+        align-items: flex-end;
+        padding: 0 5px 2px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+      `;
+      
+      // Crear regla vertical (izquierda)
+      const verticalRuler = document.createElement('div');
+      verticalRuler.id = 'ruler-vertical';
+      verticalRuler.style.cssText = `
+        position: absolute;
+        top: 30px;
+        left: 0;
+        bottom: 0;
+        width: 30px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        font-size: 10px;
+        font-family: monospace;
+        box-shadow: 2px 0 5px rgba(0,0,0,0.3);
+      `;
+      
+      // Crear línea horizontal (sigue el cursor)
+      const horizontalLine = document.createElement('div');
+      horizontalLine.id = 'ruler-line-horizontal';
+      horizontalLine.style.cssText = `
+        position: absolute;
+        left: 30px;
+        right: 0;
+        height: 1px;
+        background: #FFFFFF;
+        opacity: 0.7;
+        pointer-events: none;
+        display: none;
+      `;
+      
+      // Crear línea vertical (sigue el cursor)
+      const verticalLine = document.createElement('div');
+      verticalLine.id = 'ruler-line-vertical';
+      verticalLine.style.cssText = `
+        position: absolute;
+        top: 30px;
+        bottom: 0;
+        width: 1px;
+        background: #FFFFFF;
+        opacity: 0.7;
+        pointer-events: none;
+        display: none;
+      `;
+      
+      // Crear display de coordenadas
+      const coordinateDisplay = document.createElement('div');
+      coordinateDisplay.id = 'ruler-coordinates';
+      coordinateDisplay.style.cssText = `
+        position: absolute;
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        padding: 5px 10px;
+        border-radius: 5px;
+        font-family: monospace;
+        font-size: 12px;
+        font-weight: bold;
+        pointer-events: none;
+        display: none;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        white-space: nowrap;
+      `;
+      
+      // Agregar elementos al contenedor
+      container.appendChild(horizontalRuler);
+      container.appendChild(verticalRuler);
+      container.appendChild(horizontalLine);
+      container.appendChild(verticalLine);
+      container.appendChild(coordinateDisplay);
+      
+      // Agregar contenedor al preview
+      previewContainer.appendChild(container);
+      
+      // Guardar referencias
+      rulerElements.container = container;
+      rulerElements.horizontalRuler = horizontalRuler;
+      rulerElements.verticalRuler = verticalRuler;
+      rulerElements.horizontalLine = horizontalLine;
+      rulerElements.verticalLine = verticalLine;
+      rulerElements.coordinateDisplay = coordinateDisplay;
+      
+      // Dibujar marcas en las reglas
+      drawRulerMarks();
+      
+      // Agregar event listeners
+      canvas.addEventListener('mousemove', handleRulerMouseMove);
+      canvas.addEventListener('mouseenter', showRulerGuides);
+      canvas.addEventListener('mouseleave', hideRulerGuides);
+    }
+    
+    /**
+     * Dibujar marcas de medición en las reglas
+     */
+    function drawRulerMarks() {
+      if (!canvas || !rulerElements.horizontalRuler || !rulerElements.verticalRuler) return;
+      
+      // Usar dimensiones REALES del canvas (no las visuales)
+      const canvasWidth = canvas.width;
+      const canvasHeight = canvas.height;
+      
+      // Calcular escala de visualización
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = rect.width / canvasWidth;
+      const scaleY = rect.height / canvasHeight;
+      
+      const step = 50; // Marca cada 50 píxeles en coordenadas reales
+      
+      // Marcas horizontales - escalar posición visual pero mostrar valor real
+      let htmlH = '';
+      for (let x = 0; x <= canvasWidth; x += step) {
+        const visualX = x * scaleX; // Posición en pantalla
+        htmlH += `<span style="position: absolute; left: ${visualX}px; bottom: 2px; font-size: 10px;">${x}</span>`;
+      }
+      rulerElements.horizontalRuler.innerHTML = htmlH;
+      
+      // Marcas verticales - escalar posición visual pero mostrar valor real
+      let htmlV = '';
+      for (let y = 0; y <= canvasHeight; y += step) {
+        const visualY = y * scaleY; // Posición en pantalla
+        htmlV += `<span style="position: absolute; left: 2px; top: ${visualY}px; font-size: 10px;">${y}</span>`;
+      }
+      rulerElements.verticalRuler.innerHTML = htmlV;
+    }
+    
+    /**
+     * Manejar movimiento del mouse sobre el canvas
+     */
+    function handleRulerMouseMove(event) {
+      if (!isRulerMode) return;
+      
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      
+      currentMouseX = Math.round((event.clientX - rect.left) * scaleX);
+      currentMouseY = Math.round((event.clientY - rect.top) * scaleY);
+      
+      // Limitar a los bordes del canvas
+      currentMouseX = Math.max(0, Math.min(currentMouseX, canvas.width));
+      currentMouseY = Math.max(0, Math.min(currentMouseY, canvas.height));
+      
+      updateCrosshair();
+      updateCoordinates();
+    }
+    
+    /**
+     * Actualizar líneas guía (crosshair)
+     */
+    function updateCrosshair() {
+      if (!rulerElements.horizontalLine || !rulerElements.verticalLine) return;
+      
+      const rect = canvas.getBoundingClientRect();
+      const displayX = (currentMouseX / canvas.width) * rect.width;
+      const displayY = (currentMouseY / canvas.height) * rect.height;
+      
+      // Detectar brillo del fondo y ajustar color de líneas
+      const lineColor = detectBackgroundBrightness(currentMouseX, currentMouseY);
+      
+      rulerElements.horizontalLine.style.top = (displayY + 30) + 'px';
+      rulerElements.horizontalLine.style.background = lineColor;
+      
+      rulerElements.verticalLine.style.left = (displayX + 30) + 'px';
+      rulerElements.verticalLine.style.background = lineColor;
+    }
+    
+    /**
+     * Actualizar display de coordenadas
+     */
+    function updateCoordinates() {
+      if (!rulerElements.coordinateDisplay) return;
+      
+      const rect = canvas.getBoundingClientRect();
+      const displayX = (currentMouseX / canvas.width) * rect.width;
+      const displayY = (currentMouseY / canvas.height) * rect.height;
+      
+      rulerElements.coordinateDisplay.textContent = `X: ${currentMouseX}px, Y: ${currentMouseY}px`;
+      
+      // Posicionar el display cerca del cursor, ajustando para no salir del canvas
+      let coordX = displayX + 30 + 15; // 30 de la regla + 15 de offset
+      let coordY = displayY + 30 - 30; // 30 de la regla - 30 para estar arriba del cursor
+      
+      // Ajustar si se sale por la derecha
+      if (coordX + 150 > rect.width) {
+        coordX = displayX + 30 - 160;
+      }
+      
+      // Ajustar si se sale por arriba
+      if (coordY < 35) {
+        coordY = displayY + 30 + 15;
+      }
+      
+      rulerElements.coordinateDisplay.style.left = coordX + 'px';
+      rulerElements.coordinateDisplay.style.top = coordY + 'px';
+    }
+    
+    /**
+     * Detectar brillo del fondo para color adaptativo
+     */
+    function detectBackgroundBrightness(x, y) {
+      if (!ctx || !currentImage) return '#FFFFFF';
+      
+      try {
+        // Limitar coordenadas al canvas
+        x = Math.max(0, Math.min(x, canvas.width - 1));
+        y = Math.max(0, Math.min(y, canvas.height - 1));
+        
+        const imageData = ctx.getImageData(x, y, 1, 1).data;
+        const brightness = (imageData[0] + imageData[1] + imageData[2]) / 3;
+        
+        // Si el fondo es claro (>128), usar negro; si es oscuro, usar blanco
+        return brightness > 128 ? '#000000' : '#FFFFFF';
+      } catch (error) {
+        // Si hay error al leer el píxel, usar blanco por defecto
+        return '#FFFFFF';
+      }
+    }
+    
+    /**
+     * Mostrar guías al entrar al canvas
+     */
+    function showRulerGuides() {
+      if (!isRulerMode) return;
+      
+      if (rulerElements.horizontalLine) rulerElements.horizontalLine.style.display = 'block';
+      if (rulerElements.verticalLine) rulerElements.verticalLine.style.display = 'block';
+      if (rulerElements.coordinateDisplay) rulerElements.coordinateDisplay.style.display = 'block';
+    }
+    
+    /**
+     * Ocultar guías al salir del canvas
+     */
+    function hideRulerGuides() {
+      if (!isRulerMode) return;
+      
+      if (rulerElements.horizontalLine) rulerElements.horizontalLine.style.display = 'none';
+      if (rulerElements.verticalLine) rulerElements.verticalLine.style.display = 'none';
+      if (rulerElements.coordinateDisplay) rulerElements.coordinateDisplay.style.display = 'none';
+    }
+    
+    /**
+     * Eliminar reglas métricas y limpiar
+     */
+    function removeRulers() {
+      // Remover event listeners
+      if (canvas) {
+        canvas.removeEventListener('mousemove', handleRulerMouseMove);
+        canvas.removeEventListener('mouseenter', showRulerGuides);
+        canvas.removeEventListener('mouseleave', hideRulerGuides);
+      }
+      
+      // Eliminar contenedor y todos sus elementos
+      if (rulerElements.container && rulerElements.container.parentElement) {
+        rulerElements.container.parentElement.removeChild(rulerElements.container);
+      }
+      
+      // Reset de referencias
+      rulerElements.horizontalRuler = null;
+      rulerElements.verticalRuler = null;
+      rulerElements.horizontalLine = null;
+      rulerElements.verticalLine = null;
+      rulerElements.coordinateDisplay = null;
+      rulerElements.container = null;
     }
 
     function showPositionMarker() {

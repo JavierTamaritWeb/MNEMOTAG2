@@ -27,6 +27,29 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 3. Haz clic y arrastra el elemento
 4. ¡Listo! Arrastra cuantas veces quieras
 
+### 📐 SISTEMA DE REGLAS MÉTRICAS Y COORDENADAS
+**Nueva herramienta profesional** para medición precisa:
+
+- 📏 **Reglas Métricas**: Horizontal (X) y vertical (Y) con marcas cada 50px
+- 📍 **Coordenadas en Tiempo Real**: Muestra posición exacta del cursor
+- 🎨 **Líneas Guía Adaptativas**: Cambian de color según el fondo (blanco/negro)
+- 🎯 **Origen (0,0)**: Esquina superior izquierda del canvas
+- 🔘 **Toggle ON/OFF**: Botón junto a controles de zoom
+
+**Cómo usar:**
+1. Carga una imagen
+2. Haz clic en el botón 📐 (Escala) junto a los controles de zoom
+3. Mueve el cursor sobre la imagen para ver coordenadas
+4. Las líneas guía siguen al cursor automáticamente
+
+### 🖱️ ZOOM OPTIMIZADO
+**Control preciso sin accidentes**:
+
+- ✅ **Desktop**: Zoom solo con botones (+, -, 🔍)
+- ❌ **Rueda del mouse desactivada** en desktop (>767px)
+- ✅ **Móvil**: Mantiene gestos táctiles y scroll wheel
+- 💡 **Motivo**: Evitar cambios accidentales con Magic Mouse/trackpad
+
 ---
 
 ## 🚀 CARACTERÍSTICAS v3.1.2
@@ -87,13 +110,20 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 
 ## 📚 DOCUMENTACIÓN
 
+### 📖 Índice Maestro
+- **[docs/INDICE_DOCUMENTACION.md](docs/INDICE_DOCUMENTACION.md)** - 🔍 **EMPEZAR AQUÍ** - Índice completo de toda la documentación
+
 ### Guías de Usuario
-- **[docs/GUIA_ARRASTRE.md](docs/GUIA_ARRASTRE.md)** - Guía completa del sistema de arrastre
+- **[docs/GUIA_ARRASTRE.md](docs/GUIA_ARRASTRE.md)** - Sistema Drag & Drop para marcas de agua
+- **[docs/GUIA_REGLAS_METRICAS.md](docs/GUIA_REGLAS_METRICAS.md)** - Reglas métricas y coordenadas
 
 ### Documentación Técnica
-- **[docs/DRAG_DROP_SYSTEM.md](docs/DRAG_DROP_SYSTEM.md)** - Sistema drag & drop (técnico)
-- **[docs/README.md](docs/README.md)** - Índice completo de documentación
-- **[CHANGELOG.md](CHANGELOG.md)** - Historial de cambios detallado
+- **[docs/DRAG_DROP_SYSTEM.md](docs/DRAG_DROP_SYSTEM.md)** - Implementación técnica del sistema de arrastre
+- **[docs/ZOOM_OPTIMIZADO.md](docs/ZOOM_OPTIMIZADO.md)** - Sistema de zoom por dispositivo
+- **[docs/MODULAR_ARCHITECTURE.md](docs/MODULAR_ARCHITECTURE.md)** - Arquitectura modular completa
+- **[docs/V31_FEATURES.md](docs/V31_FEATURES.md)** - Características completas v3.1
+- **[docs/README.md](docs/README.md)** - Documentación técnica principal
+- **[CHANGELOG.md](CHANGELOG.md)** - Historial detallado de cambios
 
 ---
 

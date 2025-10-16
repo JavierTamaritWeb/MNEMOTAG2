@@ -4911,6 +4911,11 @@
       transform: none !important;
     }
     
+    .zoom-btn.active {
+      background: rgba(255, 255, 255, 0.4);
+      box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.6);
+    }
+    
     .zoom-level {
       color: #ffffff;
       font-size: 12px;

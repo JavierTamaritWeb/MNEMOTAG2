@@ -24,6 +24,29 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 - ✅ **Móvil (<768px)**: Mantiene gestos táctiles (pinch-to-zoom) y scroll wheel
 - **Motivo**: Evitar zoom accidental al mover el Magic Mouse o trackpad en desktop
 
+### 📐 NUEVA FUNCIONALIDAD: Sistema de Reglas Métricas
+
+#### Sistema de Coordenadas y Medición en Vista Previa
+- ✅ **Botón "Escala"**: Nuevo botón junto a controles de zoom para activar/desactivar reglas
+- ✅ **Reglas Métricas**: Horizontal (superior) y vertical (izquierda) con marcas cada 50px
+- ✅ **Origen de Coordenadas**: Esquina superior izquierda (0, 0)
+- ✅ **Líneas Guía**: Líneas horizontal y vertical que siguen al cursor en tiempo real
+- ✅ **Display de Coordenadas**: Muestra posición exacta del cursor (X: px, Y: px)
+- ✅ **Color Adaptativo**: Líneas cambian de color según el brillo del fondo
+  - Blanco para fondos oscuros
+  - Negro para fondos claros
+- ✅ **Toggle ON/OFF**: Mostrar/ocultar todo el sistema con un solo click
+
+**Características Técnicas:**
+- Detección automática de brillo mediante `getImageData()`
+- Event listeners optimizados (mousemove, mouseenter, mouseleave)
+- Limpieza completa al desactivar (sin residuos en DOM)
+- Reglas con fondo semi-transparente para no obstruir
+- Coordenadas que se ajustan para no salirse del canvas
+- Z-index apropiado para no interferir con otros elementos
+- **Escalado correcto**: Las marcas usan coordenadas reales del canvas, escaladas visualmente
+- Consistencia total entre reglas y coordenadas mostradas
+
 **Características:**
 - **Feedback visual:** Cursor cambia a `grab` (sobre elemento) y `grabbing` (durante arrastre)
 - **Notificaciones:** Mensajes de confirmación al finalizar el reposicionamiento

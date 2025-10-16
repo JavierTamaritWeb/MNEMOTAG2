@@ -1,6 +1,6 @@
 # 📦 MNEMOTAG V3.1 - NUEVAS CARACTERÍSTICAS
 
-**Versión:** 3.1.2  
+**Versión:** 3.1.3  
 **Fecha:** Octubre 2025  
 **Autor:** Javier Tamarit
 
@@ -8,15 +8,18 @@
 
 ## 🎯 RESUMEN EJECUTIVO
 
-La versión 3.1 de MnemoTag introduce 7 características principales que transforman la aplicación en una herramienta profesional completa:
+La versión 3.1 de MnemoTag introduce 10 características principales que transforman la aplicación en una herramienta profesional completa:
 
 1. **Sistema de Atajos de Teclado** - Navegación rápida optimizada para Mac
 2. **Batch Processing** - Procesamiento por lotes de hasta 50 imágenes
 3. **Capas de Texto Avanzadas** - Sistema completo de text layers
 4. **Recorte Inteligente** - Crop tool con sugerencias automáticas
-5. **Feedback Visual de Estado** ⭐ v3.1.2 - Indicadores visuales en botones de carga
-6. **Secciones Colapsables** ⭐ v3.1.2 - Sistema de minimización de secciones con delegación de eventos
-7. **Geolocalización Mejorada** ⭐ v3.1.2 - GPS con feedback contextual no intrusivo
+5. **Feedback Visual de Estado** (v3.1.2) - Indicadores visuales en botones de carga
+6. **Secciones Colapsables** (v3.1.2) - Sistema de minimización de secciones con delegación de eventos
+7. **Geolocalización Mejorada** (v3.1.2) - GPS con feedback contextual no intrusivo
+8. **Sistema Drag & Drop Ultra Intuitivo** ⭐ v3.1.3 - Posicionamiento independiente de marcas de agua
+9. **Reglas Métricas y Coordenadas** ⭐ v3.1.3 - Sistema profesional de medición precisa
+10. **Zoom Optimizado** ⭐ v3.1.3 - Control diferenciado por dispositivo (desktop/móvil)
 
 ---
 
@@ -663,5 +666,221 @@ document.addEventListener('click', (e) => {
 
 ---
 
-**Documentación actualizada:** Octubre 2025  
+## 🎯 SISTEMA DRAG & DROP ULTRA INTUITIVO (v3.1.3)
+
+### CARACTERÍSTICAS
+
+- **Posicionamiento independiente** de texto e imagen de marcas de agua
+- **Arrastre directo** sin pasos previos confusos
+- **Bordes visuales de colores**: Azul para texto, naranja para imagen
+- **Mensajes informativos** con gradientes de color
+- **Modo oscuro optimizado** con alto contraste
+- **Soporte completo** para mouse, trackpad y dispositivos táctiles
+
+### FUNCIONAMIENTO
+
+1. Selecciona "🎯 Posición personalizada (arrastra para mover)" en texto o imagen
+2. Verás un borde punteado de color alrededor del elemento (azul/naranja)
+3. Haz clic y arrastra el elemento a la posición deseada
+4. Suelta para confirmar la posición
+5. Puedes arrastrar cuantas veces quieras sin reconfigurar
+
+### INDICADORES VISUALES
+
+| Elemento | Color Borde | Color Mensaje | Comportamiento |
+|----------|-------------|---------------|----------------|
+| **Texto** | 🔵 Azul punteado | Gradiente azul-índigo | Arrastra texto independientemente |
+| **Imagen** | 🟠 Naranja punteado | Gradiente naranja-ámbar | Arrastra imagen independientemente |
+
+### BENEFICIOS
+
+✅ **Simplicidad**: Sin clicks iniciales ni confirmaciones confusas  
+✅ **Claridad Visual**: Bordes y mensajes específicos para cada elemento  
+✅ **Independencia Total**: Texto e imagen no interfieren entre sí  
+✅ **Multi-dispositivo**: Funciona perfectamente en desktop y móvil  
+✅ **Modo Oscuro**: Colores optimizados para alta visibilidad
+
+### IMPLEMENTACIÓN TÉCNICA
+
+```javascript
+// Variables globales
+isDragging = false
+dragTarget = null  // 'text' o 'image'
+dragOffsetX = 0
+dragOffsetY = 0
+textWatermarkBounds = null  // { x, y, width, height }
+imageWatermarkBounds = null
+
+// Funciones principales
+handleDragStart(event)   // Inicia arrastre (mouse/touch)
+handleDragMove(event)    // Actualiza posición durante arrastre
+handleDragEnd(event)     // Finaliza arrastre y guarda posición
+isPointInText(x, y)      // Detecta si click está en texto
+isPointInImage(x, y)     // Detecta si click está en imagen
+```
+
+### DOCUMENTACIÓN COMPLETA
+
+Ver [**GUIA_ARRASTRE.md**](GUIA_ARRASTRE.md) para guía completa de usuario  
+Ver [**DRAG_DROP_SYSTEM.md**](DRAG_DROP_SYSTEM.md) para detalles técnicos
+
+---
+
+## 📐 REGLAS MÉTRICAS Y COORDENADAS (v3.1.3)
+
+### CARACTERÍSTICAS
+
+- **Reglas métricas** horizontales y verticales con marcas cada 50px
+- **Coordenadas en tiempo real** (X: px, Y: px) del cursor
+- **Líneas guía adaptativas** que siguen al cursor
+- **Color inteligente**: Blanco en fondo oscuro, negro en fondo claro
+- **Toggle ON/OFF** con un solo click
+- **Origen (0,0)** en esquina superior izquierda
+
+### ELEMENTOS VISUALES
+
+```
+┌─────────────────────────────────────────────────┐
+│ 0    50   100  150  200  250  300  350  400   │ ← Regla horizontal
+├─────────────────────────────────────────────────┤
+│0 │                 ┃                            │
+│  │                 ┃      ┌──────────────────┐  │
+│50│                 ┃      │ X: 245px Y: 150px│  │
+│  │                 ┃      └──────────────────┘  │
+│100│──────────────────────────────               │
+└─────────────────────────────────────────────────┘
+ ↑                    ↑                    ↑
+Regla            Línea guía          Display
+vertical         vertical           coordenadas
+```
+
+### CASOS DE USO
+
+1. **Posicionamiento Preciso**: Coloca marcas de agua en coordenadas exactas
+2. **Medición de Elementos**: Verifica dimensiones con precisión de píxel
+3. **Alineación Exacta**: Alinea múltiples elementos en ejes perfectos
+4. **Centrado Perfecto**: Centra elementos usando coordenadas matemáticas
+5. **Diseño Profesional**: Trabaja con medidas exactas como en herramientas pro
+
+### IMPLEMENTACIÓN TÉCNICA
+
+```javascript
+// Variables globales
+isRulerMode = false
+currentMouseX = 0
+currentMouseY = 0
+rulerElements = {
+  horizontalRuler: null,
+  verticalRuler: null,
+  horizontalLine: null,
+  verticalLine: null,
+  coordinateDisplay: null,
+  container: null
+}
+
+// Funciones principales
+toggleRulerMode()                    // Activar/desactivar sistema
+createRulers()                       // Crear elementos visuales
+drawRulerMarks()                     // Dibujar marcas numéricas
+handleRulerMouseMove(event)          // Actualizar posición cursor
+updateCrosshair()                    // Actualizar líneas guía
+updateCoordinates()                  // Actualizar display coordenadas
+detectBackgroundBrightness(x, y)    // Detectar color de fondo
+```
+
+### BENEFICIOS
+
+✅ **Precisión Profesional**: Posicionamiento con exactitud de píxel  
+✅ **Feedback Visual**: Líneas y coordenadas en tiempo real  
+✅ **Adaptabilidad**: Color de líneas según brillo del fondo  
+✅ **No Obstructivo**: Opacidad 70%, se puede ver la imagen claramente  
+✅ **Fácil de Usar**: Un click activa, otro desactiva
+
+### DOCUMENTACIÓN COMPLETA
+
+Ver [**GUIA_REGLAS_METRICAS.md**](GUIA_REGLAS_METRICAS.md) para guía completa
+
+---
+
+## 🖱️ ZOOM OPTIMIZADO (v3.1.3)
+
+### CARACTERÍSTICAS
+
+- **Zoom diferenciado** por tamaño de pantalla
+- **Desktop (>767px)**: Rueda del mouse/trackpad **DESACTIVADA**
+- **Móvil (<768px)**: Todas las funciones de zoom activas
+- **Control preciso** con botones +, -, 🔍 en todos los dispositivos
+- **Previene zoom accidental** con Magic Mouse y trackpads
+
+### COMPORTAMIENTO POR DISPOSITIVO
+
+#### Desktop (≥768px)
+| Acción | Estado | Motivo |
+|--------|--------|--------|
+| 🖱️ Rueda mouse | ❌ Desactivado | Evitar cambios accidentales |
+| 🖱️ Trackpad scroll | ❌ Desactivado | Evitar cambios accidentales |
+| ➕➖ Botones zoom | ✅ Activo | Control preciso intencional |
+| 🔍 Reset 100% | ✅ Activo | Restablecimiento rápido |
+
+#### Móvil (<768px)
+| Acción | Estado | Motivo |
+|--------|--------|--------|
+| 👆 Pinch-to-zoom | ✅ Activo | Gesto natural táctil |
+| 📜 Scroll wheel | ✅ Activo | Compatible periféricos |
+| ➕➖ Botones zoom | ✅ Activo | Alternativa siempre disponible |
+| 🔍 Reset 100% | ✅ Activo | Restablecimiento rápido |
+
+### PROBLEMA RESUELTO
+
+**Antes (v3.1.2):**
+- ❌ Usuarios con Magic Mouse/trackpad experimentaban zoom accidental constante
+- ❌ Movimientos involuntarios del trackpad cambiaban el zoom sin intención
+- ❌ Frustración y pérdida de precisión en el trabajo
+
+**Después (v3.1.3):**
+- ✅ Desktop solo permite zoom con botones (control intencional)
+- ✅ Móvil mantiene funcionalidad completa (gestos táctiles)
+- ✅ Experiencia fluida sin interrupciones
+
+### IMPLEMENTACIÓN
+
+```javascript
+function initMouseWheelZoom() {
+  if (canvas) {
+    const handleWheelZoom = function(e) {
+      if (!isZoomed && !isZooming) return;
+
+      // VERIFICAR TAMAÑO DE PANTALLA
+      const isMobile = window.innerWidth < 768;
+      
+      // En desktop, bloquear zoom con rueda
+      if (!isMobile) {
+        return; // Solo botones permitidos
+      }
+
+      // En móvil, continuar con zoom normal
+      e.preventDefault();
+      // ... lógica de zoom ...
+    };
+
+    canvas.addEventListener('wheel', handleWheelZoom, { passive: false });
+  }
+}
+```
+
+### BENEFICIOS
+
+✅ **Control Preciso**: Sin cambios accidentales en desktop  
+✅ **Funcionalidad Completa**: Móvil mantiene todos los gestos  
+✅ **Menos Frustración**: Flujo de trabajo ininterrumpido  
+✅ **Adaptable**: Sistema inteligente según dispositivo  
+✅ **Profesional**: Comportamiento esperado en apps profesionales
+
+### DOCUMENTACIÓN COMPLETA
+
+Ver [**ZOOM_OPTIMIZADO.md**](ZOOM_OPTIMIZADO.md) para guía técnica completa
+
+---
+
+**Documentación actualizada:** 16 de Octubre 2025  
 **Versión del documento:** 1.0

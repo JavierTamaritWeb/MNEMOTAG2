@@ -1,7 +1,13 @@
 # 📚 MNEMOTAG - DOCUMENTACIÓN TÉCNICA
 
 **Versión:** 3.1.3  
-**Última actualización:** 15 Octubre 2025
+**Última actualización:** 16 Octubre 2025
+
+---
+
+## 🔍 NAVEGACIÓN RÁPIDA
+
+> 📖 **¿Buscas algo específico?** Consulta el [**INDICE_DOCUMENTACION.md**](INDICE_DOCUMENTACION.md) - Índice maestro con navegación por usuario, característica, nivel de detalle y versión.
 
 ---
 
@@ -88,6 +94,48 @@
 
 ---
 
+### 📐 Sistema de Reglas Métricas y Coordenadas
+
+**Nueva herramienta profesional** para medición y posicionamiento preciso:
+
+#### Características Principales
+- 📏 **Reglas con Marcas**: Horizontal (eje X) y vertical (eje Y) cada 50px
+- 📍 **Coordenadas en Tiempo Real**: Muestra `X: px, Y: px` del cursor
+- 🎨 **Color Adaptativo**: Líneas blancas en fondo oscuro, negras en fondo claro
+- 🎯 **Sistema de Coordenadas**: Origen (0,0) en esquina superior izquierda
+- 🔘 **Toggle Simple**: Botón junto a controles de zoom para activar/desactivar
+
+#### Implementación
+- Detección automática de brillo con `getImageData()`
+- Escalado correcto entre coordenadas reales y visuales
+- Event listeners optimizados (mousemove, mouseenter, mouseleave)
+- Limpieza completa al desactivar (sin residuos en DOM)
+- Líneas guía con opacidad 70% para no obstruir
+
+#### Casos de Uso
+- Posicionamiento preciso de marcas de agua
+- Verificación de dimensiones y medidas
+- Alineación exacta de elementos
+- Diseño profesional con coordenadas exactas
+
+---
+
+### 🖱️ Zoom Optimizado para Desktop
+
+**Control preciso sin cambios accidentales**:
+
+#### Desktop (>767px)
+- ✅ Zoom **solo con botones**: +, -, 🔍 (100%)
+- ❌ **Rueda del mouse/trackpad DESACTIVADA**
+- 💡 Motivo: Evitar zoom accidental con Magic Mouse o trackpad
+
+#### Móvil (<768px)
+- ✅ Mantiene **gestos táctiles** (pinch-to-zoom)
+- ✅ Mantiene **scroll wheel** para zoom
+- ✅ Funcionalidad completa en dispositivos táctiles
+
+---
+
 ## 📝 Historial de Versiones
 
 ### v3.1.2 (Octubre 2025)
@@ -130,12 +178,12 @@ MNEMOTAG2/
 
 ## 📊 ESTADÍSTICAS DEL PROYECTO
 
-- **Versión:** 3.1.2
-- **Líneas de código:** ~20,500
+- **Versión:** 3.1.3
+- **Líneas de código:** ~21,800
 - **Archivos de código:** 20 (HTML, JS, CSS)
 - **Managers:** 10 módulos especializados
 - **Utilidades:** 6 archivos auxiliares
-- **Documentación:** 6 archivos técnicos
+- **Documentación:** 9 archivos técnicos
 - **Estado:** Producción, estable
 
 ---
@@ -148,5 +196,24 @@ MNEMOTAG2/
 
 ---
 
+---
+
+## 📚 GUÍAS Y DOCUMENTACIÓN TÉCNICA
+
+### Guías de Usuario
+- 📖 [**GUIA_ARRASTRE.md**](GUIA_ARRASTRE.md) - Sistema Drag & Drop para posicionamiento de marcas de agua
+- 📐 [**GUIA_REGLAS_METRICAS.md**](GUIA_REGLAS_METRICAS.md) - Sistema de coordenadas y medición precisa
+
+### Documentación Técnica
+- 🎯 [**DRAG_DROP_SYSTEM.md**](DRAG_DROP_SYSTEM.md) - Implementación técnica del sistema de arrastre
+- 🖱️ [**ZOOM_OPTIMIZADO.md**](ZOOM_OPTIMIZADO.md) - Sistema de zoom diferenciado por dispositivo
+- 🏗️ [**MODULAR_ARCHITECTURE.md**](MODULAR_ARCHITECTURE.md) - Arquitectura modular del proyecto
+- 🔍 [**FILTER_OPTIMIZATION.md**](FILTER_OPTIMIZATION.md) - Optimización de filtros con Web Workers
+- 🛡️ [**ENHANCED_VALIDATION.md**](ENHANCED_VALIDATION.md) - Sistema de validación y seguridad
+- 👷 [**WORKER_INTEGRATION.md**](WORKER_INTEGRATION.md) - Integración de Web Workers
+- ✨ [**V31_FEATURES.md**](V31_FEATURES.md) - Características principales v3.1
+
+---
+
 **Autor:** Javier Tamarit  
-**Última actualización:** 13 de octubre de 2025
+**Última actualización:** 16 de octubre de 2025
