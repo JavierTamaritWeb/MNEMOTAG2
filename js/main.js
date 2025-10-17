@@ -51,6 +51,7 @@
     let dragOffsetY = 0;
     let textWatermarkBounds = null; // { x, y, width, height }
     let imageWatermarkBounds = null; // { x, y, width, height }
+    let showPositioningBorders = true; // Controla si se muestran los bordes de guía (false al descargar)
     
     // Variables para sistema de Reglas Métricas
     let isRulerMode = false;
@@ -2466,6 +2467,28 @@
         applyImageWatermarkOptimized();
       }
     }
+    
+    // Función auxiliar para redibujar el canvas completo desde cero
+    function redrawCompleteCanvas() {
+      if (!canvas || !ctx || !currentImage) {
+        console.warn('⚠️ No se puede redibujar: canvas, ctx o currentImage no disponibles');
+        return;
+      }
+      
+      // 1. Limpiar canvas completamente
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // 2. Redibujar imagen base con alta calidad
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
+      
+      // 3. Aplicar marcas de agua (respetará showPositioningBorders)
+      applyWatermarkOptimized();
+      
+      // 4. Aplicar filtros CSS si existen
+      applyCanvasFilters();
+    }
 
     function applyTextWatermarkOptimized() {
       const text = document.getElementById('watermark-text').value.trim();
@@ -2511,8 +2534,8 @@
       // Draw text with enhanced quality
       ctx.fillText(text, positions.x, positions.y);
       
-      // Si está en modo personalizado, dibujar borde indicador
-      if (position === 'custom') {
+      // Si está en modo personalizado Y showPositioningBorders es true, dibujar borde indicador
+      if (position === 'custom' && showPositioningBorders) {
         ctx.save();
         ctx.strokeStyle = 'rgba(59, 130, 246, 0.5)'; // Azul semi-transparente
         ctx.lineWidth = 2;
@@ -2601,8 +2624,8 @@
       
       ctx.drawImage(watermarkImg, positions.x, positions.y, width, height);
       
-      // Si está en modo personalizado, dibujar borde indicador
-      if (position === 'custom') {
+      // Si está en modo personalizado Y showPositioningBorders es true, dibujar borde indicador
+      if (position === 'custom' && showPositioningBorders) {
         ctx.save();
         ctx.globalAlpha = 1; // Opacidad completa para el borde
         ctx.strokeStyle = 'rgba(245, 158, 11, 0.7)'; // Naranja semi-transparente
@@ -3883,6 +3906,12 @@
       }
       
       try {
+        // IMPORTANTE: Desactivar bordes de guía antes de descargar
+        showPositioningBorders = false;
+        
+        // Redibujar canvas completo sin los bordes
+        redrawCompleteCanvas();
+        
         // Detectar si la imagen tiene transparencia
         const hasAlpha = hasImageAlphaChannel(canvas);
         
@@ -3998,6 +4027,12 @@
       } catch (error) {
         console.error('Error al descargar:', error);
         showError('Error al descargar la imagen.');
+      } finally {
+        // IMPORTANTE: Reactivar bordes de guía después de descargar
+        showPositioningBorders = true;
+        
+        // Redibujar canvas completo CON los bordes para la vista previa
+        redrawCompleteCanvas();
       }
     }
 
@@ -4601,6 +4636,12 @@
       }
       
       try {
+        // IMPORTANTE: Desactivar bordes de guía antes de descargar
+        showPositioningBorders = false;
+        
+        // Redibujar canvas completo sin los bordes
+        redrawCompleteCanvas();
+        
         // Show progress bar
         showProgressBar('Iniciando descarga...');
         
@@ -4703,6 +4744,12 @@
         console.error('Error al descargar:', error);
         hideProgressBar();
         showError('Error al descargar la imagen.');
+      } finally {
+        // IMPORTANTE: Reactivar bordes de guía después de descargar
+        showPositioningBorders = true;
+        
+        // Redibujar canvas completo CON los bordes para la vista previa
+        redrawCompleteCanvas();
       }
     }
     
@@ -4920,6 +4967,12 @@
       }
       
       try {
+        // IMPORTANTE: Desactivar bordes de guía antes de descargar
+        showPositioningBorders = false;
+        
+        // Redibujar canvas completo sin los bordes
+        redrawCompleteCanvas();
+        
         showLoadingState('Preparando descarga...');
         
         // Generate filename with timestamp
@@ -4943,6 +4996,12 @@
         console.error('Error downloading image:', error);
         hideLoadingState();
         showError('Error al descargar la imagen');
+      } finally {
+        // IMPORTANTE: Reactivar bordes de guía después de descargar
+        showPositioningBorders = true;
+        
+        // Redibujar canvas completo CON los bordes para la vista previa
+        redrawCompleteCanvas();
       }
     }
 
