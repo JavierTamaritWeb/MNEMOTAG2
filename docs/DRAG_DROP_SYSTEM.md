@@ -82,7 +82,10 @@ let dragOffsetX = 0;                 // Offset X del punto de agarre
 let dragOffsetY = 0;                 // Offset Y del punto de agarre
 let textWatermarkBounds = null;      // { x, y, width, height }
 let imageWatermarkBounds = null;     // { x, y, width, height }
+let showPositioningBorders = true;   // Controla si se muestran bordes de guía
 ```
+
+> **Nota**: `showPositioningBorders` se establece en `false` temporalmente al descargar la imagen para que los bordes de guía no aparezcan en el archivo final.
 
 ### Funciones Principales
 
@@ -245,6 +248,87 @@ Usa gestos táctiles para posicionar con precisión en dispositivos móviles.
 - La vista previa se actualiza en tiempo real mientras arrastras
 - Las posiciones se guardan en `customTextPosition` y `customImagePosition`
 
+## 🖼️ Descarga Limpia de Imágenes
+
+### Problema Identificado y Solucionado
+
+**Problema Original**: Los bordes de guía (azul/naranja) aparecían en la imagen descargada porque `applyWatermarkOptimized()` solo dibujaba las marcas de agua ENCIMA del canvas existente sin limpiar los bordes previos.
+
+**Solución Implementada**: Sistema de redibujado completo del canvas antes de la descarga.
+
+### Función `redrawCompleteCanvas()`
+
+Nueva función auxiliar que redibuja TODO el canvas desde cero:
+
+```javascript
+function redrawCompleteCanvas() {
+  if (!canvas || !ctx || !currentImage) {
+    console.warn('⚠️ No se puede redibujar');
+    return;
+  }
+  
+  // 1. Limpiar canvas completamente
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // 2. Redibujar imagen base con alta calidad
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
+  
+  // 3. Aplicar marcas de agua (respeta showPositioningBorders)
+  applyWatermarkOptimized();
+  
+  // 4. Aplicar filtros CSS
+  applyCanvasFilters();
+}
+```
+
+### Secuencia de Descarga
+
+Todas las funciones de descarga (`downloadImage`, `downloadImageWithProgress`, `downloadImageEnhanced`) ahora siguen esta secuencia:
+
+```javascript
+try {
+  // 1. Desactivar bordes de guía
+  showPositioningBorders = false;
+  
+  // 2. Redibujar canvas completo SIN bordes
+  redrawCompleteCanvas();
+  
+  // 3. Generar imagen limpia
+  const blob = await canvas.toBlob(...);
+  
+  // 4. Descargar imagen
+  // ...
+  
+} catch (error) {
+  // Manejo de errores
+} finally {
+  // 5. Reactivar bordes para vista previa
+  showPositioningBorders = true;
+  
+  // 6. Redibujar canvas completo CON bordes
+  redrawCompleteCanvas();
+}
+```
+
+### Resultado
+
+| Situación | Estado de Bordes |
+|-----------|------------------|
+| **Vista Previa** | ✅ Visibles (guía visual) |
+| **Imagen Descargada** | ✅ **Eliminados** (imagen limpia) |
+| **Después de Descargar** | ✅ Visibles (restaurados automáticamente) |
+
+### Ventajas
+
+- ✅ **Limpieza total**: Canvas se limpia completamente antes de redibujar
+- ✅ **Automático**: El usuario no necesita hacer nada especial
+- ✅ **Reversible**: Vista previa se restaura automáticamente después de descargar
+- ✅ **Consistente**: Funciona en las 3 funciones de descarga diferentes
+
+---
+
 ## 🔮 Futuras Mejoras Posibles
 
 - [ ] Snap to grid (alineación a cuadrícula)
@@ -256,7 +340,7 @@ Usa gestos táctiles para posicionar con precisión en dispositivos móviles.
 
 ---
 
-**Versión**: 1.0  
-**Fecha**: 2025-10-15  
+**Versión**: 1.1  
+**Fecha**: 2025-10-16  
 **Autor**: Sistema de IA Claude Sonnet 4.5
 

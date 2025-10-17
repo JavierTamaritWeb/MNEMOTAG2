@@ -20,12 +20,14 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 - 💡 **Mensajes Claros**: Instrucciones específicas con gradientes de color
 - 🌙 **Modo Oscuro**: Optimizado con colores de alto contraste
 - 📱 **Multi-Dispositivo**: Funciona perfectamente en desktop y móvil
+- 🖼️ **Descarga Limpia**: Los bordes de guía NO aparecen en la imagen descargada
 
 **Cómo usar:**
 1. Selecciona "🎯 Posición personalizada (arrastra para mover)"
 2. Verás un borde punteado de color (azul o naranja)
 3. Haz clic y arrastra el elemento
 4. ¡Listo! Arrastra cuantas veces quieras
+5. Al descargar, la imagen estará limpia sin bordes
 
 ### 📐 SISTEMA DE REGLAS MÉTRICAS Y COORDENADAS
 **Nueva herramienta profesional** para medición precisa:

@@ -4,7 +4,7 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
-## [3.1.3] - 2025-10-15
+## [3.1.3] - 2025-10-16
 
 ### ✨ NUEVA FUNCIONALIDAD DESTACADA
 
@@ -15,6 +15,7 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 - **💡 Mensajes Claros:** Instrucciones específicas en gradientes de colores según el elemento activo
 - **🔄 Sin Click Inicial:** El sistema antiguo de "click para posicionar" ha sido eliminado
 - **📍 Feedback Constante:** Mensajes en canvas que indican "ARRASTRA texto/imagen" en lugar de "Haz clic"
+- **🖼️ Descarga Limpia:** Los bordes de guía NO aparecen en la imagen descargada
 
 ### 🔧 MEJORAS DE USABILIDAD
 
@@ -74,6 +75,50 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 - ✅ iOS y Android
 
 **Documentación:** Ver `docs/DRAG_DROP_SYSTEM.md` para detalles completos
+
+### 🐛 CORRECCIÓN CRÍTICA: Bordes de Guía en Imagen Descargada
+
+#### Problema Identificado
+- ❌ Los bordes de guía (azul/naranja) aparecían en la imagen final descargada
+- ❌ `applyWatermarkOptimized()` solo dibujaba ENCIMA del canvas sin limpiar
+- ❌ Los bordes ya dibujados permanecían en el canvas
+
+#### Solución Implementada
+- ✅ **Variable de control:** `showPositioningBorders` (true/false)
+- ✅ **Nueva función:** `redrawCompleteCanvas()` que:
+  1. Limpia el canvas completamente con `clearRect()`
+  2. Redibuja la imagen base desde cero
+  3. Aplica marcas de agua (respetando `showPositioningBorders`)
+  4. Aplica filtros CSS
+
+#### Secuencia de Descarga Corregida
+```javascript
+// ANTES de descargar:
+showPositioningBorders = false;
+redrawCompleteCanvas(); // Limpia y redibuja sin bordes
+
+// Generar imagen limpia
+canvas.toDataURL() / toBlob();
+
+// DESPUÉS de descargar (finally):
+showPositioningBorders = true;
+redrawCompleteCanvas(); // Restaura vista previa con bordes
+```
+
+#### Funciones Actualizadas
+- ✅ `downloadImage()` - Usa `redrawCompleteCanvas()`
+- ✅ `downloadImageWithProgress()` - Usa `redrawCompleteCanvas()`
+- ✅ `downloadImageEnhanced()` - Usa `redrawCompleteCanvas()`
+
+#### Resultado
+| Situación | Antes | Ahora |
+|-----------|-------|-------|
+| Vista Previa | Bordes ✅ | Bordes ✅ |
+| Imagen Descargada | Bordes ❌ | **Sin bordes** ✅ |
+| Después de Descargar | Bordes ✅ | Bordes ✅ |
+
+**Archivos modificados:**
+- `js/main.js` - Variable `showPositioningBorders`, función `redrawCompleteCanvas()`, 3 funciones de descarga actualizadas
 
 ---
 
