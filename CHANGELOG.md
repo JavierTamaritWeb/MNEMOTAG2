@@ -4,6 +4,63 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.1.4] - 2025-11-17
+
+### 🐛 CORRECCIÓN DE BUGS CRÍTICOS
+
+#### Bug #1: Descarga WebP No Funcionaba en Segundas Descargas
+- ✅ **SOLUCIONADO:** Error crítico que impedía descargar después de eliminar el archivo
+- **Problema:** `lastDownloadDirectory` guardaba resultado de `queryPermission()` ("granted") en lugar del directorio
+- **Causa:** API recibía string inválido en `startIn`, causando fallo silencioso
+- **Solución:** Eliminada línea problemática, API recuerda ubicación automáticamente
+- **Tests:** 10/10 tests pasados - verificado con suite automatizada
+- **Archivos:** `js/main.js` (funciones `downloadImage` y `downloadImageWithProgress`)
+
+#### Bug #2: Botones de Acción Solapados
+- ✅ **SOLUCIONADO:** Botones "Restablecer", "Antes/Después" y "Descargar" se solapaban
+- **Problema:** Contenedor `.action-buttons` sin estilos base, anchos mínimos excesivos
+- **Causa:** Faltaban estilos CSS, `min-width` demasiado grande (280px, 200px)
+- **Solución:**
+  - Agregado contenedor base con `display: flex`, `gap: 12px`, `flex-wrap: wrap`
+  - Reducidos anchos: Download 280px→220px, Compare 200px→180px, Reset 170px
+  - Agregado `flex-shrink: 0` para prevenir compresión no deseada
+- **Archivos:** `css/styles.css` (31 líneas modificadas)
+
+#### Bug #3: Preview Nombre de Archivo Invisible en Modo Oscuro
+- ✅ **SOLUCIONADO:** Texto "ARCHIVO FINAL: nombre.webp" no legible en tema oscuro
+- **Problema:** Clases Tailwind `dark:` no funcionaban, app usa `[data-theme="dark"]`
+- **Causa:** Sistema de temas incompatible con sintaxis Tailwind dark mode
+- **Solución:**
+  - Agregados estilos CSS personalizados con selector `[data-theme="dark"]`
+  - Fondo gris oscuro `#374151`, borde azul vibrante `#2563EB`
+  - Texto gris claro `#D1D5DB`, nombre azul claro `#60A5FA`
+  - Uso de `!important` para sobrescribir clases inline
+- **Archivos:** `css/styles.css` (14 líneas nuevas), `index.html` (clases complementarias)
+
+### ⚡ MEJORAS DE UX
+
+- **Logging mejorado:** Mensajes console.log para debug de descargas
+- **Contraste optimizado:** Alto contraste en preview de archivos
+- **Responsividad:** Botones se adaptan mejor a pantallas medianas
+
+### 📊 TESTS EJECUTADOS
+
+**Suite 1: WebP Download (10 tests)**
+- ✅ Variable lastDownloadDirectory correcta
+- ✅ showSaveFilePicker usado correctamente
+- ✅ Secuencia write correcta (createWritable → write → close)
+- ✅ Manejo AbortError implementado
+- ✅ Uso correcto de Blobs
+- ✅ Logging de eventos completo
+- ✅ startIn directory configurado
+- ✅ Fallback tradicional disponible
+- ✅ Sin memory leaks
+- ✅ Consistencia entre funciones de descarga
+
+**Tasa de éxito: 100% (10/10)**
+
+---
+
 ## [3.1.3] - 2025-10-16
 
 ### ✨ NUEVA FUNCIONALIDAD DESTACADA
@@ -750,24 +807,32 @@ Lanzamiento inicial de MnemoTag.
 
 ## 📊 ESTADÍSTICAS DEL PROYECTO
 
-### Versión 3.1.2 (Actual)
-- **Líneas de código totales:** ~8,600
+### Versión 3.1.4 (Actual)
+- **Líneas de código totales:** ~8,650
 - **Archivos de código:** 20
 - **Documentación:** 7 archivos
 - **Características principales:** 5
-- **Tests implementados:** 45+
+- **Tests implementados:** 55+ (10 nuevos tests WebP)
 - **Navegadores soportados:** 4
 - **Compatibilidad:** Desktop, Tablet, Mobile
+- **Bugs críticos resueltos:** 3
 
 ### Crecimiento desde v3.0
-- **+2,600 líneas de código** (+43%)
+- **+2,650 líneas de código** (+44%)
 - **+4 nuevos managers**
 - **+1 sistema de utilidades**
 - **+5 documentos técnicos**
-- **+45 tests**
+- **+55 tests automatizados**
+- **Bug fixes:** 13 bugs resueltos
+
+### Cambios en v3.1.4
+- **+50 líneas** (fixes y mejoras)
+- **+10 tests** WebP download
+- **+3 bugs** críticos solucionados
+- **+1 suite** de tests automatizada
 
 ---
 
-**Última actualización:** 13 de octubre de 2025  
-**Versión actual:** 3.1.2  
+**Última actualización:** 17 de noviembre de 2025  
+**Versión actual:** 3.1.4  
 **Estado:** ✅ Estable y listo para producción

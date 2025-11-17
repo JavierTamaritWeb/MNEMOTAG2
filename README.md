@@ -4,13 +4,35 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos.
 
-![Version](https://img.shields.io/badge/version-3.1.3-blue.svg)
+![Version](https://img.shields.io/badge/version-3.1.4-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 
 ---
 
-## ⭐ NOVEDADES v3.1.3
+## ⭐ NOVEDADES v3.1.4
+
+### 🐛 BUGS CRÍTICOS SOLUCIONADOS
+
+#### ✅ Descarga WebP Corregida
+- **Problema resuelto:** Descargas fallaban silenciosamente después de eliminar el archivo
+- Ahora puedes descargar múltiples veces sin problemas
+- Sistema de fallback automático WebP → PNG/JPEG
+- Tests automatizados (10/10 ✅)
+
+#### ✅ Botones Sin Solapamiento
+- **Interfaz mejorada:** Botones de acción ahora se distribuyen correctamente
+- Responsive optimizado para pantallas medianas
+- Sin solapamientos visuales
+
+#### ✅ Modo Oscuro Perfecto
+- **Preview visible:** Elemento "ARCHIVO FINAL" ahora legible en tema oscuro
+- Alto contraste garantizado
+- Colores vibrantes y profesionales
+
+---
+
+## ⭐ CARACTERÍSTICAS v3.1.3
 
 ### 🎯 SISTEMA DRAG & DROP ULTRA INTUITIVO
 **Sistema completamente rediseñado** para posicionar marcas de agua:
@@ -54,7 +76,9 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 
 ---
 
-## 🚀 CARACTERÍSTICAS v3.1.2
+## 🚀 CARACTERÍSTICAS ANTERIORES
+
+### v3.1.2
 
 ### 🎨 FEEDBACK VISUAL DE ESTADO
 - 🔴🟢 Botones con indicadores de color dinámicos

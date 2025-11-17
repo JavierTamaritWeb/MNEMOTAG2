@@ -1573,6 +1573,14 @@
     
     /* ===== BOTONES MEJORADOS CON DISEÑO PREMIUM ===== */
     
+    /* Estilos base para contenedor de botones de acción */
+    .action-buttons {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    
     /* Reset completo de todos los botones */
     .action-buttons .btn,
     .button--action,
@@ -1827,8 +1835,9 @@
     
     /* Botón de comparación con más espacio */
     #compare-toggle-btn {
-      min-width: 200px !important;
-      padding: 16px 32px !important;
+      min-width: 180px !important;
+      padding: 16px 24px !important;
+      flex-shrink: 0;
     }
     
     /* Modo oscuro con hovers coloridos */
@@ -2115,16 +2124,24 @@
     
     /* Padding específico para botón de descarga */
     #download-image {
-      padding: 18px 32px !important;
-      padding-left: 32px !important;
-      padding-right: 32px !important;
-      min-width: 280px !important;
-      gap: 12px !important;
+      padding: 18px 28px !important;
+      padding-left: 28px !important;
+      padding-right: 28px !important;
+      min-width: 220px !important;
+      gap: 10px !important;
       min-height: 58px !important;
+      flex-shrink: 0;
     }
     
     #download-image i {
-      margin-right: 12px !important;
+      margin-right: 10px !important;
+    }
+    
+    /* Botón restablecer */
+    #reset-changes {
+      min-width: 170px !important;
+      padding: 16px 24px !important;
+      flex-shrink: 0;
     }
     
     /* Texto de información de imagen en mayúsculas */
@@ -5440,6 +5457,21 @@
 
     [data-theme="dark"] .filename-preview strong {
       color: var(--text-primary);
+    }
+
+    /* Estilos específicos para el ID filename-preview */
+    [data-theme="dark"] #filename-preview {
+      background-color: #374151 !important;
+      border-color: #2563EB !important;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    [data-theme="dark"] #filename-preview span:first-of-type {
+      color: #D1D5DB !important;
+    }
+
+    [data-theme="dark"] #filename-preview #filename-preview-text {
+      color: #60A5FA !important;
     }
 
     /* Mobile Responsive */

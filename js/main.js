@@ -3992,12 +3992,17 @@
 
           try {
             const handle = await window.showSaveFilePicker(options);
-            lastDownloadDirectory = await handle.queryPermission({ mode: 'readwrite' });
+            
+            // Guardar el directorio para futura referencia (no el resultado del permiso)
+            // No necesitamos guardar el handle específico, solo recordar el directorio
+            // La API recordará la ubicación automáticamente
             
             const writable = await handle.createWritable();
             const blob = await canvasToBlob(canvas, finalMimeType, outputQuality);
             await writable.write(blob);
             await writable.close();
+            
+            console.log('✅ Archivo guardado correctamente:', fullFilename);
             
             const qualityText = finalFormat === 'png' ? '' : ` (calidad: ${Math.round(outputQuality * 100)}%)`;
             showSuccess(`Imagen guardada exitosamente en formato ${finalFormat.toUpperCase()}${qualityText}!`);
@@ -4005,6 +4010,7 @@
           } catch (saveError) {
             // Si el usuario cancela, no mostrar error
             if (saveError.name === 'AbortError') {
+              console.log('ℹ️ Descarga cancelada por el usuario');
               return;
             }
             console.warn('Error con File System Access API, usando fallback:', saveError);
@@ -4659,6 +4665,22 @@
         // Start progress simulation
         const progressPromise = simulateProgressSteps(downloadSteps, 2800);
         
+        // Detectar si la imagen tiene transparencia
+        const hasAlpha = hasImageAlphaChannel(canvas);
+        
+        // Determinar formato final con fallback
+        const requestedMimeType = getMimeType(outputFormat);
+        const finalMimeType = await determineFallbackFormat(hasAlpha, requestedMimeType);
+        const finalFormat = finalMimeType.split('/')[1];
+        
+        // Si el formato cambió, mostrar notificación informativa
+        if (finalMimeType !== requestedMimeType) {
+          const requestedFormat = outputFormat.toUpperCase();
+          const actualFormat = finalFormat.toUpperCase();
+          console.info(`Usando fallback: ${requestedFormat} → ${actualFormat} (mejor compatibilidad)`);
+          UIManager.showInfo(`📄 Exportando en ${actualFormat} para máxima compatibilidad (solicitado: ${requestedFormat})`);
+        }
+        
         // Obtener metadatos antes de la descarga
         const metadata = MetadataManager.getMetadata();
         const exifData = MetadataManager.applyMetadataToImage(canvas);
@@ -4711,23 +4733,64 @@
           filename = 'imagen-editada';
         }
         
-        // Usar el formato seleccionado en lugar de la extensión original
-        const extension = getFileExtension(outputFormat);
+        // Usar el formato final determinado por el sistema de fallback
+        const extension = getFileExtension(finalFormat);
         const fullFilename = `${filename}.${extension}`;
         
         // Wait for processing steps
         await new Promise(resolve => setTimeout(resolve, 900));
         
-        // Obtener el tipo MIME basado en el formato seleccionado
-        const mimeType = getMimeType(outputFormat);
-        
         // Complete progress
         await progressPromise;
+        
+        // Usar la API File System Access si está disponible (Chrome/Edge modernos)
+        if ('showSaveFilePicker' in window) {
+          const options = {
+            suggestedName: fullFilename,
+            types: [{
+              description: 'Imágenes',
+              accept: {
+                [finalMimeType]: [`.${extension}`]
+              }
+            }],
+            startIn: lastDownloadDirectory || 'desktop'
+          };
+
+          try {
+            const handle = await window.showSaveFilePicker(options);
+            
+            // Guardar el directorio para futura referencia (no el resultado del permiso)
+            // No necesitamos guardar el handle específico, solo recordar el directorio
+            // La API recordará la ubicación automáticamente
+            
+            const writable = await handle.createWritable();
+            const blob = await canvasToBlob(canvas, finalMimeType, outputQuality);
+            await writable.write(blob);
+            await writable.close();
+            
+            console.log('✅ Archivo guardado correctamente:', fullFilename);
+            
+            // Hide progress bar
+            hideProgressBar();
+            
+            const qualityText = finalFormat === 'png' ? '' : ` (calidad: ${Math.round(outputQuality * 100)}%)`;
+            showSuccess(`Imagen guardada exitosamente en formato ${finalFormat.toUpperCase()}${qualityText}!`);
+            return;
+          } catch (saveError) {
+            // Si el usuario cancela, no mostrar error
+            if (saveError.name === 'AbortError') {
+              console.log('ℹ️ Descarga cancelada por el usuario');
+              hideProgressBar();
+              return;
+            }
+            console.warn('Error con File System Access API, usando fallback:', saveError);
+          }
+        }
         
         // Fallback para navegadores que no soportan la API o si falla
         const link = document.createElement('a');
         link.download = fullFilename;
-        link.href = canvas.toDataURL(mimeType, outputQuality);
+        link.href = canvas.toDataURL(finalMimeType, outputQuality);
         
         // Simular click
         document.body.appendChild(link);
@@ -4737,8 +4800,8 @@
         // Hide progress bar
         hideProgressBar();
         
-        const qualityText = outputFormat === 'png' ? '' : ` (calidad: ${Math.round(outputQuality * 100)}%)`;
-        showSuccess(`Imagen descargada en formato ${outputFormat.toUpperCase()}${qualityText}!`);
+        const qualityText = finalFormat === 'png' ? '' : ` (calidad: ${Math.round(outputQuality * 100)}%)`;
+        showSuccess(`Imagen descargada en formato ${finalFormat.toUpperCase()}${qualityText}!`);
         
       } catch (error) {
         console.error('Error al descargar:', error);

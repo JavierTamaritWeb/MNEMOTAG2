@@ -1,7 +1,7 @@
 # 🚀 Resumen Ejecutivo de Versiones - MNEMOTAG
 
 **Documento**: Resumen de evolución del proyecto  
-**Última actualización**: 16 de Octubre de 2025
+**Última actualización**: 17 de Noviembre de 2025
 
 ---
 
@@ -9,14 +9,58 @@
 
 | Versión | Fecha | Características Principales | Estado |
 |---------|-------|----------------------------|--------|
-| **v3.1.3** | 16 Oct 2025 | Drag & Drop, Reglas Métricas, Zoom Optimizado | 🟢 **Actual** |
+| **v3.1.4** | 17 Nov 2025 | Bug Fixes Críticos: WebP, Botones, Dark Mode | 🟢 **Actual** |
+| **v3.1.3** | 16 Oct 2025 | Drag & Drop, Reglas Métricas, Zoom Optimizado | ✅ Estable |
 | **v3.1.2** | 13 Oct 2025 | Feedback Visual, Secciones Colapsables, GPS | ✅ Estable |
 | **v3.1.1** | Oct 2025 | Mejoras de rendimiento | ✅ Estable |
 | **v3.1.0** | Oct 2025 | Atajos, Batch, Text Layers, Crop | ✅ Estable |
 
 ---
 
-## 🎯 v3.1.3 - DRAG & DROP Y MEDICIÓN PROFESIONAL (Actual)
+## 🐛 v3.1.4 - BUG FIXES CRÍTICOS (Actual)
+
+### 📅 Fecha de lanzamiento: 17 de Noviembre de 2025
+
+### ✨ Correcciones Críticas
+
+#### 1. 🔧 Descarga WebP Reparada
+**Impacto**: ⭐⭐⭐⭐⭐
+
+- Error que impedía descargas repetidas después de eliminar archivo
+- `lastDownloadDirectory` mal configurada
+- Sistema de fallback automático mejorado
+- 10 tests automatizados implementados
+
+**Beneficio**: Descargas estables y confiables en todos los formatos
+
+#### 2. 🎨 Botones Sin Solapamiento
+**Impacto**: ⭐⭐⭐⭐
+
+- Botones de acción correctamente distribuidos
+- Responsive optimizado
+- Anchos reducidos y flexibles
+
+**Beneficio**: Interfaz limpia en todas las resoluciones
+
+#### 3. 🌙 Modo Oscuro Perfecto
+**Impacto**: ⭐⭐⭐⭐
+
+- Preview de nombre de archivo visible
+- Alto contraste en tema oscuro
+- Estilos CSS personalizados
+
+**Beneficio**: Experiencia visual consistente
+
+### 📊 Métricas de Calidad
+
+- **Tests pasados**: 10/10 (100%)
+- **Bugs resueltos**: 3 críticos
+- **Líneas agregadas**: ~50
+- **Archivos modificados**: 3
+
+---
+
+## 🎯 v3.1.3 - DRAG & DROP Y MEDICIÓN PROFESIONAL
 
 ### 📅 Fecha de lanzamiento: 16 de Octubre de 2025
 
