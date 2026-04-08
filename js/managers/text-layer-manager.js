@@ -192,9 +192,19 @@ class TextLayerManager {
         link.rel = 'stylesheet';
         link.href = fontUrl;
         document.head.appendChild(link);
-        
-        // Esperar a que la fuente se cargue
-        await document.fonts.load(`16px "${fontFamily}"`);
+
+        // Esperar a que la fuente se cargue, con timeout de 5 s para que la
+        // UI no se congele si Google Fonts está caído o lento.
+        const FONT_LOAD_TIMEOUT_MS = 5000;
+        await Promise.race([
+          document.fonts.load(`16px "${fontFamily}"`),
+          new Promise((_, reject) =>
+            setTimeout(
+              () => reject(new Error(`Timeout cargando fuente ${fontFamily} (>${FONT_LOAD_TIMEOUT_MS}ms)`)),
+              FONT_LOAD_TIMEOUT_MS
+            )
+          )
+        ]);
       }
       
       this.loadedFonts.add(fontFamily);

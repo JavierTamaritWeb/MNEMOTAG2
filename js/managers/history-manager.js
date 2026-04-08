@@ -14,20 +14,25 @@
  * - Actualización automática de botones UI
  */
 
+// Límite de memoria total para los snapshots base64 del historial.
+// En imágenes 4K, cada canvas.toDataURL() puede ocupar 10-30 MB; con 20
+// estados eso son 200-600 MB. Este tope evita OOM en sesiones largas.
+const HISTORY_MAX_TOTAL_SIZE = 100 * 1024 * 1024; // 100 MB cumulativos
+
 const historyManager = {
   states: [],
   currentIndex: -1,
   maxStates: 20,
-  
+
   /**
    * Guardar el estado actual del canvas y configuración
    */
   saveState: function() {
     if (!canvas || !currentImage) return;
-    
+
     // Remover estados futuros si estamos en medio del historial
     this.states = this.states.slice(0, this.currentIndex + 1);
-    
+
     // Guardar estado actual
     const state = {
       imageData: canvas.toDataURL(),
@@ -36,16 +41,35 @@ const historyManager = {
       fileBaseName: fileBaseName || 'imagen', // Incluir nombre de archivo
       timestamp: Date.now()
     };
-    
+
+    // Control de memoria: si el propio nuevo snapshot excede el tope,
+    // no se guarda (sería absurdo evict-ear todo el historial por uno solo).
+    const newSize = state.imageData ? state.imageData.length : 0;
+    if (newSize > HISTORY_MAX_TOTAL_SIZE) {
+      console.warn(
+        `historyManager: snapshot demasiado grande (${(newSize / 1024 / 1024).toFixed(1)} MB), ` +
+        `excede el tope de ${(HISTORY_MAX_TOTAL_SIZE / 1024 / 1024)} MB. No se guarda al historial.`
+      );
+      return;
+    }
+
+    // Liberar estados viejos hasta que el nuevo entre en el presupuesto total.
+    let totalSize = this.states.reduce((acc, s) => acc + (s.imageData ? s.imageData.length : 0), 0);
+    while (this.states.length > 0 && (totalSize + newSize) > HISTORY_MAX_TOTAL_SIZE) {
+      const removed = this.states.shift();
+      totalSize -= (removed && removed.imageData ? removed.imageData.length : 0);
+      if (this.currentIndex > 0) this.currentIndex--;
+    }
+
     this.states.push(state);
     this.currentIndex++;
-    
-    // Limitar el número de estados
+
+    // Limitar también el número de estados (techo absoluto del historial)
     if (this.states.length > this.maxStates) {
       this.states.shift();
       this.currentIndex--;
     }
-    
+
     this.updateUndoRedoButtons();
   },
   

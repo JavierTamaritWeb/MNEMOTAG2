@@ -170,35 +170,23 @@ function getMimeType(format) {
  * @returns {Promise<Blob>} Promise que resuelve con el blob
  */
 async function canvasToBlob(canvas, mimeType, quality = 0.9) {
+  // Antes (v3.3.3 y anteriores) había aquí un test prematuro que creaba un
+  // canvas 1×1 vacío y testaba toDataURL(mimeType) para decidir si forzar
+  // JPEG. Ese test podía dar falsos negativos en navegadores con WebP/AVIF
+  // soportados. Eliminado en v3.3.4: confiamos en que canvas.toBlob() devuelva
+  // null al callback si el formato no está soportado, y caemos al fallback.
   try {
-    // Use native canvas.toBlob method with fallback support
     return await new Promise((resolve, reject) => {
-      // Check if browser supports the requested format
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = 1;
-      tempCanvas.height = 1;
-      
-      // Test format support
-      const testDataUrl = tempCanvas.toDataURL(mimeType);
-      if (!testDataUrl.startsWith(`data:${mimeType}`)) {
-        // Format not supported, fallback to JPEG
-        console.warn(`Format ${mimeType} not supported, falling back to JPEG`);
-        mimeType = 'image/jpeg';
-      }
-      
-      // Convert canvas to blob
       canvas.toBlob((blob) => {
         if (blob) {
           resolve(blob);
         } else {
-          reject(new Error('Failed to convert canvas to blob'));
+          reject(new Error(`canvas.toBlob devolvió null para ${mimeType}`));
         }
       }, mimeType, quality);
     });
-    
   } catch (error) {
-    console.error('Error with canvas conversion:', error);
-    // Final fallback to JPEG
+    console.warn(`canvasToBlob falló para ${mimeType}, cayendo a JPEG:`, error.message || error);
     return canvasToBlob_fallback(canvas, 'image/jpeg', quality);
   }
 }

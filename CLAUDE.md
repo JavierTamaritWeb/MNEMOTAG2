@@ -106,6 +106,6 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 
 ## Versioning and commits
 
-**Current version: v3.3.3** (patch release: tanda de seguridad — fix XSS latente en los toasts de UIManager, eliminación de código muerto duplicado en SecurityManager y MetadataManager). Sources kept in sync: `index.html` `<title>`, `README.md` badge + NOVEDADES heading, `CHANGELOG.md` header + footer + topmost entry, and `docs/INDICE_DOCUMENTACION.md`. Note: `docs/RESUMEN_VERSIONES.md` is a hand-curated historical table that still marks `v3.1.4` as "Actual" — it has not been updated in the bump and would need a dedicated entry with narrative. `git log` remains the authoritative source for the actual commit version.
+**Current version: v3.3.4** (patch release: bugs latentes y limpieza — límite de memoria en history-manager, timeout en loadFont, eliminación del test prematuro de canvasToBlob, borrado de pauseAll/resumeAll). Sources kept in sync: `index.html` `<title>`, `README.md` badge + NOVEDADES heading, `CHANGELOG.md` header + footer + topmost entry, and `docs/INDICE_DOCUMENTACION.md`. Note: `docs/RESUMEN_VERSIONES.md` is a hand-curated historical table that still marks `v3.1.4` as "Actual" — it has not been updated in the bump and would need a dedicated entry with narrative. `git log` remains the authoritative source for the actual commit version.
 
 Commit messages follow `Versión X.Y.Z - <descripción>` in Spanish — match this style. `CHANGELOG.md` and the docs under `docs/` are kept hand-updated per release.

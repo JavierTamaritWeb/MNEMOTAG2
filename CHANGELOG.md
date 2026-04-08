@@ -4,6 +4,31 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.3.4] - 2026-04-09
+
+### Changed
+- **`historyManager.saveState` con límite de memoria** (`js/managers/history-manager.js`). Hasta ahora `maxStates = 20` limitaba solo por **número** de estados. Pero `canvas.toDataURL()` puede ocupar 10–30 MB por estado en imágenes 4K, lo que en una sesión larga acumulaba 200–600 MB. Nuevo tope **`HISTORY_MAX_TOTAL_SIZE = 100 MB cumulativos`**: antes de hacer push del nuevo snapshot, se calcula el tamaño total y se liberan estados viejos (FIFO) hasta que el nuevo entre. Si el propio nuevo snapshot excede el tope completo, no se guarda y se emite un `console.warn`.
+- **`text-layer-manager.loadFont` con timeout** (`js/managers/text-layer-manager.js:189-201`). `document.fonts.load(...)` se envuelve ahora en `Promise.race` con un timeout de 5 segundos. Si Google Fonts está caído o lento, el race rechaza con un error que se captura en el catch externo, la fuente se omite y la app sigue funcionando. Antes la UI podía colgarse indefinidamente.
+- **`canvasToBlob` simplificada** (`js/utils/helpers.js:172-189`). Eliminado el test prematuro que creaba un canvas 1×1 vacío y testaba `toDataURL(mimeType)` para decidir si forzar JPEG. Ese test podía dar falsos negativos en navegadores con WebP/AVIF soportados y forzar JPEG cuando el formato pedido sí funcionaba. Ahora se confía en que `canvas.toBlob` devolverá `null` al callback si el formato no está soportado, lo cual rechaza la promesa y el catch externo cae a `canvasToBlob_fallback`. ~17 líneas eliminadas.
+
+### Removed
+- **`SmartDebounce.pauseAll` y `SmartDebounce.resumeAll`** (`js/utils/smart-debounce.js`). Código muerto: nadie en el proyecto las llamaba. Además `resumeAll` era un **stub** que solo hacía `console.log` — nunca volvía a ejecutar los callbacks pausados, así que en realidad ni siquiera "reanudaba". ~42 líneas eliminadas. Si en el futuro se necesita pausar/reanudar debouncing, hay que rediseñarlo guardando referencias a las funciones originales y a sus argumentos.
+
+### Added
+- **Tests de regresión** en `tests/specs/regression.spec.js` (suite `Regresión — Bugs latentes y limpieza (v3.3.4)`):
+  - `history-manager.js` define `HISTORY_MAX_TOTAL_SIZE = 100 * 1024 * 1024`.
+  - `text-layer-manager.js` envuelve `document.fonts.load` en `Promise.race` con `FONT_LOAD_TIMEOUT_MS`.
+  - `helpers.js` ya **no** contiene el test prematuro `tempCanvas.width = 1` ni `const testDataUrl = tempCanvas.toDataURL(mimeType)`.
+  - `smart-debounce.js` ya **no** define `pauseAll: function` ni `resumeAll: function`.
+
+### Verification
+- Todos los tests siguen verde con `node tests/run-in-node.js` tras los cambios.
+
+### Falsos positivos descartados de la auditoría original
+- **Punto 6** del bundle de bugs latentes (batch-manager: error en una imagen aborta el batch entero): **NO existe**. El bucle `for...of` en `processBatch` (líneas 232-259) ya tiene `try/catch` interno que continúa con la siguiente imagen si una falla. **No se tocó.**
+
+---
+
 ## [3.3.3] - 2026-04-09
 
 ### Security
@@ -1012,5 +1037,5 @@ Lanzamiento inicial de MnemoTag.
 ---
 
 **Última actualización:** 9 de abril de 2026  
-**Versión actual:** 3.3.3  
+**Versión actual:** 3.3.4  
 **Estado:** ✅ Estable y listo para producción

@@ -91,6 +91,34 @@ describe('Regresión — Escritura real de EXIF en JPEG', function () {
   });
 });
 
+describe('Regresión — Bugs latentes y limpieza (v3.3.4)', function () {
+  it('history-manager.js define el límite de memoria HISTORY_MAX_TOTAL_SIZE', async function () {
+    const src = await fetchSource('../js/managers/history-manager.js');
+    expect(src).toContain('HISTORY_MAX_TOTAL_SIZE');
+    expect(src).toContain('100 * 1024 * 1024');
+  });
+
+  it('text-layer-manager.js envuelve fonts.load en Promise.race con timeout', async function () {
+    const src = await fetchSource('../js/managers/text-layer-manager.js');
+    expect(src).toContain('Promise.race');
+    expect(src).toContain('FONT_LOAD_TIMEOUT_MS');
+    expect(src).toContain('document.fonts.load');
+  });
+
+  it('helpers.js ya no testa el formato con un canvas 1x1 vacío', async function () {
+    const src = await fetchSource('../js/utils/helpers.js');
+    // El bloque del test prematuro tenía estas líneas exactas
+    expect(src).not.toContain('tempCanvas.width = 1');
+    expect(src).not.toContain('const testDataUrl = tempCanvas.toDataURL(mimeType)');
+  });
+
+  it('smart-debounce.js ya no define pauseAll ni resumeAll', async function () {
+    const src = await fetchSource('../js/utils/smart-debounce.js');
+    expect(src).not.toContain('pauseAll: function');
+    expect(src).not.toContain('resumeAll: function');
+  });
+});
+
 describe('Regresión — XSS latente en toasts (ui-manager)', function () {
   it('ui-manager.js ya no interpola config.action.handler en onclick=', async function () {
     const src = await fetchSource('../js/managers/ui-manager.js');

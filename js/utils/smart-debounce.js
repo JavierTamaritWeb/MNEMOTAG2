@@ -269,49 +269,13 @@ const SmartDebounce = {
     };
   },
   
-  // Pausar todas las operaciones
-  pauseAll: function() {
-    const pending = this.getPendingOperations();
-    
-    // Guardar estado para poder reanudar
-    this._pausedState = {
-      timers: new Map(this.timers),
-      animationFrames: new Map(this.animationFrames)
-    };
-    
-    this.clear();
-    
-    if (this.config.enableLogging) {
-      console.log(`⏸️ SmartDebounce: Pausadas ${pending.total} operaciones`);
-    }
-    
-    return pending;
-  },
-  
-  // Reanudar operaciones pausadas
-  resumeAll: function() {
-    if (!this._pausedState) {
-      console.warn('⚠️ SmartDebounce: No hay operaciones pausadas para reanudar');
-      return;
-    }
-    
-    // Restaurar timers (con delay reducido)
-    for (const [key, timer] of this._pausedState.timers) {
-      // Reanudar con delay reducido
-      const reducedDelay = Math.max(50, this.config.defaultDelay * 0.3);
-      setTimeout(() => {
-        // Ejecutar la función original (si está disponible)
-        console.log(`🔄 SmartDebounce: Reanudando [${key}]`);
-      }, reducedDelay);
-    }
-    
-    this._pausedState = null;
-    
-    if (this.config.enableLogging) {
-      console.log('▶️ SmartDebounce: Operaciones reanudadas');
-    }
-  },
-  
+  // NOTA: las antiguas funciones `pauseAll` y `resumeAll` se eliminaron en
+  // v3.3.4 como código muerto. Nadie en el proyecto las llamaba, y `resumeAll`
+  // era además un stub: solo hacía console.log y nunca volvía a ejecutar los
+  // callbacks pausados. Si en el futuro hace falta pausar/reanudar debouncing,
+  // hay que rediseñarlo guardando referencias a las funciones originales y a
+  // sus argumentos, no solo los timer IDs.
+
   // Limpiar todos los timers y frames
   clear: function() {
     const totalCleared = this.timers.size + this.animationFrames.size;

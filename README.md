@@ -4,9 +4,22 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos.
 
-![Version](https://img.shields.io/badge/version-3.3.3-blue.svg)
+![Version](https://img.shields.io/badge/version-3.3.4-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
+
+---
+
+## ⭐ NOVEDADES v3.3.4
+
+> **Patch release.** Bugs latentes y limpieza: límite de memoria en el historial undo/redo, timeout en la carga de Google Fonts, eliminación del test prematuro de soporte de formato, borrado de código muerto en SmartDebounce.
+
+### 🛡️ Robustez
+
+- **`historyManager` con límite real de memoria**: hasta ahora solo limitaba por número de estados (máximo 20). En imágenes 4K cada snapshot del canvas puede ocupar 10–30 MB → con 20 estados llegabas a 200–600 MB de memoria del navegador, posible OOM en sesiones largas. Ahora hay un tope de **100 MB cumulativos**: cuando un nuevo snapshot no entra, se liberan los más viejos hasta que entre.
+- **`text-layer-manager.loadFont` con timeout de 5 s**: si Google Fonts está caído o lento, la UI ya no se cuelga indefinidamente esperando `document.fonts.load(...)`. Tras 5 segundos lanza un error que se captura en el catch externo y la fuente se omite (sin romper la capa de texto).
+- **`canvasToBlob` sin test prematuro**: el bloque que testaba el formato con un canvas 1×1 vacío y `toDataURL` podía dar falsos negativos en algunos navegadores con WebP/AVIF y forzar JPEG cuando ese formato sí estaba soportado. Eliminado: ahora se confía en que `canvas.toBlob` reportará el error si el formato no está soportado, y el catch externo cae a `canvasToBlob_fallback`.
+- **`smart-debounce` sin código muerto**: borradas las funciones `pauseAll` y `resumeAll` que nadie llamaba. Además `resumeAll` era un stub que ni siquiera ejecutaba los callbacks pausados.
 
 ---
 
