@@ -351,38 +351,12 @@ const MetadataManager = {
     return validation;
   },
   
-  /**
-   * Exportar metadatos a formato JSON
-   * @returns {string} Metadatos en formato JSON
-   */
-  exportToJSON: function() {
-    const metadata = this.getMetadata();
-    return JSON.stringify(metadata, null, 2);
-  },
-  
-  /**
-   * Importar metadatos desde formato JSON
-   * @param {string} jsonString - String JSON con metadatos
-   * @returns {boolean} True si se importó correctamente
-   */
-  importFromJSON: function(jsonString) {
-    try {
-      const metadata = JSON.parse(jsonString);
-      
-      // Aplicar metadatos a los campos del formulario
-      Object.entries(metadata).forEach(([key, value]) => {
-        const element = document.getElementById(`meta${key.charAt(0).toUpperCase() + key.slice(1)}`);
-        if (element && typeof value === 'string') {
-          element.value = value;
-        }
-      });
-      
-      return true;
-    } catch (error) {
-      console.error('Error al importar metadatos:', error);
-      return false;
-    }
-  },
+  // NOTA: las funciones `exportToJSON` e `importFromJSON` se eliminaron en
+  // v3.3.3 como código muerto. Nadie las llamaba en producción, e
+  // `importFromJSON` además asignaba elementos del DOM dinámicamente
+  // (`document.getElementById('meta' + ...)`) sin validación, lo cual era
+  // un patrón frágil. Si en el futuro se necesita import/export JSON,
+  // habrá que rediseñarlo con validación de campos y un esquema fijo.
 
   // ===== ESCRITURA REAL DE EXIF EN JPEG =====
   // Estas funciones requieren `piexif` (cargado por CDN en index.html).

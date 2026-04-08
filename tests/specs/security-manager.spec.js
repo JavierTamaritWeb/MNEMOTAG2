@@ -140,13 +140,7 @@ describe('SecurityManager.isValidFileBaseName', function () {
   });
 });
 
-describe('sanitizeFilename (función global)', function () {
-  it('devuelve fallback para entradas no string', function () {
-    expect(sanitizeFilename(null)).toBe('imagen_editada');
-    expect(sanitizeFilename(undefined)).toBe('imagen_editada');
-  });
-
-  it('reemplaza espacios por guiones y normaliza a minúsculas', function () {
-    expect(sanitizeFilename('Mi Foto Bonita')).toBe('mi-foto-bonita');
-  });
-});
+// Nota: la suite `sanitizeFilename (función global)` se eliminó en v3.3.3
+// junto con la función, que era código muerto duplicado de
+// `sanitizeFileBaseName` (en helpers.js). Esa última sí está testeada
+// en helpers.spec.js.

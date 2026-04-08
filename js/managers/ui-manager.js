@@ -100,16 +100,14 @@ const UIManager = {
     };
     
     this.hideError(); // Clear any existing error
-    
+
     const errorContainer = document.createElement('div');
     errorContainer.className = 'error-toast';
     errorContainer.setAttribute('data-category', config.category);
-    
-    let actionButton = '';
-    if (config.action) {
-      actionButton = `<button class="error-action" onclick="${config.action.handler}">${config.action.label}</button>`;
-    }
-    
+
+    // Construir el HTML SIN el botón de acción para evitar XSS por
+    // interpolación de config.action.handler dentro de onclick="..."
+    // (mismo patrón que se arregló en el batch listing en 3.2.12).
     errorContainer.innerHTML = `
       <div class="error-content">
         <span class="error-icon">⚠️</span>
@@ -117,11 +115,32 @@ const UIManager = {
           <span class="error-message">${typeof SecurityManager !== 'undefined' ? SecurityManager.sanitizeText(message) : message}</span>
           ${config.stackTrace ? `<details class="error-details"><summary>Detalles técnicos</summary><pre>${config.stackTrace}</pre></details>` : ''}
         </div>
-        ${actionButton}
-        <button class="error-close" onclick="this.parentElement.parentElement.remove()">×</button>
+        <button class="error-close" type="button" aria-label="Cerrar" onclick="this.parentElement.parentElement.remove()">×</button>
       </div>
     `;
-    
+
+    // Si hay action, construir el botón de forma segura con DOM API.
+    // El handler se acepta como función o (deprecado) como string que se
+    // ignora con un warning — nunca se evalúa.
+    if (config.action) {
+      const actionBtn = document.createElement('button');
+      actionBtn.type = 'button';
+      actionBtn.className = 'error-action';
+      actionBtn.textContent = String(config.action.label || 'Acción');
+      if (typeof config.action.handler === 'function') {
+        actionBtn.addEventListener('click', config.action.handler);
+      } else if (config.action.handler != null) {
+        console.warn('UIManager.showError: action.handler como string ya no se soporta (XSS). Pasa una función.');
+      }
+      const content = errorContainer.querySelector('.error-content');
+      const closeBtn = errorContainer.querySelector('.error-close');
+      if (content && closeBtn) {
+        content.insertBefore(actionBtn, closeBtn);
+      } else if (content) {
+        content.appendChild(actionBtn);
+      }
+    }
+
     document.body.appendChild(errorContainer);
     this.activeToasts.add(errorContainer);
     
@@ -165,21 +184,35 @@ const UIManager = {
     const warningContainer = document.createElement('div');
     warningContainer.className = 'warning-toast';
     warningContainer.setAttribute('data-category', config.category);
-    
-    let actionButton = '';
-    if (config.action) {
-      actionButton = `<button class="warning-action" onclick="${config.action.handler}">${config.action.label}</button>`;
-    }
-    
+
+    // HTML sin el botón de acción para evitar XSS (ver showError)
     warningContainer.innerHTML = `
       <div class="warning-content">
         <span class="warning-icon">⚠️</span>
         <span class="warning-message">${typeof SecurityManager !== 'undefined' ? SecurityManager.sanitizeText(message) : message}</span>
-        ${actionButton}
-        <button class="warning-close" onclick="this.parentElement.parentElement.remove()">×</button>
+        <button class="warning-close" type="button" aria-label="Cerrar" onclick="this.parentElement.parentElement.remove()">×</button>
       </div>
     `;
-    
+
+    if (config.action) {
+      const actionBtn = document.createElement('button');
+      actionBtn.type = 'button';
+      actionBtn.className = 'warning-action';
+      actionBtn.textContent = String(config.action.label || 'Acción');
+      if (typeof config.action.handler === 'function') {
+        actionBtn.addEventListener('click', config.action.handler);
+      } else if (config.action.handler != null) {
+        console.warn('UIManager.showWarning: action.handler como string ya no se soporta (XSS). Pasa una función.');
+      }
+      const content = warningContainer.querySelector('.warning-content');
+      const closeBtn = warningContainer.querySelector('.warning-close');
+      if (content && closeBtn) {
+        content.insertBefore(actionBtn, closeBtn);
+      } else if (content) {
+        content.appendChild(actionBtn);
+      }
+    }
+
     document.body.appendChild(warningContainer);
     this.activeToasts.add(warningContainer);
     
@@ -223,21 +256,35 @@ const UIManager = {
     const successContainer = document.createElement('div');
     successContainer.className = 'success-toast';
     successContainer.setAttribute('data-category', config.category);
-    
-    let actionButton = '';
-    if (config.action) {
-      actionButton = `<button class="success-action" onclick="${config.action.handler}">${config.action.label}</button>`;
-    }
-    
+
+    // HTML sin el botón de acción para evitar XSS (ver showError)
     successContainer.innerHTML = `
       <div class="success-content">
         <span class="success-icon">${config.icon}</span>
         <span class="success-message">${typeof SecurityManager !== 'undefined' ? SecurityManager.sanitizeText(message) : message}</span>
-        ${actionButton}
-        <button class="success-close" onclick="this.parentElement.parentElement.remove()">×</button>
+        <button class="success-close" type="button" aria-label="Cerrar" onclick="this.parentElement.parentElement.remove()">×</button>
       </div>
     `;
-    
+
+    if (config.action) {
+      const actionBtn = document.createElement('button');
+      actionBtn.type = 'button';
+      actionBtn.className = 'success-action';
+      actionBtn.textContent = String(config.action.label || 'Acción');
+      if (typeof config.action.handler === 'function') {
+        actionBtn.addEventListener('click', config.action.handler);
+      } else if (config.action.handler != null) {
+        console.warn('UIManager.showSuccess: action.handler como string ya no se soporta (XSS). Pasa una función.');
+      }
+      const content = successContainer.querySelector('.success-content');
+      const closeBtn = successContainer.querySelector('.success-close');
+      if (content && closeBtn) {
+        content.insertBefore(actionBtn, closeBtn);
+      } else if (content) {
+        content.appendChild(actionBtn);
+      }
+    }
+
     document.body.appendChild(successContainer);
     this.activeToasts.add(successContainer);
     

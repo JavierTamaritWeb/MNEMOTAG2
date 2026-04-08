@@ -4,9 +4,21 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos.
 
-![Version](https://img.shields.io/badge/version-3.3.2-blue.svg)
+![Version](https://img.shields.io/badge/version-3.3.3-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
+
+---
+
+## ⭐ NOVEDADES v3.3.3
+
+> **Patch release.** Tanda de seguridad: fix XSS latente en los toasts de UIManager y eliminación de código muerto duplicado.
+
+### 🛡️ Seguridad reforzada
+
+- **Fix XSS latente en `UIManager.showError`/`showWarning`/`showSuccess`**: las tres funciones interpolaban `${config.action.handler}` dentro de `onclick="..."` en el HTML del toast. No estaba activo (ninguna llamada actual del proyecto pasaba un `action.handler`), pero el código vulnerable era exactamente el mismo patrón que el del batch que arreglamos en 3.2.12. Ahora el botón de acción se construye con `createElement` + `addEventListener` + `textContent`. Si alguien pasa un `handler` como string (estilo viejo), se ignora con un `console.warn` — nunca se ejecuta.
+- **Borrada `sanitizeFilename`** (función global de `security-manager.js`): era código muerto duplicado, peor que `sanitizeFileBaseName` de `helpers.js` que sí preserva tildes y se usa en producción.
+- **Borradas `exportToJSON` e `importFromJSON`** de `metadata-manager.js`: código muerto. `importFromJSON` además asignaba elementos del DOM dinámicamente sin validación, un patrón frágil.
 
 ---
 

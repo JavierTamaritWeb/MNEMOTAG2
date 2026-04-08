@@ -409,21 +409,13 @@ const SecurityManager = {
   }
 };
 
-// Función utilitaria para sanitizar nombres de archivo
-function sanitizeFilename(filename) {
-  if (!filename || typeof filename !== 'string') return 'imagen_editada';
-  
-  return filename
-    .toLowerCase()
-    .replace(/[^\w\s.-]/g, '') // Solo permitir letras, números, espacios, puntos y guiones
-    .replace(/\s+/g, '-')      // Reemplazar espacios con guiones
-    .replace(/-+/g, '-')       // Eliminar guiones múltiples
-    .replace(/^-+|-+$/g, '')   // Eliminar guiones al inicio y final
-    .substring(0, 100)         // Limitar longitud
-    .trim() || 'imagen_editada'; // Fallback si queda vacío
-}
+// NOTA: la antigua función global `sanitizeFilename` se eliminó en v3.3.3
+// como código muerto. Era un duplicado peor que `sanitizeFileBaseName` de
+// `js/utils/helpers.js` (que sí preserva tildes y eñes y se usa de verdad
+// en `main.js`). Para sanitizar nombres de archivo, usar `sanitizeFileBaseName`
+// y `SecurityManager.isValidFileBaseName`.
 
 // Export para uso modular
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { SecurityManager, sanitizeFilename };
+  module.exports = { SecurityManager };
 }

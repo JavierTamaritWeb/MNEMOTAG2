@@ -91,6 +91,36 @@ describe('Regresión — Escritura real de EXIF en JPEG', function () {
   });
 });
 
+describe('Regresión — XSS latente en toasts (ui-manager)', function () {
+  it('ui-manager.js ya no interpola config.action.handler en onclick=', async function () {
+    const src = await fetchSource('../js/managers/ui-manager.js');
+
+    // Patrón vulnerable que existía antes del fix
+    expect(src).not.toMatch(/onclick="\$\{config\.action\.handler\}"/);
+    expect(src).not.toContain('${config.action.handler}');
+  });
+
+  it('ui-manager.js construye los botones de acción con DOM API segura', async function () {
+    const src = await fetchSource('../js/managers/ui-manager.js');
+
+    // Después del fix debe haber createElement + addEventListener + textContent
+    expect(src).toContain("createElement('button')");
+    expect(src).toContain("addEventListener('click', config.action.handler)");
+    expect(src).toContain('actionBtn.textContent');
+  });
+
+  it('security-manager.js ya no define la función global sanitizeFilename', async function () {
+    const src = await fetchSource('../js/managers/security-manager.js');
+    expect(src).not.toContain('function sanitizeFilename');
+  });
+
+  it('metadata-manager.js ya no define exportToJSON ni importFromJSON', async function () {
+    const src = await fetchSource('../js/managers/metadata-manager.js');
+    expect(src).not.toContain('exportToJSON: function');
+    expect(src).not.toContain('importFromJSON: function');
+  });
+});
+
 describe('Regresión — Conversión de formato JPEG con alpha', function () {
   it('helpers.js ya NO fuerza PNG cuando hay alpha y se pidió JPEG', async function () {
     const src = await fetchSource('../js/utils/helpers.js');

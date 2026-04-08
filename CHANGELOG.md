@@ -4,6 +4,28 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.3.3] - 2026-04-09
+
+### Security
+- **Fix XSS latente en `UIManager.showError`/`showWarning`/`showSuccess`** (`js/managers/ui-manager.js:108,169,227`). Las tres funciones interpolaban `${config.action.handler}` dentro de un atributo `onclick="..."` en el HTML del toast. **No estaba activo** (ninguna llamada del proyecto pasaba hoy un `action.handler` — la única referencia era una línea comentada en `metadata-manager.js:146`), pero el código vulnerable era exactamente el mismo patrón que el del batch que arreglamos en 3.2.12. **Refactor**: construir el botón de acción con `createElement` + `addEventListener` + `textContent` después del `appendChild`. El `handler` solo se ejecuta si es una `function`; si llega como string, se ignora con un `console.warn` (compatibilidad con código antiguo, sin evaluarlo).
+
+### Removed
+- **`sanitizeFilename` (función global)** de `js/managers/security-manager.js`. Era código muerto duplicado: nadie en producción la llamaba (`main.js` usa `sanitizeFileBaseName` de `helpers.js`, que es mejor — preserva tildes y eñes con un regex específico). Quitada también del `module.exports`.
+- **`exportToJSON` e `importFromJSON`** de `js/managers/metadata-manager.js:354-385`. Ambas eran código muerto. `importFromJSON` además era un patrón frágil porque asignaba elementos del DOM dinámicamente (`document.getElementById('meta' + key)`) sin validación de campos.
+- **Suite de tests `sanitizeFilename (función global)`** de `tests/specs/security-manager.spec.js`, eliminada junto con la función.
+
+### Added
+- **Tests de regresión** en `tests/specs/regression.spec.js` (suite `Regresión — XSS latente en toasts`):
+  - `ui-manager.js` ya **no** interpola `config.action.handler` en `onclick=`.
+  - `ui-manager.js` **sí** usa `createElement('button')` + `addEventListener('click'` + `textContent`.
+  - `security-manager.js` ya **no** define `sanitizeFilename`.
+  - `metadata-manager.js` ya **no** define `exportToJSON` ni `importFromJSON`.
+
+### Verification
+- Todos los tests siguen verde con `node tests/run-in-node.js` tras los cambios.
+
+---
+
 ## [3.3.2] - 2026-04-08
 
 ### Fixed
@@ -989,6 +1011,6 @@ Lanzamiento inicial de MnemoTag.
 
 ---
 
-**Última actualización:** 8 de abril de 2026  
-**Versión actual:** 3.3.2  
+**Última actualización:** 9 de abril de 2026  
+**Versión actual:** 3.3.3  
 **Estado:** ✅ Estable y listo para producción
