@@ -106,6 +106,6 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 
 ## Versioning and commits
 
-**The version number is partially desynchronized.** `index.html:6` `<title>` is kept in sync with the latest commit version (`v3.2.16` at the time of writing) during each cleanup pass, but `README.md` and `CHANGELOG.md` still say `3.1.4`. `git log` is the most up-to-date source. If you cut a real release, sync `README.md`, `CHANGELOG.md`, and `docs/INDICE_DOCUMENTACION.md` to match.
+**Current version: v3.3.0** (minor release that consolidates the changes accumulated in 3.2.12–3.2.17). Sources kept in sync: `index.html` `<title>`, `README.md` badge + NOVEDADES heading, `CHANGELOG.md` header + footer + topmost entry, and `docs/INDICE_DOCUMENTACION.md`. Note: `docs/RESUMEN_VERSIONES.md` is a hand-curated historical table that still marks `v3.1.4` as "Actual" — it has not been updated in the bump and would need a dedicated entry with narrative for `v3.3.0`. `git log` remains the authoritative source for the actual commit version.
 
 Commit messages follow `Versión X.Y.Z - <descripción>` in Spanish — match this style. `CHANGELOG.md` and the docs under `docs/` are kept hand-updated per release.

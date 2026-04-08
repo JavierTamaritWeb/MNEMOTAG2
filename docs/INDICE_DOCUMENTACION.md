@@ -1,7 +1,7 @@
-# 📚 Índice Completo de Documentación - MNEMOTAG v3.1.4
+# 📚 Índice Completo de Documentación - MNEMOTAG v3.3.0
 
-**Versión**: 3.1.4  
-**Fecha**: 17 de Noviembre de 2025  
+**Versión**: 3.3.0  
+**Fecha**: 8 de abril de 2026  
 **Autor**: Javier Tamarit
 
 ---
@@ -328,8 +328,8 @@ Para reportar errores o sugerir mejoras en la documentación, abre un issue en G
 
 ---
 
-**Última actualización**: 16 de Octubre de 2025  
-**Versión del documento**: 1.0  
+**Última actualización**: 8 de abril de 2026  
+**Versión del documento**: 1.1  
 
-✨ **Documentación completa y actualizada para MNEMOTAG v3.1.3** ✨
+✨ **Documentación completa y actualizada para MNEMOTAG v3.3.0** ✨
 

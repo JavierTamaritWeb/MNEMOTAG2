@@ -1,6 +1,22 @@
-# 📝 CHANGELOG - MNEMOTAG v3.2
+# 📝 CHANGELOG - MNEMOTAG v3.3
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
+
+---
+
+## [3.3.0] - 2026-04-08
+
+### Notes
+- **Release minor estable.** v3.3.0 promueve a una línea de versión menor todos los cambios significativos acumulados en 3.2.12–3.2.17. **No introduce funcionalidad nueva propia**: el bump refleja que la suma de cambios previos justifica un release minor según semver.
+- Hitos consolidados desde v3.2.x:
+  - **Escritura real de EXIF en JPEG** vía `piexifjs@1.0.6` (3.2.15).
+  - **Suite de tests automatizados** con 67 tests y dos runners (browser + Node, ambos sin npm) (3.2.12, 3.2.14).
+  - **Fix XSS crítico** en el listado del procesamiento por lotes (3.2.12).
+  - **Worker pool resucitado** tras corregir el path del script (3.2.12).
+  - **Strict mode** activado en los 16 managers/utils (3.2.13).
+  - **Limpieza HTML Tier 1**: `maxlength`, `min`/`max`, `aria-label` (3.2.12).
+  - **Documentación interna**: nuevo `CLAUDE.md` para futuras instancias del agente (3.2.12).
+- Para el detalle de cada cambio, consultar las entradas `[3.2.12]` a `[3.2.17]` más abajo.
 
 ---
 
@@ -928,5 +944,5 @@ Lanzamiento inicial de MnemoTag.
 ---
 
 **Última actualización:** 8 de abril de 2026  
-**Versión actual:** 3.2.16  
+**Versión actual:** 3.3.0  
 **Estado:** ✅ Estable y listo para producción
