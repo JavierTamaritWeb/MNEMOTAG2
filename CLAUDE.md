@@ -11,7 +11,10 @@ MnemoTag is a **client-side, single-page** image editor (vanilla JS, no framewor
 There is no `package.json`, no bundler, no test framework. The app is a static site:
 
 - **Run locally:** open `index.html` directly in a browser, or use the VS Code Live Server extension (configured to port 5505 in `.vscode/settings.json`).
-- **No build, no lint.** Tests live in `tests/` and run as a static HTML page: serve the project root with Live Server and open `http://localhost:5505/tests/index.html`. The runner is a ~250-line custom mini-framework (`tests/test-runner.js`) with no dependencies. Specs cover `AppConfig`, `helpers`, `SecurityManager`, `MetadataManager`, `historyManager`, plus regression tests for the XSS-in-batch / worker-path / falsy-metadata-toast bugs that were fixed in this codebase. The regression tests use `fetch()` to read source files, so they only work when served via HTTP (not `file://`).
+- **No build, no lint.** Tests live in `tests/` and have **two runners** that share the same specs:
+  - **Browser runner (authoritative).** `tests/index.html` + `tests/test-runner.js` (~250-line custom mini-framework, zero dependencies). Serve the project root with Live Server and open `http://localhost:5505/tests/index.html`. This is the source of truth — it executes against a real DOM, real Canvas, real `fetch()`. Use it before any release.
+  - **Node runner (fast / CI / agent-friendly).** `tests/run-in-node.js` runs the same `tests/specs/*.spec.js` files inside a `vm.createContext` with minimal polyfills (`document`, `localStorage`, `performance`, and `fetch` aliased to `fs.readFileSync`). Command: `node tests/run-in-node.js`. Finishes in ~80 ms. No npm, no `package.json`, no `node_modules` — uses only Node's built-in `fs`/`path`/`vm`. Use it as a smoke check before committing, or from any agent that doesn't have a browser. **Caveat:** because the DOM is stubbed, any future test that touches a real `Canvas` 2D context, real layout, or live event dispatch will pass in Node but only the browser runner can truly verify it.
+  - Specs cover `AppConfig`, `helpers`, `SecurityManager`, `MetadataManager`, `historyManager`, plus regression tests for the XSS-in-batch / worker-path / falsy-metadata-toast bugs that were fixed in this codebase. Current count: **57 tests**, all green.
 - **External deps are CDN-loaded** in `index.html` (Tailwind 2.2.19, Font Awesome 6.4.0, JSZip 3.10.1, Google Fonts). There is nothing to `npm install`.
 - **Cache busting:** only one `<script>` currently uses a cache-busting query string — `metadata-manager.js?v=1760378841` in `index.html:1488`. Bump it (or add the same trick to other files) when a hard refresh isn't picking up changes during development.
 
@@ -91,6 +94,6 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 
 ## Versioning and commits
 
-**The version number is partially desynchronized.** `index.html:6` `<title>` is kept in sync with the latest commit version (`v3.2.13` at the time of writing) during each cleanup pass, but `README.md` and `CHANGELOG.md` still say `3.1.4`. `git log` is the most up-to-date source. If you cut a real release, sync `README.md`, `CHANGELOG.md`, and `docs/INDICE_DOCUMENTACION.md` to match.
+**The version number is partially desynchronized.** `index.html:6` `<title>` is kept in sync with the latest commit version (`v3.2.14` at the time of writing) during each cleanup pass, but `README.md` and `CHANGELOG.md` still say `3.1.4`. `git log` is the most up-to-date source. If you cut a real release, sync `README.md`, `CHANGELOG.md`, and `docs/INDICE_DOCUMENTACION.md` to match.
 
 Commit messages follow `Versión X.Y.Z - <descripción>` in Spanish — match this style. `CHANGELOG.md` and the docs under `docs/` are kept hand-updated per release.
