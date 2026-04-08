@@ -4,6 +4,34 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.3.2] - 2026-04-08
+
+### Fixed
+- **Conversión de formato JPEG con alpha rota desde versiones anteriores.** Si el usuario cargaba un PNG con transparencia y elegía JPEG en el desplegable de formato de salida, el código sustituía silenciosamente JPEG por PNG. La sustitución solo dejaba rastro en `console.info`, invisible para el usuario común. **Causa raíz**: lógica en `js/utils/helpers.js:353-356` (función `determineFallbackFormat`) que forzaba PNG cuando había alpha y se pedía JPEG.
+- **Solución**: eliminada la lógica forzada en `determineFallbackFormat`. La función ahora respeta la elección del usuario.
+
+### Added
+- **`helpers.flattenCanvasForJpeg(canvas)`** (`js/utils/helpers.js`): nuevo helper utilitario que devuelve un canvas nuevo con fondo blanco (`#ffffff`) y el contenido del canvas original dibujado encima. Sin esto, las áreas transparentes saldrían como negro al exportar JPEG (default del codec). Con esto, el comportamiento es coherente con Photoshop/GIMP/Squoosh.
+- **Integración en `main.js`**: las dos funciones de descarga (`downloadImage` y `downloadImageWithProgress`) usan `flattenCanvasForJpeg(canvas)` en sus 4 puntos de export (cada función × las dos ramas, `showSaveFilePicker` con Blob y fallback `<a download>` con dataURL). El aplanado solo se aplica cuando `finalMimeType === 'image/jpeg'`. PNG/WebP/AVIF se exportan sin tocar el canvas, preservando alpha.
+- **Tests**:
+  - `tests/specs/helpers.spec.js`: nueva suite `helpers — flattenCanvasForJpeg` con 3 tests (función expuesta como global, dimensiones del canvas resultado, devuelve `null`/`undefined` sin tocar).
+  - `tests/specs/regression.spec.js`: nueva suite `Regresión — Conversión de formato JPEG con alpha` con 4 tests que verifican el código fuente con `fetch + grep` (ausencia del forzado a PNG, presencia del helper, presencia de las llamadas en `main.js`, condicionadas a `finalMimeType === 'image/jpeg'`).
+
+### Changed
+- **`CLAUDE.md`**: sección "Image processing pipeline" actualizada con la nota sobre el aplanado contra blanco.
+- **`js/main.js:3975-3977`**: comentario obsoleto sobre `applyMetadataToImage` siendo "un stub" eliminado. Lleva obsoleto desde v3.2.15 cuando se implementó la escritura real de EXIF en JPEG.
+
+### Verification
+- 74/74 tests OK con `node tests/run-in-node.js` tras los cambios (67 anteriores + 3 nuevos del helper + 4 nuevos de regresión).
+
+### Validación manual recomendada
+- Cargar un PNG con transparencia.
+- Seleccionar **JPEG** en el desplegable de formato de salida.
+- Descargar.
+- Verificar que el archivo descargado es `.jpg` y que las áreas que eran transparentes salen blancas.
+
+---
+
 ## [3.3.1] - 2026-04-08
 
 ### Changed
@@ -962,5 +990,5 @@ Lanzamiento inicial de MnemoTag.
 ---
 
 **Última actualización:** 8 de abril de 2026  
-**Versión actual:** 3.3.1  
+**Versión actual:** 3.3.2  
 **Estado:** ✅ Estable y listo para producción

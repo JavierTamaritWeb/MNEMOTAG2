@@ -86,3 +86,26 @@ describe('helpers — debounce', function () {
     });
   });
 });
+
+describe('helpers — flattenCanvasForJpeg', function () {
+  it('está expuesto como función global', function () {
+    expect(typeof flattenCanvasForJpeg).toBe('function');
+  });
+
+  it('devuelve un canvas con las mismas dimensiones que el original', function () {
+    // En el runner Node, document.createElement devuelve un stub. Solo
+    // podemos verificar que la función no falla y devuelve algo con
+    // width/height copiadas. La verificación visual del fondo blanco
+    // requiere browser real.
+    const fakeCanvas = { width: 800, height: 600 };
+    const result = flattenCanvasForJpeg(fakeCanvas);
+    expect(result).toBeDefined();
+    expect(result.width).toBe(800);
+    expect(result.height).toBe(600);
+  });
+
+  it('devuelve el input sin cambios si recibe null/undefined', function () {
+    expect(flattenCanvasForJpeg(null)).toBeNull();
+    expect(flattenCanvasForJpeg(undefined)).toBeUndefined();
+  });
+});

@@ -4,9 +4,21 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos.
 
-![Version](https://img.shields.io/badge/version-3.3.1-blue.svg)
+![Version](https://img.shields.io/badge/version-3.3.2-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
+
+---
+
+## ⭐ NOVEDADES v3.3.2
+
+> **Patch release.** Fix de la conversión de formato: PNG con transparencia → JPEG ahora respeta la elección del usuario y aplana contra blanco.
+
+### 🐛 Conversión de formato JPEG arreglada
+
+- **Antes**: cargabas un PNG con transparencia, elegías JPEG en el desplegable de salida, descargabas… y el archivo salía como **PNG**, sin avisar. La sustitución era completamente silenciosa (solo un `console.info` invisible).
+- **Ahora**: el código respeta tu elección de formato. Si pides JPEG sobre un PNG con transparencia, **te da JPEG**, aplanando las áreas transparentes contra blanco (igual que Photoshop, GIMP, Squoosh).
+- **Por dentro**: nuevo helper `flattenCanvasForJpeg(canvas)` en `js/utils/helpers.js` que devuelve un canvas nuevo con fondo blanco más el contenido original encima. Se invoca desde los 4 puntos del flujo de descarga (`downloadImage` y `downloadImageWithProgress`, cada uno con la rama `showSaveFilePicker` y la rama fallback `<a download>`) **solo cuando el formato elegido es JPEG**. PNG/WebP/AVIF siguen preservando alpha sin tocar.
 
 ---
 

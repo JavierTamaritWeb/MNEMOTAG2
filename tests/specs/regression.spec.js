@@ -90,3 +90,34 @@ describe('Regresión — Escritura real de EXIF en JPEG', function () {
     expect(src).toContain('embedExifInJpegBlob');
   });
 });
+
+describe('Regresión — Conversión de formato JPEG con alpha', function () {
+  it('helpers.js ya NO fuerza PNG cuando hay alpha y se pidió JPEG', async function () {
+    const src = await fetchSource('../js/utils/helpers.js');
+    // El bug original tenía esta línea exacta — debe haber sido eliminada
+    expect(src).not.toContain("if (hasAlpha && (preferredFormat === 'image/jpeg'))");
+    expect(src).not.toContain('JPEG no soporta transparencia, usando PNG');
+  });
+
+  it('helpers.js define la función flattenCanvasForJpeg', async function () {
+    const src = await fetchSource('../js/utils/helpers.js');
+    expect(src).toContain('function flattenCanvasForJpeg');
+    // Verifica que el aplanado usa fondo blanco (#ffffff)
+    expect(src).toContain("flatCtx.fillStyle = '#ffffff'");
+  });
+
+  it('main.js usa flattenCanvasForJpeg en al menos 4 puntos del flujo de descarga', async function () {
+    const src = await fetchSource('../js/main.js');
+    // Hay 4 puntos: downloadImage (showSaveFilePicker + fallback) y
+    // downloadImageWithProgress (showSaveFilePicker + fallback).
+    const matches = src.match(/flattenCanvasForJpeg\(canvas\)/g) || [];
+    expect(matches.length).toBeGreaterThan(3);
+  });
+
+  it('main.js condiciona el aplanado a finalMimeType === image/jpeg', async function () {
+    const src = await fetchSource('../js/main.js');
+    // El patrón ternario debe estar presente para no aplicar flatten en
+    // PNG/WebP/AVIF
+    expect(src).toContain("(finalMimeType === 'image/jpeg')");
+  });
+});

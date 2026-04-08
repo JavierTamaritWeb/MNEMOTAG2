@@ -319,19 +319,30 @@ async function supportsEncode(mimeType) {
 }
 
 /**
- * Determinar formato de fallback basado en transparencia y soporte DE EXPORTACIÓN
- * @param {boolean} hasAlpha - Si la imagen tiene canal alpha
+ * Determinar formato de fallback basado en soporte DE EXPORTACIÓN del navegador.
+ *
+ * Nota importante (cambio en v3.3.2): la lógica anterior forzaba PNG cuando
+ * el formato preferido era JPEG y la imagen tenía canal alpha. Eso rompía la
+ * conversión de formato (PNG transparente → JPG quedaba como PNG, sin avisar).
+ * Ahora se RESPETA la elección del usuario; el aplanado contra blanco para
+ * JPEG se hace en main.js antes de invocar canvas.toBlob/toDataURL, vía
+ * `flattenCanvasForJpeg(canvas)`.
+ *
+ * @param {boolean} hasAlpha - Si la imagen tiene canal alpha (se mantiene en
+ *                             la firma por compatibilidad y para los fallbacks
+ *                             de AVIF/WebP no soportados, donde sí se elige
+ *                             PNG vs JPEG según transparencia).
  * @param {string} preferredFormat - Formato preferido
  * @returns {Promise<string>} Formato final a usar
  */
 async function determineFallbackFormat(hasAlpha, preferredFormat = 'image/jpeg') {
   // Primero verificar si el formato preferido soporta EXPORTACIÓN
   const supportsExport = await supportsEncode(preferredFormat);
-  
+
   // Si el formato preferido NO se puede exportar, buscar alternativas
   if (!supportsExport) {
     console.info(`Formato ${preferredFormat} no soporta exportación, buscando alternativa...`);
-    
+
     // Cadena de fallback para exportación
     if (preferredFormat === 'image/avif') {
       // AVIF → WebP → PNG/JPEG
@@ -349,14 +360,39 @@ async function determineFallbackFormat(hasAlpha, preferredFormat = 'image/jpeg')
     }
   }
 
-  // Si necesita alpha y el formato no lo soporta, usar PNG
-  if (hasAlpha && (preferredFormat === 'image/jpeg')) {
-    console.info('JPEG no soporta transparencia, usando PNG');
-    return 'image/png';
-  }
-
-  // Si llegamos aquí, el formato preferido es viable
+  // Respetar la elección del usuario. Si pidió JPEG con alpha, el aplanado
+  // ocurre en main.js justo antes del export, no aquí.
   return preferredFormat;
+}
+
+/**
+ * Aplana un canvas con transparencia contra un fondo blanco, devolviendo un
+ * canvas nuevo apto para exportar como JPEG sin que las áreas transparentes
+ * salgan en negro (default del codec JPEG).
+ *
+ * Este helper se usa en el flujo de descarga de main.js cuando el formato
+ * elegido es JPEG. No se aplica a PNG/WebP/AVIF, que sí preservan alpha.
+ *
+ * @param {HTMLCanvasElement} canvas - Canvas original (con o sin transparencia)
+ * @returns {HTMLCanvasElement} Canvas nuevo con fondo blanco + contenido encima
+ */
+function flattenCanvasForJpeg(canvas) {
+  if (!canvas) return canvas;
+  const flat = document.createElement('canvas');
+  flat.width = canvas.width;
+  flat.height = canvas.height;
+  const flatCtx = flat.getContext('2d');
+  // Defensivo: en entornos donde getContext devuelve null (tests con stubs,
+  // browsers obsoletos sin Canvas2D), degradamos elegantemente devolviendo
+  // el canvas original sin tocar. En producción esto no debería ocurrir.
+  if (!flatCtx) return canvas;
+  // Fondo blanco (color de aplanado por defecto, coherente con Photoshop/GIMP)
+  flatCtx.fillStyle = '#ffffff';
+  flatCtx.fillRect(0, 0, flat.width, flat.height);
+  // Imagen original encima, preservando alpha original (que se aplanará al
+  // exportar como JPEG porque el codec descarta el canal alpha).
+  flatCtx.drawImage(canvas, 0, 0);
+  return flat;
 }
 
 /**
@@ -397,6 +433,7 @@ if (typeof module !== 'undefined' && module.exports) {
     supportsDecode,
     supportsEncode,
     determineFallbackFormat,
-    hasImageAlphaChannel
+    hasImageAlphaChannel,
+    flattenCanvasForJpeg
   };
 }

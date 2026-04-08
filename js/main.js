@@ -3972,14 +3972,16 @@
           UIManager.showInfo(`📄 Exportando en ${actualFormat} para máxima compatibilidad (solicitado: ${requestedFormat})`);
         }
         
-        // Persistir los datos del formulario en localStorage para recordarlos
-        // entre sesiones. NO se incrustan en el archivo descargado: la escritura
-        // real de EXIF/XMP no está implementada (applyMetadataToImage es un stub).
+        // Persistir los datos del formulario en localStorage (para recordarlos
+        // entre sesiones) y registrar la intención de embedding EXIF.
+        // Desde v3.2.15, los metadatos SE INCRUSTAN realmente en JPEG vía
+        // piexifjs (en embedExifInJpegBlob/DataUrl, llamado más abajo).
+        // Para PNG/WebP/AVIF siguen sin metadatos (limitación de piexifjs).
         const metadata = MetadataManager.getMetadata();
         MetadataManager.applyMetadataToImage(canvas);
 
         if (metadata.title || metadata.author || metadata.copyright || metadata.latitude) {
-          console.log('Datos del formulario de metadatos (solo localStorage):', metadata);
+          console.log('Datos del formulario de metadatos:', metadata);
         }
         
         // Obtener el título y sanitizar el nombre del archivo
@@ -4031,7 +4033,13 @@
             // La API recordará la ubicación automáticamente
             
             const writable = await handle.createWritable();
-            let blob = await canvasToBlob(canvas, finalMimeType, outputQuality);
+            // Si exportamos a JPEG, aplanar el canvas contra blanco para que
+            // las áreas transparentes no salgan negras (default del codec JPEG).
+            // Para PNG/WebP/AVIF se preserva el alpha original.
+            const sourceCanvas = (finalMimeType === 'image/jpeg')
+              ? flattenCanvasForJpeg(canvas)
+              : canvas;
+            let blob = await canvasToBlob(sourceCanvas, finalMimeType, outputQuality);
             // Embeber EXIF si es JPEG (no-op para otros formatos o sin metadatos)
             blob = await MetadataManager.embedExifInJpegBlob(blob);
             await writable.write(blob);
@@ -4055,9 +4063,13 @@
         // Fallback para navegadores que no soportan la API o si falla
         const link = document.createElement('a');
         link.download = fullFilename;
+        // Mismo aplanado para JPEG en el camino fallback
+        const fallbackCanvas = (finalMimeType === 'image/jpeg')
+          ? flattenCanvasForJpeg(canvas)
+          : canvas;
         // Embeber EXIF si es JPEG (no-op para otros formatos o sin metadatos)
         link.href = MetadataManager.embedExifInJpegDataUrl(
-          canvas.toDataURL(finalMimeType, outputQuality)
+          fallbackCanvas.toDataURL(finalMimeType, outputQuality)
         );
 
         // Simular click
@@ -4802,7 +4814,11 @@
             // La API recordará la ubicación automáticamente
             
             const writable = await handle.createWritable();
-            let blob = await canvasToBlob(canvas, finalMimeType, outputQuality);
+            // Aplanado contra blanco si exportamos JPEG (igual que en downloadImage)
+            const sourceCanvas = (finalMimeType === 'image/jpeg')
+              ? flattenCanvasForJpeg(canvas)
+              : canvas;
+            let blob = await canvasToBlob(sourceCanvas, finalMimeType, outputQuality);
             // Embeber EXIF si es JPEG (no-op para otros formatos o sin metadatos)
             blob = await MetadataManager.embedExifInJpegBlob(blob);
             await writable.write(blob);
@@ -4830,9 +4846,13 @@
         // Fallback para navegadores que no soportan la API o si falla
         const link = document.createElement('a');
         link.download = fullFilename;
+        // Aplanado contra blanco si exportamos JPEG (igual que en downloadImage)
+        const fallbackCanvas = (finalMimeType === 'image/jpeg')
+          ? flattenCanvasForJpeg(canvas)
+          : canvas;
         // Embeber EXIF si es JPEG (no-op para otros formatos o sin metadatos)
         link.href = MetadataManager.embedExifInJpegDataUrl(
-          canvas.toDataURL(finalMimeType, outputQuality)
+          fallbackCanvas.toDataURL(finalMimeType, outputQuality)
         );
         
         // Simular click
