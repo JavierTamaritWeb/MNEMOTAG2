@@ -91,6 +91,53 @@ describe('Regresión — Escritura real de EXIF en JPEG', function () {
   });
 });
 
+describe('Regresión — WebP EXIF real con manipulación RIFF/VP8X (v3.3.7)', function () {
+  it('metadata-manager.js define los métodos de embedding WebP', async function () {
+    const src = await fetchSource('../js/managers/metadata-manager.js');
+    expect(src).toContain('embedExifInWebpBlob');
+    expect(src).toContain('embedExifInWebpDataUrl');
+    expect(src).toContain('_parseWebpDimensions');
+    expect(src).toContain('_buildVp8xChunk');
+    expect(src).toContain('_buildRiffExifChunk');
+    expect(src).toContain('_addExifToVp8xWebp');
+    expect(src).toContain('_convertSimpleWebpToVp8xWithExif');
+  });
+
+  it('metadata-manager.js maneja los 3 tipos de chunk WebP (VP8/VP8L/VP8X)', async function () {
+    const src = await fetchSource('../js/managers/metadata-manager.js');
+    expect(src).toContain("type === 'VP8X'");
+    expect(src).toContain("type === 'VP8 '");
+    expect(src).toContain("type === 'VP8L'");
+  });
+
+  it('metadata-manager.js setea el flag EXIF (bit 3) en VP8X', async function () {
+    const src = await fetchSource('../js/managers/metadata-manager.js');
+    // El bit EXIF en VP8X es 0x08
+    expect(src).toContain('0x08');
+  });
+
+  it('metadata-manager.js valida el resultado WebP antes de devolverlo', async function () {
+    const src = await fetchSource('../js/managers/metadata-manager.js');
+    // Tras la generación, debe verificar que el resultado sigue empezando por
+    // los bytes 'RIFF' (0x52 0x49 0x46 0x46) y contiene 'WEBP' en bytes 8-11.
+    expect(src).toContain('0x52');
+    expect(src).toContain('0x57');
+    expect(src).toContain('no parece WebP válido, devolviendo original');
+  });
+
+  it('main.js llama a embedExifInWebpBlob en el flujo de descarga', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('MetadataManager.embedExifInWebpBlob');
+    const matches = src.match(/MetadataManager\.embedExifInWebpBlob/g) || [];
+    expect(matches.length).toBeGreaterThan(1);
+  });
+
+  it('main.js llama a embedExifInWebpDataUrl en el camino fallback', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('MetadataManager.embedExifInWebpDataUrl');
+  });
+});
+
 describe('Regresión — PNG EXIF real con chunks eXIf (v3.3.6)', function () {
   it('helpers.js define la utilidad crc32 con tabla de lookup', async function () {
     const src = await fetchSource('../js/utils/helpers.js');

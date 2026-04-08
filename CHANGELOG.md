@@ -4,6 +4,42 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.3.7] - 2026-04-09
+
+### Added
+- **EXIF real para WebP** (`js/managers/metadata-manager.js`). Sin librerías externas, sin npm. Manipulación binaria a mano del contenedor RIFF + conversión automática de WebP "simple" (`VP8 ` lossy o `VP8L` lossless) a WebP extended (`VP8X`) para poder añadir el chunk `EXIF`.
+- **Nuevos métodos en `MetadataManager`**:
+  - `_parseWebpDimensions(bytes)`: detecta el tipo de chunk del WebP (VP8/VP8L/VP8X) y extrae width, height y `hasAlpha` del bitstream o del header VP8X. Maneja los 3 tipos.
+  - `_buildVp8xChunk(width, height, hasExif, hasAlpha)`: construye un chunk `VP8X` de 18 bytes (FourCC 'VP8X' + size=10 + flags + reserved + canvas_width-1 + canvas_height-1).
+  - `_buildRiffExifChunk(tiffBytes)`: construye un chunk RIFF EXIF con padding par. Reutiliza el bloque TIFF que genera `piexif.dump()` (mismo helper `_piexifBinaryToTiffBytes` que para PNG).
+  - `_addExifToVp8xWebp(webpBytes, exifChunk)`: caso WebP que ya es VP8X. Solo añade el chunk EXIF al final y setea el bit 3 (EXIF flag) del header VP8X. Recalcula el size del RIFF principal.
+  - `_convertSimpleWebpToVp8xWithExif(webpBytes, vp8xChunk, exifChunk)`: caso WebP simple (VP8 / VP8L). Inserta el chunk VP8X delante del bitstream y el EXIF al final. Recalcula el size del RIFF.
+  - `embedExifInWebpBlob(blob)` (async) y `embedExifInWebpDataUrl(dataUrl)` (async): API pública análoga a JPEG/PNG. Defensivas.
+- **Integración en `js/main.js`** en los 4 puntos del flujo de descarga, encadenadas tras JPEG y PNG. Cada función filtra por `blob.type` y devuelve sin tocar si no es su formato.
+
+### Defensiva
+Las funciones WebP son ultra-defensivas. Validan signature RIFF/WEBP antes de manipular, validan post-generación que el resultado sigue siendo un WebP válido (magic bytes), y todo está envuelto en try/catch que devuelve el blob original ante cualquier error. **NUNCA producen un WebP corrupto.** Si en algún caso edge la conversión falla, el archivo descargado sale sin EXIF pero sin daño.
+
+### Tests
+- `tests/specs/regression.spec.js`: nueva suite `Regresión — WebP EXIF real con manipulación RIFF/VP8X (v3.3.7)` con 6 tests fetch+grep que verifican: los 7 métodos privados/públicos en metadata-manager.js, manejo de los 3 tipos VP8/VP8L/VP8X, presencia del flag EXIF (0x08), validación post-generación de bytes RIFF/WEBP, y llamadas a `embedExifInWebpBlob`/`embedExifInWebpDataUrl` desde main.js.
+
+### Verification automática
+- 100/100 tests OK con `node tests/run-in-node.js` tras los cambios (94 anteriores + 6 nuevos).
+
+### ⚠️ Validación manual OBLIGATORIA pendiente
+A diferencia de JPEG y PNG, la validación visual con un browser real es **indispensable** para WebP antes de confiar en producción. El runner Node solo verifica que el código está en su sitio, no que los WebP generados sean abribles. Pasos:
+1. Cargar una imagen en MnemoTag.
+2. Rellenar metadatos (título, autor, copyright, GPS).
+3. Seleccionar "WebP" como formato de salida.
+4. Descargar.
+5. Comprobar que el archivo `.webp` se abre sin error en cualquier visor (Preview, Finder, Chrome, etc.).
+6. Comprobar que un visor EXIF (Apple Preview Info → "Más info" → Exif, exiftool, exif.tools) muestra los tags `Image Description`, `Artist`, `Copyright`, `GPS Latitude/Longitude`.
+7. Repetir con un PNG de origen (lossless WebP de salida) y con un JPG de origen (lossy WebP de salida) para cubrir VP8 y VP8L.
+
+Si algún caso falla, las funciones están preparadas para degradar elegantemente devolviendo el blob original — el archivo saldrá sin EXIF pero sin corrupción.
+
+---
+
 ## [3.3.6] - 2026-04-09
 
 ### Added
@@ -1082,5 +1118,5 @@ Lanzamiento inicial de MnemoTag.
 ---
 
 **Última actualización:** 9 de abril de 2026  
-**Versión actual:** 3.3.6  
+**Versión actual:** 3.3.7  
 **Estado:** ✅ Estable y listo para producción

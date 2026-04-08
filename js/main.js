@@ -4104,7 +4104,8 @@
             // Embeber EXIF según formato. Cada función es defensiva: si no es
             // su formato o no hay metadatos, devuelve el blob original.
             blob = await MetadataManager.embedExifInJpegBlob(blob);
-            blob = await MetadataManager.embedExifInPngBlob(blob); // v3.3.6
+            blob = await MetadataManager.embedExifInPngBlob(blob);  // v3.3.6
+            blob = await MetadataManager.embedExifInWebpBlob(blob); // v3.3.7
             await writable.write(blob);
             await writable.close();
 
@@ -4134,12 +4135,14 @@
         const fallbackCanvas = (finalMimeType === 'image/jpeg')
           ? flattenCanvasForJpeg(canvas, flattenColorFallback)
           : canvas;
-        // Embeber EXIF en JPEG (sync) o PNG (async). Solo aplica al formato real.
+        // Embeber EXIF según formato. JPEG es sync, PNG y WebP son async.
         let fallbackHref = MetadataManager.embedExifInJpegDataUrl(
           fallbackCanvas.toDataURL(finalMimeType, outputQuality)
         );
         if (finalMimeType === 'image/png') {
           fallbackHref = await MetadataManager.embedExifInPngDataUrl(fallbackHref); // v3.3.6
+        } else if (finalMimeType === 'image/webp') {
+          fallbackHref = await MetadataManager.embedExifInWebpDataUrl(fallbackHref); // v3.3.7
         }
         link.href = fallbackHref;
 
@@ -4897,7 +4900,8 @@
             let blob = await canvasToBlob(sourceCanvas, finalMimeType, outputQuality);
             // Embeber EXIF según formato
             blob = await MetadataManager.embedExifInJpegBlob(blob);
-            blob = await MetadataManager.embedExifInPngBlob(blob); // v3.3.6
+            blob = await MetadataManager.embedExifInPngBlob(blob);  // v3.3.6
+            blob = await MetadataManager.embedExifInWebpBlob(blob); // v3.3.7
             await writable.write(blob);
             await writable.close();
 
@@ -4931,12 +4935,14 @@
         const fallbackCanvas = (finalMimeType === 'image/jpeg')
           ? flattenCanvasForJpeg(canvas, flattenColorFallback)
           : canvas;
-        // Embeber EXIF en JPEG (sync) o PNG (async)
+        // Embeber EXIF según formato. JPEG es sync, PNG y WebP son async.
         let fallbackHrefP = MetadataManager.embedExifInJpegDataUrl(
           fallbackCanvas.toDataURL(finalMimeType, outputQuality)
         );
         if (finalMimeType === 'image/png') {
           fallbackHrefP = await MetadataManager.embedExifInPngDataUrl(fallbackHrefP); // v3.3.6
+        } else if (finalMimeType === 'image/webp') {
+          fallbackHrefP = await MetadataManager.embedExifInWebpDataUrl(fallbackHrefP); // v3.3.7
         }
         link.href = fallbackHrefP;
         

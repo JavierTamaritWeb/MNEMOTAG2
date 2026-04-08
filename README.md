@@ -4,9 +4,39 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos.
 
-![Version](https://img.shields.io/badge/version-3.3.6-blue.svg)
+![Version](https://img.shields.io/badge/version-3.3.7-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
+
+---
+
+## ⭐ NOVEDADES v3.3.7
+
+> **Patch release.** EXIF real para WebP (sin librerías externas, sin npm).
+
+### 🏷️ Metadatos reales también en WebP
+
+Con esta versión, **JPEG, PNG y WebP** escriben metadatos EXIF reales en el archivo descargado. Los campos del formulario (título, autor, copyright, fecha, GPS, software) se incrustan al exportar.
+
+**Cómo se hace por dentro** (manipulación binaria a mano del contenedor RIFF):
+- WebP usa el formato RIFF con chunks. Para tener metadatos EXIF necesita el header `VP8X` (extended). Si el WebP es "simple" (solo `VP8` lossy o `VP8L` lossless), MnemoTag lo **convierte a VP8X** sobre la marcha:
+  1. Parsea el bitstream para extraer las dimensiones reales (`_parseWebpDimensions` maneja los 3 tipos: VP8, VP8L y VP8X).
+  2. Construye un chunk `VP8X` (18 bytes: FourCC + size + flags + dimensiones).
+  3. Construye un chunk `EXIF` con el bloque TIFF que reutiliza `piexif.dump()`.
+  4. Re-empaqueta: `RIFF + size + WEBP + VP8X + bitstream original + EXIF`, recalculando el size del RIFF principal.
+- Si el WebP ya tenía formato VP8X, solo se añade el chunk `EXIF` al final y se setea el bit 3 (EXIF flag) del header.
+- Las funciones son **ultra-defensivas**: ante cualquier error de parsing, validación post-generación fallida, o caso edge, devuelven el blob original sin tocar. **Nunca producen un WebP corrupto.**
+
+⚠️ **Atención — validación browser indispensable**: el runner de tests Node verifica que el código está donde tiene que estar (~6 tests fetch+grep), pero **NO puede verificar visualmente** que los WebP generados sean legibles y muestren los EXIF correctamente. Antes de confiar en WebP en producción, **abre un WebP descargado por la app con un visor EXIF** (Apple Preview Info, exiftool, exif.tools online) y comprueba que los tags aparecen y que el visor lo abre sin error.
+
+### Estado de soporte EXIF por formato
+
+| Formato | EXIF | Cómo |
+|---|---|---|
+| **JPEG** | ✅ Real desde v3.2.15 | piexifjs (CDN) |
+| **PNG** | ✅ Real desde v3.3.6 | Chunks `eXIf` (manipulación binaria + crc32) |
+| **WebP** | ✅ Real desde v3.3.7 | RIFF + conversión a VP8X (manipulación binaria) |
+| **AVIF** | ❌ Pendiente | Necesitaría manipulación de ISOBMFF boxes |
 
 ---
 

@@ -781,6 +781,250 @@ const MetadataManager = {
       console.warn('No se pudo insertar EXIF en PNG (dataURL):', err);
       return dataUrl;
     }
+  },
+
+  // ===== ESCRITURA REAL DE EXIF EN WebP (v3.3.7) =====
+  // WebP usa contenedor RIFF con chunks. Para tener metadatos EXIF necesita
+  // el header VP8X (extended). Si el WebP es "simple" (solo VP8 lossy o
+  // VP8L lossless), hay que CONVERTIRLO añadiendo un chunk VP8X delante con
+  // las dimensiones reales de la imagen y los flags apropiados.
+  //
+  // Layout objetivo (extended WebP con EXIF):
+  //   RIFF [size:4] WEBP
+  //     VP8X chunk (header con flags, dimensiones)
+  //     [VP8 | VP8L]  ← bitstream original
+  //     EXIF chunk    ← chunks de metadatos al final
+  //
+  // ATENCIÓN: la manipulación binaria de WebP es delicada. Toda la lógica
+  // está envuelta en try/catch defensivo: ante cualquier error o validación
+  // fallida, las funciones devuelven el blob original sin tocar. NUNCA
+  // producen un WebP corrupto. Aún así, **la validación visual en browser
+  // real es OBLIGATORIA** antes de confiar en estos métodos en producción.
+
+  /**
+   * Lee dimensiones y tipo de un WebP a partir de sus bytes crudos.
+   * @param {Uint8Array} bytes - WebP completo (incluye RIFF header)
+   * @returns {Object|null} { width, height, type: 'VP8'|'VP8L'|'VP8X', hasAlpha }
+   */
+  _parseWebpDimensions: function(bytes) {
+    if (bytes.length < 30) return null;
+    // RIFF (52 49 46 46) ... WEBP (57 45 42 50)
+    if (bytes[0] !== 0x52 || bytes[1] !== 0x49 || bytes[2] !== 0x46 || bytes[3] !== 0x46) return null;
+    if (bytes[8] !== 0x57 || bytes[9] !== 0x45 || bytes[10] !== 0x42 || bytes[11] !== 0x50) return null;
+
+    // Primer chunk del WebP
+    const type = String.fromCharCode(bytes[12], bytes[13], bytes[14], bytes[15]);
+
+    if (type === 'VP8X') {
+      // Layout VP8X data (offset 20):
+      //   flags (1) + reserved (3) + canvas_width-1 (3 LE) + canvas_height-1 (3 LE)
+      const flags = bytes[20];
+      const width = ((bytes[24] | (bytes[25] << 8) | (bytes[26] << 16)) & 0xFFFFFF) + 1;
+      const height = ((bytes[27] | (bytes[28] << 8) | (bytes[29] << 16)) & 0xFFFFFF) + 1;
+      const hasAlpha = (flags & 0x10) !== 0;
+      return { width, height, type: 'VP8X', hasAlpha };
+    } else if (type === 'VP8 ') {
+      // VP8 lossy. El bitstream empieza en byte 20.
+      // Bytes 20-22: frame tag (3 bytes)
+      // Bytes 23-25: signature 0x9D 0x01 0x2A
+      // Bytes 26-27: width raw (low 14 bits = width)
+      // Bytes 28-29: height raw (low 14 bits = height)
+      if (bytes.length < 30) return null;
+      if (bytes[23] !== 0x9D || bytes[24] !== 0x01 || bytes[25] !== 0x2A) return null;
+      const width = (bytes[26] | (bytes[27] << 8)) & 0x3FFF;
+      const height = (bytes[28] | (bytes[29] << 8)) & 0x3FFF;
+      return { width, height, type: 'VP8', hasAlpha: false };
+    } else if (type === 'VP8L') {
+      // VP8L lossless. Byte 20 = signature 0x2F. Bytes 21-24 contienen
+      // width-1 (14 bits) | height-1 (14 bits) | alpha_used (1 bit) | version (3 bits)
+      // bit-packed little-endian.
+      if (bytes.length < 25) return null;
+      if (bytes[20] !== 0x2F) return null;
+      const b1 = bytes[21], b2 = bytes[22], b3 = bytes[23], b4 = bytes[24];
+      // width-1 = bits 0-13 = b1 (8 bits) | (b2 & 0x3F) << 8 (6 bits)
+      const width = (b1 | ((b2 & 0x3F) << 8)) + 1;
+      // height-1 = bits 14-27 = (b2 >> 6) (2 bits) | b3 << 2 (8 bits) | (b4 & 0x0F) << 10 (4 bits)
+      const height = ((b2 >> 6) | (b3 << 2) | ((b4 & 0x0F) << 10)) + 1;
+      const hasAlpha = (b4 & 0x10) !== 0;
+      return { width, height, type: 'VP8L', hasAlpha };
+    }
+
+    return null;
+  },
+
+  /**
+   * Construye un chunk VP8X (header extended WebP) de 18 bytes:
+   *   FourCC 'VP8X' (4) + size=10 (4) + flags+reserved+w+h (10)
+   */
+  _buildVp8xChunk: function(width, height, hasExif, hasAlpha) {
+    const chunk = new Uint8Array(18);
+    // FourCC 'VP8X'
+    chunk[0] = 0x56; chunk[1] = 0x50; chunk[2] = 0x38; chunk[3] = 0x58;
+    // size = 10 (LE)
+    chunk[4] = 10; chunk[5] = 0; chunk[6] = 0; chunk[7] = 0;
+    // flags
+    let flags = 0;
+    if (hasExif) flags |= 0x08;
+    if (hasAlpha) flags |= 0x10;
+    chunk[8] = flags;
+    // reserved (3 bytes)
+    chunk[9] = 0; chunk[10] = 0; chunk[11] = 0;
+    // canvas_width - 1 (3 bytes LE)
+    const w = (width - 1) & 0xFFFFFF;
+    chunk[12] = w & 0xFF;
+    chunk[13] = (w >> 8) & 0xFF;
+    chunk[14] = (w >> 16) & 0xFF;
+    // canvas_height - 1 (3 bytes LE)
+    const h = (height - 1) & 0xFFFFFF;
+    chunk[15] = h & 0xFF;
+    chunk[16] = (h >> 8) & 0xFF;
+    chunk[17] = (h >> 16) & 0xFF;
+    return chunk;
+  },
+
+  /**
+   * Construye un chunk RIFF EXIF con padding par.
+   * Estructura: [FourCC 'EXIF':4][size:4 LE][data:padded a even]
+   */
+  _buildRiffExifChunk: function(tiffBytes) {
+    const dataLen = tiffBytes.length;
+    const padded = (dataLen % 2 === 0) ? dataLen : dataLen + 1;
+    const chunk = new Uint8Array(8 + padded);
+    // FourCC 'EXIF'
+    chunk[0] = 0x45; chunk[1] = 0x58; chunk[2] = 0x49; chunk[3] = 0x46;
+    // size declarado (sin padding) en LE
+    const dv = new DataView(chunk.buffer);
+    dv.setUint32(4, dataLen, true);
+    chunk.set(tiffBytes, 8);
+    // El byte de padding (si lo hay) ya es 0 por default
+    return chunk;
+  },
+
+  /**
+   * Caso A: WebP ya extended (VP8X). Añadir el chunk EXIF al final y
+   * setear el bit EXIF en el VP8X header.
+   */
+  _addExifToVp8xWebp: function(webpBytes, exifChunk) {
+    const out = new Uint8Array(webpBytes.length + exifChunk.length);
+    out.set(webpBytes, 0);
+    // Setear bit 3 (EXIF) en flags del VP8X (byte 20)
+    out[20] = out[20] | 0x08;
+    // Añadir el chunk EXIF al final
+    out.set(exifChunk, webpBytes.length);
+    // Recalcular el size del RIFF (bytes 4-7 LE) = total - 8
+    const dv = new DataView(out.buffer);
+    dv.setUint32(4, out.length - 8, true);
+    return out;
+  },
+
+  /**
+   * Caso B: WebP simple (VP8 / VP8L). Convertir a VP8X insertando un
+   * VP8X chunk al principio y un EXIF chunk al final.
+   */
+  _convertSimpleWebpToVp8xWithExif: function(webpBytes, vp8xChunk, exifChunk) {
+    const headerLen = 12; // RIFF[4] + size[4] + WEBP[4]
+    const bitstreamPart = webpBytes.subarray(headerLen);
+    const newTotal = headerLen + vp8xChunk.length + bitstreamPart.length + exifChunk.length;
+    const out = new Uint8Array(newTotal);
+
+    // Header RIFF + size placeholder + WEBP
+    out.set(webpBytes.subarray(0, headerLen), 0);
+    // Recalcular size del RIFF
+    const dv = new DataView(out.buffer);
+    dv.setUint32(4, newTotal - 8, true);
+
+    // VP8X chunk
+    out.set(vp8xChunk, headerLen);
+    // Bitstream original (VP8 o VP8L)
+    out.set(bitstreamPart, headerLen + vp8xChunk.length);
+    // EXIF chunk al final
+    out.set(exifChunk, headerLen + vp8xChunk.length + bitstreamPart.length);
+
+    return out;
+  },
+
+  /**
+   * Inserta EXIF en un Blob WebP. Asíncrono.
+   * Defensiva: si algo falla, devuelve el blob original sin tocar.
+   * NUNCA produce un WebP corrupto.
+   */
+  embedExifInWebpBlob: async function(blob) {
+    if (typeof piexif === 'undefined') return blob;
+    if (!blob || blob.type !== 'image/webp') return blob;
+
+    try {
+      const metadata = this.getMetadata();
+      const exifObj = this.buildExifObject(metadata);
+      if (!exifObj) return blob;
+
+      const piexifBinary = piexif.dump(exifObj);
+      const tiffBytes = this._piexifBinaryToTiffBytes(piexifBinary);
+      if (!tiffBytes || tiffBytes.length === 0) return blob;
+
+      const arrayBuffer = await blob.arrayBuffer();
+      const webpBytes = new Uint8Array(arrayBuffer);
+
+      // Parsear el WebP existente
+      const dim = this._parseWebpDimensions(webpBytes);
+      if (!dim) {
+        console.warn('embedExifInWebpBlob: no se pudo parsear el WebP, devolviendo original');
+        return blob;
+      }
+
+      const exifChunk = this._buildRiffExifChunk(tiffBytes);
+
+      let newBytes;
+      if (dim.type === 'VP8X') {
+        // Ya es extended: solo añadimos EXIF y seteamos el flag
+        newBytes = this._addExifToVp8xWebp(webpBytes, exifChunk);
+      } else {
+        // VP8 o VP8L simple: convertir a VP8X con EXIF
+        const vp8xChunk = this._buildVp8xChunk(dim.width, dim.height, true, dim.hasAlpha);
+        newBytes = this._convertSimpleWebpToVp8xWithExif(webpBytes, vp8xChunk, exifChunk);
+      }
+
+      // Validación post: el resultado DEBE seguir siendo un WebP válido
+      if (newBytes[0] !== 0x52 || newBytes[1] !== 0x49 || newBytes[2] !== 0x46 || newBytes[3] !== 0x46 ||
+          newBytes[8] !== 0x57 || newBytes[9] !== 0x45 || newBytes[10] !== 0x42 || newBytes[11] !== 0x50) {
+        console.warn('embedExifInWebpBlob: resultado no parece WebP válido, devolviendo original');
+        return blob;
+      }
+
+      return new Blob([newBytes], { type: 'image/webp' });
+    } catch (err) {
+      console.warn('No se pudo insertar EXIF en WebP (blob):', err);
+      return blob;
+    }
+  },
+
+  /**
+   * Wrapper dataURL para el camino de descarga con `<a download>`.
+   */
+  embedExifInWebpDataUrl: async function(dataUrl) {
+    if (typeof piexif === 'undefined') return dataUrl;
+    if (typeof dataUrl !== 'string') return dataUrl;
+    if (!dataUrl.startsWith('data:image/webp')) return dataUrl;
+
+    try {
+      const base64 = dataUrl.split(',')[1];
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: 'image/webp' });
+
+      const newBlob = await this.embedExifInWebpBlob(blob);
+      if (newBlob === blob) return dataUrl;
+
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error || new Error('FileReader error'));
+        reader.readAsDataURL(newBlob);
+      });
+    } catch (err) {
+      console.warn('No se pudo insertar EXIF en WebP (dataURL):', err);
+      return dataUrl;
+    }
   }
 };
 
