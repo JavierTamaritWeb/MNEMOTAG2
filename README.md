@@ -4,9 +4,29 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos.
 
-![Version](https://img.shields.io/badge/version-3.3.4-blue.svg)
+![Version](https://img.shields.io/badge/version-3.3.5-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
+
+---
+
+## ⭐ NOVEDADES v3.3.5
+
+> **Patch release.** 5 mejoras de UX para el editor de marcas de agua y la conversión de formato.
+
+### 🎯 Marcas de agua más coherentes y agradables
+
+- **Auto-escala del texto según tamaño de imagen**: nuevo checkbox "Auto-escalar al tamaño de la imagen" en la sección del watermark de texto. Cuando está activo, el `size` del slider se multiplica por `canvas.width / 1000`. Resultado: un watermark con `size=24` se ve consistentemente igual de grande en una imagen 800×600 y en una 4000×3000. Antes era inconsistente.
+- **Hover state del borde guía**: cuando arrastras el ratón sobre un watermark en modo "posición personalizada", el borde guía punteado (azul para texto, naranja para imagen) se intensifica (color más saturado, grosor +1px). Antes el borde era estático y no había feedback visual de que estabas sobre un elemento arrastrable.
+
+### 🖼️ Conversión de formato más informativa y configurable
+
+- **Color de aplanado JPEG configurable**: nuevo input de color en la sección "5. Configuración de salida" → "Formato de salida". Cuando exportas un PNG con transparencia a JPEG, el color de fondo del aplanado ya no es solo blanco; puedes elegir el que quieras (negro, color de marca, etc.). Default sigue siendo blanco.
+- **Toast informativo al aplanar**: cuando descargas un PNG transparente como JPEG, ahora aparece un toast que explica explícitamente "Aplanando transparencia contra <color> para exportar a JPEG". Antes la decisión era silenciosa.
+
+### 💾 Formulario que se acuerda de ti
+
+- **Auto-guardado del formulario en localStorage**: hasta ahora solo se persistía el campo "Autor" entre sesiones. Si refrescabas accidentalmente, perdías Título, Descripción, Keywords y Copyright. Desde 3.3.5, **todos los campos textuales** se guardan automáticamente con cada cambio (debounced 500 ms) y se restauran al cargar la app. **NO se persisten** GPS (privacidad), licencia (intencionalidad) ni fecha de creación (debe coincidir con la imagen real).
 
 ---
 

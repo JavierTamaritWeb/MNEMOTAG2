@@ -91,6 +91,54 @@ describe('Regresión — Escritura real de EXIF en JPEG', function () {
   });
 });
 
+describe('Regresión — Mejoras de UX (v3.3.5)', function () {
+  it('main.js define el helper getFlattenColor', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('function getFlattenColor()');
+  });
+
+  it('main.js usa flattenCanvasForJpeg con segundo parámetro (color)', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('flattenCanvasForJpeg(canvas, flattenColor');
+  });
+
+  it('main.js incluye lógica de auto-escala del texto del watermark', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain("getElementById('watermark-auto-scale')");
+    expect(src).toContain('canvas.width / 1000');
+  });
+
+  it('main.js maneja hover state del borde guía con hoveredWatermark', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('let hoveredWatermark');
+    expect(src).toContain("hoveredWatermark === 'text'");
+    expect(src).toContain("hoveredWatermark === 'image'");
+  });
+
+  it('metadata-manager.js define setupAutoSave y persistencia ampliada', async function () {
+    const src = await fetchSource('../js/managers/metadata-manager.js');
+    expect(src).toContain('setupAutoSave: function');
+    expect(src).toContain('saveFormToLocalStorage: function');
+    expect(src).toContain('AUTOSAVE_FIELDS');
+  });
+
+  it('main.js dispara MetadataManager.setupAutoSave al inicializar', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('MetadataManager.setupAutoSave()');
+  });
+
+  it('index.html incluye el input de color de aplanado JPEG', async function () {
+    const src = await fetchSource('../index.html');
+    expect(src).toContain('id="jpeg-flatten-color"');
+    expect(src).toContain('type="color"');
+  });
+
+  it('index.html incluye el checkbox de auto-escalar texto', async function () {
+    const src = await fetchSource('../index.html');
+    expect(src).toContain('id="watermark-auto-scale"');
+  });
+});
+
 describe('Regresión — Bugs latentes y limpieza (v3.3.4)', function () {
   it('history-manager.js define el límite de memoria HISTORY_MAX_TOTAL_SIZE', async function () {
     const src = await fetchSource('../js/managers/history-manager.js');
@@ -160,15 +208,18 @@ describe('Regresión — Conversión de formato JPEG con alpha', function () {
   it('helpers.js define la función flattenCanvasForJpeg', async function () {
     const src = await fetchSource('../js/utils/helpers.js');
     expect(src).toContain('function flattenCanvasForJpeg');
-    // Verifica que el aplanado usa fondo blanco (#ffffff)
-    expect(src).toContain("flatCtx.fillStyle = '#ffffff'");
+    // Verifica que el aplanado tiene un fallback a blanco (default)
+    expect(src).toContain("'#ffffff'");
+    expect(src).toContain('flatCtx.fillStyle');
   });
 
   it('main.js usa flattenCanvasForJpeg en al menos 4 puntos del flujo de descarga', async function () {
     const src = await fetchSource('../js/main.js');
     // Hay 4 puntos: downloadImage (showSaveFilePicker + fallback) y
-    // downloadImageWithProgress (showSaveFilePicker + fallback).
-    const matches = src.match(/flattenCanvasForJpeg\(canvas\)/g) || [];
+    // downloadImageWithProgress (showSaveFilePicker + fallback). Desde
+    // v3.3.5 la función acepta un segundo parámetro (color de fondo),
+    // así que el match es por nombre + paréntesis abierto + 'canvas'.
+    const matches = src.match(/flattenCanvasForJpeg\(canvas[,)]/g) || [];
     expect(matches.length).toBeGreaterThan(3);
   });
 

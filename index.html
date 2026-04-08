@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MnemoTag v3.3.4</title>
+  <title>MnemoTag v3.3.5</title>
   
   <!-- Favicon moderno con SVG -->
   <link rel="icon" type="image/svg+xml" href="images/favicon.svg">
@@ -415,6 +415,14 @@
                         <div class="flex justify-between text-xs text-gray-500 mt-1">
                           <span class="range-label">Pequeño</span>
                           <span class="range-label">Grande</span>
+                        </div>
+                        <!-- v3.3.5: Auto-escala del texto según tamaño de imagen -->
+                        <div class="mt-2 flex items-center gap-2">
+                          <input type="checkbox" id="watermark-auto-scale" class="cursor-pointer">
+                          <label for="watermark-auto-scale" class="text-xs text-gray-600 cursor-pointer">
+                            Auto-escalar al tamaño de la imagen
+                            <span class="text-gray-400">(referencia: 1000 px de ancho)</span>
+                          </label>
                         </div>
                       </div>
                       <div class="mb-4">
@@ -857,6 +865,19 @@
                             <p id="format-fallback" class="text-xs text-amber-600 mt-1" style="display: none;"></p>
                           </div>
                         </div>
+                      </div>
+
+                      <!-- Color de aplanado para JPEG (v3.3.5) -->
+                      <div class="mt-3 flex items-center gap-3">
+                        <label for="jpeg-flatten-color" class="text-sm text-gray-700">
+                          <i class="fas fa-fill-drip mr-1"></i>
+                          Color de fondo al exportar a JPEG:
+                        </label>
+                        <input type="color"
+                               id="jpeg-flatten-color"
+                               value="#ffffff"
+                               aria-label="Color de fondo al aplanar transparencia para JPEG"
+                               title="Solo se usa cuando exportas un PNG con transparencia a JPEG. Por defecto blanco.">
                       </div>
                     </div>
 

@@ -52,6 +52,7 @@
     let textWatermarkBounds = null; // { x, y, width, height }
     let imageWatermarkBounds = null; // { x, y, width, height }
     let showPositioningBorders = true; // Controla si se muestran los bordes de guía (false al descargar)
+    let hoveredWatermark = null; // v3.3.5: 'text' | 'image' | null — para hover state visual del borde guía
     
     // Variables para sistema de Reglas Métricas
     let isRulerMode = false;
@@ -268,8 +269,12 @@
         // Configurar interceptores de errores globales
         setupGlobalErrorHandling();
         
-        // Cargar metadatos guardados
+        // Cargar metadatos guardados (v3.3.5: ahora restaura todos los
+        // campos textuales, no solo el autor)
         MetadataManager.loadSavedMetadata();
+        // Engancha los listeners para auto-guardar el formulario en cada
+        // cambio (debounced 500ms). Antes solo se guardaba al descargar.
+        MetadataManager.setupAutoSave();
         
         // Initialize character counters
         initCharacterCounters();
@@ -782,6 +787,7 @@
           { id: 'watermark-size', event: 'input' },
           { id: 'watermark-opacity', event: 'input' },
           { id: 'watermark-position', event: 'change' },
+          { id: 'watermark-auto-scale', event: 'change' }, // v3.3.5
           { id: 'watermark-image-size', event: 'change' },
           { id: 'watermark-image-opacity', event: 'input' },
           { id: 'watermark-image-position', event: 'change' },
@@ -2515,13 +2521,23 @@
         textWatermarkBounds = null; // No hay texto, limpiar bounds
         return;
       }
-      
+
       const font = document.getElementById('watermark-font').value;
       const color = document.getElementById('watermark-color').value;
-      const size = parseInt(document.getElementById('watermark-size').value);
+      let size = parseInt(document.getElementById('watermark-size').value, 10);
       const opacity = parseInt(document.getElementById('watermark-opacity').value) / 100;
       const position = document.getElementById('watermark-position').value;
-      
+
+      // v3.3.5: Auto-escala del texto según el tamaño de la imagen.
+      // Sin esto, size=24 se ve enorme en imágenes 800×600 y diminuto en 4K.
+      // Referencia: 1000 px de ancho = factor 1 (sin cambios). El tamaño
+      // mínimo aplicado es 8 px para que nunca sea ilegible.
+      const autoScaleEl = document.getElementById('watermark-auto-scale');
+      if (autoScaleEl && autoScaleEl.checked && canvas && canvas.width > 0) {
+        const factor = canvas.width / 1000;
+        size = Math.max(8, Math.round(size * factor));
+      }
+
       // Cache font configuration for better performance
       const fontConfig = `${size}px ${font}`;
       ctx.font = fontConfig;
@@ -2553,11 +2569,16 @@
       // Draw text with enhanced quality
       ctx.fillText(text, positions.x, positions.y);
       
-      // Si está en modo personalizado Y showPositioningBorders es true, dibujar borde indicador
+      // Si está en modo personalizado Y showPositioningBorders es true, dibujar borde indicador.
+      // v3.3.5: si el ratón está sobre el texto (hoveredWatermark === 'text'),
+      // el borde se pinta más intenso para feedback visual.
       if (position === 'custom' && showPositioningBorders) {
+        const isHover = hoveredWatermark === 'text';
         ctx.save();
-        ctx.strokeStyle = 'rgba(59, 130, 246, 0.5)'; // Azul semi-transparente
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = isHover
+          ? 'rgba(59, 130, 246, 0.95)'  // Azul intenso al hover
+          : 'rgba(59, 130, 246, 0.5)';   // Azul semi-transparente normal
+        ctx.lineWidth = isHover ? 3 : 2;
         ctx.setLineDash([5, 5]); // Línea punteada
         ctx.strokeRect(
           textWatermarkBounds.x - 5,
@@ -2659,12 +2680,17 @@
       
       ctx.drawImage(watermarkImg, positions.x, positions.y, width, height);
       
-      // Si está en modo personalizado Y showPositioningBorders es true, dibujar borde indicador
+      // Si está en modo personalizado Y showPositioningBorders es true, dibujar borde indicador.
+      // v3.3.5: si el ratón está sobre la imagen del watermark, intensificar
+      // el borde para feedback visual.
       if (position === 'custom' && showPositioningBorders) {
+        const isHover = hoveredWatermark === 'image';
         ctx.save();
         ctx.globalAlpha = 1; // Opacidad completa para el borde
-        ctx.strokeStyle = 'rgba(245, 158, 11, 0.7)'; // Naranja semi-transparente
-        ctx.lineWidth = 3;
+        ctx.strokeStyle = isHover
+          ? 'rgba(245, 158, 11, 1)'    // Naranja intenso al hover
+          : 'rgba(245, 158, 11, 0.7)'; // Naranja semi-transparente normal
+        ctx.lineWidth = isHover ? 4 : 3;
         ctx.setLineDash([8, 4]); // Línea punteada
         ctx.strokeRect(
           imageWatermarkBounds.x - 5,
@@ -3082,24 +3108,43 @@
         // Cambiar cursor si está sobre un elemento arrastrable
         const textPosition = document.getElementById('watermark-position')?.value;
         const imagePosition = document.getElementById('watermark-image-position')?.value;
-        
+
         if (textPosition !== 'custom' && imagePosition !== 'custom') {
           canvas.style.cursor = 'default';
+          // v3.3.5: salir de hover si cambiamos a modo no-custom
+          if (hoveredWatermark !== null) {
+            hoveredWatermark = null;
+            updatePreview();
+          }
           return;
         }
-        
+
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
         const scaleY = canvas.height / rect.height;
-        
+
         const x = (event.clientX - rect.left) * scaleX;
         const y = (event.clientY - rect.top) * scaleY;
-        
-        if ((textPosition === 'custom' && isPointInText(x, y)) || 
-            (imagePosition === 'custom' && isPointInImage(x, y))) {
+
+        // v3.3.5: detectar hover sobre texto o imagen para feedback visual
+        let newHover = null;
+        if (textPosition === 'custom' && isPointInText(x, y)) {
+          newHover = 'text';
+        } else if (imagePosition === 'custom' && isPointInImage(x, y)) {
+          newHover = 'image';
+        }
+
+        if (newHover) {
           canvas.style.cursor = 'grab';
         } else {
           canvas.style.cursor = 'default';
+        }
+
+        // Solo re-renderizar si el estado de hover cambió, para no disparar
+        // updatePreview en cada mousemove sin causa.
+        if (newHover !== hoveredWatermark) {
+          hoveredWatermark = newHover;
+          updatePreview();
         }
         return;
       }
@@ -3938,6 +3983,18 @@
       }
     }
 
+    /**
+     * Lee el color elegido por el usuario para aplanar transparencia al
+     * exportar JPEG. Devuelve un string hex válido (#rrggbb). Si no existe
+     * el control o el valor es inválido, devuelve blanco como fallback
+     * (coherente con Photoshop/GIMP).
+     */
+    function getFlattenColor() {
+      const input = document.getElementById('jpeg-flatten-color');
+      const value = input && input.value ? String(input.value).trim() : '';
+      return /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#ffffff';
+    }
+
     async function downloadImage() {
       if (!canvas) {
         showError('No hay imagen para descargar.');
@@ -3948,7 +4005,7 @@
         showError('Por favor, selecciona una imagen primero.');
         return;
       }
-      
+
       try {
         // IMPORTANTE: Desactivar bordes de guía antes de descargar
         showPositioningBorders = false;
@@ -4036,8 +4093,12 @@
             // Si exportamos a JPEG, aplanar el canvas contra blanco para que
             // las áreas transparentes no salgan negras (default del codec JPEG).
             // Para PNG/WebP/AVIF se preserva el alpha original.
+            const flattenColor = getFlattenColor();
+            if (finalMimeType === 'image/jpeg' && hasAlpha) {
+              UIManager.showInfo(`🎨 Aplanando transparencia contra ${flattenColor.toLowerCase()} para exportar a JPEG`);
+            }
             const sourceCanvas = (finalMimeType === 'image/jpeg')
-              ? flattenCanvasForJpeg(canvas)
+              ? flattenCanvasForJpeg(canvas, flattenColor)
               : canvas;
             let blob = await canvasToBlob(sourceCanvas, finalMimeType, outputQuality);
             // Embeber EXIF si es JPEG (no-op para otros formatos o sin metadatos)
@@ -4064,8 +4125,12 @@
         const link = document.createElement('a');
         link.download = fullFilename;
         // Mismo aplanado para JPEG en el camino fallback
+        const flattenColorFallback = getFlattenColor();
+        if (finalMimeType === 'image/jpeg' && hasAlpha) {
+          UIManager.showInfo(`🎨 Aplanando transparencia contra ${flattenColorFallback.toLowerCase()} para exportar a JPEG`);
+        }
         const fallbackCanvas = (finalMimeType === 'image/jpeg')
-          ? flattenCanvasForJpeg(canvas)
+          ? flattenCanvasForJpeg(canvas, flattenColorFallback)
           : canvas;
         // Embeber EXIF si es JPEG (no-op para otros formatos o sin metadatos)
         link.href = MetadataManager.embedExifInJpegDataUrl(
@@ -4814,9 +4879,14 @@
             // La API recordará la ubicación automáticamente
             
             const writable = await handle.createWritable();
-            // Aplanado contra blanco si exportamos JPEG (igual que en downloadImage)
+            // Aplanado para JPEG (igual que en downloadImage), respetando el
+            // color elegido por el usuario en la sección de salida.
+            const flattenColor = getFlattenColor();
+            if (finalMimeType === 'image/jpeg' && hasAlpha) {
+              UIManager.showInfo(`🎨 Aplanando transparencia contra ${flattenColor.toLowerCase()} para exportar a JPEG`);
+            }
             const sourceCanvas = (finalMimeType === 'image/jpeg')
-              ? flattenCanvasForJpeg(canvas)
+              ? flattenCanvasForJpeg(canvas, flattenColor)
               : canvas;
             let blob = await canvasToBlob(sourceCanvas, finalMimeType, outputQuality);
             // Embeber EXIF si es JPEG (no-op para otros formatos o sin metadatos)
@@ -4846,9 +4916,13 @@
         // Fallback para navegadores que no soportan la API o si falla
         const link = document.createElement('a');
         link.download = fullFilename;
-        // Aplanado contra blanco si exportamos JPEG (igual que en downloadImage)
+        // Aplanado para JPEG con color configurable
+        const flattenColorFallback = getFlattenColor();
+        if (finalMimeType === 'image/jpeg' && hasAlpha) {
+          UIManager.showInfo(`🎨 Aplanando transparencia contra ${flattenColorFallback.toLowerCase()} para exportar a JPEG`);
+        }
         const fallbackCanvas = (finalMimeType === 'image/jpeg')
-          ? flattenCanvasForJpeg(canvas)
+          ? flattenCanvasForJpeg(canvas, flattenColorFallback)
           : canvas;
         // Embeber EXIF si es JPEG (no-op para otros formatos o sin metadatos)
         link.href = MetadataManager.embedExifInJpegDataUrl(

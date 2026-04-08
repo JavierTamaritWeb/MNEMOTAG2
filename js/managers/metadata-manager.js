@@ -273,30 +273,108 @@ const MetadataManager = {
     return exifData;
   },
   
+  // Lista de IDs de campos del formulario de metadatos que se persisten
+  // automáticamente en localStorage. NO incluye GPS (privacidad), license
+  // (intencionalidad), ni creationDate (debe coincidir con la imagen real).
+  AUTOSAVE_FIELDS: ['metaTitle', 'metaAuthor', 'metaCopyright', 'description', 'keywords'],
+
   /**
-   * Cargar metadatos guardados del localStorage
+   * Cargar metadatos guardados del localStorage en los campos del formulario.
+   * Desde v3.3.5 restaura todos los campos textuales (no solo el autor).
    */
   loadSavedMetadata: function() {
     try {
       const saved = localStorage.getItem('imageMetadata');
-      if (saved) {
-        const metadata = JSON.parse(saved);
-        
-        // Restaurar valores en los campos
-        if (metadata.author) {
-          const authorField = document.getElementById('metaAuthor');
-          if (authorField) authorField.value = metadata.author;
-        }
-        // NO restaurar licencia automáticamente - dejar que el usuario la seleccione cada vez
-        // if (metadata.license) {
-        //   const licenseField = document.getElementById('metaLicense');
-        //   if (licenseField) licenseField.value = metadata.license;
-        // }
-        
-        // No restaurar ubicación automáticamente por privacidad
+      if (!saved) return;
+
+      const metadata = JSON.parse(saved);
+      if (!metadata || typeof metadata !== 'object') return;
+
+      // Map de id de campo -> property en el blob persistido. Algunos
+      // campos del DOM se llaman distinto a las keys del objeto.
+      const fieldMap = {
+        metaTitle: 'title',
+        metaAuthor: 'author',
+        metaCopyright: 'copyright',
+        description: 'description',
+        keywords: 'keywords'
+      };
+
+      for (const fieldId of this.AUTOSAVE_FIELDS) {
+        const propKey = fieldMap[fieldId];
+        if (!propKey) continue;
+        const value = metadata[propKey];
+        if (typeof value !== 'string') continue;
+        const el = document.getElementById(fieldId);
+        if (el) el.value = value;
       }
+
+      // NO restaurar GPS (lat/lon/alt): privacidad. Cada sesión empieza vacía.
+      // NO restaurar license: el usuario debe elegirla intencionalmente cada vez.
+      // NO restaurar creationDate: debe coincidir con la fecha real de la foto.
     } catch (error) {
       console.warn('No se pudieron cargar metadatos guardados:', error);
+    }
+  },
+
+  /**
+   * Persistir el formulario completo en localStorage de forma debounced.
+   * Se llama desde setupAutoSave en cada evento input/change.
+   * Solo guarda los campos textuales, NO GPS ni license (ver loadSavedMetadata).
+   */
+  saveFormToLocalStorage: function() {
+    try {
+      const fieldMap = {
+        metaTitle: 'title',
+        metaAuthor: 'author',
+        metaCopyright: 'copyright',
+        description: 'description',
+        keywords: 'keywords'
+      };
+
+      // Cargar lo existente para no pisar campos que esta función no toca
+      // (por ejemplo si applyMetadataToImage guardó GPS antes).
+      let existing = {};
+      try {
+        const saved = localStorage.getItem('imageMetadata');
+        if (saved) existing = JSON.parse(saved) || {};
+      } catch (e) { /* ignorar */ }
+
+      for (const fieldId of this.AUTOSAVE_FIELDS) {
+        const el = document.getElementById(fieldId);
+        if (!el) continue;
+        existing[fieldMap[fieldId]] = el.value || '';
+      }
+
+      localStorage.setItem('imageMetadata', JSON.stringify(existing));
+    } catch (error) {
+      console.warn('No se pudo guardar el formulario en localStorage:', error);
+    }
+  },
+
+  /**
+   * Engancha listeners 'input' a los campos textuales del formulario para
+   * persistirlos automáticamente en localStorage. Se llama una vez en init.
+   * El guardado está debounced a 500 ms para no saturar localStorage.
+   */
+  setupAutoSave: function() {
+    let saveTimer = null;
+    const debounceMs = 500;
+
+    const handler = () => {
+      if (saveTimer) clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => {
+        this.saveFormToLocalStorage();
+        saveTimer = null;
+      }, debounceMs);
+    };
+
+    for (const fieldId of this.AUTOSAVE_FIELDS) {
+      const el = document.getElementById(fieldId);
+      if (el) {
+        el.addEventListener('input', handler);
+        el.addEventListener('change', handler);
+      }
     }
   },
   

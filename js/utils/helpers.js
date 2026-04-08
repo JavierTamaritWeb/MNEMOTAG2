@@ -364,7 +364,7 @@ async function determineFallbackFormat(hasAlpha, preferredFormat = 'image/jpeg')
  * @param {HTMLCanvasElement} canvas - Canvas original (con o sin transparencia)
  * @returns {HTMLCanvasElement} Canvas nuevo con fondo blanco + contenido encima
  */
-function flattenCanvasForJpeg(canvas) {
+function flattenCanvasForJpeg(canvas, backgroundColor) {
   if (!canvas) return canvas;
   const flat = document.createElement('canvas');
   flat.width = canvas.width;
@@ -374,8 +374,12 @@ function flattenCanvasForJpeg(canvas) {
   // browsers obsoletos sin Canvas2D), degradamos elegantemente devolviendo
   // el canvas original sin tocar. En producción esto no debería ocurrir.
   if (!flatCtx) return canvas;
-  // Fondo blanco (color de aplanado por defecto, coherente con Photoshop/GIMP)
-  flatCtx.fillStyle = '#ffffff';
+  // Color de aplanado (default blanco, coherente con Photoshop/GIMP).
+  // Desde v3.3.5 el usuario puede elegirlo desde la UI; pasar el valor
+  // hex aquí. Si no llega, usar blanco.
+  flatCtx.fillStyle = (typeof backgroundColor === 'string' && backgroundColor.startsWith('#'))
+    ? backgroundColor
+    : '#ffffff';
   flatCtx.fillRect(0, 0, flat.width, flat.height);
   // Imagen original encima, preservando alpha original (que se aplanará al
   // exportar como JPEG porque el codec descarta el canal alpha).

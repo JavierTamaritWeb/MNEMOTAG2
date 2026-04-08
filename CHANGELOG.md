@@ -4,6 +4,28 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.3.5] - 2026-04-09
+
+### Added
+- **Auto-escala del texto del watermark según tamaño de imagen** (`js/main.js applyTextWatermarkOptimized` + `index.html`). Nuevo checkbox `watermark-auto-scale` en la sección del watermark de texto. Cuando está activo, el `size` del slider se multiplica por `canvas.width / 1000` (referencia: 1000 px = factor 1, mínimo 8 px). Resultado: el tamaño percibido del watermark es consistente entre imágenes pequeñas y grandes. Antes `size=24` era 24 píxeles fijos del canvas, lo que en 4K se veía diminuto.
+- **Color configurable de aplanado JPEG** (`js/utils/helpers.js flattenCanvasForJpeg` + `index.html` + `js/main.js getFlattenColor`). Nuevo `<input type="color" id="jpeg-flatten-color">` en la sección de salida. Cuando se exporta un PNG con transparencia a JPEG, el color de fondo del aplanado ya no es blanco fijo; el usuario puede elegirlo. Default blanco. La función `flattenCanvasForJpeg` ahora acepta un segundo parámetro `backgroundColor`.
+- **Hover state visual del borde guía del watermark** (`js/main.js`). Nueva variable global `hoveredWatermark` (`'text'` | `'image'` | `null`). En `handleDragMove` cuando NO se está dragging, si el cursor está sobre un watermark en modo custom, se actualiza el flag y se dispara `updatePreview()` SOLO si cambió el estado (no en cada mousemove). En `applyTextWatermarkOptimized` y `drawCachedWatermark`, el borde se pinta más intenso (color más saturado y grosor +1) cuando el ratón está encima.
+- **Toast informativo al aplanar JPEG** (`js/main.js downloadImage` y `downloadImageWithProgress`). Cuando se descarga un PNG con alpha como JPEG, ahora se muestra un toast `UIManager.showInfo` que dice explícitamente "Aplanando transparencia contra <color> para exportar a JPEG". Antes la decisión era silenciosa.
+- **Auto-guardado del formulario en localStorage** (`js/managers/metadata-manager.js`). Nuevos métodos: `MetadataManager.AUTOSAVE_FIELDS`, `loadSavedMetadata` (ampliado para restaurar todos los campos textuales, no solo `author`), `saveFormToLocalStorage`, `setupAutoSave`. Se enganchan listeners `input`/`change` con debounce de 500 ms a los 5 campos textuales (`metaTitle`, `metaAuthor`, `metaCopyright`, `description`, `keywords`). **NO se persisten** GPS, license ni creationDate (privacidad e intencionalidad). `main.js` llama a `setupAutoSave()` durante init.
+
+### Changed
+- `helpers.flattenCanvasForJpeg(canvas)` → `helpers.flattenCanvasForJpeg(canvas, backgroundColor)`. Cambio retrocompatible: si el segundo parámetro es undefined o no es un hex válido, sigue usando blanco.
+- `MetadataManager.loadSavedMetadata` ahora restaura `metaTitle`, `metaCopyright`, `description` y `keywords` (antes solo `metaAuthor`).
+
+### Added (tests)
+- `tests/specs/regression.spec.js`: nueva suite `Regresión — Mejoras de UX (v3.3.5)` con 8 tests fetch+grep que verifican: helper `getFlattenColor`, llamadas a `flattenCanvasForJpeg(canvas, flattenColor)`, presencia de la lógica `canvas.width / 1000`, variable `hoveredWatermark` y sus comparaciones, métodos `setupAutoSave`/`saveFormToLocalStorage`/`AUTOSAVE_FIELDS` en MetadataManager, llamada a `MetadataManager.setupAutoSave()` desde main.js, e inputs `jpeg-flatten-color` y `watermark-auto-scale` en index.html.
+- Actualizados los tests de regresión existentes de `flattenCanvasForJpeg` para reflejar la nueva firma con segundo parámetro.
+
+### Verification
+- 88/88 tests OK con `node tests/run-in-node.js` tras los cambios (80 anteriores + 8 nuevos).
+
+---
+
 ## [3.3.4] - 2026-04-09
 
 ### Changed
@@ -1037,5 +1059,5 @@ Lanzamiento inicial de MnemoTag.
 ---
 
 **Última actualización:** 9 de abril de 2026  
-**Versión actual:** 3.3.4  
+**Versión actual:** 3.3.5  
 **Estado:** ✅ Estable y listo para producción
