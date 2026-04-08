@@ -1,3 +1,5 @@
+'use strict';
+
 /**
  * BatchManager - Sistema de procesamiento por lotes de imágenes
  * Permite cargar múltiples imágenes y aplicarles la misma configuración

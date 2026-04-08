@@ -1,3 +1,5 @@
+'use strict';
+
 // ===== APP CONFIG =====
 // Configuración global para MnemoTag v3.0
 

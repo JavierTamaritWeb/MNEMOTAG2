@@ -6674,7 +6674,9 @@
       // Exponer funciones globalmente para onclick handlers
       window.openBatchModal = openBatchModal;
       window.closeBatchModal = closeBatchModal;
-      window.removeBatchImage = removeBatchImage;
+      // removeBatchImage ya no necesita exponerse globalmente: tras el fix XSS,
+      // el botón de eliminar se engancha vía addEventListener directo (main.js
+      // updateBatchImagesList), en lugar del antiguo onclick="removeBatchImage(...)".
       window.processBatch = processBatch;
       window.downloadBatchZip = downloadBatchZip;
 

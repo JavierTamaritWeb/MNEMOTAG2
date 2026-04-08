@@ -1,3 +1,5 @@
+'use strict';
+
 /**
  * CropManager - Sistema de recorte inteligente de imágenes
  * Soporta proporciones fijas, drag-and-drop y sugerencias automáticas

@@ -1,3 +1,5 @@
+'use strict';
+
 // ===== FILTER MANAGER =====
 // Sistema de filtros avanzados con Web Workers para MnemoTag v3.0
 

@@ -1,3 +1,5 @@
+'use strict';
+
 /**
  * MnemoTag v3.0 - Filter Loading Manager
  * Sistema de loading states específicos para operaciones de filtros

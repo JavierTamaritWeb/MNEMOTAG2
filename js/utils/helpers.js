@@ -1,3 +1,5 @@
+'use strict';
+
 // ===== HELPERS =====
 // Funciones utilitarias para MnemoTag v3.0
 

@@ -1,3 +1,5 @@
+'use strict';
+
 /**
  * TextLayerManager - Sistema de capas de texto avanzadas
  * Permite múltiples textos con efectos y Google Fonts

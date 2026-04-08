@@ -1,3 +1,5 @@
+'use strict';
+
 // ===== HISTORY MANAGER =====
 // Gestión de historial para deshacer/rehacer en MnemoTag v3.0
 

@@ -1,3 +1,5 @@
+'use strict';
+
 // ===== SECURITY MANAGER =====
 // Módulo de seguridad y validación para MnemoTag v3.0
 

@@ -1,3 +1,5 @@
+'use strict';
+
 /**
  * MnemoTag v3.0 - UI Manager
  * Sistema de gestión de interfaz de usuario con notificaciones, loading states y utilidades

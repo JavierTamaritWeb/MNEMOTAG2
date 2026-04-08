@@ -1,3 +1,5 @@
+'use strict';
+
 /**
  * KeyboardShortcutManager - Sistema de gestión de atajos de teclado
  * Maneja combinaciones de teclas para acciones rápidas en la aplicación

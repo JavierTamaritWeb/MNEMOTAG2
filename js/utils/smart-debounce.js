@@ -1,3 +1,5 @@
+'use strict';
+
 /**
  * MnemoTag v3.0 - Smart Debounce
  * Sistema de debouncing inteligente con optimization frames y gestión avanzada

@@ -1,3 +1,5 @@
+'use strict';
+
 // ===== WEB WORKER PARA PROCESAMIENTO DE IMÁGENES =====
 // Worker optimizado para filtros pesados con OffscreenCanvas
 

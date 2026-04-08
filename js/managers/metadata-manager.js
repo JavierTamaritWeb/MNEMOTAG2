@@ -1,3 +1,5 @@
+'use strict';
+
 // ===== METADATA MANAGER =====
 // Gestión de metadatos EXIF y geolocalización para MnemoTag v3.0
 
