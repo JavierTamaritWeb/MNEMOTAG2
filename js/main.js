@@ -4101,8 +4101,10 @@
               ? flattenCanvasForJpeg(canvas, flattenColor)
               : canvas;
             let blob = await canvasToBlob(sourceCanvas, finalMimeType, outputQuality);
-            // Embeber EXIF si es JPEG (no-op para otros formatos o sin metadatos)
+            // Embeber EXIF según formato. Cada función es defensiva: si no es
+            // su formato o no hay metadatos, devuelve el blob original.
             blob = await MetadataManager.embedExifInJpegBlob(blob);
+            blob = await MetadataManager.embedExifInPngBlob(blob); // v3.3.6
             await writable.write(blob);
             await writable.close();
 
@@ -4132,10 +4134,14 @@
         const fallbackCanvas = (finalMimeType === 'image/jpeg')
           ? flattenCanvasForJpeg(canvas, flattenColorFallback)
           : canvas;
-        // Embeber EXIF si es JPEG (no-op para otros formatos o sin metadatos)
-        link.href = MetadataManager.embedExifInJpegDataUrl(
+        // Embeber EXIF en JPEG (sync) o PNG (async). Solo aplica al formato real.
+        let fallbackHref = MetadataManager.embedExifInJpegDataUrl(
           fallbackCanvas.toDataURL(finalMimeType, outputQuality)
         );
+        if (finalMimeType === 'image/png') {
+          fallbackHref = await MetadataManager.embedExifInPngDataUrl(fallbackHref); // v3.3.6
+        }
+        link.href = fallbackHref;
 
         // Simular click
         document.body.appendChild(link);
@@ -4889,8 +4895,9 @@
               ? flattenCanvasForJpeg(canvas, flattenColor)
               : canvas;
             let blob = await canvasToBlob(sourceCanvas, finalMimeType, outputQuality);
-            // Embeber EXIF si es JPEG (no-op para otros formatos o sin metadatos)
+            // Embeber EXIF según formato
             blob = await MetadataManager.embedExifInJpegBlob(blob);
+            blob = await MetadataManager.embedExifInPngBlob(blob); // v3.3.6
             await writable.write(blob);
             await writable.close();
 
@@ -4924,10 +4931,14 @@
         const fallbackCanvas = (finalMimeType === 'image/jpeg')
           ? flattenCanvasForJpeg(canvas, flattenColorFallback)
           : canvas;
-        // Embeber EXIF si es JPEG (no-op para otros formatos o sin metadatos)
-        link.href = MetadataManager.embedExifInJpegDataUrl(
+        // Embeber EXIF en JPEG (sync) o PNG (async)
+        let fallbackHrefP = MetadataManager.embedExifInJpegDataUrl(
           fallbackCanvas.toDataURL(finalMimeType, outputQuality)
         );
+        if (finalMimeType === 'image/png') {
+          fallbackHrefP = await MetadataManager.embedExifInPngDataUrl(fallbackHrefP); // v3.3.6
+        }
+        link.href = fallbackHrefP;
         
         // Simular click
         document.body.appendChild(link);

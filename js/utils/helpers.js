@@ -411,6 +411,39 @@ function hasImageAlphaChannel(canvas) {
   return false; // No hay transparencia
 }
 
+// =============================================================================
+// CRC32 (ISO-HDLC, polinomio 0xEDB88320)
+// =============================================================================
+// Implementación estándar con tabla de lookup precomputada. Necesaria para
+// generar chunks PNG válidos en MetadataManager.embedExifInPngBlob (v3.3.6).
+// El CRC se calcula sobre [chunk type (4 bytes)] + [chunk data].
+// No hay dependencias: puro Uint8Array + bitwise.
+
+const CRC32_TABLE = (function () {
+  const table = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) {
+      c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    }
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+
+/**
+ * Calcula el CRC32 (ISO-HDLC) de un Uint8Array.
+ * @param {Uint8Array} bytes
+ * @returns {number} CRC32 sin signo (0..0xFFFFFFFF)
+ */
+function crc32(bytes) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) {
+    c = CRC32_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  }
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
 // Export para uso modular
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
@@ -426,6 +459,7 @@ if (typeof module !== 'undefined' && module.exports) {
     supportsEncode,
     determineFallbackFormat,
     hasImageAlphaChannel,
-    flattenCanvasForJpeg
+    flattenCanvasForJpeg,
+    crc32
   };
 }

@@ -575,6 +575,212 @@ const MetadataManager = {
       console.warn('No se pudo insertar EXIF en JPEG (blob):', err);
       return blob;
     }
+  },
+
+  // ===== ESCRITURA REAL DE EXIF EN PNG (v3.3.6) =====
+  // PNG no usa el mismo contenedor que JPEG. El spec PNG 1.5+ define un chunk
+  // estándar `eXIf` cuyo payload es exactamente el bloque TIFF (header + IFDs)
+  // que ya genera piexif, sin la cabecera APP1 ni el marcador "Exif\0\0".
+  // Implementamos manipulación binaria de chunks PNG a mano (sin librería
+  // externa) para insertar el chunk eXIf justo antes del primer IDAT.
+
+  /**
+   * Strippea la cabecera APP1 + "Exif\0\0" del binary string que devuelve
+   * piexif.dump(), dejando solo el bloque TIFF crudo apto para un chunk PNG eXIf.
+   *
+   * Estructura típica del output de piexif.dump():
+   *   FF E1 ll ll 45 78 69 66 00 00 [ TIFF header + IFDs ]
+   *   marker  size  E  x  i  f \0 \0
+   * @param {string} piexifBinary - binary string crudo de piexif.dump()
+   * @returns {Uint8Array} TIFF data lista para chunk eXIf
+   */
+  _piexifBinaryToTiffBytes: function(piexifBinary) {
+    // Convertir binary string a Uint8Array
+    const len = piexifBinary.length;
+    const u8 = new Uint8Array(len);
+    for (let i = 0; i < len; i++) u8[i] = piexifBinary.charCodeAt(i) & 0xff;
+
+    // Si arranca con FF E1 (APP1 marker JPEG) saltamos APP1+size+"Exif\0\0"
+    if (u8.length > 10 && u8[0] === 0xFF && u8[1] === 0xE1) {
+      // FF E1 (2) + size (2) + "Exif" (4) + \0\0 (2) = 10 bytes
+      return u8.subarray(10);
+    }
+    // Si arranca directamente con "Exif\0\0" saltamos 6 bytes
+    if (u8.length > 6 && u8[0] === 0x45 && u8[1] === 0x78 && u8[2] === 0x69 && u8[3] === 0x66) {
+      return u8.subarray(6);
+    }
+    // Si arranca directamente con TIFF header (II*\0 o MM\0*) lo devolvemos tal cual
+    return u8;
+  },
+
+  /**
+   * Construye un chunk PNG eXIf con CRC32 válido.
+   * Estructura del chunk: [length:4][type:4][data][crc:4]
+   * @param {Uint8Array} tiffBytes - bloque TIFF crudo (sin APP1 ni "Exif\0\0")
+   * @returns {Uint8Array} chunk completo listo para insertar en el PNG
+   */
+  _buildPngExifChunk: function(tiffBytes) {
+    const length = tiffBytes.length;
+    const chunk = new Uint8Array(4 + 4 + length + 4);
+    const dv = new DataView(chunk.buffer);
+
+    // length (big-endian)
+    dv.setUint32(0, length, false);
+    // type "eXIf"
+    chunk[4] = 0x65; // 'e'
+    chunk[5] = 0x58; // 'X'
+    chunk[6] = 0x49; // 'I'
+    chunk[7] = 0x66; // 'f'
+    // data
+    chunk.set(tiffBytes, 8);
+    // crc32 sobre [type + data]
+    const crcInput = chunk.subarray(4, 8 + length);
+    const crc = (typeof crc32 === 'function') ? crc32(crcInput) : 0;
+    dv.setUint32(8 + length, crc, false);
+
+    return chunk;
+  },
+
+  /**
+   * Inserta un chunk eXIf en un PNG (Uint8Array) justo antes del primer IDAT.
+   * Si el PNG ya tiene un chunk eXIf, lo reemplaza.
+   * @param {Uint8Array} pngBytes - PNG completo (incluye signature)
+   * @param {Uint8Array} exifChunk - chunk eXIf completo (length+type+data+crc)
+   * @returns {Uint8Array} PNG nuevo con el chunk insertado
+   */
+  _insertExifChunkInPng: function(pngBytes, exifChunk) {
+    // Validar signature PNG
+    const PNG_SIG = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+    for (let i = 0; i < 8; i++) {
+      if (pngBytes[i] !== PNG_SIG[i]) {
+        throw new Error('No es un PNG válido (signature inválida)');
+      }
+    }
+
+    // Recorrer chunks para encontrar el primer IDAT y posibles eXIf existentes.
+    const chunks = []; // Lista de { start, length, type }
+    let pos = 8;
+    while (pos < pngBytes.length) {
+      if (pos + 8 > pngBytes.length) break;
+      const dv = new DataView(pngBytes.buffer, pngBytes.byteOffset + pos, 8);
+      const dataLen = dv.getUint32(0, false);
+      const type = String.fromCharCode(pngBytes[pos + 4], pngBytes[pos + 5], pngBytes[pos + 6], pngBytes[pos + 7]);
+      const totalLen = 4 + 4 + dataLen + 4;
+      chunks.push({ start: pos, length: totalLen, type: type });
+      pos += totalLen;
+      if (type === 'IEND') break;
+    }
+
+    // Construir el PNG nuevo: signature + chunks pre-IDAT + exifChunk + chunks restantes
+    let firstIdatIdx = chunks.findIndex(c => c.type === 'IDAT');
+    if (firstIdatIdx === -1) {
+      throw new Error('PNG sin chunks IDAT (corrupto)');
+    }
+
+    // Filtrar chunks eXIf existentes (los reemplazamos con el nuevo)
+    const filtered = chunks.filter(c => c.type !== 'eXIf');
+    // Recalcular el índice del primer IDAT en la lista filtrada
+    firstIdatIdx = filtered.findIndex(c => c.type === 'IDAT');
+
+    // Calcular tamaño del PNG resultante
+    let totalSize = 8; // signature
+    for (const c of filtered) totalSize += c.length;
+    totalSize += exifChunk.length;
+
+    const out = new Uint8Array(totalSize);
+    out.set(pngBytes.subarray(0, 8), 0); // signature
+    let writePos = 8;
+
+    for (let i = 0; i < filtered.length; i++) {
+      if (i === firstIdatIdx) {
+        // Insertar exifChunk justo antes del primer IDAT
+        out.set(exifChunk, writePos);
+        writePos += exifChunk.length;
+      }
+      const c = filtered[i];
+      out.set(pngBytes.subarray(c.start, c.start + c.length), writePos);
+      writePos += c.length;
+    }
+
+    return out;
+  },
+
+  /**
+   * Inserta EXIF en un Blob PNG. Asíncrono.
+   * Defensiva: si piexif no está, si no es PNG, si no hay metadatos, o si
+   * la manipulación falla por cualquier motivo, devuelve el blob original
+   * sin tocar. NUNCA produce un PNG corrupto.
+   * @param {Blob} blob - Blob PNG generado por canvas.toBlob()
+   * @returns {Promise<Blob>} Blob nuevo con eXIf incrustado, o el original
+   */
+  embedExifInPngBlob: async function(blob) {
+    if (typeof piexif === 'undefined') return blob;
+    if (!blob || blob.type !== 'image/png') return blob;
+
+    try {
+      const metadata = this.getMetadata();
+      const exifObj = this.buildExifObject(metadata);
+      if (!exifObj) return blob;
+
+      // Generar bloque TIFF desde piexif
+      const piexifBinary = piexif.dump(exifObj);
+      const tiffBytes = this._piexifBinaryToTiffBytes(piexifBinary);
+      if (!tiffBytes || tiffBytes.length === 0) return blob;
+
+      // Leer el blob como ArrayBuffer
+      const arrayBuffer = await blob.arrayBuffer();
+      const pngBytes = new Uint8Array(arrayBuffer);
+
+      // Construir chunk eXIf y reinjertar
+      const exifChunk = this._buildPngExifChunk(tiffBytes);
+      const newPng = this._insertExifChunkInPng(pngBytes, exifChunk);
+
+      // Validar que el resultado sigue empezando por la signature PNG
+      if (newPng[0] !== 0x89 || newPng[1] !== 0x50) {
+        console.warn('embedExifInPngBlob: resultado no parece PNG válido, devolviendo original');
+        return blob;
+      }
+
+      return new Blob([newPng], { type: 'image/png' });
+    } catch (err) {
+      console.warn('No se pudo insertar EXIF en PNG (blob):', err);
+      return blob;
+    }
+  },
+
+  /**
+   * Inserta EXIF en un dataURL PNG. Wrapper sobre embedExifInPngBlob para
+   * el camino de descarga con `<a download>`.
+   * @param {string} dataUrl - dataURL `data:image/png;base64,...`
+   * @returns {Promise<string>} dataURL con EXIF, o el original
+   */
+  embedExifInPngDataUrl: async function(dataUrl) {
+    if (typeof piexif === 'undefined') return dataUrl;
+    if (typeof dataUrl !== 'string') return dataUrl;
+    if (!dataUrl.startsWith('data:image/png')) return dataUrl;
+
+    try {
+      // dataURL → Blob (sin pasar por fetch)
+      const base64 = dataUrl.split(',')[1];
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: 'image/png' });
+
+      const newBlob = await this.embedExifInPngBlob(blob);
+      if (newBlob === blob) return dataUrl; // Sin cambios
+
+      // Blob → dataURL
+      return await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error || new Error('FileReader error'));
+        reader.readAsDataURL(newBlob);
+      });
+    } catch (err) {
+      console.warn('No se pudo insertar EXIF en PNG (dataURL):', err);
+      return dataUrl;
+    }
   }
 };
 

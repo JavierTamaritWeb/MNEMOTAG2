@@ -4,9 +4,34 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos.
 
-![Version](https://img.shields.io/badge/version-3.3.5-blue.svg)
+![Version](https://img.shields.io/badge/version-3.3.6-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
+
+---
+
+## ⭐ NOVEDADES v3.3.6
+
+> **Patch release.** EXIF real para PNG (sin librerías externas, sin npm).
+
+### 🏷️ Metadatos reales también en PNG
+
+Hasta ahora MnemoTag solo escribía EXIF al exportar como JPEG (vía piexifjs). Desde **v3.3.6**, los campos del formulario (título, autor, copyright, fecha, GPS, software) se incrustan **realmente** también en los PNG descargados, usando el chunk estándar `eXIf` definido en PNG spec 1.5.
+
+**Cómo se hace por dentro** (sin librerías externas, sin npm):
+- `helpers.js` añade una utilidad `crc32` con tabla de lookup precomputada (CRC-32/ISO-HDLC, polinomio `0xEDB88320`).
+- `MetadataManager` añade los métodos `embedExifInPngBlob` y `embedExifInPngDataUrl`. La estrategia es:
+  1. Generar el bloque TIFF reutilizando `piexif.dump(exifObj)` (ya cargado para JPEG).
+  2. Strippear la cabecera APP1 + `Exif\0\0` que añade piexif para JPEG, dejando el TIFF crudo apto para un chunk PNG.
+  3. Construir un chunk `eXIf` válido: `[length:4][type='eXIf'][data][crc32]`.
+  4. Parsear los chunks del PNG existente, reemplazar cualquier `eXIf` previo, e insertar el nuevo justo antes del primer `IDAT` (convención del spec).
+  5. Re-empaquetar los bytes y devolver un Blob nuevo.
+- Si algo falla en cualquier punto (PNG corrupto, piexif ausente, error al parsear), las funciones devuelven el blob original sin tocar — degradación elegante. **Nunca producen un PNG corrupto.**
+- 4 puntos de integración en `main.js` (los mismos que JPEG): `downloadImage` y `downloadImageWithProgress`, cada uno con su rama `showSaveFilePicker` y su rama fallback `<a download>`.
+
+**Cómo verificarlo**: descarga un PNG con campos rellenados y ábrelo con un visor EXIF (Apple Preview Info, exiftool, exif.tools online). Deberías ver `ImageDescription`, `Artist`, `Copyright`, `DateTime` y los tags GPS.
+
+**Lo que sigue sin escribir metadatos**: WebP y AVIF. WebP necesitaría manipulación de chunks RIFF + conversión a VP8X (más complejo que PNG); AVIF necesitaría ISOBMFF boxes (mucho más complejo). En el roadmap.
 
 ---
 

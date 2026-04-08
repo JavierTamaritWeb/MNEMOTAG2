@@ -80,9 +80,11 @@ Watermarks (text and image) can be free-positioned by dragging. `main.js` mainta
 
 When `isRulerMode` is true, `main.js` injects DOM-level ruler/guide elements (tracked in `rulerElements`) on top of the canvas. They're plain DOM (not drawn to canvas), so they never end up in exports. Guide-line color is chosen by sampling background brightness via `getImageData()` — keep that in mind if you change canvas pixel formats.
 
-### EXIF/metadata writing — JPEG only
+### EXIF/metadata writing — JPEG and PNG
 
-EXIF writing is implemented **only for JPEG** via `piexifjs@1.0.6` (loaded by CDN in `index.html`). PNG, WebP and AVIF exports still come out without metadata — those formats would need different libraries (PNG `tEXt`/`iTXt` chunks, WebP RIFF chunks, AVIF ISOBMFF boxes).
+EXIF writing is implemented for **JPEG** (via `piexifjs@1.0.6` loaded by CDN) and for **PNG** (via manipulación binaria a mano del chunk `eXIf` PNG spec 1.5+, sin librerías externas, reutilizando el output de `piexif.dump()` strippeado). **WebP y AVIF** siguen sin metadatos — WebP necesitaría manipulación de chunks RIFF + conversión a VP8X, AVIF necesitaría ISOBMFF boxes.
+
+**PNG implementation (v3.3.6)**: el chunk `eXIf` (PNG spec 1.5) recibe exactamente el bloque TIFF (header + IFDs) que ya genera `piexif.dump()`, después de strippearle la cabecera APP1 + `Exif\0\0`. La manipulación PNG está en `MetadataManager._buildPngExifChunk` + `_insertExifChunkInPng`, que usan la utilidad `crc32` de `helpers.js`. El chunk se inserta antes del primer `IDAT` (convención). Si el PNG ya tenía un chunk `eXIf`, se reemplaza. La función es defensiva: ante cualquier error devuelve el blob original sin tocar.
 
 **Implementation:**
 - `MetadataManager.buildExifObject(metadata)` builds a piexif-compatible object from the form fields. Maps `title → ImageDescription`, `author → Artist`, `copyright → Copyright`, `software → Software`, `createdAt → DateTimeOriginal + DateTime`, and `latitude/longitude/altitude → GPS IFD` (with N/S/E/W refs and DMS rationals via `piexif.GPSHelper.degToDmsRational`). Returns `null` if there is nothing to write or if `piexif` isn't loaded.
@@ -106,6 +108,6 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 
 ## Versioning and commits
 
-**Current version: v3.3.5** (patch release: 5 mejoras de UX — auto-escala del texto del watermark, color configurable de aplanado JPEG, hover state visual del borde guía, toast informativo al aplanar, auto-guardado del formulario en localStorage). Sources kept in sync: `index.html` `<title>`, `README.md` badge + NOVEDADES heading, `CHANGELOG.md` header + footer + topmost entry, and `docs/INDICE_DOCUMENTACION.md`. Note: `docs/RESUMEN_VERSIONES.md` is a hand-curated historical table that still marks `v3.1.4` as "Actual" — it has not been updated in the bump and would need a dedicated entry with narrative. `git log` remains the authoritative source for the actual commit version.
+**Current version: v3.3.6** (patch release: PNG EXIF real con manipulación binaria de chunks `eXIf`, sin librerías externas, reutilizando piexifjs para generar el bloque TIFF). PNG ahora se une a JPEG en escribir metadatos reales al archivo. WebP/AVIF siguen pendientes. Sources kept in sync: `index.html` `<title>`, `README.md` badge + NOVEDADES heading, `CHANGELOG.md` header + footer + topmost entry, and `docs/INDICE_DOCUMENTACION.md`. Note: `docs/RESUMEN_VERSIONES.md` is a hand-curated historical table that still marks `v3.1.4` as "Actual" — it has not been updated in the bump and would need a dedicated entry with narrative. `git log` remains the authoritative source for the actual commit version.
 
 Commit messages follow `Versión X.Y.Z - <descripción>` in Spanish — match this style. `CHANGELOG.md` and the docs under `docs/` are kept hand-updated per release.

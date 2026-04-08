@@ -91,6 +91,52 @@ describe('Regresión — Escritura real de EXIF en JPEG', function () {
   });
 });
 
+describe('Regresión — PNG EXIF real con chunks eXIf (v3.3.6)', function () {
+  it('helpers.js define la utilidad crc32 con tabla de lookup', async function () {
+    const src = await fetchSource('../js/utils/helpers.js');
+    expect(src).toContain('CRC32_TABLE');
+    expect(src).toContain('function crc32(bytes)');
+    expect(src).toContain('0xEDB88320');
+  });
+
+  it('metadata-manager.js define los métodos de embedding PNG', async function () {
+    const src = await fetchSource('../js/managers/metadata-manager.js');
+    expect(src).toContain('embedExifInPngBlob');
+    expect(src).toContain('embedExifInPngDataUrl');
+    expect(src).toContain('_buildPngExifChunk');
+    expect(src).toContain('_insertExifChunkInPng');
+    expect(src).toContain('_piexifBinaryToTiffBytes');
+  });
+
+  it('metadata-manager.js construye el chunk eXIf con type y CRC', async function () {
+    const src = await fetchSource('../js/managers/metadata-manager.js');
+    // El chunk eXIf debe tener bytes 'e','X','I','f'
+    expect(src).toContain('0x65'); // 'e'
+    expect(src).toContain('0x58'); // 'X'
+    expect(src).toContain('0x49'); // 'I'
+    expect(src).toContain('0x66'); // 'f'
+  });
+
+  it('metadata-manager.js valida la signature PNG antes de manipular', async function () {
+    const src = await fetchSource('../js/managers/metadata-manager.js');
+    expect(src).toContain('PNG_SIG');
+    expect(src).toContain('0x89'); // primer byte de la signature PNG
+  });
+
+  it('main.js llama a embedExifInPngBlob en el flujo de descarga', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('MetadataManager.embedExifInPngBlob');
+    // Debe haber al menos 2 llamadas (downloadImage + downloadImageWithProgress, ramas Blob)
+    const matches = src.match(/MetadataManager\.embedExifInPngBlob/g) || [];
+    expect(matches.length).toBeGreaterThan(1);
+  });
+
+  it('main.js llama a embedExifInPngDataUrl en el camino fallback', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('MetadataManager.embedExifInPngDataUrl');
+  });
+});
+
 describe('Regresión — Mejoras de UX (v3.3.5)', function () {
   it('main.js define el helper getFlattenColor', async function () {
     const src = await fetchSource('../js/main.js');

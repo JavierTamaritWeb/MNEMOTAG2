@@ -4,6 +4,29 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.3.6] - 2026-04-09
+
+### Added
+- **EXIF real para PNG vía chunks `eXIf`** (`js/managers/metadata-manager.js`). Sin librerías externas, sin npm. Implementación a mano de manipulación binaria de chunks PNG. Reutiliza `piexif.dump()` para generar el bloque TIFF y le strippea la cabecera APP1 + `Exif\0\0` que añade para JPEG. El chunk `eXIf` es estándar desde PNG spec 1.5.
+- **Utilidad `crc32`** en `js/utils/helpers.js`. Implementación CRC-32/ISO-HDLC con tabla de lookup precomputada (polinomio `0xEDB88320`). Necesaria para generar chunks PNG con CRC válido. Exportada en `module.exports`.
+- **Nuevos métodos en `MetadataManager`**:
+  - `_piexifBinaryToTiffBytes(binary)`: convierte el output de `piexif.dump()` a `Uint8Array` apto para chunk PNG (strippea APP1 + `Exif\0\0`).
+  - `_buildPngExifChunk(tiffBytes)`: construye un chunk `eXIf` completo `[length:4][type=eXIf][data][crc32]`.
+  - `_insertExifChunkInPng(pngBytes, exifChunk)`: parsea el PNG, valida la signature, encuentra el primer `IDAT`, elimina `eXIf` previos si los hubiera, y re-empaqueta el PNG con el chunk insertado justo antes del primer `IDAT`.
+  - `embedExifInPngBlob(blob)` (async) y `embedExifInPngDataUrl(dataUrl)` (async): API pública análoga a las de JPEG. Defensivas: ante cualquier error devuelven el input sin tocar.
+- **Integración en `js/main.js`** en los 4 puntos del flujo de descarga (`downloadImage` y `downloadImageWithProgress`, cada uno con sus dos ramas). Las llamadas son chained: primero `embedExifInJpegBlob` (no-op si no es JPEG), luego `embedExifInPngBlob` (no-op si no es PNG). Cada función filtra por su `blob.type` y devuelve sin tocar si no es su formato.
+
+### Tests
+- `tests/specs/regression.spec.js`: nueva suite `Regresión — PNG EXIF real con chunks eXIf (v3.3.6)` con 6 tests fetch+grep que verifican: utilidad `crc32` en helpers.js, métodos `embedExifInPngBlob`/`embedExifInPngDataUrl`/`_buildPngExifChunk`/`_insertExifChunkInPng`/`_piexifBinaryToTiffBytes`, bytes ASCII del chunk type `eXIf`, validación de signature PNG, y llamadas en `main.js` (mínimo 2 para Blob + presencia de DataUrl).
+
+### Verification
+- 94/94 tests OK con `node tests/run-in-node.js` tras los cambios (88 anteriores + 6 nuevos).
+
+### Notes
+- **Validación manual pendiente**: el runner Node no tiene Canvas2D real, así que no puede verificar visualmente que un PNG descargado contenga EXIF leíble. Hay que abrir un PNG generado por la app con un visor EXIF (Apple Preview Info, exiftool, exif.tools) y comprobar que aparecen los campos. La función es defensiva: si el resultado no es PNG válido, se devuelve el original sin tocar.
+
+---
+
 ## [3.3.5] - 2026-04-09
 
 ### Added
@@ -1059,5 +1082,5 @@ Lanzamiento inicial de MnemoTag.
 ---
 
 **Última actualización:** 9 de abril de 2026  
-**Versión actual:** 3.3.5  
+**Versión actual:** 3.3.6  
 **Estado:** ✅ Estable y listo para producción
