@@ -4,15 +4,54 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos.
 
-![Version](https://img.shields.io/badge/version-3.1.4-blue.svg)
+![Version](https://img.shields.io/badge/version-3.2.16-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 
 ---
 
-## ⭐ NOVEDADES v3.1.4
+## ⭐ NOVEDADES v3.2.16
 
-### 🐛 BUGS CRÍTICOS SOLUCIONADOS
+### ✅ EXIF JPEG: ahora funciona de verdad
+
+Hasta esta versión, MnemoTag mostraba un formulario de "metadatos EXIF" y un toast de éxito tras la descarga, pero **el archivo descargado no contenía ningún metadato**. `MetadataManager.applyMetadataToImage()` era un stub que solo guardaba en `localStorage`.
+
+A partir de **v3.2.15**, los campos del formulario se incrustan **realmente** en el archivo descargado cuando el formato es **JPEG**, gracias a la integración con [`piexifjs@1.0.6`](https://github.com/hMatoba/piexifjs) (cargada desde jsdelivr CDN, sin npm):
+
+| Campo del formulario | Tag EXIF |
+|---|---|
+| Título | `ImageDescription` |
+| Autor | `Artist` |
+| Copyright (incluye licencia) | `Copyright` |
+| Fecha de creación | `DateTimeOriginal` + `DateTime` |
+| Latitud / Longitud / Altitud | `GPS IFD` (con refs N/S/E/W y rationals DMS) |
+| Software | `Software` |
+
+**Cómo verificarlo:** descarga una imagen JPEG con campos rellenados y ábrela con cualquier visor EXIF — Apple Preview Info (⌘+I → "Más info"), `exiftool`, o servicios online como `exif.tools`.
+
+**Lo que NO hace** (intencionalmente):
+- **PNG, WebP y AVIF** siguen exportándose sin metadatos. Cada formato necesita su propia librería (PNG `tEXt`/`iTXt` chunks, WebP RIFF chunks, AVIF ISOBMFF boxes) y aún no están implementados.
+- `description` y `keywords` no se incrustan: EXIF no tiene tags estándar limpios para ellos.
+
+### 🔒 Seguridad reforzada
+
+- **Fix XSS crítico** en el listado del procesamiento por lotes: nombres de archivo maliciosos ya no pueden ejecutar JavaScript al renderizar (`v3.2.12`).
+- **Worker pool resucitado**: una ruta de script rota desde versiones anteriores hacía que los Web Workers nunca se iniciaran. Corregida — ahora el procesamiento de filtros pesados puede usar el pool de workers de verdad (`v3.2.12`).
+- **Strict mode** activado en los 16 archivos de `js/managers/` y `js/utils/`, más el worker (`v3.2.13`).
+
+### 🧪 Suite de tests automatizados
+
+- **67 tests** cubriendo `AppConfig`, `helpers`, `SecurityManager`, `MetadataManager` (incluyendo los nuevos métodos de embedding EXIF), `historyManager`, y los 4 fixes de regresión más importantes.
+- **Dos formas de ejecutarlos**:
+  - **Navegador (autoritativo)**: abre `http://localhost:5505/tests/index.html` con Live Server.
+  - **Línea de comandos**: `node tests/run-in-node.js`. Sin npm, sin dependencias, ~80 ms.
+- Ambos runners reusan los mismos `tests/specs/*.spec.js`.
+
+---
+
+## 🚀 CARACTERÍSTICAS ANTERIORES
+
+### v3.1.4 — Bugs corregidos
 
 #### ✅ Descarga WebP Corregida
 - **Problema resuelto:** Descargas fallaban silenciosamente después de eliminar el archivo
@@ -30,11 +69,9 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 - Alto contraste garantizado
 - Colores vibrantes y profesionales
 
----
+### v3.1.3 — Drag & Drop ultra intuitivo, reglas métricas y zoom optimizado
 
-## ⭐ CARACTERÍSTICAS v3.1.3
-
-### 🎯 SISTEMA DRAG & DROP ULTRA INTUITIVO
+#### 🎯 SISTEMA DRAG & DROP ULTRA INTUITIVO
 **Sistema completamente rediseñado** para posicionar marcas de agua:
 
 - 🔵 **Bordes Visuales**: Azul para texto, naranja para imagen
@@ -51,7 +88,7 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 4. ¡Listo! Arrastra cuantas veces quieras
 5. Al descargar, la imagen estará limpia sin bordes
 
-### 📐 SISTEMA DE REGLAS MÉTRICAS Y COORDENADAS
+#### 📐 SISTEMA DE REGLAS MÉTRICAS Y COORDENADAS
 **Nueva herramienta profesional** para medición precisa:
 
 - 📏 **Reglas Métricas**: Horizontal (X) y vertical (Y) con marcas cada 50px
@@ -66,7 +103,7 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 3. Mueve el cursor sobre la imagen para ver coordenadas
 4. Las líneas guía siguen al cursor automáticamente
 
-### 🖱️ ZOOM OPTIMIZADO
+#### 🖱️ ZOOM OPTIMIZADO
 **Control preciso sin accidentes**:
 
 - ✅ **Desktop**: Zoom solo con botones (+, -, 🔍)
@@ -74,30 +111,26 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 - ✅ **Móvil**: Mantiene gestos táctiles y scroll wheel
 - 💡 **Motivo**: Evitar cambios accidentales con Magic Mouse/trackpad
 
----
+### v3.1.2 — Feedback visual, geolocalización y secciones colapsables
 
-## 🚀 CARACTERÍSTICAS ANTERIORES
-
-### v3.1.2
-
-### 🎨 FEEDBACK VISUAL DE ESTADO
+#### 🎨 FEEDBACK VISUAL DE ESTADO
 - 🔴🟢 Botones con indicadores de color dinámicos
 - Vista previa de imágenes cargadas en miniatura
 - Confirmación visual inmediata de acciones
 
-### 📍 GEOLOCALIZACIÓN MEJORADA
+#### 📍 GEOLOCALIZACIÓN MEJORADA
 - Obtención automática de coordenadas GPS
 - Mensajes de estado contextuales (no intrusivos)
 - Indicadores de éxito/error debajo de los campos
 
-### 🎯 SECCIONES COLAPSABLES
+#### 🎯 SECCIONES COLAPSABLES
 - Todas las secciones principales son colapsables/expandibles
 - Soporte para navegación por teclado (Enter/Space)
 - Minimización automática del marco del card
 
-## 🚀 CARACTERÍSTICAS v3.1
+### v3.1 — Atajos de teclado, batch, capas de texto y recorte
 
-### ⌨️ ATAJOS DE TECLADO (MAC)
+#### ⌨️ ATAJOS DE TECLADO (MAC)
 - ⌘+Z / ⌘+⇧+Z: Deshacer/Rehacer
 - ⌘+S: Guardar
 - ⌘+⇧+C: Copiar al portapapeles
@@ -105,28 +138,28 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 - ⌘+T: Capas de texto
 - ⌘+R: Recorte
 
-### 📦 PROCESAMIENTO POR LOTES
+#### 📦 PROCESAMIENTO POR LOTES
 - Hasta 50 imágenes simultáneas
 - Exportación automática en ZIP
 - Barra de progreso en tiempo real
 
-### 🎨 CAPAS DE TEXTO
+#### 🎨 CAPAS DE TEXTO
 - Hasta 10 capas independientes
 - 20+ Google Fonts
 - Efectos avanzados
 
-### ✂️ RECORTE INTELIGENTE
+#### ✂️ RECORTE INTELIGENTE
 - 7 proporciones predefinidas
 - Modo personalizado
 - Sugerencias automáticas
 
-### 📂 SECCIONES COLAPSABLES
+#### 📂 SECCIONES COLAPSABLES
 - 4 secciones principales: Metadatos, Marca de agua, Filtros, Configuración de salida
 - Minimización completa del marco del card
 - Delegación de eventos para máxima compatibilidad
 - Soporte para teclado (Enter/Space)
 
-### 📍 GEOLOCALIZACIÓN MEJORADA
+#### 📍 GEOLOCALIZACIÓN MEJORADA
 - Obtención automática de coordenadas GPS
 - Feedback contextual en 3 estados (loading, success, error)
 - Mensajes no intrusivos debajo de los campos

@@ -1,6 +1,100 @@
-# 📝 CHANGELOG - MNEMOTAG v3.1
+# 📝 CHANGELOG - MNEMOTAG v3.2
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
+
+---
+
+## [3.2.16] - 2026-04-08
+
+### Changed
+- **`.gitignore`**: añadida sección para `.claude/`, el directorio donde Claude Code guarda estado local del agente y los permisos aprobados por sesión. No es código del proyecto, contiene rutas absolutas específicas de la máquina del desarrollador y cambia constantemente entre sesiones, así que no debe trackearse.
+- Sincronización menor: `<title>` de `index.html` a `v3.2.16`, nota de versión en `CLAUDE.md`.
+
+---
+
+## [3.2.15] - 2026-04-08
+
+### Added
+- **Escritura real de EXIF en JPEG** vía `piexifjs@1.0.6` (cargada desde jsdelivr CDN). La promesa de "EXIF metadata editor" del marketing del proyecto **ahora es real** para JPEG.
+- Nuevos métodos en `MetadataManager` (`js/managers/metadata-manager.js`):
+  - `buildExifObject(metadata)` — construye un objeto piexif a partir de los campos del formulario.
+  - `embedExifInJpegBlob(blob)` (async) — embebe EXIF en un Blob JPEG.
+  - `embedExifInJpegDataUrl(dataUrl)` (sync) — gemela para el camino de descarga con `<a download>`.
+- Mapeo de campos: `title→ImageDescription`, `author→Artist`, `copyright→Copyright`, `software→Software`, `createdAt→DateTimeOriginal+DateTime`, `lat/lon/alt→GPS IFD` (con refs N/S/E/W y rationals DMS).
+- 6 tests unitarios nuevos en `tests/specs/metadata-manager.spec.js` + 4 tests de regresión en `tests/specs/regression.spec.js`. Total: **67 tests** (antes 57).
+
+### Changed
+- `js/main.js`: el flujo de descarga (`downloadImage` y `downloadImageWithProgress`) ahora incrusta EXIF en los **4 puntos** de descarga (ambos métodos × ambas rutas: `showSaveFilePicker` con Blob y fallback `<a download>` con dataURL).
+- El stub `applyMetadataToImage()` se mantiene para preservar `localStorage` entre sesiones (sigue siendo útil para recordar el autor entre cargas).
+
+### Notes
+- **`description` y `keywords` no se incrustan** porque EXIF no tiene tags estándar limpios para ellos. Microsoft `XPSubject`/`XPComment` requieren UTF-16 LE y son inconsistentes entre lectores.
+- **`license`** se bundlea dentro del string `copyright` vía `generateCopyright()`.
+- **PNG, WebP y AVIF siguen sin metadatos**: cada formato necesitaría su propia librería (PNG `tEXt`/`iTXt` chunks, WebP RIFF chunks, AVIF ISOBMFF boxes).
+
+---
+
+## [3.2.14] - 2026-04-08
+
+### Added
+- **Runner de tests para Node** (`tests/run-in-node.js`) que ejecuta los mismos `tests/specs/*.spec.js` del runner browser pero desde línea de comandos. Polyfills mínimos: `document` stub, `localStorage` con `Map`, `performance.now`, `fetch` aliasado a `fs.readFileSync`. Sin npm, sin `package.json`, sin `node_modules` — solo módulos nativos de Node (`fs`, `path`, `vm`).
+- Comando: `node tests/run-in-node.js`. Tiempo de ejecución: ~80 ms para los 57 tests.
+
+### Changed
+- `CLAUDE.md`: sección "Running and developing" actualizada con la jerarquía de los dos runners — **browser autoritativo** (DOM real, Canvas real, fetch real), **Node como atajo rápido** para pre-commit y agentes que no tienen browser. Si algún test futuro toca Canvas/layout real, solo el browser puede verificarlo de verdad.
+
+---
+
+## [3.2.13] - 2026-04-08
+
+### Changed
+- **Strict mode activado** en los 16 archivos de `js/managers/` y `js/utils/`, más `js/image-processor.js` (worker script). Previene asignaciones implícitas a globales y otros errores silenciosos del sloppy mode.
+- `js/main.js` queda **sin tocar** intencionalmente: tiene `let currentImage`, `let canvas`, etc. en script-scope global accedidos desde otros managers, y strict mode podría exponer asignaciones implícitas que ahora son silenciosas. Requiere tests más exhaustivos antes de migrarse.
+
+### Removed
+- `window.removeBatchImage` ya no se expone como global. Era necesaria para el viejo `onclick="removeBatchImage(${img.id})"` del listado del batch, pero tras el refactor del XSS en 3.2.12 el botón se engancha vía `addEventListener` directamente. Comentario en su lugar explica el motivo del hueco.
+
+### Security (nota, no fix activo)
+- **Hallazgo documentado para futura tanda**: `js/managers/ui-manager.js:108,169,227` tiene un patrón XSS latente similar al del batch — interpola `${config.action.handler}` dentro de `onclick="..."` en el HTML de los toasts. **No está activo** (ninguna llamada actual del proyecto pasa un `action.handler` — la única referencia que existe es una línea comentada en `metadata-manager.js:146`), pero el código vulnerable sigue ahí y merece su propia tanda de seguridad.
+
+---
+
+## [3.2.12] - 2026-04-08
+
+### Security
+- **Fix XSS crítico** en `updateBatchImagesList` (`js/main.js`). El listado del procesamiento por lotes interpolaba `img.name`, `img.dataUrl` e `img.id` directamente dentro de `innerHTML = batchImages.map(\`...\`)` sin escape. Refactorizado a construcción DOM segura con `createElement` + `textContent` + `addEventListener`. **Vector real**: un archivo con nombre `evil"><img src=x onerror=alert(1)>.jpg` ejecutaba JS al renderizar.
+
+### Fixed
+- **Worker pool resucitado.** `js/managers/worker-manager.js:16` declaraba `workerScript: 'workers/image-processor.js'`, pero el archivo real está en `js/image-processor.js`. Los `new Worker(...)` fallaban siempre en silencio y todo el procesamiento de filtros caía permanentemente al fallback de hilo principal (`js/utils/fallback-processor.js`). Path corregido a `'js/image-processor.js'`.
+- **Toast falaz eliminado** (`js/main.js`). Tras una descarga, la UI mostraba "Imagen descargada con metadatos: ..." afirmando algo que el código nunca hizo. `MetadataManager.applyMetadataToImage()` solo guardaba en `localStorage`. El toast genuino "Imagen guardada exitosamente en formato …" sigue saliendo. (Esta versión todavía no escribe EXIF — eso llegó en 3.2.15.)
+
+### Added
+- **Suite de tests completa** en `tests/`. Mini framework casero (`tests/test-runner.js`, ~250 líneas, sin dependencias) con `describe`/`it`/`expect`. Specs cubren `AppConfig`, `helpers`, `SecurityManager`, `MetadataManager`, `historyManager` y 6 tests de regresión para los 3 fixes anteriores. **57 tests** verde. Se ejecuta abriendo `http://localhost:5505/tests/index.html` con Live Server.
+- **Limpieza HTML Tier 1** (`index.html`):
+  - `maxlength` en `metaTitle` (60), `metaAuthor` (100), `metaCopyright` (200), `description` (160), `keywords` (200), `watermark-text` (100). Antes solo había contadores JavaScript que no impedían el desbordamiento.
+  - `min`/`max` físicos en `metaLatitude` (`-90`/`90`), `metaLongitude` (`-180`/`180`), `metaAltitude` (`-500`/`9000`).
+  - `aria-label` en los 4 headers colapsables (metadata, watermark, filters, output) y en el botón `autoCopyright`. Lectores de pantalla ya no anuncian "button" sin contexto.
+  - `<title>` sincronizado a `v3.2.12`.
+- `CLAUDE.md` (nuevo) — guía de arquitectura para futuras instancias de Claude Code, documentando trampas conocidas: el path histórico del worker, EXIF como stub (en aquel momento), tema con `[data-theme="dark"]` y no Tailwind `dark:`, wheel zoom desactivado en desktop a propósito.
+
+---
+
+## [3.2.0 - 3.2.11] - Cambios sin documentar en este CHANGELOG
+
+Estos commits son anteriores a la introducción del CHANGELOG estructurado en esta línea de versiones. Para detalle completo, consultar `git log`. Lista de commit messages tal cual:
+
+- **3.2.11** – Reparar creación de la descarga y la sección 5
+- **3.2.10** – Eliminar línea discontinua naranja en la imagen descargada
+- **3.2.9** – Implementación del botón escala
+- **3.2.8** – Eliminar el zoom del trackpad de las pantallas > 768px
+- **3.2.7** – Actualización de la personalización de las marcas de agua
+- **3.2.6** – Cambiar estilo de los botones de abajo en el modo oscuro
+- **3.2.5** – Reparar el cierre de las secciones y las notificaciones
+- **3.2.4** – Actualizar documentación
+- **3.2.3** – Mejorar los botones de seleccionar archivo
+- **3.2.2** – Centrar el modal
+- **3.2.1** – Función antes/después
+- **3.2.0** – Implementación de las nuevas funciones
 
 ---
 
@@ -807,7 +901,7 @@ Lanzamiento inicial de MnemoTag.
 
 ## 📊 ESTADÍSTICAS DEL PROYECTO
 
-### Versión 3.1.4 (Actual)
+### Versión 3.1.4
 - **Líneas de código totales:** ~8,650
 - **Archivos de código:** 20
 - **Documentación:** 7 archivos
@@ -833,6 +927,6 @@ Lanzamiento inicial de MnemoTag.
 
 ---
 
-**Última actualización:** 17 de noviembre de 2025  
-**Versión actual:** 3.1.4  
+**Última actualización:** 8 de abril de 2026  
+**Versión actual:** 3.2.16  
 **Estado:** ✅ Estable y listo para producción
