@@ -3928,25 +3928,14 @@
           UIManager.showInfo(`📄 Exportando en ${actualFormat} para máxima compatibilidad (solicitado: ${requestedFormat})`);
         }
         
-        // Obtener metadatos antes de la descarga
+        // Persistir los datos del formulario en localStorage para recordarlos
+        // entre sesiones. NO se incrustan en el archivo descargado: la escritura
+        // real de EXIF/XMP no está implementada (applyMetadataToImage es un stub).
         const metadata = MetadataManager.getMetadata();
-        const exifData = MetadataManager.applyMetadataToImage(canvas);
-        
-        // Mostrar resumen de metadatos si están presentes
+        MetadataManager.applyMetadataToImage(canvas);
+
         if (metadata.title || metadata.author || metadata.copyright || metadata.latitude) {
-          console.log('Metadatos aplicados:', metadata);
-          
-          let metaInfo = [];
-          if (metadata.title) metaInfo.push(`Título: ${metadata.title}`);
-          if (metadata.author) metaInfo.push(`Autor: ${metadata.author}`);
-          if (metadata.copyright) metaInfo.push(`Copyright: ${metadata.copyright}`);
-          if (metadata.latitude && metadata.longitude) {
-            metaInfo.push(`Ubicación: ${metadata.latitude.toFixed(4)}, ${metadata.longitude.toFixed(4)}`);
-          }
-          
-          if (metaInfo.length > 0) {
-            UIManager.showSuccess(`Imagen descargada con metadatos: ${metaInfo.join(' | ')}`);
-          }
+          console.log('Datos del formulario de metadatos (solo localStorage):', metadata);
         }
         
         // Obtener el título y sanitizar el nombre del archivo
@@ -6183,23 +6172,57 @@
       const container = document.getElementById('batch-images-list');
       if (!container) return;
 
+      // Limpiar contenedor sin innerHTML (evita XSS por nombre de archivo)
+      container.replaceChildren();
+
       if (batchImages.length === 0) {
-        container.innerHTML = '<p class="text-sm text-gray-500 text-center py-4">No hay imágenes agregadas</p>';
+        const empty = document.createElement('p');
+        empty.className = 'text-sm text-gray-500 text-center py-4';
+        empty.textContent = 'No hay imágenes agregadas';
+        container.appendChild(empty);
         return;
       }
 
-      container.innerHTML = batchImages.map(img => `
-        <div class="batch-item">
-          <img src="${img.dataUrl}" alt="${img.name}" class="batch-item-thumbnail">
-          <div class="batch-item-info">
-            <div class="batch-item-name">${img.name}</div>
-            <div class="batch-item-size">${formatFileSize(img.size)}</div>
-          </div>
-          <button class="batch-item-remove" onclick="removeBatchImage(${img.id})">
-            <i class="fas fa-times"></i>
-          </button>
-        </div>
-      `).join('');
+      // Construir cada item con DOM API: img.name y img.dataUrl son datos
+      // controlados por el usuario y NUNCA deben interpolarse en HTML.
+      batchImages.forEach(img => {
+        const item = document.createElement('div');
+        item.className = 'batch-item';
+
+        const thumb = document.createElement('img');
+        thumb.src = img.dataUrl;
+        thumb.alt = img.name;
+        thumb.className = 'batch-item-thumbnail';
+        item.appendChild(thumb);
+
+        const info = document.createElement('div');
+        info.className = 'batch-item-info';
+
+        const name = document.createElement('div');
+        name.className = 'batch-item-name';
+        name.textContent = img.name;
+        info.appendChild(name);
+
+        const size = document.createElement('div');
+        size.className = 'batch-item-size';
+        size.textContent = formatFileSize(img.size);
+        info.appendChild(size);
+
+        item.appendChild(info);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'batch-item-remove';
+        removeBtn.addEventListener('click', () => removeBatchImage(img.id));
+
+        const icon = document.createElement('i');
+        icon.className = 'fas fa-times';
+        icon.setAttribute('aria-hidden', 'true');
+        removeBtn.appendChild(icon);
+
+        item.appendChild(removeBtn);
+        container.appendChild(item);
+      });
     }
 
     async function processBatch() {

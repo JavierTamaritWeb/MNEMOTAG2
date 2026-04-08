@@ -13,7 +13,7 @@ const WorkerManager = {
   
   // Configuración de workers
   config: {
-    workerScript: 'workers/image-processor.js',
+    workerScript: 'js/image-processor.js',
     defaultPoolSize: 2,
     maxRetries: 3,
     timeout: 30000, // 30 segundos

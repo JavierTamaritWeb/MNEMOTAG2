@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MnemoTag v3.1.2</title>
+  <title>MnemoTag v3.2.12</title>
   
   <!-- Favicon moderno con SVG -->
   <link rel="icon" type="image/svg+xml" href="images/favicon.svg">
@@ -138,7 +138,8 @@
                    role="button"
                    tabindex="0"
                    aria-expanded="true"
-                   aria-controls="metadata-content">
+                   aria-controls="metadata-content"
+                   aria-label="Mostrar u ocultar la sección de metadatos y copyright">
                 <h2 class="text-xl font-semibold">2. Metadatos y Copyright</h2>
                 <i class="fas fa-chevron-down section__icon" aria-hidden="true"></i>
               </div>
@@ -153,14 +154,16 @@
                       <label for="metaTitle">Título</label>
                       <input type="text" id="metaTitle" name="metaTitle"
                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
-                             placeholder="TÍTULO DE LA IMAGEN">
+                             placeholder="TÍTULO DE LA IMAGEN"
+                             maxlength="60">
                       <div class="char-counter" id="title-counter">0/60 caracteres</div>
                     </div>
                     <div class="metadata-field">
                       <label for="metaAuthor">Autor</label>
                       <input type="text" id="metaAuthor" name="metaAuthor"
                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
-                             placeholder="NOMBRE DEL AUTOR">
+                             placeholder="NOMBRE DEL AUTOR"
+                             maxlength="100">
                     </div>
                   </div>
                   
@@ -171,9 +174,10 @@
                       <div class="copyright-input-group">
                         <input type="text" id="metaCopyright" name="metaCopyright"
                                class="flex-1 px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
-                               placeholder="© 2025 TU NOMBRE">
-                        <button type="button" class="copyright-generator border border-gray-300 px-3" id="autoCopyright" title="Generar copyright automático">
-                          <i class="fas fa-magic"></i>
+                               placeholder="© 2025 TU NOMBRE"
+                               maxlength="200">
+                        <button type="button" class="copyright-generator border border-gray-300 px-3" id="autoCopyright" title="Generar copyright automático" aria-label="Generar copyright automático">
+                          <i class="fas fa-magic" aria-hidden="true"></i>
                         </button>
                       </div>
                     </div>
@@ -216,13 +220,13 @@
                     <div class="geo-grid">
                       <input type="number" id="metaLatitude" name="metaLatitude"
                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
-                             placeholder="LATITUD" step="any">
+                             placeholder="LATITUD" step="any" min="-90" max="90">
                       <input type="number" id="metaLongitude" name="metaLongitude"
                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
-                             placeholder="LONGITUD" step="any">
+                             placeholder="LONGITUD" step="any" min="-180" max="180">
                       <input type="number" id="metaAltitude" name="metaAltitude"
                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
-                             placeholder="ALTITUD (M)" step="any">
+                             placeholder="ALTITUD (M)" step="any" min="-500" max="9000">
                     </div>
                     <small class="location-status gps-status" id="locationStatus">
                       Haz clic en "Ubicación actual" para obtener coordenadas GPS
@@ -234,14 +238,16 @@
                     <label for="description" class="block text-gray-700 font-medium mb-2 form-label">Descripción</label>
                     <textarea id="description" name="description" rows="3"
                               placeholder="DESCRIBE BREVEMENTE EL CONTENIDO DE LA IMAGEN: PAISAJE, RETRATO, EVENTO, OBJETO, ETC. ESTA INFORMACIÓN AYUDARÁ A CATALOGAR Y ENCONTRAR LA IMAGEN MÁS FÁCILMENTE."
-                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-textarea"></textarea>
+                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-textarea"
+                              maxlength="160"></textarea>
                     <div class="char-counter" id="description-counter">0/160 caracteres</div>
                   </div>
                   <div class="mb-4">
                     <label for="keywords" class="block text-gray-700 font-medium mb-2 form-label">Palabras clave (separadas por comas)</label>
                     <input type="text" id="keywords" name="keywords"
                            placeholder="NATURALEZA, PAISAJE, MONTAÑA, FOTOGRAFÍA, VIAJE, AVENTURA, CIELO, NUBES"
-                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input">
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
+                           maxlength="200">
                     <div class="char-counter" id="keywords-counter">0/200 caracteres</div>
                   </div>
                   <div>
@@ -312,7 +318,8 @@
                    role="button"
                    tabindex="0"
                    aria-expanded="true"
-                   aria-controls="watermark-content">
+                   aria-controls="watermark-content"
+                   aria-label="Mostrar u ocultar la sección de marca de agua">
                 <h2 class="text-xl font-semibold">3. Añadir marca de agua</h2>
                 <i class="fas fa-chevron-down section__icon" aria-hidden="true"></i>
               </div>
@@ -342,7 +349,8 @@
                       <div class="mb-4">
                         <label for="watermark-text" class="block text-gray-700 font-medium mb-2 form-label">Texto</label>
                         <input type="text" id="watermark-text" name="watermark-text"
-                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input">
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
+                               maxlength="100">
                       </div>
                       <div class="mb-4">
                         <label for="watermark-font" class="block text-gray-700 font-medium mb-2 form-label">Fuente</label>
@@ -536,7 +544,8 @@
                  role="button"
                  tabindex="0"
                  aria-expanded="true"
-                 aria-controls="filters-content">
+                 aria-controls="filters-content"
+                 aria-label="Mostrar u ocultar la sección de filtros y ajustes">
               <h2 class="text-xl font-semibold">4. Filtros y Ajustes</h2>
               <i class="fas fa-chevron-down section__icon" aria-hidden="true"></i>
             </div>
@@ -630,7 +639,8 @@
                  role="button"
                  tabindex="0"
                  aria-expanded="true"
-                 aria-controls="output-content">
+                 aria-controls="output-content"
+                 aria-label="Mostrar u ocultar la sección de configuración de salida">
               <h2 class="text-xl font-semibold">5. Configuración de salida</h2>
               <i class="fas fa-chevron-down section__icon" aria-hidden="true"></i>
             </div>

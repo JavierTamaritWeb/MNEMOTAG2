@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MnemoTag — Tests</title>
+  <style>
+    :root {
+      --bg: #0f1115;
+      --fg: #e6e6e6;
+      --muted: #8a8f98;
+      --pass: #2ecc71;
+      --fail: #e74c3c;
+      --line: #232730;
+      --code-bg: #1a1d24;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                   "Helvetica Neue", Arial, sans-serif;
+      margin: 0;
+      padding: 24px;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.5;
+    }
+    header {
+      max-width: 900px;
+      margin: 0 auto 24px;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 16px;
+    }
+    h1 {
+      margin: 0 0 4px;
+      font-size: 22px;
+      letter-spacing: -0.01em;
+    }
+    .lead {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .summary {
+      margin: 12px 0 0;
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 14px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      display: inline-block;
+    }
+    .summary.ok { background: rgba(46, 204, 113, 0.12); color: var(--pass); }
+    .summary.fail { background: rgba(231, 76, 60, 0.12); color: var(--fail); }
+    main {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .suite {
+      margin-bottom: 24px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px 20px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .suite h2 {
+      margin: 0 0 12px;
+      font-size: 16px;
+      color: var(--fg);
+    }
+    .suite ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .test {
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 13px;
+      padding: 4px 0;
+    }
+    .test.passed { color: var(--pass); }
+    .test.failed { color: var(--fail); }
+    .error {
+      margin: 6px 0 6px 18px;
+      padding: 8px 10px;
+      background: var(--code-bg);
+      border-left: 3px solid var(--fail);
+      border-radius: 4px;
+      color: var(--fg);
+      font-size: 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    footer {
+      max-width: 900px;
+      margin: 24px auto 0;
+      padding-top: 16px;
+      border-top: 1px solid var(--line);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    code {
+      background: var(--code-bg);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>MnemoTag — Tests</h1>
+    <p class="lead">
+      Suite de tests unitarios y de regresión. Sin dependencias, sin npm.
+      Sirve la raíz del proyecto con Live Server (port 5505) y abre
+      <code>http://localhost:5505/tests/index.html</code>.
+    </p>
+    <div id="test-summary" class="summary">corriendo...</div>
+  </header>
+
+  <main id="test-results"></main>
+
+  <footer>
+    Si ves errores de <code>fetch</code> en la consola, asegúrate de servir el
+    proyecto por HTTP. Abrir el archivo con <code>file://</code> rompe los tests
+    de regresión que leen el código fuente.
+  </footer>
+
+  <!-- 1. Código de la app que vamos a testear (ojo al orden de carga) -->
+  <script src="../js/utils/app-config.js"></script>
+  <script src="../js/utils/helpers.js"></script>
+  <script src="../js/managers/security-manager.js"></script>
+  <script src="../js/managers/metadata-manager.js"></script>
+  <script src="../js/managers/history-manager.js"></script>
+
+  <!-- 2. Mini framework de tests -->
+  <script src="test-runner.js"></script>
+
+  <!-- 3. Specs (cada uno registra sus describe/it) -->
+  <script src="specs/app-config.spec.js"></script>
+  <script src="specs/helpers.spec.js"></script>
+  <script src="specs/security-manager.spec.js"></script>
+  <script src="specs/metadata-manager.spec.js"></script>
+  <script src="specs/history-manager.spec.js"></script>
+  <script src="specs/regression.spec.js"></script>
+
+  <!-- 4. Ejecutar -->
+  <script>
+    // Esperar al DOMContentLoaded para asegurar que #test-results existe
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', runAllTests);
+    } else {
+      runAllTests();
+    }
+  </script>
+</body>
+</html>
