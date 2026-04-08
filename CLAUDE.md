@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-MnemoTag is a **client-side, single-page** image editor (vanilla JS, no framework, no build step). It applies filters, adds text/image watermarks, crops, and exports JPEG/PNG/WebP/AVIF — all in the browser. The UI also exposes an "EXIF metadata" form, but **that part is a stub** — see "EXIF/metadata writing is a stub" below before assuming it works. Documentation is in Spanish; UI strings, comments, and commit messages are in Spanish too.
+MnemoTag is a **client-side, single-page** image editor (vanilla JS, no framework, no build step). It applies filters, adds text/image watermarks, crops, and exports JPEG/PNG/WebP/AVIF — all in the browser. **EXIF metadata writing works for JPEG only** (via piexifjs CDN) — PNG/WebP/AVIF still come out without metadata. See "EXIF/metadata writing — JPEG only" below for details. Documentation is in Spanish; UI strings, comments, and commit messages are in Spanish too.
 
 ## Running and developing
 
@@ -14,8 +14,8 @@ There is no `package.json`, no bundler, no test framework. The app is a static s
 - **No build, no lint.** Tests live in `tests/` and have **two runners** that share the same specs:
   - **Browser runner (authoritative).** `tests/index.html` + `tests/test-runner.js` (~250-line custom mini-framework, zero dependencies). Serve the project root with Live Server and open `http://localhost:5505/tests/index.html`. This is the source of truth — it executes against a real DOM, real Canvas, real `fetch()`. Use it before any release.
   - **Node runner (fast / CI / agent-friendly).** `tests/run-in-node.js` runs the same `tests/specs/*.spec.js` files inside a `vm.createContext` with minimal polyfills (`document`, `localStorage`, `performance`, and `fetch` aliased to `fs.readFileSync`). Command: `node tests/run-in-node.js`. Finishes in ~80 ms. No npm, no `package.json`, no `node_modules` — uses only Node's built-in `fs`/`path`/`vm`. Use it as a smoke check before committing, or from any agent that doesn't have a browser. **Caveat:** because the DOM is stubbed, any future test that touches a real `Canvas` 2D context, real layout, or live event dispatch will pass in Node but only the browser runner can truly verify it.
-  - Specs cover `AppConfig`, `helpers`, `SecurityManager`, `MetadataManager`, `historyManager`, plus regression tests for the XSS-in-batch / worker-path / falsy-metadata-toast bugs that were fixed in this codebase. Current count: **57 tests**, all green.
-- **External deps are CDN-loaded** in `index.html` (Tailwind 2.2.19, Font Awesome 6.4.0, JSZip 3.10.1, Google Fonts). There is nothing to `npm install`.
+  - Specs cover `AppConfig`, `helpers`, `SecurityManager`, `MetadataManager` (including the JPEG EXIF embedding methods), `historyManager`, plus regression tests for the XSS-in-batch / worker-path / falsy-metadata-toast bugs and for the EXIF integration. Current count: **67 tests**, all green.
+- **External deps are CDN-loaded** in `index.html` (Tailwind 2.2.19, Font Awesome 6.4.0, JSZip 3.10.1, piexifjs 1.0.6, Google Fonts). There is nothing to `npm install`.
 - **Cache busting:** only one `<script>` currently uses a cache-busting query string — `metadata-manager.js?v=1760378841` in `index.html:1488`. Bump it (or add the same trick to other files) when a hard refresh isn't picking up changes during development.
 
 ## Architecture
@@ -43,7 +43,7 @@ js/
     ├── security-manager.js     # XSS sanitization, file/dimension validation
     ├── worker-manager.js       # Web Worker pool (transferable objects, job queue) — script path lives at js/image-processor.js
     ├── history-manager.js      # Undo/redo stack
-    ├── metadata-manager.js     # Form values + localStorage persistence (NOT real EXIF — see stub note below)
+    ├── metadata-manager.js     # Form values + localStorage + JPEG EXIF writing via piexifjs
     ├── filter-loading-manager.js  # Lazy filter module loading
     ├── filter-manager.js       # Filter pipeline + presets
     ├── ui-manager.js           # Toasts, modals, collapsible sections, hero
@@ -80,9 +80,21 @@ Watermarks (text and image) can be free-positioned by dragging. `main.js` mainta
 
 When `isRulerMode` is true, `main.js` injects DOM-level ruler/guide elements (tracked in `rulerElements`) on top of the canvas. They're plain DOM (not drawn to canvas), so they never end up in exports. Guide-line color is chosen by sampling background brightness via `getImageData()` — keep that in mind if you change canvas pixel formats.
 
-### EXIF/metadata writing is a stub
+### EXIF/metadata writing — JPEG only
 
-Despite the project marketing itself as an "EXIF metadata editor", **no metadata is ever written into the exported file**. `MetadataManager.applyMetadataToImage()` (`js/managers/metadata-manager.js:249-272`) only stores the form values in `localStorage` — its own comment admits this: *"Crear metadatos EXIF simulados (en un proyecto real usarías una librería como piexifjs)"*. The downloaded JPEG/PNG/WebP comes out clean. The form values are kept across sessions (so the `Author` field is remembered) and used as the filename basename, but that's the extent of it. If you implement real EXIF writing, JPEG would need `piexifjs` (or similar), PNG needs `tEXt`/`iTXt` chunk manipulation, and WebP needs RIFF `EXIF`/`XMP ` chunk manipulation — three different code paths.
+EXIF writing is implemented **only for JPEG** via `piexifjs@1.0.6` (loaded by CDN in `index.html`). PNG, WebP and AVIF exports still come out without metadata — those formats would need different libraries (PNG `tEXt`/`iTXt` chunks, WebP RIFF chunks, AVIF ISOBMFF boxes).
+
+**Implementation:**
+- `MetadataManager.buildExifObject(metadata)` builds a piexif-compatible object from the form fields. Maps `title → ImageDescription`, `author → Artist`, `copyright → Copyright`, `software → Software`, `createdAt → DateTimeOriginal + DateTime`, and `latitude/longitude/altitude → GPS IFD` (with N/S/E/W refs and DMS rationals via `piexif.GPSHelper.degToDmsRational`). Returns `null` if there is nothing to write or if `piexif` isn't loaded.
+- `MetadataManager.embedExifInJpegBlob(blob)` (async) takes a JPEG `Blob`, converts it to a dataURL via `FileReader`, calls `piexif.dump()` + `piexif.insert()`, and rebuilds a new `Blob` from the resulting base64. Returns the **original** blob if it isn't JPEG, if `piexif` is missing, or if the form has no data — graceful degradation, never throws.
+- `MetadataManager.embedExifInJpegDataUrl(dataUrl)` (sync) is the dataURL-only twin used in the `<a download>` fallback path.
+- `main.js` calls these in **four places** in the download flow: `downloadImage` and `downloadImageWithProgress`, each with both the `showSaveFilePicker` path (Blob) and the `<a download>` fallback (dataURL).
+
+**Form fields that are NOT written to EXIF:**
+- `description` and `keywords`: EXIF has no clean native tag for them. Microsoft's `XPSubject`/`XPComment` exist but require UTF-16 LE encoding and are flaky across readers; they're skipped.
+- `license`: bundled into the `copyright` string by `generateCopyright()` instead.
+
+`MetadataManager.applyMetadataToImage()` (`metadata-manager.js:249-272`) **still exists** and still only writes to `localStorage` — that part is unchanged. It's now a complement to `embedExifInJpegBlob`, not a replacement: localStorage preserves form values across sessions, while `embedExifInJpegBlob` actually writes them into the file.
 
 ### Theming
 
@@ -94,6 +106,6 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 
 ## Versioning and commits
 
-**The version number is partially desynchronized.** `index.html:6` `<title>` is kept in sync with the latest commit version (`v3.2.14` at the time of writing) during each cleanup pass, but `README.md` and `CHANGELOG.md` still say `3.1.4`. `git log` is the most up-to-date source. If you cut a real release, sync `README.md`, `CHANGELOG.md`, and `docs/INDICE_DOCUMENTACION.md` to match.
+**The version number is partially desynchronized.** `index.html:6` `<title>` is kept in sync with the latest commit version (`v3.2.15` at the time of writing) during each cleanup pass, but `README.md` and `CHANGELOG.md` still say `3.1.4`. `git log` is the most up-to-date source. If you cut a real release, sync `README.md`, `CHANGELOG.md`, and `docs/INDICE_DOCUMENTACION.md` to match.
 
 Commit messages follow `Versión X.Y.Z - <descripción>` in Spanish — match this style. `CHANGELOG.md` and the docs under `docs/` are kept hand-updated per release.

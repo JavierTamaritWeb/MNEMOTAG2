@@ -3987,12 +3987,14 @@
             // La API recordará la ubicación automáticamente
             
             const writable = await handle.createWritable();
-            const blob = await canvasToBlob(canvas, finalMimeType, outputQuality);
+            let blob = await canvasToBlob(canvas, finalMimeType, outputQuality);
+            // Embeber EXIF si es JPEG (no-op para otros formatos o sin metadatos)
+            blob = await MetadataManager.embedExifInJpegBlob(blob);
             await writable.write(blob);
             await writable.close();
-            
+
             console.log('✅ Archivo guardado correctamente:', fullFilename);
-            
+
             const qualityText = finalFormat === 'png' ? '' : ` (calidad: ${Math.round(outputQuality * 100)}%)`;
             showSuccess(`Imagen guardada exitosamente en formato ${finalFormat.toUpperCase()}${qualityText}!`);
             return;
@@ -4005,20 +4007,23 @@
             console.warn('Error con File System Access API, usando fallback:', saveError);
           }
         }
-        
+
         // Fallback para navegadores que no soportan la API o si falla
         const link = document.createElement('a');
         link.download = fullFilename;
-        link.href = canvas.toDataURL(finalMimeType, outputQuality);
-        
+        // Embeber EXIF si es JPEG (no-op para otros formatos o sin metadatos)
+        link.href = MetadataManager.embedExifInJpegDataUrl(
+          canvas.toDataURL(finalMimeType, outputQuality)
+        );
+
         // Simular click
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        
+
         const qualityText = finalFormat === 'png' ? '' : ` (calidad: ${Math.round(outputQuality * 100)}%)`;
         showSuccess(`Imagen descargada en formato ${finalFormat.toUpperCase()}${qualityText}!`);
-        
+
       } catch (error) {
         console.error('Error al descargar:', error);
         showError('Error al descargar la imagen.');
@@ -4753,15 +4758,17 @@
             // La API recordará la ubicación automáticamente
             
             const writable = await handle.createWritable();
-            const blob = await canvasToBlob(canvas, finalMimeType, outputQuality);
+            let blob = await canvasToBlob(canvas, finalMimeType, outputQuality);
+            // Embeber EXIF si es JPEG (no-op para otros formatos o sin metadatos)
+            blob = await MetadataManager.embedExifInJpegBlob(blob);
             await writable.write(blob);
             await writable.close();
-            
+
             console.log('✅ Archivo guardado correctamente:', fullFilename);
-            
+
             // Hide progress bar
             hideProgressBar();
-            
+
             const qualityText = finalFormat === 'png' ? '' : ` (calidad: ${Math.round(outputQuality * 100)}%)`;
             showSuccess(`Imagen guardada exitosamente en formato ${finalFormat.toUpperCase()}${qualityText}!`);
             return;
@@ -4775,11 +4782,14 @@
             console.warn('Error con File System Access API, usando fallback:', saveError);
           }
         }
-        
+
         // Fallback para navegadores que no soportan la API o si falla
         const link = document.createElement('a');
         link.download = fullFilename;
-        link.href = canvas.toDataURL(finalMimeType, outputQuality);
+        // Embeber EXIF si es JPEG (no-op para otros formatos o sin metadatos)
+        link.href = MetadataManager.embedExifInJpegDataUrl(
+          canvas.toDataURL(finalMimeType, outputQuality)
+        );
         
         // Simular click
         document.body.appendChild(link);

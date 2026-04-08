@@ -382,6 +382,147 @@ const MetadataManager = {
       console.error('Error al importar metadatos:', error);
       return false;
     }
+  },
+
+  // ===== ESCRITURA REAL DE EXIF EN JPEG =====
+  // Estas funciones requieren `piexif` (cargado por CDN en index.html).
+  // Si la librería no está disponible o el formato no es JPEG, devuelven el
+  // input sin tocar — degradación elegante. Solo soportan JPEG; PNG/WebP/AVIF
+  // no llevan EXIF aquí (el blob/dataURL sale tal cual del canvas).
+
+  /**
+   * Construye el objeto EXIF a partir de los metadatos del formulario.
+   * @param {Object} metadata - Resultado de getMetadata()
+   * @returns {Object|null} Objeto compatible con piexif.dump(), o null si no
+   *                        hay nada que escribir.
+   */
+  buildExifObject: function(metadata) {
+    if (typeof piexif === 'undefined') return null;
+
+    const zeroth = {};
+    const exif = {};
+    const gps = {};
+    let hasAnyField = false;
+
+    if (metadata.title) {
+      zeroth[piexif.ImageIFD.ImageDescription] = String(metadata.title);
+      hasAnyField = true;
+    }
+    if (metadata.author) {
+      zeroth[piexif.ImageIFD.Artist] = String(metadata.author);
+      hasAnyField = true;
+    }
+    if (metadata.copyright) {
+      zeroth[piexif.ImageIFD.Copyright] = String(metadata.copyright);
+      hasAnyField = true;
+    }
+    if (metadata.software) {
+      zeroth[piexif.ImageIFD.Software] = String(metadata.software);
+      hasAnyField = true;
+    }
+
+    // Fecha de creación → DateTimeOriginal en formato "YYYY:MM:DD HH:MM:SS"
+    if (metadata.createdAt) {
+      try {
+        const d = new Date(metadata.createdAt);
+        if (!isNaN(d.getTime())) {
+          const pad = (n) => String(n).padStart(2, '0');
+          const exifDate = `${d.getFullYear()}:${pad(d.getMonth() + 1)}:${pad(d.getDate())} ` +
+                           `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+          exif[piexif.ExifIFD.DateTimeOriginal] = exifDate;
+          zeroth[piexif.ImageIFD.DateTime] = exifDate;
+          hasAnyField = true;
+        }
+      } catch (e) {
+        // Fecha inválida — la ignoramos en silencio
+      }
+    }
+
+    // GPS: solo si lat y lon son números válidos
+    const lat = typeof metadata.latitude === 'number' ? metadata.latitude : null;
+    const lon = typeof metadata.longitude === 'number' ? metadata.longitude : null;
+    if (lat !== null && lon !== null && !isNaN(lat) && !isNaN(lon)) {
+      gps[piexif.GPSIFD.GPSLatitudeRef] = lat < 0 ? 'S' : 'N';
+      gps[piexif.GPSIFD.GPSLatitude] = piexif.GPSHelper.degToDmsRational(Math.abs(lat));
+      gps[piexif.GPSIFD.GPSLongitudeRef] = lon < 0 ? 'W' : 'E';
+      gps[piexif.GPSIFD.GPSLongitude] = piexif.GPSHelper.degToDmsRational(Math.abs(lon));
+
+      const alt = typeof metadata.altitude === 'number' ? metadata.altitude : null;
+      if (alt !== null && !isNaN(alt)) {
+        gps[piexif.GPSIFD.GPSAltitudeRef] = alt < 0 ? 1 : 0;
+        // GPSAltitude es un rational [num, den]; multiplicamos x100 para conservar cm
+        gps[piexif.GPSIFD.GPSAltitude] = [Math.round(Math.abs(alt) * 100), 100];
+      }
+
+      hasAnyField = true;
+    }
+
+    if (!hasAnyField) return null;
+
+    return { '0th': zeroth, 'Exif': exif, 'GPS': gps };
+  },
+
+  /**
+   * Inserta EXIF en un dataURL JPEG. Sincrónico.
+   * @param {string} dataUrl - dataURL `data:image/jpeg;base64,...`
+   * @returns {string} dataURL con EXIF incrustado, o el original si no aplica.
+   */
+  embedExifInJpegDataUrl: function(dataUrl) {
+    if (typeof piexif === 'undefined') return dataUrl;
+    if (typeof dataUrl !== 'string') return dataUrl;
+    if (!dataUrl.startsWith('data:image/jpeg')) return dataUrl;
+
+    try {
+      const metadata = this.getMetadata();
+      const exifObj = this.buildExifObject(metadata);
+      if (!exifObj) return dataUrl;
+
+      const exifBytes = piexif.dump(exifObj);
+      return piexif.insert(exifBytes, dataUrl);
+    } catch (err) {
+      console.warn('No se pudo insertar EXIF en JPEG (dataURL):', err);
+      return dataUrl;
+    }
+  },
+
+  /**
+   * Inserta EXIF en un Blob JPEG. Asíncrono.
+   * @param {Blob} blob - Blob JPEG generado por canvas.toBlob()
+   * @returns {Promise<Blob>} Blob nuevo con EXIF incrustado, o el original si
+   *                          no aplica (no es JPEG, sin metadatos, sin librería).
+   */
+  embedExifInJpegBlob: async function(blob) {
+    if (typeof piexif === 'undefined') return blob;
+    if (!blob || blob.type !== 'image/jpeg') return blob;
+
+    try {
+      const metadata = this.getMetadata();
+      const exifObj = this.buildExifObject(metadata);
+      if (!exifObj) return blob;
+
+      // Blob → dataURL
+      const dataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error || new Error('FileReader error'));
+        reader.readAsDataURL(blob);
+      });
+
+      const exifBytes = piexif.dump(exifObj);
+      const newDataUrl = piexif.insert(exifBytes, dataUrl);
+
+      // dataURL → Blob (sin pasar por fetch para no depender de él)
+      const base64 = newDataUrl.split(',')[1];
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return new Blob([bytes], { type: 'image/jpeg' });
+    } catch (err) {
+      console.warn('No se pudo insertar EXIF en JPEG (blob):', err);
+      return blob;
+    }
   }
 };
 

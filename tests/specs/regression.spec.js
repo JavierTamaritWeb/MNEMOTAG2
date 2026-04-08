@@ -65,3 +65,28 @@ describe('Regresión — Toast falaz de metadatos (main.js)', function () {
     expect(src).toContain('Imagen guardada exitosamente');
   });
 });
+
+describe('Regresión — Escritura real de EXIF en JPEG', function () {
+  it('main.js llama a embedExifInJpegBlob después de canvasToBlob', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('MetadataManager.embedExifInJpegBlob');
+  });
+
+  it('main.js llama a embedExifInJpegDataUrl en el fallback de descarga', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('MetadataManager.embedExifInJpegDataUrl');
+  });
+
+  it('index.html carga piexifjs desde CDN', async function () {
+    const src = await fetchSource('../index.html');
+    expect(src).toContain('piexifjs');
+    expect(src).toContain('piexif.min.js');
+  });
+
+  it('metadata-manager.js define los tres métodos de embedding', async function () {
+    const src = await fetchSource('../js/managers/metadata-manager.js');
+    expect(src).toContain('buildExifObject');
+    expect(src).toContain('embedExifInJpegDataUrl');
+    expect(src).toContain('embedExifInJpegBlob');
+  });
+});

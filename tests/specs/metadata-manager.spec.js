@@ -53,3 +53,56 @@ describe('MetadataManager.validateMetadata', function () {
     expect(result.isValid).toBe(true);
   });
 });
+
+describe('MetadataManager — escritura EXIF en JPEG', function () {
+  it('expone los nuevos métodos de embedding', function () {
+    expect(typeof MetadataManager.buildExifObject).toBe('function');
+    expect(typeof MetadataManager.embedExifInJpegBlob).toBe('function');
+    expect(typeof MetadataManager.embedExifInJpegDataUrl).toBe('function');
+  });
+
+  it('buildExifObject devuelve null si no hay piexif disponible', function () {
+    // En el runner Node, piexif no está cargado: el método debe degradar.
+    // En el runner browser SÍ está, así que el resultado depende de si hay
+    // metadatos rellenados. Aquí solo verificamos la rama de degradación
+    // cuando piexif no existe en el sandbox de tests.
+    if (typeof piexif === 'undefined') {
+      const result = MetadataManager.buildExifObject({
+        title: 'Test',
+        author: 'Javier',
+      });
+      expect(result).toBeNull();
+    } else {
+      // En el browser: debe devolver objeto con sección "0th"
+      const result = MetadataManager.buildExifObject({
+        title: 'Test',
+        author: 'Javier',
+      });
+      expect(result).not.toBeNull();
+      expect(typeof result['0th']).toBe('object');
+    }
+  });
+
+  it('embedExifInJpegDataUrl devuelve la cadena tal cual si no es JPEG', function () {
+    const pngDataUrl = 'data:image/png;base64,iVBORw0KGgo=';
+    const result = MetadataManager.embedExifInJpegDataUrl(pngDataUrl);
+    expect(result).toBe(pngDataUrl);
+  });
+
+  it('embedExifInJpegDataUrl devuelve la cadena tal cual si la entrada no es string', function () {
+    expect(MetadataManager.embedExifInJpegDataUrl(null)).toBeNull();
+    expect(MetadataManager.embedExifInJpegDataUrl(undefined)).toBeUndefined();
+    expect(MetadataManager.embedExifInJpegDataUrl(42)).toBe(42);
+  });
+
+  it('embedExifInJpegBlob devuelve el blob tal cual si no es JPEG', async function () {
+    const fakePng = { type: 'image/png', size: 100 };
+    const result = await MetadataManager.embedExifInJpegBlob(fakePng);
+    expect(result).toBe(fakePng);
+  });
+
+  it('embedExifInJpegBlob devuelve el blob tal cual si es null/undefined', async function () {
+    expect(await MetadataManager.embedExifInJpegBlob(null)).toBeNull();
+    expect(await MetadataManager.embedExifInJpegBlob(undefined)).toBeUndefined();
+  });
+});
