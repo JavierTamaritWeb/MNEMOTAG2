@@ -4,6 +4,24 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.3.1] - 2026-04-08
+
+### Changed
+- **Previsualización del watermark más fluida durante el drag** (`js/main.js`):
+  - **RAF coalescing real** en `updatePreview` y `updatePreviewStandard`: nuevo flag `pendingPreviewRender` impide que múltiples `mousemove` encolen `requestAnimationFrame` independientes que se acumulan tras soltar el ratón. Ahora hay un solo render en vuelo a la vez.
+  - **Skipping de operaciones costosas durante el drag**: si `isDragging === true`, `updatePreviewStandard` se salta `applyCanvasFilters()` y `debouncedSaveHistory()` (este último llama internamente a `canvas.toDataURL()`, muy caro en imágenes grandes). Al soltar el drag, `handleDragEnd` y `handleTouchEnd` disparan un `updatePreview()` final completo para reaplicar filtros y guardar al historial.
+  - **Sincronización del overlay DOM**: `updatePreviewStandard` ahora invoca `showTextPositionMarker()` y `showPositionMarker()` cuando el modo es `custom`, no solo durante el drag. Antes el overlay del borde guía quedaba desfasado al cambiar `size`/`opacity` con sliders.
+  - **Forzar camino estándar durante el drag**: `updatePreview` no enruta al worker (`updatePreviewWithWorker`) si está en drag activo, aunque haya filtros pesados pendientes. Reduce coste por frame.
+  - Eliminados varios `console.log` ruidosos que se disparaban en cada frame durante el drag (`'⚠️ updatePreview…'`, `'🔄 Actualizando preview…'`, `'✅ Preview actualizado…'`, `'🔧 Usando Worker…'`).
+
+### Added
+- **Manejo de errores al cargar imagen del watermark** (`applyImageWatermarkOptimized` en `js/main.js:2584+`): añadidos `reader.onerror` y `watermarkImg.onerror`, ambos con `console.warn` y `UIManager.showError` informativos. Antes la carga de una imagen corrupta o ilegible fallaba en silencio.
+
+### Verification
+- 67/67 tests OK con `node tests/run-in-node.js` tras los cambios.
+
+---
+
 ## [3.3.0] - 2026-04-08
 
 ### Notes
@@ -944,5 +962,5 @@ Lanzamiento inicial de MnemoTag.
 ---
 
 **Última actualización:** 8 de abril de 2026  
-**Versión actual:** 3.3.0  
+**Versión actual:** 3.3.1  
 **Estado:** ✅ Estable y listo para producción

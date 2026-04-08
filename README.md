@@ -4,15 +4,33 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos.
 
-![Version](https://img.shields.io/badge/version-3.3.0-blue.svg)
+![Version](https://img.shields.io/badge/version-3.3.1-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 
 ---
 
-## ⭐ NOVEDADES v3.3.0
+## ⭐ NOVEDADES v3.3.1
 
-> **Release minor estable.** v3.3.0 consolida los cambios significativos acumulados en la línea 3.2.12–3.2.17: EXIF real en JPEG, suite de tests automatizados, fixes de seguridad críticos (XSS, worker pool), runner Node, limpieza HTML Tier 1 y `'use strict';` en todos los managers.
+> **Patch release.** Mejoras de fluidez en la previsualización de marcas de agua durante el arrastre.
+
+### 🎯 Previsualización del watermark más fluida
+
+- **RAF coalescing real durante el drag**: cada `mousemove` ya no encola un `requestAnimationFrame` independiente. Ahora hay un solo render en vuelo a la vez. Antes, los renders se acumulaban en imágenes grandes y se procesaban tras soltar el ratón → lag visible. Ahora el movimiento es notablemente más fluido.
+- **Filtros y `saveState` se pausan durante el drag**: las operaciones costosas (`applyCanvasFilters`, `canvas.toDataURL` para historial undo/redo) se saltan mientras el usuario está arrastrando un watermark. Al soltar, se ejecuta un render completo final con todo. Esto recorta drásticamente el coste por frame en imágenes ≥2400px.
+- **Bordes guía DOM sincronizados con cambios de input**: el overlay del borde guía ahora se actualiza cuando cambias `size`, `opacity`, etc. (no solo durante el drag). Antes el borde quedaba desfasado del watermark dibujado.
+- **Manejo de errores al cargar imagen del watermark**: el `FileReader` y la decodificación de `Image` ya tienen `onerror` con toast informativo. Antes una imagen corrupta fallaba en silencio.
+- **Logs de consola limpios**: eliminados los `console.log` ruidosos que se disparaban en cada frame durante el drag.
+
+### Tras el bump
+
+Esta versión es la línea base para los próximos fixes (v3.3.x). Las características anteriores siguen documentadas en el bloque histórico de abajo (CARACTERÍSTICAS ANTERIORES).
+
+---
+
+## ⭐ NOVEDADES v3.3.0 (consolidación previa)
+
+> **Release minor estable.** v3.3.0 consolidaba los cambios significativos acumulados en la línea 3.2.12–3.2.17: EXIF real en JPEG, suite de tests automatizados, fixes de seguridad críticos (XSS, worker pool), runner Node, limpieza HTML Tier 1 y `'use strict';` en todos los managers.
 
 ### ✅ EXIF JPEG: ahora funciona de verdad
 

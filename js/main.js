@@ -2327,52 +2327,73 @@
       // Ver initMouseWheelZoom() para la implementación con detección de dispositivo
     }
 
+    // Flag para coalescer múltiples llamadas a updatePreview en un solo RAF.
+    // Sin este flag, cada mousemove durante un drag encolaba un RAF
+    // independiente y los renders se acumulaban tras soltar el ratón.
+    let pendingPreviewRender = false;
+
     function updatePreview() {
       if (!currentImage || !ctx) {
-        console.log('⚠️ updatePreview: Sin imagen o contexto disponible');
         FilterLoadingManager.hideFilterLoading();
         return;
       }
-      
-      console.log('🔄 Actualizando preview con filtros optimizados');
-      
-      // Verificar si necesitamos usar worker para procesamiento pesado
-      if (FilterManager.shouldUseWorker()) {
+
+      // Durante un drag activo, forzamos siempre el camino estándar (rápido).
+      // El camino con worker se reserva para cambios de filtros pesados, no
+      // para reposicionamiento de marcas de agua.
+      if (!isDragging && FilterManager.shouldUseWorker()) {
         updatePreviewWithWorker();
       } else {
         updatePreviewStandard();
       }
     }
-    
+
     // Actualización estándar del preview (sin worker)
     function updatePreviewStandard() {
-      // Performance optimization: requestAnimationFrame for smooth rendering
+      // Coalescing: si ya hay un RAF en vuelo, no encolamos otro.
+      if (pendingPreviewRender) return;
+      pendingPreviewRender = true;
+
       requestAnimationFrame(() => {
+        pendingPreviewRender = false;
         try {
           // Clear canvas with optimized method
           ctx.clearRect(0, 0, canvas.width, canvas.height);
-          
+
           // Draw image with better quality
           ctx.imageSmoothingEnabled = true;
           ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
-          
+
           // Apply watermark with caching
           applyWatermarkOptimized();
-          
-          // Aplicar filtros CSS al canvas (con cache y loading states)
-          applyCanvasFilters();
-          
-          // Save state to history (debounced)
-          if (typeof debouncedSaveHistory === 'undefined') {
-            window.debouncedSaveHistory = SmartDebounce.intelligent('save-history', () => {
-              historyManager.saveState();
-            }, 1000);
+
+          // Sincronizar overlays DOM con la posición actual cuando estamos
+          // en modo personalizado (S1). Antes solo se actualizaban durante el
+          // drag, así que cambiar size/opacity dejaba el overlay desfasado.
+          const textPositionMode = document.getElementById('watermark-position')?.value;
+          const imagePositionMode = document.getElementById('watermark-image-position')?.value;
+          if (textPositionMode === 'custom' && customTextPosition && typeof showTextPositionMarker === 'function') {
+            showTextPositionMarker();
           }
-          debouncedSaveHistory();
-          
-          console.log('✅ Preview actualizado exitosamente');
-          
+          if (imagePositionMode === 'custom' && customImagePosition && typeof showPositionMarker === 'function') {
+            showPositionMarker();
+          }
+
+          // Saltar trabajo costoso durante un drag activo (P2):
+          // los filtros CSS y el saveState con canvas.toDataURL() son los
+          // dos puntos calientes. Al soltar el drag, handleDragEnd dispara
+          // un updatePreview() final completo.
+          if (!isDragging) {
+            applyCanvasFilters();
+
+            if (typeof debouncedSaveHistory === 'undefined') {
+              window.debouncedSaveHistory = SmartDebounce.intelligent('save-history', () => {
+                historyManager.saveState();
+              }, 1000);
+            }
+            debouncedSaveHistory();
+          }
         } catch (error) {
           console.error('❌ Error al actualizar preview:', error);
           FilterLoadingManager.hideFilterLoading();
@@ -2383,8 +2404,6 @@
     // Actualización del preview usando worker para filtros pesados
     async function updatePreviewWithWorker() {
       try {
-        console.log('🔧 Usando Worker para filtros pesados');
-        
         // Obtener datos de imagen para el worker
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = canvas.width;
@@ -2591,7 +2610,23 @@
           cache.lastWatermarkConfig = currentConfig;
           drawCachedWatermark(watermarkImg, currentConfig);
         };
+        watermarkImg.onerror = function() {
+          // R1: la decodificación de la imagen falló (archivo corrupto, formato
+          // no soportado, etc.). Antes esto era silencioso.
+          console.warn('No se pudo decodificar la imagen de la marca de agua');
+          if (typeof UIManager !== 'undefined' && UIManager.showError) {
+            UIManager.showError('No se pudo cargar la imagen de la marca de agua. Comprueba que el archivo no esté corrupto.');
+          }
+        };
         watermarkImg.src = e.target.result;
+      };
+      reader.onerror = function() {
+        // R1: el FileReader falló al leer el archivo (permiso denegado, I/O,
+        // archivo eliminado mientras se leía, etc.). Antes esto era silencioso.
+        console.warn('FileReader falló al leer la imagen de la marca de agua');
+        if (typeof UIManager !== 'undefined' && UIManager.showError) {
+          UIManager.showError('No se pudo leer el archivo de la marca de agua. Inténtalo de nuevo.');
+        }
       };
       reader.readAsDataURL(watermarkImageInput.files[0]);
     }
@@ -3106,6 +3141,11 @@
         UIManager.showSuccess(`${emoji} ${elementType} reposicionado correctamente`);
         dragTarget = null;
         canvas.style.cursor = 'default';
+
+        // Render completo final: durante el drag se saltaron applyCanvasFilters
+        // y debouncedSaveHistory para reducir lag. Ahora que terminó el drag,
+        // los volvemos a aplicar (P2).
+        updatePreview();
       }
     }
     
@@ -3194,6 +3234,10 @@
         const emoji = dragTarget === 'text' ? '📝' : '🖼️';
         UIManager.showSuccess(`${emoji} ${elementType} reposicionado correctamente`);
         dragTarget = null;
+
+        // Render completo final tras el drag táctil (P2): aplica filtros y
+        // saveState que se saltaron durante el arrastre.
+        updatePreview();
       }
     }
     
