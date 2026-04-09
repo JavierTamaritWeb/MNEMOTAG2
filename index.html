@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MnemoTag v3.3.11</title>
+  <title>MnemoTag v3.3.12</title>
   
   <!-- Favicon moderno con SVG -->
   <link rel="icon" type="image/svg+xml" href="images/favicon.svg">
@@ -635,7 +635,12 @@
                       </button>
                     </div>
                     
-                    <div class="mt-4">
+                    <div class="mt-4 flex flex-col gap-2">
+                      <!-- v3.3.12: Auto-mejorar (auto-balance) -->
+                      <button type="button" id="auto-balance-btn" class="btn btn-primary button--feature" title="Mejora automáticamente brillo y contraste analizando los percentiles 1% y 99% de luminosidad">
+                        <i class="fas fa-magic" aria-hidden="true"></i>
+                        Auto-mejorar imagen
+                      </button>
                       <button type="button" id="resetFilters" class="reset-filters-btn">
                         <i class="fas fa-undo" aria-hidden="true"></i>
                         RESETEAR FILTROS
@@ -1048,6 +1053,13 @@
                 </button>
                 <button id="ruler-toggle-btn" class="zoom-btn" title="Mostrar/Ocultar reglas métricas y coordenadas">
                   <i class="fas fa-ruler-combined"></i>
+                </button>
+                <!-- v3.3.12: Análisis visual -->
+                <button id="histogram-btn" class="zoom-btn" title="Mostrar histograma RGB y luminosidad">
+                  <i class="fas fa-chart-bar"></i>
+                </button>
+                <button id="palette-btn" class="zoom-btn" title="Extraer paleta de colores dominantes">
+                  <i class="fas fa-palette"></i>
                 </button>
               </div>
             </div>
@@ -1536,6 +1548,50 @@
             <i class="fas fa-info-circle"></i>
             Los atajos nativos de Mac (⌘+C, ⌘+V, ⌘+X) funcionan normalmente en campos de texto
           </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- v3.3.12: Modal de Histograma RGB / Luminosidad -->
+    <div id="histogram-modal" class="analysis-modal hidden" role="dialog" aria-modal="true" aria-labelledby="histogram-modal-title">
+      <div class="analysis-modal__backdrop" data-close-modal="histogram"></div>
+      <div class="analysis-modal__content">
+        <div class="analysis-modal__header">
+          <h3 id="histogram-modal-title" class="analysis-modal__title">
+            <i class="fas fa-chart-bar"></i> Histograma RGB y Luminosidad
+          </h3>
+          <button type="button" class="analysis-modal__close" data-close-modal="histogram" aria-label="Cerrar">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="analysis-modal__body">
+          <canvas id="histogram-canvas" width="512" height="220"></canvas>
+          <div class="analysis-modal__legend">
+            <span class="analysis-modal__legend-item" style="--swatch:#ef4444;">R</span>
+            <span class="analysis-modal__legend-item" style="--swatch:#10b981;">G</span>
+            <span class="analysis-modal__legend-item" style="--swatch:#3b82f6;">B</span>
+            <span class="analysis-modal__legend-item" style="--swatch:#6b7280;">Lum</span>
+          </div>
+          <p class="text-xs text-gray-500 mt-2">El histograma se calcula sobre el canvas actual (con filtros y marcas de agua aplicados).</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- v3.3.12: Modal de Paleta de colores dominantes -->
+    <div id="palette-modal" class="analysis-modal hidden" role="dialog" aria-modal="true" aria-labelledby="palette-modal-title">
+      <div class="analysis-modal__backdrop" data-close-modal="palette"></div>
+      <div class="analysis-modal__content">
+        <div class="analysis-modal__header">
+          <h3 id="palette-modal-title" class="analysis-modal__title">
+            <i class="fas fa-palette"></i> Paleta de colores dominantes
+          </h3>
+          <button type="button" class="analysis-modal__close" data-close-modal="palette" aria-label="Cerrar">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="analysis-modal__body">
+          <div id="palette-grid" class="palette-grid"></div>
+          <p class="text-xs text-gray-500 mt-2">Click sobre cualquier color para copiar el código hex al portapapeles.</p>
         </div>
       </div>
     </div>

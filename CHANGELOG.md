@@ -4,6 +4,29 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.3.12] - 2026-04-08
+
+### Added
+- **Histograma RGB + luminosidad** en modal. Botón con icono `chart-bar` en la barra de zoom del canvas (`index.html:1052`). Click abre `#histogram-modal` con un canvas 512×220 que pinta los 4 histogramas superpuestos (R, G, B y luminosidad ITU-R BT.601 = 0.299·R + 0.587·G + 0.114·B). Cada canal con opacidad 0.55 para que se vean las superposiciones, cuadrícula sutil cada cuarto vertical y leyenda inferior con swatches. Píxeles con `alpha === 0` se descartan del cómputo. Función `showHistogram()` en `js/main.js`.
+- **Paleta de colores dominantes** en modal. Botón con icono `palette` también en la barra de zoom (`index.html:1055`). Click abre `#palette-modal` con un grid responsive que muestra los 12 colores más frecuentes de la imagen, extraídos por **cuantización en buckets 8×8×8** (`r >> 5`, 3 bits por canal). Cada swatch tiene el color y su código hex en mayúsculas; **click sobre un swatch copia el hex al portapapeles** vía `navigator.clipboard.writeText` con toast de confirmación. Sampleo cada 4 píxeles (stride = 16 bytes) para no recorrer millones en imágenes grandes. Funciones `showPalette()` y `_extractDominantColors(imageData, count)` en `js/main.js`.
+- **Botón "Auto-mejorar imagen"** (auto-balance) en la sección de filtros, encima del botón "RESETEAR FILTROS" (`index.html:638`). Función `autoBalanceImage()` en `js/main.js`: construye un histograma de luminosidad sobre los píxeles visibles, calcula los **percentiles 1% y 99%**, construye una LUT (Look-Up Table) `Uint8ClampedArray(256)` que mapea linealmente `[lo, hi] → [0, 255]`, y la aplica a los 3 canales por separado para preservar la dominante de color. Si `hi <= lo`, muestra un info-toast en lugar de aplicar la transformación (la imagen ya tiene buen rango dinámico). El cambio se persiste en `historyManager.saveState()` para que el botón Deshacer revierta el auto-balance. Toast reporta los valores `lo`/`hi` calculados.
+- **Modales `#histogram-modal` y `#palette-modal`** en `index.html`, con backdrop, header con título e icono FA, botón de cierre, y body. Cierre vía click en backdrop, botón X o atributo `data-close-modal` (todos enganchados en bloque genérico de `setupEventListeners`).
+- **Estilos completos** para los modales y la paleta en `css/styles.css`: clases `.analysis-modal`, `.analysis-modal__backdrop`, `.analysis-modal__content`, `.analysis-modal__header`, `.analysis-modal__title`, `.analysis-modal__close`, `.analysis-modal__body`, `.analysis-modal__legend`, `.analysis-modal__legend-item`, `.palette-grid`, `.palette-swatch`, `.palette-swatch__color`, `.palette-swatch__info`. Variantes para tema oscuro vía `[data-theme="dark"]`. Backdrop con `backdrop-filter: blur(4px)`, hover lift de los swatches y leyenda con swatch CSS via `--swatch` custom property.
+- **Helper `_getCanvasImageData()`** en `js/main.js`: wrapper defensivo que devuelve `null` si no hay imagen cargada o si `getImageData` lanza por canvas tainted. Reusado por las 3 funciones de análisis.
+- **Tests de regresión** en `tests/specs/regression.spec.js`: nuevo `describe('Regresión — Análisis visual (v3.3.12): histograma + paleta + auto-fix')` con 6 aserciones que verifican `showHistogram` con coeficientes BT.601, `_extractDominantColors` con shift `>> 5`, `autoBalanceImage` con percentiles + LUT + saveState, los 3 botones en HTML, los 2 modales en HTML, y las clases CSS de los modales y la paleta.
+
+### Notas de implementación
+- **Construcción del histograma**: 4 `Uint32Array(256)` para evitar overflow en imágenes grandes. Normalización por el máximo común a los 4 canales para que la escala vertical sea consistente.
+- **Cuantización de paleta**: 8 niveles por canal (3 bits) → ~512 buckets totales. Centrado del color en el bucket sumando 16. Map ordenada por frecuencia descendente, top 12.
+- **LUT de auto-balance**: clamping explícito en `i <= lo` (→ 0) e `i >= hi` (→ 255), interpolación lineal en el rango interior. Píxeles totalmente transparentes preservados sin tocar.
+- **DOM API segura** en la construcción de los swatches de paleta (`createElement`, `textContent`, `appendChild`) — sin `innerHTML` interpolado, manteniendo la línea de defensa XSS del proyecto.
+
+### Verificación
+- `node tests/run-in-node.js` → **111/111 OK** (105 anteriores + 6 nuevos)
+- `node tests/binary-validation.js` → 36/36 OK (sin cambios)
+
+---
+
 ## [3.3.11] - 2026-04-08
 
 ### Added
@@ -1212,5 +1235,5 @@ Lanzamiento inicial de MnemoTag.
 ---
 
 **Última actualización:** 8 de abril de 2026  
-**Versión actual:** 3.3.11  
+**Versión actual:** 3.3.12  
 **Estado:** ✅ Estable y listo para producción

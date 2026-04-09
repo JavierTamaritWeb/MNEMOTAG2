@@ -6518,5 +6518,176 @@
   box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.3), 0 4px 15px rgba(245, 158, 11, 0.4);
 }
 
+/* ============================================================
+   v3.3.12 — Modales de análisis visual (histograma + paleta)
+   ============================================================ */
 
+.analysis-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.analysis-modal.hidden {
+  display: none;
+}
+
+.analysis-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+}
+
+.analysis-modal__content {
+  position: relative;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+[data-theme="dark"] .analysis-modal__content {
+  background: #1f2937;
+  color: #f3f4f6;
+}
+
+.analysis-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+[data-theme="dark"] .analysis-modal__header {
+  border-bottom-color: #374151;
+}
+
+.analysis-modal__title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.analysis-modal__close {
+  background: transparent;
+  border: none;
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.analysis-modal__close:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+[data-theme="dark"] .analysis-modal__close:hover {
+  background: #374151;
+  color: #f9fafb;
+}
+
+.analysis-modal__body {
+  padding: 1.5rem;
+}
+
+#histogram-canvas {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+[data-theme="dark"] #histogram-canvas {
+  background: #111827;
+  border-color: #374151;
+}
+
+.analysis-modal__legend {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.analysis-modal__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+[data-theme="dark"] .analysis-modal__legend-item {
+  color: #d1d5db;
+}
+
+.analysis-modal__legend-item::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: var(--swatch);
+  display: inline-block;
+}
+
+.palette-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 0.75rem;
+}
+
+.palette-swatch {
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid #e5e7eb;
+  transition: transform 0.15s, box-shadow 0.15s;
+  background: #fff;
+}
+
+[data-theme="dark"] .palette-swatch {
+  border-color: #374151;
+  background: #111827;
+}
+
+.palette-swatch:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+
+.palette-swatch__color {
+  height: 70px;
+  width: 100%;
+}
+
+.palette-swatch__info {
+  padding: 0.4rem 0.5rem;
+  font-size: 0.7rem;
+  text-align: center;
+  font-family: monospace;
+  color: #374151;
+}
+
+[data-theme="dark"] .palette-swatch__info {
+  color: #d1d5db;
+}
 

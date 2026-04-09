@@ -4,11 +4,45 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos.
 
-![Version](https://img.shields.io/badge/version-3.3.11-blue.svg)
+![Version](https://img.shields.io/badge/version-3.3.12-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 [![Tests](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml)
 [![Deploy to GitHub Pages](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml)
+
+---
+
+## ⭐ NOVEDADES v3.3.12
+
+> **Feature release — Análisis visual.** Tres herramientas profesionales para entender y mejorar la imagen sin salir de la app: histograma RGB, paleta de colores dominantes y auto-mejora con un click.
+
+### 📊 Histograma RGB + luminosidad
+
+- Botón **chart-bar** en la barra de zoom del canvas. Abre un modal con un canvas de 512×220 que pinta los 4 histogramas superpuestos (R en rojo, G en verde, B en azul, luminosidad en gris) con opacidad 0.55 para que se vean las mezclas.
+- La luminosidad se calcula con los coeficientes ITU-R BT.601 (0.299·R + 0.587·G + 0.114·B), no es una media ingenua.
+- Píxeles con `alpha === 0` se ignoran en el cómputo (las zonas transparentes no contaminan el histograma de la imagen visible).
+- Cuadrícula sutil cada cuarto y leyenda con swatches debajo del canvas. Compatible con tema oscuro.
+
+### 🎨 Paleta de colores dominantes
+
+- Botón **palette** en la misma barra. Extrae los 12 colores más frecuentes de la imagen mediante cuantización por buckets 8×8×8 (3 bits por canal, ~512 colores cuantizados totales) y los muestra como swatches en un grid responsive.
+- Cada swatch muestra el color y su código hex en mayúsculas. **Click para copiar el hex al portapapeles** (`navigator.clipboard.writeText`) con toast de confirmación.
+- Sampleo cada 4 píxeles para no congelar el navegador en imágenes grandes — el resultado visual es indistinguible.
+
+### ✨ Auto-mejorar imagen (auto-balance)
+
+- Botón **Auto-mejorar imagen** (icono `magic`) en la sección de filtros, encima de "Resetear filtros".
+- Calcula los **percentiles 1% y 99% de la luminosidad** sobre todos los píxeles visibles, construye una LUT (Look-Up Table) que mapea linealmente `[lo, hi] → [0, 255]` y la aplica a los 3 canales por separado para preservar la dominante de color.
+- Si la imagen ya tiene buen rango dinámico (`hi <= lo`), muestra un info-toast en lugar de aplicar la transformación.
+- **El cambio se guarda en el historial** (`historyManager.saveState()`), por lo que el botón Deshacer revierte el auto-balance.
+- Toast de éxito reporta los valores `lo` y `hi` calculados para que sepas qué rango se ha estirado.
+
+### Verificación
+
+- `node tests/run-in-node.js` → **111/111 OK** (105 anteriores + 6 nuevos para v3.3.12)
+- `node tests/binary-validation.js` → 36/36 OK (sin cambios)
+
+Cero regresiones. Las tres herramientas operan sobre `ctx.getImageData()` directo, sin tocar el flujo de filtros existente.
 
 ---
 

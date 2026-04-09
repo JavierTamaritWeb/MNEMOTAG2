@@ -360,3 +360,54 @@ describe('Regresión — Quick wins UX (v3.3.11): paste + export multi-size', fu
     expect(src).toContain('id="download-multisize-btn"');
   });
 });
+
+describe('Regresión — Análisis visual (v3.3.12): histograma + paleta + auto-fix', function () {
+  it('main.js define showHistogram con cómputo de histogramas RGB+luminosidad', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('function showHistogram');
+    // Coeficientes ITU-R BT.601 para luminosidad
+    expect(src).toContain('0.299');
+    expect(src).toContain('0.587');
+    expect(src).toContain('0.114');
+  });
+
+  it('main.js define _extractDominantColors usando cuantización por buckets', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('_extractDominantColors');
+    expect(src).toContain('function showPalette');
+    // Cuantización shift >> 5 (8 niveles por canal)
+    expect(src).toContain('>> 5');
+  });
+
+  it('main.js define autoBalanceImage con percentiles 1% y 99% y LUT', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('function autoBalanceImage');
+    expect(src).toContain('totalPixels * 0.01');
+    expect(src).toContain('totalPixels * 0.99');
+    expect(src).toContain('Uint8ClampedArray(256)');
+    // Tras aplicar la LUT debe persistir el cambio en historial
+    expect(src).toContain('historyManager.saveState');
+  });
+
+  it('index.html incluye los botones de histograma, paleta y auto-balance', async function () {
+    const src = await fetchSource('../index.html');
+    expect(src).toContain('id="histogram-btn"');
+    expect(src).toContain('id="palette-btn"');
+    expect(src).toContain('id="auto-balance-btn"');
+  });
+
+  it('index.html incluye los modales de histograma y paleta', async function () {
+    const src = await fetchSource('../index.html');
+    expect(src).toContain('id="histogram-modal"');
+    expect(src).toContain('id="histogram-canvas"');
+    expect(src).toContain('id="palette-modal"');
+    expect(src).toContain('id="palette-grid"');
+  });
+
+  it('css/styles.css define las clases de los modales de análisis y la paleta', async function () {
+    const src = await fetchSource('../css/styles.css');
+    expect(src).toContain('.analysis-modal');
+    expect(src).toContain('.palette-grid');
+    expect(src).toContain('.palette-swatch');
+  });
+});
