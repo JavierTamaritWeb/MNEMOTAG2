@@ -666,6 +666,38 @@
                         <i class="fas fa-magic-wand-sparkles" aria-hidden="true"></i>
                         Eliminar fondo (IA)
                       </button>
+
+                      <!-- v3.4.5: Filter presets (localStorage) -->
+                      <div class="preset-manager-ui mt-3 pt-3 border-t border-gray-200">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                          <i class="fas fa-sliders" aria-hidden="true"></i>
+                          Presets de filtros
+                        </label>
+                        <div class="flex gap-2 mb-2">
+                          <input type="text" id="preset-name-input"
+                                 placeholder="Nombre del preset"
+                                 maxlength="40"
+                                 class="flex-1 px-2 py-1 text-sm border border-gray-300 rounded form-input"
+                                 aria-label="Nombre del preset">
+                          <button type="button" id="preset-save-btn" class="btn btn-outline text-sm" title="Guardar brillo/contraste/saturación/desenfoque actuales como preset">
+                            <i class="fas fa-save" aria-hidden="true"></i>
+                            Guardar
+                          </button>
+                        </div>
+                        <div class="flex gap-2">
+                          <select id="preset-select" class="flex-1 px-2 py-1 text-sm border border-gray-300 rounded form-input"
+                                  aria-label="Preset guardado">
+                            <option value="">— No hay presets guardados —</option>
+                          </select>
+                          <button type="button" id="preset-load-btn" class="btn btn-outline text-sm" title="Cargar el preset seleccionado">
+                            <i class="fas fa-folder-open" aria-hidden="true"></i>
+                          </button>
+                          <button type="button" id="preset-delete-btn" class="btn btn-outline text-sm" title="Eliminar el preset seleccionado">
+                            <i class="fas fa-trash" aria-hidden="true"></i>
+                          </button>
+                        </div>
+                      </div>
+
                       <button type="button" id="resetFilters" class="reset-filters-btn">
                         <i class="fas fa-undo" aria-hidden="true"></i>
                         RESETEAR FILTROS
@@ -1720,6 +1752,7 @@
   <script src="js/managers/batch-manager.js"></script>
   <script src="js/managers/text-layer-manager.js"></script>
   <script src="js/managers/crop-manager.js"></script>
+  <script src="js/managers/preset-manager.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

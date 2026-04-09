@@ -159,6 +159,7 @@ load('js/utils/helpers.js');
 load('js/managers/security-manager.js');
 load('js/managers/metadata-manager.js');
 load('js/managers/history-manager.js');
+load('js/managers/preset-manager.js');
 
 // ---- 2) Test runner casero -------------------------------------------------
 

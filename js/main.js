@@ -755,6 +755,57 @@
         if (removeBgBtn) {
           removeBgBtn.addEventListener('click', removeBackgroundWithAI);
         }
+
+        // v3.4.5: Filter presets (guardar/cargar/eliminar en localStorage)
+        const presetSelect = document.getElementById('preset-select');
+        const presetNameInput = document.getElementById('preset-name-input');
+        const presetSaveBtn = document.getElementById('preset-save-btn');
+        const presetLoadBtn = document.getElementById('preset-load-btn');
+        const presetDeleteBtn = document.getElementById('preset-delete-btn');
+        if (typeof PresetManager !== 'undefined' && presetSelect) {
+          // Poblar el select al arrancar.
+          PresetManager.populateSelect(presetSelect);
+        }
+        if (presetSaveBtn && presetNameInput && presetSelect) {
+          presetSaveBtn.addEventListener('click', function () {
+            const name = presetNameInput.value;
+            if (PresetManager.savePreset(name)) {
+              presetNameInput.value = '';
+              PresetManager.populateSelect(presetSelect);
+              presetSelect.value = name.trim();
+            }
+          });
+          // Enter en el input también guarda.
+          presetNameInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              presetSaveBtn.click();
+            }
+          });
+        }
+        if (presetLoadBtn && presetSelect) {
+          presetLoadBtn.addEventListener('click', function () {
+            const name = presetSelect.value;
+            if (!name) {
+              UIManager.showError('Selecciona un preset primero');
+              return;
+            }
+            PresetManager.loadPreset(name);
+          });
+        }
+        if (presetDeleteBtn && presetSelect) {
+          presetDeleteBtn.addEventListener('click', function () {
+            const name = presetSelect.value;
+            if (!name) {
+              UIManager.showError('Selecciona un preset primero');
+              return;
+            }
+            if (window.confirm('¿Eliminar el preset "' + name + '"?')) {
+              PresetManager.deletePreset(name);
+              PresetManager.populateSelect(presetSelect);
+            }
+          });
+        }
         // v3.3.14: Panel de historial visual.
         const historyToggleBtn = document.getElementById('history-toggle-btn');
         if (historyToggleBtn) {

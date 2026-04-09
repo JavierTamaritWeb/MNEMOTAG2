@@ -551,7 +551,8 @@ describe('Regresión — PWA real con Service Worker (v3.3.16)', function () {
   it('service-worker.js define las 3 estrategias y los listeners principales', async function () {
     const src = await fetchSource('../service-worker.js');
     expect(src).toContain('CACHE_VERSION');
-    expect(src).toContain('mnemotag-v3.3');
+    // Nombre del cache prefijado con 'mnemotag-v' seguido de versión (v3.3.x, v3.4.x, etc.)
+    expect(src).toMatch(/mnemotag-v\d+\.\d+/);
     expect(src).toContain("addEventListener('install'");
     expect(src).toContain("addEventListener('activate'");
     expect(src).toContain("addEventListener('fetch'");
@@ -664,5 +665,48 @@ describe('Regresión — Eliminar fondo con IA, lazy load (v3.3.18)', function (
     expect(src).toContain('Eliminar fondo');
     // Tooltip explicativo del peso del modelo
     expect(src).toContain('10-15 MB');
+  });
+});
+
+describe('Regresión — Filter presets (v3.4.5)', function () {
+  it('preset-manager.js define la API pública mínima', async function () {
+    const src = await fetchSource('../js/managers/preset-manager.js');
+    expect(src).toContain('savePreset: function');
+    expect(src).toContain('loadPreset: function');
+    expect(src).toContain('listPresets: function');
+    expect(src).toContain('deletePreset: function');
+    expect(src).toContain('populateSelect: function');
+  });
+
+  it('preset-manager.js persiste en localStorage con prefijo propio', async function () {
+    const src = await fetchSource('../js/managers/preset-manager.js');
+    expect(src).toContain("STORAGE_PREFIX: 'mnemotag-preset-'");
+    expect(src).toContain('localStorage.setItem');
+    expect(src).toContain('localStorage.getItem');
+  });
+
+  it('index.html incluye la UI de presets (input, select, botones)', async function () {
+    const src = await fetchSource('../index.html');
+    expect(src).toContain('id="preset-name-input"');
+    expect(src).toContain('id="preset-select"');
+    expect(src).toContain('id="preset-save-btn"');
+    expect(src).toContain('id="preset-load-btn"');
+    expect(src).toContain('id="preset-delete-btn"');
+  });
+
+  it('index.html carga preset-manager.js antes de main.js', async function () {
+    const src = await fetchSource('../index.html');
+    const presetIdx = src.indexOf('preset-manager.js');
+    const mainIdx = src.indexOf('js/main.js');
+    expect(presetIdx).toBeGreaterThan(0);
+    expect(mainIdx).toBeGreaterThan(presetIdx);
+  });
+
+  it('main.js registra los listeners de PresetManager', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain("PresetManager.savePreset");
+    expect(src).toContain("PresetManager.loadPreset");
+    expect(src).toContain("PresetManager.deletePreset");
+    expect(src).toContain("PresetManager.populateSelect");
   });
 });
