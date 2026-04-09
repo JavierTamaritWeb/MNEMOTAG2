@@ -726,10 +726,10 @@
           pasteBtn.addEventListener('click', handlePasteButtonClick);
         }
 
-        // v3.3.11: Botón "Descargar varios tamaños" (multi-size export).
+        // v3.3.11 / v3.4.10: extraído a ExportManager.
         const multisizeBtn = document.getElementById('download-multisize-btn');
         if (multisizeBtn) {
-          multisizeBtn.addEventListener('click', downloadMultipleSizes);
+          multisizeBtn.addEventListener('click', function () { ExportManager.downloadMultipleSizes(); });
         }
 
         // v3.3.12 / v3.4.7: Análisis visual — extraído a AnalysisManager.
@@ -1001,7 +1001,8 @@
         }
         
         if (downloadImageBtn) {
-          downloadImageBtn.addEventListener('click', downloadImageWithProgress);
+          // v3.4.10: delegado a ExportManager
+          downloadImageBtn.addEventListener('click', function () { ExportManager.downloadImageWithProgress(); });
         }
         
         if (undoBtn) {
@@ -1661,7 +1662,7 @@
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
         if (canvas && currentImage) {
-          downloadImage();
+          ExportManager.downloadImage(); // v3.4.10
         }
       }
       
@@ -4118,107 +4119,6 @@
      * normal de export (canvasToBlob + EXIF embedding según formato), y
      * genera un único archivo .zip que el usuario descarga.
      */
-    async function downloadMultipleSizes() {
-      if (!canvas || !currentImage) {
-        showError('No hay imagen para exportar.');
-        return;
-      }
-      if (typeof JSZip === 'undefined') {
-        showError('JSZip no está cargado. No se puede generar el ZIP.');
-        return;
-      }
-
-      // Recoger los anchos seleccionados
-      const widths = ['multisize-2048', 'multisize-1024', 'multisize-512', 'multisize-256']
-        .map(id => {
-          const el = document.getElementById(id);
-          return el && el.checked ? parseInt(el.value, 10) : null;
-        })
-        .filter(w => w !== null && !isNaN(w));
-
-      if (widths.length === 0) {
-        UIManager.showInfo('Marca al menos un tamaño para exportar.');
-        return;
-      }
-
-      try {
-        UIManager.showInfo(`📦 Generando ZIP con ${widths.length} tamaños…`);
-        showPositioningBorders = false;
-        redrawCompleteCanvas();
-
-        // Determinar formato y MIME elegidos por el usuario, respetando
-        // el flujo defensivo del export normal.
-        const hasAlpha = hasImageAlphaChannel(canvas);
-        const requestedMimeType = getMimeType(outputFormat);
-        const finalMimeType = await determineFallbackFormat(hasAlpha, requestedMimeType);
-        const finalFormat = finalMimeType.split('/')[1];
-        const extension = getFileExtension(finalFormat);
-        const flattenColor = getFlattenColor();
-
-        // Persistir metadatos en localStorage como hace el flujo normal
-        MetadataManager.applyMetadataToImage(canvas);
-
-        // Determinar nombre base
-        const basenameInput = document.getElementById('file-basename');
-        const customBaseName = basenameInput ? basenameInput.value.trim() : '';
-        let baseName = customBaseName || fileBaseName || 'imagen';
-        if (!SecurityManager.isValidFileBaseName(baseName)) baseName = 'imagen';
-
-        const zip = new JSZip();
-        const sourceWidth = canvas.width;
-        const sourceHeight = canvas.height;
-        const aspectRatio = sourceHeight / sourceWidth;
-
-        for (const targetWidth of widths) {
-          // Saltar tamaños mayores que el original (no upscale)
-          const w = Math.min(targetWidth, sourceWidth);
-          const h = Math.round(w * aspectRatio);
-
-          // Canvas temporal con la imagen redimensionada
-          const tempCanvas = document.createElement('canvas');
-          tempCanvas.width = w;
-          tempCanvas.height = h;
-          const tempCtx = tempCanvas.getContext('2d');
-          tempCtx.imageSmoothingEnabled = true;
-          tempCtx.imageSmoothingQuality = 'high';
-          tempCtx.drawImage(canvas, 0, 0, w, h);
-
-          // Aplicar aplanado para JPEG si procede
-          const sourceForExport = (finalMimeType === 'image/jpeg')
-            ? flattenCanvasForJpeg(tempCanvas, flattenColor)
-            : tempCanvas;
-
-          // Generar blob y embeber EXIF según formato
-          let blob = await canvasToBlob(sourceForExport, finalMimeType, outputQuality);
-          blob = await MetadataManager.embedExifInJpegBlob(blob);
-          blob = await MetadataManager.embedExifInPngBlob(blob);
-          blob = await MetadataManager.embedExifInWebpBlob(blob);
-          blob = await MetadataManager.embedExifInAvifBlob(blob); // v3.3.17
-
-          zip.file(`${baseName}-${w}px.${extension}`, blob);
-        }
-
-        const zipBlob = await zip.generateAsync({ type: 'blob' });
-
-        // Descargar el ZIP usando un link <a download>
-        const url = URL.createObjectURL(zipBlob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${baseName}-multisize.zip`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-
-        showSuccess(`📦 ZIP con ${widths.length} tamaños descargado: ${baseName}-multisize.zip`);
-      } catch (err) {
-        console.error('Error en downloadMultipleSizes:', err);
-        showError('Error al generar el ZIP de varios tamaños: ' + (err.message || err));
-      } finally {
-        showPositioningBorders = true;
-        redrawCompleteCanvas();
-      }
-    }
 
     // ============================================================
     // v3.4.3 — Helpers de accesibilidad para modales
@@ -4414,171 +4314,6 @@
     }
 
 
-    async function downloadImage() {
-      if (!canvas) {
-        showError('No hay imagen para descargar.');
-        return;
-      }
-
-      if (!currentFile) {
-        showError('Por favor, selecciona una imagen primero.');
-        return;
-      }
-
-      try {
-        // IMPORTANTE: Desactivar bordes de guía antes de descargar
-        showPositioningBorders = false;
-        
-        // Redibujar canvas completo sin los bordes
-        redrawCompleteCanvas();
-        
-        // Detectar si la imagen tiene transparencia
-        const hasAlpha = hasImageAlphaChannel(canvas);
-        
-        // Determinar formato final con fallback
-        const requestedMimeType = getMimeType(outputFormat);
-        const finalMimeType = await determineFallbackFormat(hasAlpha, requestedMimeType);
-        const finalFormat = finalMimeType.split('/')[1];
-        
-        // Si el formato cambió, mostrar notificación informativa
-        if (finalMimeType !== requestedMimeType) {
-          const requestedFormat = outputFormat.toUpperCase();
-          const actualFormat = finalFormat.toUpperCase();
-          console.info(`Usando fallback: ${requestedFormat} → ${actualFormat} (mejor compatibilidad)`);
-          UIManager.showInfo(`📄 Exportando en ${actualFormat} para máxima compatibilidad (solicitado: ${requestedFormat})`);
-        }
-        
-        // Persistir los datos del formulario en localStorage (para recordarlos
-        // entre sesiones) y registrar la intención de embedding EXIF.
-        // Desde v3.2.15, los metadatos SE INCRUSTAN realmente en JPEG vía
-        // piexifjs (en embedExifInJpegBlob/DataUrl, llamado más abajo).
-        // Para PNG/WebP/AVIF siguen sin metadatos (limitación de piexifjs).
-        const metadata = MetadataManager.getMetadata();
-        MetadataManager.applyMetadataToImage(canvas);
-
-        // Obtener el título y sanitizar el nombre del archivo
-        // Usar fileBaseName personalizado o fallback a metadata/título
-        const basenameInput = document.getElementById('file-basename');
-        const customBaseName = basenameInput ? basenameInput.value.trim() : '';
-        const titleInput = document.getElementById('metaTitle');
-        
-        // Prioridad: 1) Input personalizado (ya sanitizado), 2) fileBaseName actual, 3) Metadata, 4) Fallback
-        let filename = customBaseName || fileBaseName;
-        
-        // Solo si no hay nombre personalizado, usar metadata o fallback
-        if (!filename || filename === 'imagen') {
-          filename = metadata.title || titleInput.value.trim() || 'imagen';
-          // Sanitizar solo si viene de metadata/título
-          filename = sanitizeFileBaseName(filename);
-        }
-        
-        
-        // Validar que el nombre sea válido (ya está sanitizado por sanitizeFileBaseName)
-        if (!SecurityManager.isValidFileBaseName(filename)) {
-          console.warn('⚠️ Nombre inválido, usando fallback:', filename);
-          filename = 'imagen'; // Fallback seguro
-        }
-        
-        // Usar el formato final determinado por el sistema de fallback
-        const extension = getFileExtension(finalFormat);
-        const fullFilename = `${filename}.${extension}`;
-        
-        // Usar la API File System Access si está disponible (Chrome/Edge modernos)
-        if ('showSaveFilePicker' in window) {
-          const options = {
-            suggestedName: fullFilename,
-            types: [{
-              description: 'Imágenes',
-              accept: {
-                [finalMimeType]: [`.${extension}`]
-              }
-            }],
-            startIn: lastDownloadDirectory || 'desktop'
-          };
-
-          try {
-            const handle = await window.showSaveFilePicker(options);
-            
-            // Guardar el directorio para futura referencia (no el resultado del permiso)
-            // No necesitamos guardar el handle específico, solo recordar el directorio
-            // La API recordará la ubicación automáticamente
-            
-            const writable = await handle.createWritable();
-            // Si exportamos a JPEG, aplanar el canvas contra blanco para que
-            // las áreas transparentes no salgan negras (default del codec JPEG).
-            // Para PNG/WebP/AVIF se preserva el alpha original.
-            const flattenColor = getFlattenColor();
-            if (finalMimeType === 'image/jpeg' && hasAlpha) {
-              UIManager.showInfo(`🎨 Aplanando transparencia contra ${flattenColor.toLowerCase()} para exportar a JPEG`);
-            }
-            const sourceCanvas = (finalMimeType === 'image/jpeg')
-              ? flattenCanvasForJpeg(canvas, flattenColor)
-              : canvas;
-            let blob = await canvasToBlob(sourceCanvas, finalMimeType, outputQuality);
-            // Embeber EXIF según formato. Cada función es defensiva: si no es
-            // su formato o no hay metadatos, devuelve el blob original.
-            blob = await MetadataManager.embedExifInJpegBlob(blob);
-            blob = await MetadataManager.embedExifInPngBlob(blob);  // v3.3.6
-            blob = await MetadataManager.embedExifInWebpBlob(blob); // v3.3.7
-            blob = await MetadataManager.embedExifInAvifBlob(blob); // v3.3.17
-            await writable.write(blob);
-            await writable.close();
-
-            const qualityText = finalFormat === 'png' ? '' : ` (calidad: ${Math.round(outputQuality * 100)}%)`;
-            showSuccess(`Imagen guardada exitosamente en formato ${finalFormat.toUpperCase()}${qualityText}!`);
-            return;
-          } catch (saveError) {
-            // Si el usuario cancela, no mostrar error
-            if (saveError.name === 'AbortError') {
-              return;
-            }
-            console.warn('Error con File System Access API, usando fallback:', saveError);
-          }
-        }
-
-        // Fallback para navegadores que no soportan la API o si falla
-        const link = document.createElement('a');
-        link.download = fullFilename;
-        // Mismo aplanado para JPEG en el camino fallback
-        const flattenColorFallback = getFlattenColor();
-        if (finalMimeType === 'image/jpeg' && hasAlpha) {
-          UIManager.showInfo(`🎨 Aplanando transparencia contra ${flattenColorFallback.toLowerCase()} para exportar a JPEG`);
-        }
-        const fallbackCanvas = (finalMimeType === 'image/jpeg')
-          ? flattenCanvasForJpeg(canvas, flattenColorFallback)
-          : canvas;
-        // Embeber EXIF según formato. JPEG es sync, PNG/WebP/AVIF son async.
-        let fallbackHref = MetadataManager.embedExifInJpegDataUrl(
-          fallbackCanvas.toDataURL(finalMimeType, outputQuality)
-        );
-        if (finalMimeType === 'image/png') {
-          fallbackHref = await MetadataManager.embedExifInPngDataUrl(fallbackHref); // v3.3.6
-        } else if (finalMimeType === 'image/webp') {
-          fallbackHref = await MetadataManager.embedExifInWebpDataUrl(fallbackHref); // v3.3.7
-        } else if (finalMimeType === 'image/avif') {
-          fallbackHref = await MetadataManager.embedExifInAvifDataUrl(fallbackHref); // v3.3.17
-        }
-        link.href = fallbackHref;
-
-        // Simular click
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        const qualityText = finalFormat === 'png' ? '' : ` (calidad: ${Math.round(outputQuality * 100)}%)`;
-        showSuccess(`Imagen descargada en formato ${finalFormat.toUpperCase()}${qualityText}!`);
-
-      } catch (error) {
-        console.error('Error al descargar:', error);
-        showError('Error al descargar la imagen.');
-      } finally {
-        // IMPORTANTE: Reactivar bordes de guía después de descargar
-        showPositioningBorders = true;
-        
-        // Redibujar canvas completo CON los bordes para la vista previa
-        redrawCompleteCanvas();
-      }
-    }
 
     // Funciones helper extraídas a js/utils/helpers.js
 
@@ -5165,218 +4900,6 @@
     }
     
     // Enhanced download function with progress bar
-    async function downloadImageWithProgress() {
-      if (!canvas) {
-        showError('No hay imagen para descargar.');
-        return;
-      }
-
-      if (!currentFile) {
-        showError('Por favor, selecciona una imagen primero.');
-        return;
-      }
-      
-      try {
-        // IMPORTANTE: Desactivar bordes de guía antes de descargar
-        showPositioningBorders = false;
-        
-        // Redibujar canvas completo sin los bordes
-        redrawCompleteCanvas();
-        
-        // Show progress bar
-        showProgressBar('Iniciando descarga...');
-        
-        // Define download steps
-        const downloadSteps = [
-          { message: 'Obteniendo metadatos...', duration: 300 },
-          { message: 'Aplicando metadatos...', duration: 400 },
-          { message: 'Generando nombre de archivo...', duration: 200 },
-          { message: 'Configurando formato de salida...', duration: 300 },
-          { message: 'Procesando imagen...', duration: 600 },
-          { message: 'Generando archivo...', duration: 500 },
-          { message: 'Iniciando descarga...', duration: 400 }
-        ];
-        
-        // Start progress simulation
-        const progressPromise = simulateProgressSteps(downloadSteps, 2800);
-        
-        // Detectar si la imagen tiene transparencia
-        const hasAlpha = hasImageAlphaChannel(canvas);
-        
-        // Determinar formato final con fallback
-        const requestedMimeType = getMimeType(outputFormat);
-        const finalMimeType = await determineFallbackFormat(hasAlpha, requestedMimeType);
-        const finalFormat = finalMimeType.split('/')[1];
-        
-        // Si el formato cambió, mostrar notificación informativa
-        if (finalMimeType !== requestedMimeType) {
-          const requestedFormat = outputFormat.toUpperCase();
-          const actualFormat = finalFormat.toUpperCase();
-          console.info(`Usando fallback: ${requestedFormat} → ${actualFormat} (mejor compatibilidad)`);
-          UIManager.showInfo(`📄 Exportando en ${actualFormat} para máxima compatibilidad (solicitado: ${requestedFormat})`);
-        }
-        
-        // Obtener metadatos antes de la descarga
-        const metadata = MetadataManager.getMetadata();
-        const exifData = MetadataManager.applyMetadataToImage(canvas);
-        
-        // Wait for initial progress steps
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Mostrar resumen de metadatos si están presentes
-        if (metadata.title || metadata.author || metadata.copyright || metadata.latitude) {
-          
-          let metaInfo = [];
-          if (metadata.title) metaInfo.push(`Título: ${metadata.title}`);
-          if (metadata.author) metaInfo.push(`Autor: ${metadata.author}`);
-          if (metadata.copyright) metaInfo.push(`Copyright: ${metadata.copyright}`);
-          if (metadata.latitude && metadata.longitude) {
-            metaInfo.push(`Ubicación: ${metadata.latitude}, ${metadata.longitude}`);
-          }
-          
-        }
-        
-        // Wait for more progress
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        // Generar nombre del archivo usando el campo personalizado o fallback
-        const basenameInput = document.getElementById('file-basename');
-        const customBaseName = basenameInput ? basenameInput.value.trim() : '';
-        
-        // Prioridad: 1) Input personalizado, 2) fileBaseName, 3) Metadata.title, 4) Nombre original, 5) Fallback
-        let filename = customBaseName || fileBaseName;
-        
-        if (!filename || filename === 'imagen') {
-          if (metadata.title && metadata.title.trim()) {
-            filename = metadata.title.trim();
-            filename = sanitizeFileBaseName(filename);
-          } else if (currentFile && currentFile.name) {
-            filename = currentFile.name.replace(/\.[^/.]+$/, '');
-            filename = sanitizeFileBaseName(filename);
-          } else {
-            filename = 'imagen-editada';
-          }
-        }
-        
-        
-        // Validar que el nombre sea válido
-        if (!SecurityManager.isValidFileBaseName(filename)) {
-          console.warn('⚠️ Nombre inválido en descarga con progreso, usando fallback');
-          filename = 'imagen-editada';
-        }
-        
-        // Usar el formato final determinado por el sistema de fallback
-        const extension = getFileExtension(finalFormat);
-        const fullFilename = `${filename}.${extension}`;
-        
-        // Wait for processing steps
-        await new Promise(resolve => setTimeout(resolve, 900));
-        
-        // Complete progress
-        await progressPromise;
-        
-        // Usar la API File System Access si está disponible (Chrome/Edge modernos)
-        if ('showSaveFilePicker' in window) {
-          const options = {
-            suggestedName: fullFilename,
-            types: [{
-              description: 'Imágenes',
-              accept: {
-                [finalMimeType]: [`.${extension}`]
-              }
-            }],
-            startIn: lastDownloadDirectory || 'desktop'
-          };
-
-          try {
-            const handle = await window.showSaveFilePicker(options);
-            
-            // Guardar el directorio para futura referencia (no el resultado del permiso)
-            // No necesitamos guardar el handle específico, solo recordar el directorio
-            // La API recordará la ubicación automáticamente
-            
-            const writable = await handle.createWritable();
-            // Aplanado para JPEG (igual que en downloadImage), respetando el
-            // color elegido por el usuario en la sección de salida.
-            const flattenColor = getFlattenColor();
-            if (finalMimeType === 'image/jpeg' && hasAlpha) {
-              UIManager.showInfo(`🎨 Aplanando transparencia contra ${flattenColor.toLowerCase()} para exportar a JPEG`);
-            }
-            const sourceCanvas = (finalMimeType === 'image/jpeg')
-              ? flattenCanvasForJpeg(canvas, flattenColor)
-              : canvas;
-            let blob = await canvasToBlob(sourceCanvas, finalMimeType, outputQuality);
-            // Embeber EXIF según formato
-            blob = await MetadataManager.embedExifInJpegBlob(blob);
-            blob = await MetadataManager.embedExifInPngBlob(blob);  // v3.3.6
-            blob = await MetadataManager.embedExifInWebpBlob(blob); // v3.3.7
-            blob = await MetadataManager.embedExifInAvifBlob(blob); // v3.3.17
-            await writable.write(blob);
-            await writable.close();
-
-            // Hide progress bar
-            hideProgressBar();
-
-            const qualityText = finalFormat === 'png' ? '' : ` (calidad: ${Math.round(outputQuality * 100)}%)`;
-            showSuccess(`Imagen guardada exitosamente en formato ${finalFormat.toUpperCase()}${qualityText}!`);
-            return;
-          } catch (saveError) {
-            // Si el usuario cancela, no mostrar error
-            if (saveError.name === 'AbortError') {
-              hideProgressBar();
-              return;
-            }
-            console.warn('Error con File System Access API, usando fallback:', saveError);
-          }
-        }
-
-        // Fallback para navegadores que no soportan la API o si falla
-        const link = document.createElement('a');
-        link.download = fullFilename;
-        // Aplanado para JPEG con color configurable
-        const flattenColorFallback = getFlattenColor();
-        if (finalMimeType === 'image/jpeg' && hasAlpha) {
-          UIManager.showInfo(`🎨 Aplanando transparencia contra ${flattenColorFallback.toLowerCase()} para exportar a JPEG`);
-        }
-        const fallbackCanvas = (finalMimeType === 'image/jpeg')
-          ? flattenCanvasForJpeg(canvas, flattenColorFallback)
-          : canvas;
-        // Embeber EXIF según formato. JPEG es sync, PNG/WebP/AVIF son async.
-        let fallbackHrefP = MetadataManager.embedExifInJpegDataUrl(
-          fallbackCanvas.toDataURL(finalMimeType, outputQuality)
-        );
-        if (finalMimeType === 'image/png') {
-          fallbackHrefP = await MetadataManager.embedExifInPngDataUrl(fallbackHrefP); // v3.3.6
-        } else if (finalMimeType === 'image/webp') {
-          fallbackHrefP = await MetadataManager.embedExifInWebpDataUrl(fallbackHrefP); // v3.3.7
-        } else if (finalMimeType === 'image/avif') {
-          fallbackHrefP = await MetadataManager.embedExifInAvifDataUrl(fallbackHrefP); // v3.3.17
-        }
-        link.href = fallbackHrefP;
-        
-        // Simular click
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        // Hide progress bar
-        hideProgressBar();
-        
-        const qualityText = finalFormat === 'png' ? '' : ` (calidad: ${Math.round(outputQuality * 100)}%)`;
-        showSuccess(`Imagen descargada en formato ${finalFormat.toUpperCase()}${qualityText}!`);
-        
-      } catch (error) {
-        console.error('Error al descargar:', error);
-        hideProgressBar();
-        showError('Error al descargar la imagen.');
-      } finally {
-        // IMPORTANTE: Reactivar bordes de guía después de descargar
-        showPositioningBorders = true;
-        
-        // Redibujar canvas completo CON los bordes para la vista previa
-        redrawCompleteCanvas();
-      }
-    }
     
     
     // Hide image info when no image is loaded
@@ -6418,7 +5941,7 @@
         // Ctrl/Cmd + S: Guardar/Exportar (solo cuando NO estés en un input)
         keyboardShortcuts.register('s', ['ctrl'], async () => {
           if (currentImage) {
-            await downloadImage();
+            await ExportManager.downloadImage(); // v3.4.10
           }
         }, { description: 'Guardar imagen' });
         
@@ -6460,7 +5983,7 @@
         // Ctrl/Cmd + Shift + X: Exportar con ajustes actuales
         keyboardShortcuts.register('x', ['ctrl', 'shift'], async () => {
           if (currentImage) {
-            await downloadImageWithProgress();
+            await ExportManager.downloadImageWithProgress(); // v3.4.10
             UIManager.showSuccess('✅ Imagen exportada');
           } else {
             UIManager.showInfo('ℹ️ Carga una imagen primero');
