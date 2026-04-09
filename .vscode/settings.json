@@ -1,0 +1,40 @@
+{
+  "liveServer.settings.port": 5506,
+
+  // v3.4.19: Desactivar la recarga automática de Live Server.
+  // La app se estaba reiniciando cada pocos minutos de forma aleatoria
+  // porque Live Server dispara location.reload() ante cualquier cambio
+  // en los archivos del proyecto (edición, sincronización de iCloud/
+  // OneDrive, antivirus tocando mtime, etc.). Con NoReload: true el
+  // usuario tiene que hacer Cmd+R / Ctrl+R manualmente cuando quiera
+  // ver cambios, pero la app ya no se reinicia sola.
+  "liveServer.settings.NoReload": true,
+
+  // Ignorar los archivos más ruidosos del proyecto (docs, changelog,
+  // tests, .git). Si en algún momento reactivas NoReload: false, estas
+  // exclusiones al menos reducen el ruido.
+  "liveServer.settings.ignoreFiles": [
+    ".vscode/**",
+    "**/*.md",
+    "**/*.scss",
+    "**/*.sass",
+    "**/*.log",
+    ".git/**",
+    "tests/**",
+    "docs/**",
+    "CHANGELOG.md",
+    "README.md",
+    "CLAUDE.md",
+    "eslint.config.js",
+    "playwright.config.js",
+    ".eslintrc*",
+    ".stylelintrc*"
+  ],
+
+  // Esperar 200 ms antes de decidir si un cambio merece considerarse
+  // (mitiga los "cambios fantasma" de sincronizadores cloud).
+  "liveServer.settings.wait": 200,
+
+  // Full reload en lugar de inyección parcial — más fiable si algo falla.
+  "liveServer.settings.fullReload": true
+}
