@@ -42,12 +42,59 @@
         );
       });
       // Loggear cualquier beforeunload (usuario cerrando, reload, etc.)
-      window.addEventListener('beforeunload', function () {
+      window.addEventListener('beforeunload', function (e) {
         console.warn(
-          '%c[MnemoTag diag] beforeunload disparado — la página se va a recargar/cerrar ahora',
+          '%c[MnemoTag diag] beforeunload disparado — la página se va a recargar/cerrar ahora (persistido=' + (e.persisted === true) + ')',
           'background:#3b82f6;color:#fff;font-weight:bold;padding:4px 8px;border-radius:4px;'
         );
+        // Dump de la pila si es posible — a veces ayuda a ver quién lo disparó
+        try { console.trace('[MnemoTag diag] Stack trace del beforeunload:'); } catch (_) {}
       });
+
+      // Loggear visibilitychange y pagehide (complementa beforeunload)
+      document.addEventListener('visibilitychange', function () {
+        console.warn(
+          '%c[MnemoTag diag] visibilitychange → ' + document.visibilityState,
+          'background:#8b5cf6;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;'
+        );
+      });
+      window.addEventListener('pagehide', function (e) {
+        console.warn(
+          '%c[MnemoTag diag] pagehide (persisted=' + e.persisted + ') — bfcache eviction?',
+          'background:#3b82f6;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;'
+        );
+      });
+
+      // Monitor de memoria cada 10 s (si la API está disponible — Chrome/Edge).
+      // Si el uso crece indefinidamente sabemos que hay un leak.
+      if (performance && performance.memory) {
+        setInterval(function () {
+          const used = (performance.memory.usedJSHeapSize / 1048576).toFixed(1);
+          const total = (performance.memory.totalJSHeapSize / 1048576).toFixed(1);
+          const limit = (performance.memory.jsHeapSizeLimit / 1048576).toFixed(0);
+          console.info('[MnemoTag diag] memoria JS heap: ' + used + ' / ' + total + ' MB (límite ' + limit + ' MB)');
+        }, 10000);
+      }
+
+      // Detector de "cambios de archivo en caliente" (Live Reload de VS Code
+      // Live Server o similares). Live Server inyecta un <script> en runtime
+      // que abre un WebSocket y llama a location.reload() cuando cambia un
+      // archivo. Detectamos si existe ese WebSocket escaneando el DOM.
+      try {
+        const allScripts = Array.from(document.scripts || []);
+        const liveReload = allScripts.find(function (s) {
+          return (s.src || '').includes('livereload') ||
+                 (s.src || '').includes('browser-sync') ||
+                 (s.textContent || '').includes('WebSocket') && (s.textContent || '').includes('reload');
+        });
+        if (liveReload) {
+          console.warn(
+            '%c[MnemoTag diag] DETECTADO script de Live Reload en la página: ' + (liveReload.src || '(inline)'),
+            'background:#f59e0b;color:#000;font-weight:bold;padding:4px 8px;border-radius:4px;'
+          );
+          console.warn('[MnemoTag diag] Este script puede ser la causa de los reinicios si está recargando ante cambios de archivos del proyecto.');
+        }
+      } catch (_) { /* defensivo */ }
     }
 
     // Variables globales optimizadas
