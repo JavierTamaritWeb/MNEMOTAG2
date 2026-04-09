@@ -1,0 +1,51 @@
+name: E2E Tests
+
+# v3.4.13: Playwright smoke test sin package.json en el repo.
+# Se instala Playwright vía `npx --yes` dentro del job, arranca un
+# servidor HTTP con python3 (que ya viene en la imagen) y corre los
+# specs contra el HTML real. Objetivo: cobertura end-to-end mínima
+# que complementa los 178 tests Node y 44 binarios.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  e2e:
+    name: Playwright smoke test (Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup Python 3
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Playwright + browsers
+        # `npx --yes playwright@latest install --with-deps chromium`
+        # descarga Chromium + dependencias del sistema en la imagen.
+        # Solo chromium para minimizar tiempo (no necesitamos firefox/webkit).
+        run: npx --yes playwright@latest install --with-deps chromium
+
+      - name: Run Playwright smoke test
+        run: npx --yes playwright@latest test --project=chromium
+        env:
+          CI: 'true'
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

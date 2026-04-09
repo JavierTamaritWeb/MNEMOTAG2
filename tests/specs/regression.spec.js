@@ -852,6 +852,43 @@ describe('Regresión — Web Worker para pixel ops (v3.4.12)', function () {
   });
 });
 
+describe('Regresión — Playwright E2E (v3.4.13)', function () {
+  it('playwright.config.js existe en la raíz', async function () {
+    const res = await fetch('../playwright.config.js');
+    expect(res.ok).toBe(true);
+  });
+
+  it('playwright.config.js configura webServer con python3', async function () {
+    const src = await fetchSource('../playwright.config.js');
+    expect(src).toContain('testDir: \'./tests/e2e\'');
+    expect(src).toContain('python3 -m http.server 8080');
+    expect(src).toContain("baseURL: 'http://localhost:8080'");
+  });
+
+  it('tests/e2e/smoke.spec.js existe con los smoke tests principales', async function () {
+    const src = await fetchSource('../tests/e2e/smoke.spec.js');
+    expect(src).toContain("import { test, expect } from '@playwright/test'");
+    expect(src).toContain('carga index.html sin errores en consola');
+    expect(src).toContain('expone los managers globales en window');
+    expect(src).toContain('botones principales existen y son clicables');
+    expect(src).toContain('AppState.snapshot()');
+  });
+
+  it('.github/workflows/e2e.yml define el job Playwright con npx', async function () {
+    const res = await fetch('../.github/workflows/e2e.yml');
+    expect(res.ok).toBe(true);
+    const src = await res.text();
+    expect(src).toContain('npx --yes playwright@latest install');
+    expect(src).toContain('npx --yes playwright@latest test');
+    expect(src).toContain('--project=chromium');
+  });
+
+  it('tests/e2e/fixtures/1x1.png existe como fixture de imagen', async function () {
+    const res = await fetch('../tests/e2e/fixtures/1x1.png');
+    expect(res.ok).toBe(true);
+  });
+});
+
 describe('Regresión — Filter presets (v3.4.5)', function () {
   it('preset-manager.js define la API pública mínima', async function () {
     const src = await fetchSource('../js/managers/preset-manager.js');
