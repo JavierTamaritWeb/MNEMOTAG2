@@ -1,4 +1,56 @@
- // Variables globales optimizadas
+ // v3.4.17: DIAGNÓSTICO de reinicios reportados por el usuario.
+    // Cada vez que main.js se ejecuta, incrementamos un contador en
+    // sessionStorage y loggeamos un banner muy visible con:
+    //   - timestamp del arranque actual
+    //   - cuántas veces se ha "reiniciado" la página en esta sesión
+    //   - delta con el arranque anterior (si existe)
+    // Si el usuario ve este banner aparecer repetidamente, sabemos que
+    // la página se está recargando (y no es un reset lógico dentro del
+    // script). Con el delta sabemos exactamente cada cuánto ocurre.
+    try {
+      const now = Date.now();
+      const prevBootRaw = sessionStorage.getItem('mnemotag-boot-info');
+      const prev = prevBootRaw ? JSON.parse(prevBootRaw) : null;
+      const bootCount = prev ? (prev.count + 1) : 1;
+      const deltaMs = prev ? (now - prev.ts) : null;
+      sessionStorage.setItem('mnemotag-boot-info', JSON.stringify({ ts: now, count: bootCount }));
+      const label = '%c[MnemoTag diag] Arranque #' + bootCount + ' @ ' + new Date(now).toLocaleTimeString() +
+                    (deltaMs !== null ? (' (hace ' + Math.round(deltaMs / 1000) + ' s del anterior)') : '');
+      console.warn(label, 'background:#fbbf24;color:#000;font-weight:bold;padding:4px 8px;border-radius:4px;');
+      if (deltaMs !== null && deltaMs < 5 * 60 * 1000) {
+        console.warn('[MnemoTag diag] Reinicio detectado. Si no lo has provocado tú (reload manual, edición de archivo), revisa los listeners de error abajo ↓');
+      }
+    } catch (e) { /* sessionStorage puede fallar en modo privado */ }
+
+    // v3.4.17: Handler global de errores JavaScript no capturados.
+    // Loggea con un banner rojo y retiene la pila completa para facilitar
+    // el diagnóstico del usuario.
+    if (typeof window !== 'undefined' && !window._mnemotagDiagErrorInstalled) {
+      window._mnemotagDiagErrorInstalled = true;
+      window.addEventListener('error', function (e) {
+        console.error(
+          '%c[MnemoTag diag] ERROR NO CAPTURADO: ' + (e && e.message) + ' en ' + (e && e.filename) + ':' + (e && e.lineno),
+          'background:#dc2626;color:#fff;font-weight:bold;padding:4px 8px;border-radius:4px;',
+          e && e.error
+        );
+      });
+      window.addEventListener('unhandledrejection', function (e) {
+        console.error(
+          '%c[MnemoTag diag] PROMISE RECHAZADA SIN HANDLER: ' + (e && e.reason && (e.reason.message || e.reason)),
+          'background:#dc2626;color:#fff;font-weight:bold;padding:4px 8px;border-radius:4px;',
+          e && e.reason
+        );
+      });
+      // Loggear cualquier beforeunload (usuario cerrando, reload, etc.)
+      window.addEventListener('beforeunload', function () {
+        console.warn(
+          '%c[MnemoTag diag] beforeunload disparado — la página se va a recargar/cerrar ahora',
+          'background:#3b82f6;color:#fff;font-weight:bold;padding:4px 8px;border-radius:4px;'
+        );
+      });
+    }
+
+    // Variables globales optimizadas
     let currentImage = null;
     let canvas = null;
     let ctx = null;
