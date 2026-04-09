@@ -435,34 +435,31 @@ describe('Regresión — Análisis visual (v3.3.12 → v3.4.7 extraído a Analys
   });
 });
 
-describe('Regresión — Curvas y niveles (v3.3.13): editor de curvas con LUT', function () {
-  it('main.js define el estado _curvesState con los 4 canales', async function () {
-    const src = await fetchSource('../js/main.js');
-    expect(src).toContain('_curvesState');
+describe('Regresión — Curvas y niveles (v3.3.13 → v3.4.8 extraído a CurvesManager)', function () {
+  it('curves-manager.js define el estado interno con los 4 canales', async function () {
+    const src = await fetchSource('../js/managers/curves-manager.js');
     expect(src).toContain("activeChannel: 'rgb'");
-    // Cada canal debe arrancar con los 2 puntos extremos
     expect(src).toContain('rgb: [{ x: 0, y: 0 }, { x: 255, y: 255 }]');
   });
 
-  it('main.js define _buildLutFromPoints con interpolación lineal segmentada', async function () {
-    const src = await fetchSource('../js/main.js');
+  it('curves-manager.js define _buildLutFromPoints con interpolación lineal segmentada', async function () {
+    const src = await fetchSource('../js/managers/curves-manager.js');
     expect(src).toContain('function _buildLutFromPoints');
     expect(src).toContain('Uint8ClampedArray(256)');
   });
 
-  it('main.js define openCurvesModal y _applyCurvesToImage con composición LUT', async function () {
-    const src = await fetchSource('../js/main.js');
-    expect(src).toContain('function openCurvesModal');
-    expect(src).toContain('function _applyCurvesToImage');
+  it('curves-manager.js define open() y _applyToImage con composición LUT', async function () {
+    const src = await fetchSource('../js/managers/curves-manager.js');
+    expect(src).toContain('function open');
+    expect(src).toContain('function _applyToImage');
     // Composición: primero la LUT por canal, luego la LUT RGB combinada
     expect(src).toContain('lutRGB[lutR[data[i]]]');
     expect(src).toContain('historyManager.saveState');
   });
 
-  it('main.js define _redrawCurvesCanvas con cuadrícula y línea identidad', async function () {
-    const src = await fetchSource('../js/main.js');
-    expect(src).toContain('function _redrawCurvesCanvas');
-    // Línea diagonal de referencia
+  it('curves-manager.js define _redrawCanvas con cuadrícula y línea identidad', async function () {
+    const src = await fetchSource('../js/managers/curves-manager.js');
+    expect(src).toContain('function _redrawCanvas');
     expect(src).toContain('setLineDash([4, 4])');
   });
 
@@ -483,6 +480,26 @@ describe('Regresión — Curvas y niveles (v3.3.13): editor de curvas con LUT', 
     expect(src).toContain('.curves-channel-tabs');
     expect(src).toContain('.curves-channel-btn');
     expect(src).toContain('#curves-canvas');
+  });
+
+  // v3.4.8: la extracción a manager
+  it('v3.4.8: curves-manager.js expone window.CurvesManager con IIFE', async function () {
+    const src = await fetchSource('../js/managers/curves-manager.js');
+    expect(src).toContain('window.CurvesManager = (function');
+    expect(src).toContain('open: open');
+  });
+
+  it('v3.4.8: main.js openCurvesModal delega a CurvesManager.open()', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('CurvesManager.open()');
+  });
+
+  it('v3.4.8: index.html carga curves-manager.js antes de main.js', async function () {
+    const src = await fetchSource('../index.html');
+    const curvesIdx = src.indexOf('curves-manager.js');
+    const mainIdx = src.indexOf('js/main.js');
+    expect(curvesIdx).toBeGreaterThan(0);
+    expect(mainIdx).toBeGreaterThan(curvesIdx);
   });
 });
 
