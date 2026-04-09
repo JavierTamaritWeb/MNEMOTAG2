@@ -4,6 +4,35 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.3.14] - 2026-04-08
+
+### Added
+- **Panel de historial visual con thumbnails clicables**. Botón "Historial" (icono `fa-history`) junto a Deshacer/Rehacer en `index.html:1083`, dentro de la sección del canvas. Click toggle el panel `<div id="history-panel">` que se renderiza debajo del canvas con un grid responsive de mini-cards.
+- **Cada mini-card** muestra:
+  - La imagen completa del snapshot con `<img>` y `object-fit: contain` (sin recortar — el aspect ratio real de cada estado se preserva).
+  - Número de snapshot y timestamp formateado HH:MM:SS.
+  - **Click sobre la card** llama a `historyManager.jumpToState(index)` que restaura ese estado directamente, sin tener que aplicar undo N veces. Funciona en ambas direcciones (hacia atrás y hacia adelante en el historial).
+- **El estado actual se resalta** con `.history-thumb.is-current` (borde azul 2px + halo difuso `box-shadow`).
+- **`historyManager.getStatesSummary()`** en `js/managers/history-manager.js`. Devuelve `[{index, thumbnail, timestamp, isCurrent}]` para cada estado del historial. El campo `thumbnail` es directamente el `dataURL` del snapshot — el navegador escala vía CSS `object-fit: contain` para no rasterizar dos veces ni inflar memoria.
+- **`historyManager.jumpToState(index)`** en el mismo archivo. Setea `currentIndex = index`, llama a `restoreState(states[index])` y emite un toast "Saltado al estado N+1".
+- **`historyManager._buildThumbnail(sourceDataUrl, size)`** — placeholder defensivo que actualmente devuelve el `sourceDataUrl` original (delegando el escalado al CSS). El método existe para que futuras versiones puedan hacer escalado real con un canvas temporal cacheado, sin cambiar la API pública.
+- **Auto-refresh del panel** vía `window.renderHistoryPanel`. `historyManager.updateUndoRedoButtons` (que se llama al final de cada `saveState`, `undo`, `redo` y `jumpToState`) invoca `window.renderHistoryPanel()` defensivamente si está definida. Esto evita acoplar `history-manager` a `main.js` directamente y mantiene la modularidad. Si el panel está oculto, el render es no-op (early return en la primera línea).
+- **Estado vacío amistoso**: si `summary.length === 0`, el panel muestra un `<p class="history-panel__empty">` con texto explicativo en lugar de un grid vacío.
+- **Estilos completos** en `css/styles.css`: `.history-panel`, `.history-panel__header`, `.history-panel__title`, `.history-panel__close`, `.history-panel__grid` (auto-fill 96px), `.history-thumb`, `.history-thumb.is-current` (borde azul + box-shadow), `.history-thumb__image` (h:80px, object-fit:contain), `.history-thumb__info` (timestamp en monospace), `.history-panel__empty`. Variantes para tema oscuro vía `[data-theme="dark"]`. Hover lift sutil en cada thumb.
+- **Llamada a `renderHistoryPanel()` desde `_applyCurvesToImage`** para refrescar el panel inmediatamente después de aplicar curvas (operación pixel-level que sí lo necesita explícitamente, ya que el `saveState` posterior dispara el hook genérico también).
+- **Tests de regresión** en `tests/specs/regression.spec.js`: nuevo `describe('Regresión — Histórico visual con thumbnails (v3.3.14)')` con 6 aserciones que verifican `getStatesSummary` + `jumpToState` + `_buildThumbnail` en history-manager, el hook `window.renderHistoryPanel` desde `updateUndoRedoButtons`, las funciones `renderHistoryPanel` + `toggleHistoryPanel` + exposición a `window`, el uso de DOM API segura (`createElement`) + `historyManager.jumpToState`, los IDs del panel en HTML, y las clases CSS dedicadas.
+
+### Notas de implementación
+- **Por qué un hook `window.renderHistoryPanel` y no un acoplamiento directo**: `history-manager.js` no debe conocer el DOM más allá de los botones de Deshacer/Rehacer. El hook es opcional (se invoca con `typeof === 'function'`), por lo que el manager sigue funcionando si nadie lo define (ej: en tests Node).
+- **Por qué el thumbnail es el dataURL completo y no un canvas reducido**: el navegador rasteriza una sola vez por `<img>` y aplica `object-fit: contain`. Generar miniaturas reales con un canvas temporal por estado consumiría tiempo y memoria sin beneficio visual. La clave es que CSS las muestra a 80px de altura — el ahorro real (cacheable) llegará si en el futuro se persisten thumbnails reducidos en `state.thumbnail` desde `saveState`.
+- **Por qué llamar a `renderHistoryPanel` explícitamente desde `_applyCurvesToImage`**: las operaciones pixel-level (auto-balance, curvas) ya disparan `historyManager.saveState()`, que internamente llama a `updateUndoRedoButtons`, que llama al hook. La llamada extra es defensiva por si el orden cambia en el futuro.
+
+### Verificación
+- `node tests/run-in-node.js` → **123/123 OK** (117 anteriores + 6 nuevos)
+- `node tests/binary-validation.js` → 36/36 OK (sin cambios)
+
+---
+
 ## [3.3.13] - 2026-04-08
 
 ### Added
@@ -1261,5 +1290,5 @@ Lanzamiento inicial de MnemoTag.
 ---
 
 **Última actualización:** 8 de abril de 2026  
-**Versión actual:** 3.3.13  
+**Versión actual:** 3.3.14  
 **Estado:** ✅ Estable y listo para producción

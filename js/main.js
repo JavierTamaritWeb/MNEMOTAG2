@@ -750,6 +750,21 @@
         if (curvesBtn) {
           curvesBtn.addEventListener('click', openCurvesModal);
         }
+        // v3.3.14: Panel de historial visual.
+        const historyToggleBtn = document.getElementById('history-toggle-btn');
+        if (historyToggleBtn) {
+          historyToggleBtn.addEventListener('click', toggleHistoryPanel);
+        }
+        const historyPanelClose = document.getElementById('history-panel-close');
+        if (historyPanelClose) {
+          historyPanelClose.addEventListener('click', () => {
+            const panel = document.getElementById('history-panel');
+            if (panel) {
+              panel.classList.add('hidden');
+              panel.setAttribute('aria-hidden', 'true');
+            }
+          });
+        }
         // Cerrar modales de análisis (click en backdrop o botón X).
         document.querySelectorAll('[data-close-modal]').forEach(el => {
           el.addEventListener('click', function () {
@@ -4672,6 +4687,82 @@
       UIManager.showSuccess('📈 Curvas aplicadas a la imagen');
       const modal = document.getElementById('curves-modal');
       if (modal) modal.classList.add('hidden');
+      // v3.3.14: refresca el panel de historial si está visible
+      renderHistoryPanel();
+    }
+
+    // ============================================================
+    // v3.3.14 — Panel de historial visual con thumbnails clicables
+    // ============================================================
+
+    function toggleHistoryPanel() {
+      const panel = document.getElementById('history-panel');
+      if (!panel) return;
+      const isHidden = panel.classList.contains('hidden');
+      if (isHidden) {
+        renderHistoryPanel();
+        panel.classList.remove('hidden');
+        panel.setAttribute('aria-hidden', 'false');
+      } else {
+        panel.classList.add('hidden');
+        panel.setAttribute('aria-hidden', 'true');
+      }
+    }
+
+    // Exponer a window para que historyManager.updateUndoRedoButtons
+    // pueda invocar el re-render del panel sin acoplar managers entre sí.
+    window.renderHistoryPanel = renderHistoryPanel;
+
+    function renderHistoryPanel() {
+      const panel = document.getElementById('history-panel');
+      const grid = document.getElementById('history-panel-grid');
+      if (!panel || !grid) return;
+      // Si el panel está oculto no perdemos tiempo construyendo el DOM.
+      if (panel.classList.contains('hidden')) return;
+      if (typeof historyManager === 'undefined' || !historyManager.getStatesSummary) return;
+
+      const summary = historyManager.getStatesSummary();
+      grid.replaceChildren();
+
+      if (summary.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'history-panel__empty';
+        empty.textContent = 'Aún no hay estados en el historial. Aplica un filtro o cambio para empezar a guardarlo.';
+        grid.appendChild(empty);
+        return;
+      }
+
+      summary.forEach(item => {
+        const thumb = document.createElement('div');
+        thumb.className = 'history-thumb' + (item.isCurrent ? ' is-current' : '');
+        thumb.title = 'Estado ' + (item.index + 1) + ' · click para restaurar';
+
+        const img = document.createElement('img');
+        img.className = 'history-thumb__image';
+        img.alt = 'Estado ' + (item.index + 1);
+        img.src = item.thumbnail;
+        // El navegador escala a 80px de altura via CSS object-fit.
+
+        const info = document.createElement('div');
+        info.className = 'history-thumb__info';
+        const date = new Date(item.timestamp);
+        const hh = String(date.getHours()).padStart(2, '0');
+        const mm = String(date.getMinutes()).padStart(2, '0');
+        const ss = String(date.getSeconds()).padStart(2, '0');
+        info.textContent = '#' + (item.index + 1) + ' · ' + hh + ':' + mm + ':' + ss;
+
+        thumb.appendChild(img);
+        thumb.appendChild(info);
+        thumb.addEventListener('click', () => {
+          if (typeof historyManager.jumpToState === 'function') {
+            historyManager.jumpToState(item.index);
+            // Re-render para mover el highlight de "is-current"
+            renderHistoryPanel();
+          }
+        });
+
+        grid.appendChild(thumb);
+      });
     }
 
     async function downloadImage() {

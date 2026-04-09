@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MnemoTag v3.3.13</title>
+  <title>MnemoTag v3.3.14</title>
   
   <!-- Favicon moderno con SVG -->
   <link rel="icon" type="image/svg+xml" href="images/favicon.svg">
@@ -1068,6 +1068,19 @@
                 </button>
               </div>
             </div>
+            <!-- v3.3.14: Panel de histórico visual con thumbnails -->
+            <div id="history-panel" class="history-panel hidden" aria-hidden="true">
+              <div class="history-panel__header">
+                <h4 class="history-panel__title">
+                  <i class="fas fa-history"></i> Historial visual
+                </h4>
+                <button type="button" id="history-panel-close" class="history-panel__close" aria-label="Cerrar panel de historial">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+              <div id="history-panel-grid" class="history-panel__grid"></div>
+            </div>
+
             <div class="mt-4 flex justify-between gap-3">
               <div class="flex gap-2">
                 <button id="undo-btn" class="btn btn-primary button--action" disabled title="⏪ Deshacer última acción&#10;Atajo: ⌘Z">
@@ -1077,6 +1090,11 @@
                 <button id="redo-btn" class="btn btn-primary button--action" disabled title="⏩ Rehacer acción deshecha&#10;Atajo: ⌘⇧Z o ⌘Y">
                   <i class="fas fa-redo-alt" aria-hidden="true"></i>
                   Rehacer
+                </button>
+                <!-- v3.3.14: Botón para abrir el panel de historial visual -->
+                <button id="history-toggle-btn" class="btn btn-primary button--action" title="📜 Ver historial visual">
+                  <i class="fas fa-history" aria-hidden="true"></i>
+                  Historial
                 </button>
               </div>
               <div class="flex gap-2 flex-wrap action-buttons">

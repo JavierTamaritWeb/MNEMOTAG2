@@ -4,11 +4,34 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos.
 
-![Version](https://img.shields.io/badge/version-3.3.13-blue.svg)
+![Version](https://img.shields.io/badge/version-3.3.14-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 [![Tests](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml)
 [![Deploy to GitHub Pages](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml)
+
+---
+
+## ⭐ NOVEDADES v3.3.14
+
+> **Feature release — Histórico visual con thumbnails.** Ya no necesitas deshacer/rehacer paso a paso: pulsa "Historial" y salta a cualquier estado anterior con un click sobre su miniatura.
+
+### 📜 Panel de historial visual
+
+- **Botón "Historial"** (icono `history`) junto a Deshacer y Rehacer en la sección del canvas. Click → abre/cierra un panel desplegable debajo del canvas.
+- **Mini-cards** con los snapshots del historial: cada card muestra la imagen completa con `object-fit: contain` (sin recortar — verás un reflejo real del estado), el número de snapshot y el timestamp HH:MM:SS.
+- **Click sobre cualquier thumbnail** restaura ese estado del historial directamente, sin tener que pulsar Deshacer N veces. Funciona con cualquier estado, hacia atrás o hacia adelante.
+- **El estado actual se resalta** con un borde azul de 2px y un halo difuso, así sabes en qué punto estás.
+- **El panel se re-renderiza automáticamente** cada vez que el historial cambia (al aplicar un filtro, curvas, auto-balance, recorte, etc.). No tienes que cerrarlo y abrirlo. La sincronización se hace mediante un hook ligero (`window.renderHistoryPanel`) que `historyManager` invoca al actualizar los botones de Deshacer/Rehacer.
+- **Si el panel está cerrado**, el render es no-op (no consume CPU al modificar el historial mientras no lo estés viendo).
+- **Estado vacío amistoso**: si aún no has hecho ningún cambio, el panel muestra "Aún no hay estados en el historial. Aplica un filtro o cambio para empezar a guardarlo".
+
+### Verificación
+
+- `node tests/run-in-node.js` → **123/123 OK** (117 anteriores + 6 nuevos para v3.3.14)
+- `node tests/binary-validation.js` → 36/36 OK (sin cambios)
+
+Cero regresiones. El sistema de historial existente (`historyManager.states`) se reusa entero — esta versión solo añade `getStatesSummary()` y `jumpToState(index)` como nuevos métodos públicos.
 
 ---
 

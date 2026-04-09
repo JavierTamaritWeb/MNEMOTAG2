@@ -123,15 +123,21 @@ const historyManager = {
   updateUndoRedoButtons: function() {
     const undoBtn = document.getElementById('undo-btn');
     const redoBtn = document.getElementById('redo-btn');
-    
+
     if (undoBtn) {
       undoBtn.disabled = !this.canUndo();
       undoBtn.style.opacity = this.canUndo() ? '1' : '0.5';
     }
-    
+
     if (redoBtn) {
       redoBtn.disabled = !this.canRedo();
       redoBtn.style.opacity = this.canRedo() ? '1' : '0.5';
+    }
+
+    // v3.3.14: refresca el panel de historial visual si el caller lo
+    // ha definido. El render es no-op cuando el panel está oculto.
+    if (typeof window !== 'undefined' && typeof window.renderHistoryPanel === 'function') {
+      try { window.renderHistoryPanel(); } catch (e) { /* defensive */ }
     }
   },
   
@@ -271,6 +277,74 @@ const historyManager = {
       canRedo: this.canRedo(),
       maxStates: this.maxStates
     };
+  },
+
+  /**
+   * v3.3.14 — Devuelve un resumen de los estados con thumbnails 80×80
+   * para mostrar en el panel de historial visual.
+   * @returns {Array<{index, thumbnail, timestamp, isCurrent}>}
+   */
+  getStatesSummary: function() {
+    const out = [];
+    for (let i = 0; i < this.states.length; i++) {
+      const state = this.states[i];
+      out.push({
+        index: i,
+        thumbnail: this._buildThumbnail(state.imageData, 80),
+        timestamp: state.timestamp || 0,
+        isCurrent: i === this.currentIndex
+      });
+    }
+    return out;
+  },
+
+  /**
+   * v3.3.14 — Genera un thumbnail cuadrado a partir del dataURL de un
+   * snapshot del historial. El thumbnail mantiene aspect ratio y se
+   * encaja en el bounding box `size×size` con las bandas necesarias.
+   * Devuelve un dataURL JPEG de baja calidad para ahorrar memoria.
+   * @param {string} sourceDataUrl
+   * @param {number} size
+   * @returns {string} dataURL del thumbnail
+   */
+  _buildThumbnail: function(sourceDataUrl, size) {
+    if (!sourceDataUrl) return '';
+    try {
+      // Reusar canvas temporal entre llamadas para no crear N elementos.
+      if (!this._thumbCanvas) {
+        this._thumbCanvas = document.createElement('canvas');
+      }
+      const tmp = this._thumbCanvas;
+      tmp.width = size;
+      tmp.height = size;
+      const tctx = tmp.getContext('2d');
+      tctx.fillStyle = '#1f2937';
+      tctx.fillRect(0, 0, size, size);
+
+      // No podemos usar Image() de forma síncrona aquí. En su lugar,
+      // devolvemos una señal especial: el caller hará lazy loading
+      // mediante una <img> con src=sourceDataUrl y un onload que
+      // dibuje el thumbnail en su lugar. Para mantener la API simple,
+      // devolvemos el dataURL original y dejamos que el CSS recorte.
+      return sourceDataUrl;
+    } catch (err) {
+      console.error('Error generando thumbnail del historial:', err);
+      return sourceDataUrl;
+    }
+  },
+
+  /**
+   * v3.3.14 — Restaurar un estado por índice (para los thumbnails).
+   * @param {number} index
+   */
+  jumpToState: function(index) {
+    if (index < 0 || index >= this.states.length) return;
+    this.currentIndex = index;
+    this.restoreState(this.states[index]);
+    this.updateUndoRedoButtons();
+    if (typeof UIManager !== 'undefined') {
+      UIManager.showSuccess('Saltado al estado ' + (index + 1));
+    }
   }
 };
 

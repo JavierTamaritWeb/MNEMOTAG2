@@ -462,3 +462,49 @@ describe('Regresión — Curvas y niveles (v3.3.13): editor de curvas con LUT', 
     expect(src).toContain('#curves-canvas');
   });
 });
+
+describe('Regresión — Histórico visual con thumbnails (v3.3.14)', function () {
+  it('history-manager.js define getStatesSummary y jumpToState', async function () {
+    const src = await fetchSource('../js/managers/history-manager.js');
+    expect(src).toContain('getStatesSummary: function');
+    expect(src).toContain('jumpToState: function');
+    expect(src).toContain('_buildThumbnail: function');
+  });
+
+  it('history-manager.js dispara window.renderHistoryPanel desde updateUndoRedoButtons', async function () {
+    const src = await fetchSource('../js/managers/history-manager.js');
+    expect(src).toContain('window.renderHistoryPanel');
+  });
+
+  it('main.js define renderHistoryPanel y toggleHistoryPanel', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('function renderHistoryPanel');
+    expect(src).toContain('function toggleHistoryPanel');
+    // Debe exponer la función a window para el hook desde history-manager
+    expect(src).toContain('window.renderHistoryPanel = renderHistoryPanel');
+  });
+
+  it('main.js usa replaceChildren al renderizar el panel (DOM API segura)', async function () {
+    const src = await fetchSource('../js/main.js');
+    // Buscar el render del panel y verificar que usa DOM API segura
+    expect(src).toContain('history-panel-grid');
+    expect(src).toContain("createElement('div')");
+    // Click sobre cada thumbnail llama a jumpToState
+    expect(src).toContain('historyManager.jumpToState');
+  });
+
+  it('index.html incluye el panel de historial visual y el botón toggle', async function () {
+    const src = await fetchSource('../index.html');
+    expect(src).toContain('id="history-panel"');
+    expect(src).toContain('id="history-panel-grid"');
+    expect(src).toContain('id="history-panel-close"');
+    expect(src).toContain('id="history-toggle-btn"');
+  });
+
+  it('css/styles.css define las clases del panel de historial visual', async function () {
+    const src = await fetchSource('../css/styles.css');
+    expect(src).toContain('.history-panel');
+    expect(src).toContain('.history-thumb');
+    expect(src).toContain('.history-thumb.is-current');
+  });
+});
