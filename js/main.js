@@ -7064,19 +7064,52 @@
       initializeComparisonMode();
     }
 
-    // v3.3.16: Registrar Service Worker para soporte PWA / offline.
-    // El registro se hace en `load` (no en DOMContentLoaded) para no
-    // competir con la carga inicial de assets críticos.
+    // v3.3.16 (registro) + v3.4.16 (skip en localhost):
+    // Registrar Service Worker solo en PRODUCCIÓN. En dev local (VS Code
+    // Live Server, python -m http.server, etc.) el SW interfiere con el
+    // live reload del servidor y con el flujo de trabajo del desarrollador,
+    // causando "reinicios" constantes de la app mientras se editan archivos.
+    //
+    // Además desregistramos activamente cualquier SW fantasma que haya
+    // quedado de sesiones anteriores en localhost para limpiar el cache
+    // en la siguiente recarga.
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./service-worker.js', { scope: './' })
-          .then((reg) => {
-            console.warn('[App] Service Worker registrado:', reg.scope);
-          })
-          .catch((err) => {
-            console.warn('[App] Service Worker no se pudo registrar:', err);
-          });
-      });
+      const isLocalhost =
+        location.hostname === 'localhost' ||
+        location.hostname === '127.0.0.1' ||
+        location.hostname === '0.0.0.0' ||
+        location.hostname === '::1' ||
+        location.hostname.endsWith('.localhost');
+
+      if (isLocalhost) {
+        // Desarrollo local: limpiar cualquier SW registrado de sesiones
+        // anteriores. Evita que el cache viejo interfiera con Live Server.
+        navigator.serviceWorker.getRegistrations().then((regs) => {
+          for (const r of regs) {
+            r.unregister().then((ok) => {
+              if (ok) console.warn('[App] Service Worker desregistrado en localhost:', r.scope);
+            });
+          }
+        }).catch(() => { /* defensivo */ });
+
+        // También borrar los caches asociados al SW para dejar el entorno limpio.
+        if (typeof caches !== 'undefined' && caches.keys) {
+          caches.keys().then((names) => {
+            names.filter((n) => n.startsWith('mnemotag-')).forEach((n) => caches.delete(n));
+          }).catch(() => { /* defensivo */ });
+        }
+      } else {
+        // Producción (GitHub Pages, etc.): registrar normalmente.
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./service-worker.js', { scope: './' })
+            .then((reg) => {
+              console.warn('[App] Service Worker registrado:', reg.scope);
+            })
+            .catch((err) => {
+              console.warn('[App] Service Worker no se pudo registrar:', err);
+            });
+        });
+      }
     }
     
 
