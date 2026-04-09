@@ -621,3 +621,48 @@ describe('Regresión — AVIF EXIF (v3.3.17): parser ISOBMFF defensivo', functio
     expect(src).toContain("finalMimeType === 'image/avif'");
   });
 });
+
+describe('Regresión — Eliminar fondo con IA, lazy load (v3.3.18)', function () {
+  it('main.js define removeBackgroundWithAI con lazy load del modelo', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('function removeBackgroundWithAI');
+    expect(src).toContain('_loadBackgroundRemovalLib');
+    // Lazy load: dynamic import via jsdelivr +esm
+    expect(src).toContain('background-removal');
+    expect(src).toContain('+esm');
+  });
+
+  it('main.js NO carga la librería de IA al arrancar (cero impacto en peso inicial)', async function () {
+    const src = await fetchSource('../js/main.js');
+    // Confirmar que el import es DENTRO de _loadBackgroundRemovalLib y no
+    // a nivel de módulo. Buscamos la palabra "await import" cerca de la
+    // función — y NO debe haber un import ESM estático al inicio del archivo.
+    expect(src).toContain('await import');
+    // Cache del módulo en variable global (singleton)
+    expect(src).toContain('_bgRemovalModule');
+  });
+
+  it('main.js avisa al usuario del tamaño del modelo antes de descargarlo', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('Descargando modelo de IA');
+    // Debe mencionar el tamaño aproximado para gestionar expectativas
+    expect(src).toMatch(/10.{0,5}MB/);
+  });
+
+  it('main.js degrada elegantemente si la librería falla al cargar', async function () {
+    const src = await fetchSource('../js/main.js');
+    // Try/catch alrededor del import, error claro al usuario
+    expect(src).toContain('No se pudo cargar el modelo de IA');
+    // El estado de la app no debe quedar inconsistente: variable
+    // _bgRemovalLoading se resetea en finally
+    expect(src).toContain('_bgRemovalLoading = false');
+  });
+
+  it('index.html incluye el botón "Eliminar fondo (IA)" en la sección de filtros', async function () {
+    const src = await fetchSource('../index.html');
+    expect(src).toContain('id="remove-bg-btn"');
+    expect(src).toContain('Eliminar fondo');
+    // Tooltip explicativo del peso del modelo
+    expect(src).toContain('10-15 MB');
+  });
+});

@@ -4,11 +4,46 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos.
 
-![Version](https://img.shields.io/badge/version-3.3.17-blue.svg)
+![Version](https://img.shields.io/badge/version-3.3.18-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 [![Tests](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml)
 [![Deploy to GitHub Pages](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml)
+
+---
+
+## ⭐ NOVEDADES v3.3.18
+
+> **Feature release — Eliminar fondo con IA (lazy load total).** Botón nuevo en la sección de filtros que elimina automáticamente el fondo de cualquier imagen usando un modelo de IA real. La librería se descarga UNA SOLA VEZ cuando el usuario pulsa el botón por primera vez — cero impacto en el peso inicial de la app.
+
+### 🪄 Eliminar fondo con un click
+
+- Botón **"Eliminar fondo (IA)"** (icono `magic-wand-sparkles`) en la sección de filtros, junto a "Curvas y niveles" y "Auto-mejorar imagen".
+- Click → si es la primera vez:
+  1. **Toast informativo**: *"🤖 Descargando modelo de IA (~10-15 MB). Esto solo ocurre la primera vez…"*
+  2. **Descarga lazy** del módulo `@imgly/background-removal@1.4.5` vía `await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/+esm')`. La librería usa Web Workers internamente, así que el hilo principal no se bloquea durante la descarga ni durante el procesado.
+  3. **Cachea el módulo** en una variable singleton (`_bgRemovalModule`) para que las llamadas posteriores reutilicen la librería ya cargada.
+- En llamadas posteriores → la librería ya está en memoria, el procesado empieza inmediatamente.
+- **Procesado**:
+  1. El canvas actual (con todos los filtros y marcas de agua aplicados) se convierte a un Blob PNG para preservar la transparencia.
+  2. Se llama a la función principal de la librería (`removeBackground` o `default`).
+  3. El resultado (Blob con fondo transparente) se carga de vuelta al canvas vía `<img>`.
+  4. **Se guarda en el historial** para que el botón Deshacer revierta la operación.
+- **Cero impacto en peso inicial**: si el usuario nunca pulsa el botón, la librería NUNCA se descarga. La app sigue siendo "ligera" para el 99% de los usos.
+
+### 🛡️ Degradación elegante
+
+- Si **falla la descarga** del módulo (offline, CDN bloqueado, CORS, error de red): error claro al usuario *"No se pudo cargar el modelo de IA: ... Comprueba tu conexión y vuelve a intentarlo"*. La app sigue funcionando exactamente igual que antes.
+- Si la librería **carga pero no expone la función esperada** (versión incompatible en el futuro): error claro *"La librería de IA cargada no expone la función esperada. Versión incompatible."*
+- Si el procesado **lanza** durante el run: error capturado y mostrado al usuario sin romper el estado del canvas.
+- Estado interno (`_bgRemovalLoading`) se resetea en `finally` para que el botón vuelva a funcionar tras cualquier fallo.
+
+### 🎯 Verificación
+
+- `node tests/run-in-node.js` → **142/142 OK** (137 anteriores + 5 nuevos para v3.3.18)
+- `node tests/binary-validation.js` → 44/44 OK (sin cambios)
+
+Cero regresiones. Esta es la **última versión del bloque de 8 commits** que se han ido publicando: paste/multi-size, análisis visual, curvas, historial visual, HEIC, PWA, AVIF parser, eliminar fondo con IA. La app pasa de ~700 a ~1500 funcionalidades en esta sesión sin tocar la naturaleza static-only del proyecto.
 
 ---
 

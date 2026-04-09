@@ -750,6 +750,11 @@
         if (curvesBtn) {
           curvesBtn.addEventListener('click', openCurvesModal);
         }
+        // v3.3.18: Eliminar fondo con IA (lazy load del modelo).
+        const removeBgBtn = document.getElementById('remove-bg-btn');
+        if (removeBgBtn) {
+          removeBgBtn.addEventListener('click', removeBackgroundWithAI);
+        }
         // v3.3.14: Panel de historial visual.
         const historyToggleBtn = document.getElementById('history-toggle-btn');
         if (historyToggleBtn) {
@@ -4797,6 +4802,105 @@
 
         grid.appendChild(thumb);
       });
+    }
+
+    // ============================================================
+    // v3.3.18 — Eliminar fondo con IA (lazy load on demand)
+    // ============================================================
+    //
+    // Estrategia: NO cargar el modelo de IA al arrancar la app —
+    // pesa ~10-15 MB y rompería la promesa "ligera" del proyecto.
+    // En su lugar, hacemos lazy load via dynamic import() la PRIMERA
+    // vez que el usuario pulsa el botón. Las llamadas posteriores
+    // reutilizan el módulo cacheado en `window._bgRemovalModule`.
+
+    let _bgRemovalModule = null;
+    let _bgRemovalLoading = false;
+
+    async function _loadBackgroundRemovalLib() {
+      if (_bgRemovalModule) return _bgRemovalModule;
+      if (_bgRemovalLoading) {
+        // Ya hay otra llamada en curso — esperar a que termine.
+        return new Promise((resolve, reject) => {
+          const check = () => {
+            if (_bgRemovalModule) return resolve(_bgRemovalModule);
+            if (!_bgRemovalLoading) return reject(new Error('Carga abortada'));
+            setTimeout(check, 100);
+          };
+          check();
+        });
+      }
+      _bgRemovalLoading = true;
+      try {
+        UIManager.showInfo('🤖 Descargando modelo de IA (~10-15 MB). Esto solo ocurre la primera vez…');
+        // jsdelivr +esm sirve la versión ESM de la librería para que
+        // dynamic import() funcione sin bundler.
+        _bgRemovalModule = await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/+esm');
+        return _bgRemovalModule;
+      } finally {
+        _bgRemovalLoading = false;
+      }
+    }
+
+    async function removeBackgroundWithAI() {
+      if (!canvas || !currentImage) {
+        UIManager.showError('Carga una imagen primero para eliminar el fondo.');
+        return;
+      }
+
+      let mod;
+      try {
+        mod = await _loadBackgroundRemovalLib();
+      } catch (err) {
+        console.error('Error cargando el modelo de IA:', err);
+        UIManager.showError('No se pudo cargar el modelo de IA: ' + (err.message || err) + '. Comprueba tu conexión y vuelve a intentarlo.');
+        return;
+      }
+
+      // La librería expone su función principal como `removeBackground`
+      // o como default export según la versión. Defensivo.
+      const removeFn = (mod && (mod.removeBackground || mod.default)) || null;
+      if (typeof removeFn !== 'function') {
+        UIManager.showError('La librería de IA cargada no expone la función esperada. Versión incompatible.');
+        return;
+      }
+
+      try {
+        UIManager.showInfo('🤖 Procesando imagen con IA. Esto puede tardar unos segundos…');
+
+        // Convertimos el canvas actual (con todos los filtros y marcas
+        // aplicados) a un blob PNG para preservar la transparencia.
+        const inputBlob = await new Promise((resolve, reject) => {
+          canvas.toBlob((b) => b ? resolve(b) : reject(new Error('toBlob falló')), 'image/png');
+        });
+
+        // Llamada a la librería. Devuelve un Blob con fondo transparente.
+        const resultBlob = await removeFn(inputBlob);
+
+        // Cargar el resultado de vuelta al canvas.
+        const url = URL.createObjectURL(resultBlob);
+        const img = new Image();
+        img.onload = function () {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          URL.revokeObjectURL(url);
+
+          // Marcar la imagen como con alpha (para que las descargas a
+          // JPEG fuercen el flujo de aplanado contra fondo).
+          if (typeof historyManager !== 'undefined' && historyManager.saveState) {
+            historyManager.saveState();
+          }
+          UIManager.showSuccess('🪄 Fondo eliminado correctamente');
+        };
+        img.onerror = function () {
+          URL.revokeObjectURL(url);
+          UIManager.showError('No se pudo cargar el resultado del modelo de IA.');
+        };
+        img.src = url;
+      } catch (err) {
+        console.error('Error procesando con IA:', err);
+        UIManager.showError('Error al procesar la imagen: ' + (err.message || err));
+      }
     }
 
     async function downloadImage() {

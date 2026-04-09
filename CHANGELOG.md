@@ -4,6 +4,37 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.3.18] - 2026-04-08
+
+### Added
+- **Eliminar fondo con IA (lazy load total)**. Botón "Eliminar fondo (IA)" en `index.html:649` (sección de filtros, junto a "Curvas y niveles"). Icono `fa-magic-wand-sparkles`. Tooltip: *"Eliminar el fondo de la imagen usando IA. La primera vez descarga ~10-15 MB del modelo, después funciona offline."*
+- **`removeBackgroundWithAI()`** en `js/main.js`. Validaciones iniciales (canvas + currentImage), llama a `_loadBackgroundRemovalLib()` para garantizar el módulo cargado, busca la función `removeBackground` o `default` defensivamente, convierte el canvas a Blob PNG con `canvas.toBlob`, llama a `removeFn(inputBlob)`, y carga el resultado de vuelta al canvas vía `<img>` + `URL.createObjectURL`. Tras `img.onload`, persiste en `historyManager.saveState()` para que el botón Deshacer revierta la eliminación de fondo.
+- **`_loadBackgroundRemovalLib()`** — singleton de carga lazy. Variables módulo: `_bgRemovalModule` (cache del módulo cargado) y `_bgRemovalLoading` (flag para evitar cargas paralelas). En la primera llamada:
+  1. Muestra `UIManager.showInfo('🤖 Descargando modelo de IA (~10-15 MB). Esto solo ocurre la primera vez…')`.
+  2. Hace `await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/+esm')`. El sufijo `+esm` de jsdelivr sirve la versión ESM de la librería para que `dynamic import()` funcione sin bundler.
+  3. Cachea el módulo en `_bgRemovalModule` y resetea `_bgRemovalLoading` en `finally` (para que un fallo no deje el flag bloqueado).
+- **Llamadas concurrentes** se manejan con un poller corto: si `_bgRemovalLoading === true`, se espera (con `setTimeout` 100ms) hasta que la otra carga termine y se devuelve el módulo cacheado.
+- **Cero impacto en peso inicial de la app**: el módulo NUNCA se descarga al arrancar. El bundle inicial de MnemoTag sigue siendo idéntico al de v3.3.17. Solo los usuarios que pulsen el botón pagan el coste de los ~10-15 MB.
+- **Degradación elegante completa**:
+  - Si la descarga del módulo falla → `console.error` + `UIManager.showError('No se pudo cargar el modelo de IA: ... Comprueba tu conexión y vuelve a intentarlo.')`.
+  - Si la librería carga pero no expone `removeBackground` ni `default` → error de versión incompatible.
+  - Si el procesado lanza durante el run → error capturado, mostrado al usuario sin romper el canvas.
+  - Si la imagen resultante no carga → error explícito.
+  - El estado del canvas NUNCA queda inconsistente en ningún camino de error.
+- **Tests de regresión** en `tests/specs/regression.spec.js`: nuevo `describe('Regresión — Eliminar fondo con IA, lazy load (v3.3.18)')` con 5 aserciones que verifican: la función `removeBackgroundWithAI` y el helper `_loadBackgroundRemovalLib`, que NO hay import estático del módulo (cero impacto en peso inicial), que el toast informa del tamaño del modelo (con regex `/10.{0,5}MB/` para tolerar variaciones), que existe try/catch + reset del flag loading, y que el botón está en HTML con tooltip explicativo del peso.
+
+### Notas de implementación
+- **Por qué `+esm` de jsdelivr y no unpkg / npm directo**: jsdelivr expone una versión ESM transformada vía su sufijo `+esm` que es directamente importable con `dynamic import()` sin necesidad de bundler. unpkg sirve el código tal cual, lo que requiere bundling para resolver imports internos. La librería tiene dependencias internas (web workers, ONNX runtime) que jsdelivr resuelve automáticamente.
+- **Por qué lazy load y no precarga**: la promesa fundamental del proyecto es ser "ligero" — toda la app cabe en ~700 KB de assets. Un modelo ML de 10-15 MB rompería esa promesa para los usuarios que solo quieren añadir EXIF a sus fotos. El compromiso: lazy load on demand. El usuario que pulsa el botón sabe que está activando una función avanzada y acepta el coste.
+- **Por qué `canvas.toBlob('image/png')` y no JPEG**: PNG soporta transparencia. La librería devuelve un Blob con fondo eliminado (alpha = 0 en las zonas de fondo); si convertimos a JPEG perderíamos esa información antes de pasarla al modelo, y el resultado tendría fondo blanco fijo en lugar de transparente.
+- **Por qué `historyManager.saveState()` después del onload y no antes**: queremos que el snapshot del historial contenga el resultado FINAL (con fondo eliminado), no el estado intermedio.
+
+### Verificación
+- `node tests/run-in-node.js` → **142/142 OK** (137 anteriores + 5 nuevos)
+- `node tests/binary-validation.js` → 44/44 OK (sin cambios)
+
+---
+
 ## [3.3.17] - 2026-04-08
 
 ### Added
@@ -1389,5 +1420,5 @@ Lanzamiento inicial de MnemoTag.
 ---
 
 **Última actualización:** 8 de abril de 2026  
-**Versión actual:** 3.3.17  
+**Versión actual:** 3.3.18  
 **Estado:** ✅ Estable y listo para producción

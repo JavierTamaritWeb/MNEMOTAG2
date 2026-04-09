@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MnemoTag v3.3.17</title>
+  <title>MnemoTag v3.3.18</title>
   
   <!-- Favicon moderno con SVG -->
   <link rel="icon" type="image/svg+xml" href="images/favicon.svg">
@@ -651,6 +651,11 @@
                       <button type="button" id="curves-btn" class="btn btn-primary button--feature" title="Editor de curvas y niveles (estilo Photoshop) por canal o RGB combinado">
                         <i class="fas fa-chart-line" aria-hidden="true"></i>
                         Curvas y niveles
+                      </button>
+                      <!-- v3.3.18: Eliminar fondo con IA (lazy load del modelo) -->
+                      <button type="button" id="remove-bg-btn" class="btn btn-primary button--feature" title="Eliminar el fondo de la imagen usando IA. La primera vez descarga ~10-15 MB del modelo, después funciona offline.">
+                        <i class="fas fa-magic-wand-sparkles" aria-hidden="true"></i>
+                        Eliminar fondo (IA)
                       </button>
                       <button type="button" id="resetFilters" class="reset-filters-btn">
                         <i class="fas fa-undo" aria-hidden="true"></i>
