@@ -340,7 +340,11 @@ const SecurityManager = {
     };
 
     if (!text || typeof text !== 'string') {
-      validation.errors.push('El texto de la marca de agua es requerido');
+      validation.errors.push(
+        'La marca de agua de texto está habilitada pero el campo de texto está vacío. ' +
+        'Escribe un texto en «Texto de la marca de agua», o desmarca la casilla ' +
+        '«Habilitar marca de agua de texto» si solo quieres usar marca de agua de imagen.'
+      );
       validation.isValid = false;
     } else {
       const sanitized = this.sanitizeText(text);
