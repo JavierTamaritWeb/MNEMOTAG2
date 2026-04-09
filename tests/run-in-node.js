@@ -162,6 +162,7 @@ load('js/managers/history-manager.js');
 load('js/managers/preset-manager.js');
 load('js/managers/analysis-manager.js');
 load('js/managers/curves-manager.js');
+load('js/managers/bg-removal-manager.js');
 
 // ---- 2) Test runner casero -------------------------------------------------
 

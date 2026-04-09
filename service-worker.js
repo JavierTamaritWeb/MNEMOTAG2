@@ -27,7 +27,7 @@
 // `js/main.js`.
 // =============================================================================
 
-const CACHE_VERSION = 'mnemotag-v3.4.8';
+const CACHE_VERSION = 'mnemotag-v3.4.9';
 const CACHE_NAME_APP = CACHE_VERSION + '-app';
 const CACHE_NAME_CDN = CACHE_VERSION + '-cdn';
 
@@ -57,6 +57,7 @@ const PRECACHE_URLS = [
   './js/managers/preset-manager.js',
   './js/managers/analysis-manager.js',
   './js/managers/curves-manager.js',
+  './js/managers/bg-removal-manager.js',
   './images/favicon.svg',
   './images/favicon_io/favicon.ico',
   './images/favicon_io/site.webmanifest'

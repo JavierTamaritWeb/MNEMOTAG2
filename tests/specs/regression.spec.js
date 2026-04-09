@@ -663,48 +663,62 @@ describe('Regresión — AVIF EXIF (v3.3.17): parser ISOBMFF defensivo', functio
   });
 });
 
-describe('Regresión — Eliminar fondo con IA, lazy load (v3.3.18)', function () {
-  it('main.js define removeBackgroundWithAI con lazy load del modelo', async function () {
-    const src = await fetchSource('../js/main.js');
-    expect(src).toContain('function removeBackgroundWithAI');
-    expect(src).toContain('_loadBackgroundRemovalLib');
+describe('Regresión — Eliminar fondo con IA, lazy load (v3.3.18 → v3.4.9 extraído)', function () {
+  it('bg-removal-manager.js define removeBackground con lazy load del modelo', async function () {
+    const src = await fetchSource('../js/managers/bg-removal-manager.js');
+    expect(src).toContain('function removeBackground');
+    expect(src).toContain('_loadLib');
     // Lazy load: dynamic import via jsdelivr +esm
     expect(src).toContain('background-removal');
     expect(src).toContain('+esm');
   });
 
-  it('main.js NO carga la librería de IA al arrancar (cero impacto en peso inicial)', async function () {
-    const src = await fetchSource('../js/main.js');
-    // Confirmar que el import es DENTRO de _loadBackgroundRemovalLib y no
-    // a nivel de módulo. Buscamos la palabra "await import" cerca de la
-    // función — y NO debe haber un import ESM estático al inicio del archivo.
+  it('bg-removal-manager.js NO carga la librería al arrancar (cero impacto en peso inicial)', async function () {
+    const src = await fetchSource('../js/managers/bg-removal-manager.js');
     expect(src).toContain('await import');
-    // Cache del módulo en variable global (singleton)
-    expect(src).toContain('_bgRemovalModule');
+    // Cache del módulo en closure privada (singleton)
+    expect(src).toContain('let _module');
   });
 
-  it('main.js avisa al usuario del tamaño del modelo antes de descargarlo', async function () {
-    const src = await fetchSource('../js/main.js');
+  it('bg-removal-manager.js avisa al usuario del tamaño del modelo antes de descargarlo', async function () {
+    const src = await fetchSource('../js/managers/bg-removal-manager.js');
     expect(src).toContain('Descargando modelo de IA');
     // Debe mencionar el tamaño aproximado para gestionar expectativas
     expect(src).toMatch(/10.{0,5}MB/);
   });
 
-  it('main.js degrada elegantemente si la librería falla al cargar', async function () {
-    const src = await fetchSource('../js/main.js');
-    // Try/catch alrededor del import, error claro al usuario
+  it('bg-removal-manager.js degrada elegantemente si la librería falla al cargar', async function () {
+    const src = await fetchSource('../js/managers/bg-removal-manager.js');
     expect(src).toContain('No se pudo cargar el modelo de IA');
-    // El estado de la app no debe quedar inconsistente: variable
-    // _bgRemovalLoading se resetea en finally
-    expect(src).toContain('_bgRemovalLoading = false');
+    // El flag _loading se resetea en finally para no dejar el manager bloqueado
+    expect(src).toContain('_loading = false');
   });
 
   it('index.html incluye el botón "Eliminar fondo (IA)" en la sección de filtros', async function () {
     const src = await fetchSource('../index.html');
     expect(src).toContain('id="remove-bg-btn"');
     expect(src).toContain('Eliminar fondo');
-    // Tooltip explicativo del peso del modelo
     expect(src).toContain('10-15 MB');
+  });
+
+  // v3.4.9: la extracción a manager
+  it('v3.4.9: bg-removal-manager.js expone window.BgRemovalManager con IIFE', async function () {
+    const src = await fetchSource('../js/managers/bg-removal-manager.js');
+    expect(src).toContain('window.BgRemovalManager = (function');
+    expect(src).toContain('removeBackground: removeBackground');
+  });
+
+  it('v3.4.9: main.js delega el botón remove-bg-btn a BgRemovalManager.removeBackground()', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('BgRemovalManager.removeBackground()');
+  });
+
+  it('v3.4.9: index.html carga bg-removal-manager.js antes de main.js', async function () {
+    const src = await fetchSource('../index.html');
+    const bgIdx = src.indexOf('bg-removal-manager.js');
+    const mainIdx = src.indexOf('js/main.js');
+    expect(bgIdx).toBeGreaterThan(0);
+    expect(mainIdx).toBeGreaterThan(bgIdx);
   });
 });
 
