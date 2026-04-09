@@ -156,6 +156,7 @@ function load(rel) {
 
 load('js/utils/app-config.js');
 load('js/utils/helpers.js');
+load('js/utils/app-state.js');
 load('js/managers/security-manager.js');
 load('js/managers/metadata-manager.js');
 load('js/managers/history-manager.js');

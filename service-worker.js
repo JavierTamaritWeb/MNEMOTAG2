@@ -27,7 +27,7 @@
 // `js/main.js`.
 // =============================================================================
 
-const CACHE_VERSION = 'mnemotag-v3.4.10';
+const CACHE_VERSION = 'mnemotag-v3.4.11';
 const CACHE_NAME_APP = CACHE_VERSION + '-app';
 const CACHE_NAME_CDN = CACHE_VERSION + '-cdn';
 
@@ -40,6 +40,7 @@ const PRECACHE_URLS = [
   './js/main.js',
   './js/utils/app-config.js',
   './js/utils/helpers.js',
+  './js/utils/app-state.js',
   './js/utils/smart-debounce.js',
   './js/utils/filter-cache.js',
   './js/utils/fallback-processor.js',

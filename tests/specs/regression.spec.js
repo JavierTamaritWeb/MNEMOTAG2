@@ -762,6 +762,56 @@ describe('Regresión — Export extraído a ExportManager (v3.4.10)', function (
   });
 });
 
+describe('Regresión — AppState singleton (v3.4.11)', function () {
+  it('app-state.js expone window.AppState con getters para variables globales', async function () {
+    const src = await fetchSource('../js/utils/app-state.js');
+    expect(src).toContain('window.AppState = Object.freeze');
+    // Getters principales
+    expect(src).toContain('get canvas()');
+    expect(src).toContain('get ctx()');
+    expect(src).toContain('get currentImage()');
+    expect(src).toContain('get fileBaseName()');
+    expect(src).toContain('get outputFormat()');
+    expect(src).toContain('get outputQuality()');
+  });
+
+  it('app-state.js usa typeof guards para no crashear sin main.js cargado', async function () {
+    const src = await fetchSource('../js/utils/app-state.js');
+    expect(src).toContain("typeof canvas !== 'undefined'");
+    expect(src).toContain("typeof currentImage !== 'undefined'");
+  });
+
+  it('app-state.js define setters escribibles para estado mutable', async function () {
+    const src = await fetchSource('../js/utils/app-state.js');
+    expect(src).toContain('set fileBaseName(v)');
+    expect(src).toContain('set currentRotation(v)');
+    expect(src).toContain('set outputFormat(v)');
+  });
+
+  it('app-state.js define snapshot() para debugging desde consola', async function () {
+    const src = await fetchSource('../js/utils/app-state.js');
+    expect(src).toContain('snapshot()');
+    expect(src).toContain('hasImage: !!this.currentImage');
+  });
+
+  it('index.html carga app-state.js antes de los managers', async function () {
+    const src = await fetchSource('../index.html');
+    const stateIdx = src.indexOf('app-state.js');
+    const firstManagerIdx = src.indexOf('js/managers/');
+    expect(stateIdx).toBeGreaterThan(0);
+    expect(firstManagerIdx).toBeGreaterThan(stateIdx);
+  });
+
+  it('AppState carga correctamente en el sandbox Node sin crashear', function () {
+    // Si el runner llegó hasta aquí, AppState se cargó sin lanzar
+    // porque todos los getters usan typeof guards.
+    // eslint-disable-next-line no-undef
+    expect(typeof AppState).toBe('object');
+    // eslint-disable-next-line no-undef
+    expect(AppState).not.toBe(null);
+  });
+});
+
 describe('Regresión — Filter presets (v3.4.5)', function () {
   it('preset-manager.js define la API pública mínima', async function () {
     const src = await fetchSource('../js/managers/preset-manager.js');
