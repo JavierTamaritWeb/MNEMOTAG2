@@ -1420,5 +1420,5 @@ Lanzamiento inicial de MnemoTag.
 ---
 
 **Última actualización:** 8 de abril de 2026  
-**Versión actual:** 3.3.18  
+**Versión actual:** 3.4.0  
 **Estado:** ✅ Estable y listo para producción

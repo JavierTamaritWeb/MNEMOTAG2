@@ -4,7 +4,7 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos.
 
-![Version](https://img.shields.io/badge/version-3.3.18-blue.svg)
+![Version](https://img.shields.io/badge/version-3.4.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 [![Tests](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml)
@@ -12,7 +12,7 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 
 ---
 
-## ⭐ NOVEDADES v3.3.18
+## ⭐ NOVEDADES v3.4.0
 
 > **Feature release — Eliminar fondo con IA (lazy load total).** Botón nuevo en la sección de filtros que elimina automáticamente el fondo de cualquier imagen usando un modelo de IA real. La librería se descarga UNA SOLA VEZ cuando el usuario pulsa el botón por primera vez — cero impacto en el peso inicial de la app.
 
@@ -659,4 +659,4 @@ open index.html
 
 ## 📄 LICENCIA
 
-MIT License - Javier Tamarit © 2025
+MIT License - Javier Tamarit © 2026

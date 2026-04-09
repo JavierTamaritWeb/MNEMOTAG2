@@ -6904,3 +6904,167 @@
   color: #9ca3af;
 }
 
+/* ================================================================== */
+/* v3.3.19 — Fix visual de 5 botones específicos                      */
+/* (auto-balance, curves, remove-bg, download-multisize, history).    */
+/* Usa selectores por ID para vencer al grupo masivo de la línea 1584 */
+/* (button[type="button"], .btn-secondary, .button--action, ...) y al */
+/* selector `button{}` de la línea 3903 sin afectar a otros botones.  */
+/* ================================================================== */
+
+/* === Trío de botones avanzados en la sección de filtros === */
+#auto-balance-btn,
+#curves-btn,
+#remove-bg-btn {
+  width: 100%;
+  min-width: 0;            /* anula min-width:160px de la línea 1584 */
+  min-height: 48px;
+  height: auto;            /* anula height:48px del selector button{} */
+  padding: 12px 18px;      /* más sobrio que 16px 36px en sidebar */
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  border: none;
+  border-radius: 10px;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#auto-balance-btn i,
+#curves-btn i,
+#remove-bg-btn i,
+#download-multisize-btn i,
+#history-toggle-btn i {
+  margin-right: 0;          /* anula margin-right:10px del icono línea 1749 */
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+/* Auto-mejorar: ámbar — sugiere "automático/mágico" */
+#auto-balance-btn {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.3), 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+#auto-balance-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4), 0 3px 8px rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px) !important;
+}
+
+/* Curvas: morado — precisión/profesional */
+#curves-btn {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.3), 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+#curves-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
+  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.4), 0 3px 8px rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px) !important;
+}
+
+/* Eliminar fondo IA: cian/teal — smart/IA */
+#remove-bg-btn {
+  background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+  box-shadow: 0 4px 14px rgba(6, 182, 212, 0.3), 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+#remove-bg-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
+  box-shadow: 0 6px 20px rgba(6, 182, 212, 0.4), 0 3px 8px rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px) !important;
+}
+
+/* === Descargar varios tamaños: outlined real (no impostado) === */
+#download-multisize-btn {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  height: auto;
+  padding: 12px 18px;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  border: 2px solid #3b82f6;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #1d4ed8;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+#download-multisize-btn i {
+  color: #1d4ed8;
+}
+#download-multisize-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: #ffffff;
+  border-color: #2563eb;
+  box-shadow: 0 6px 18px rgba(59, 130, 246, 0.35);
+  transform: translateY(-1px) !important;
+}
+#download-multisize-btn:hover:not(:disabled) i {
+  color: #ffffff;
+}
+[data-theme="dark"] #download-multisize-btn {
+  background: rgba(30, 41, 59, 0.85);
+  color: #93c5fd;
+  border-color: #3b82f6;
+}
+[data-theme="dark"] #download-multisize-btn i {
+  color: #93c5fd;
+}
+[data-theme="dark"] #download-multisize-btn:hover:not(:disabled) {
+  background: #3b82f6;
+  color: #ffffff;
+}
+[data-theme="dark"] #download-multisize-btn:hover:not(:disabled) i {
+  color: #ffffff;
+}
+
+/* === Historial: índigo, ancho flexible (sin el width:200px fijo) === */
+#history-toggle-btn {
+  width: auto;             /* anula width:200px de la línea 3927 */
+  min-width: 140px;
+  flex: 0 0 auto;
+  min-height: 48px;
+  height: auto;
+  padding: 12px 18px;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  border: none;
+  border-radius: 10px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%) !important;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3), 0 2px 6px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+#history-toggle-btn i {
+  color: #ffffff;
+}
+#history-toggle-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%) !important;
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.4), 0 3px 8px rgba(0, 0, 0, 0.12);
+  transform: translateY(-1px) !important;
+}
+
+/* Focus visible accesible para los 5 botones */
+#auto-balance-btn:focus-visible,
+#curves-btn:focus-visible,
+#remove-bg-btn:focus-visible,
+#download-multisize-btn:focus-visible,
+#history-toggle-btn:focus-visible {
+  outline: 3px solid rgba(99, 102, 241, 0.5);
+  outline-offset: 2px;
+}
+
