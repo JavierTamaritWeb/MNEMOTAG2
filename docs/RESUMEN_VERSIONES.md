@@ -1,7 +1,7 @@
 # 🚀 Resumen Ejecutivo de Versiones - MNEMOTAG
 
 **Documento**: Resumen de evolución del proyecto  
-**Última actualización**: 17 de Noviembre de 2025
+**Última actualización**: 9 de abril de 2026
 
 ---
 
@@ -9,7 +9,21 @@
 
 | Versión | Fecha | Características Principales | Estado |
 |---------|-------|----------------------------|--------|
-| **v3.1.4** | 17 Nov 2025 | Bug Fixes Críticos: WebP, Botones, Dark Mode | 🟢 **Actual** |
+| **v3.4.0** | 9 Abr 2026 | Umbrella: 8 features de v3.3.11–v3.3.18 + pulido visual de 5 botones nuevos | 🟢 **Actual** |
+| **v3.3.18** | 8 Abr 2026 | Eliminar fondo con IA (lazy load total del modelo `@imgly/background-removal`) | ✅ Estable |
+| **v3.3.17** | 8 Abr 2026 | Parser ISOBMFF defensivo para AVIF EXIF (infraestructura, nunca corrompe) | ✅ Estable |
+| **v3.3.16** | 8 Abr 2026 | PWA real con Service Worker (cache híbrido, offline, instalable) | ✅ Estable |
+| **v3.3.15** | 8 Abr 2026 | Soporte HEIC/HEIF (conversión iPhone via `heic2any` CDN) | ✅ Estable |
+| **v3.3.14** | 8 Abr 2026 | Historial visual con thumbnails clicables | ✅ Estable |
+| **v3.3.13** | 8 Abr 2026 | Editor de curvas y niveles estilo Photoshop (LUT pixel-level) | ✅ Estable |
+| **v3.3.12** | 8 Abr 2026 | Análisis visual: histograma RGB, paleta, auto-balance | ✅ Estable |
+| **v3.3.11** | 8 Abr 2026 | Quick wins UX: paste portapapeles + export multi-size ZIP | ✅ Estable |
+| **v3.3.10** | 9 Abr 2026 | Limpieza de 168 `console.log` ruidosos del runtime | ✅ Estable |
+| **v3.3.9** | 8 Abr 2026 | CI/CD + deploy automático a GitHub Pages | ✅ Estable |
+| **v3.3.8** | 8 Abr 2026 | Runner de validación binaria para PNG/WebP | ✅ Estable |
+| **v3.3.7** | 8 Abr 2026 | WebP EXIF real con manipulación RIFF/VP8X (sin librerías) | ✅ Estable |
+| **v3.3.6** | 8 Abr 2026 | PNG EXIF real con chunks `eXIf` (sin librerías externas) | ✅ Estable |
+| **v3.1.4** | 17 Nov 2025 | Bug Fixes Críticos: WebP, Botones, Dark Mode | ✅ Estable |
 | **v3.1.3** | 16 Oct 2025 | Drag & Drop, Reglas Métricas, Zoom Optimizado | ✅ Estable |
 | **v3.1.2** | 13 Oct 2025 | Feedback Visual, Secciones Colapsables, GPS | ✅ Estable |
 | **v3.1.1** | Oct 2025 | Mejoras de rendimiento | ✅ Estable |
@@ -17,7 +31,52 @@
 
 ---
 
-## 🐛 v3.1.4 - BUG FIXES CRÍTICOS (Actual)
+## 🎁 v3.4.0 - UMBRELLA RELEASE (Actual)
+
+### 📅 Fecha de lanzamiento: 9 de abril de 2026
+
+### Resumen
+
+v3.4.0 consolida bajo una sola versión mayor las 8 features publicadas en v3.3.11 → v3.3.18 y añade el pulido visual definitivo para los 5 botones nuevos introducidos en esos commits. Es el punto estable recomendado para usuarios que no vengan siguiendo cada patch de la serie v3.3.
+
+### Las 8 features consolidadas
+
+1. **v3.3.11 — Paste portapapeles + export multi-size ZIP**. `Cmd+V` / `Ctrl+V` carga imagen del clipboard; checkboxes 256/512/1024/2048 px para exportar varios tamaños en un único ZIP.
+2. **v3.3.12 — Análisis visual**. Histograma RGB + luminosidad en modal, paleta de 12 colores dominantes con cuantización por buckets, botón "Auto-mejorar" con percentiles 1%/99% + LUT.
+3. **v3.3.13 — Editor de curvas y niveles**. Canvas interactivo 280×280 estilo Photoshop, 4 canales (RGB + R/G/B), composición LUT pixel-level.
+4. **v3.3.14 — Historial visual con thumbnails**. Panel desplegable con mini-cards clicables, click salta directo a cualquier estado previo.
+5. **v3.3.15 — Soporte HEIC/HEIF**. Las fotos `.heic` del iPhone cargan directamente; conversión a JPEG en cliente vía `heic2any` desde CDN.
+6. **v3.3.16 — PWA real con Service Worker**. Cache híbrido (cache-first para assets propios, network-first para CDNs), offline tras primera visita, instalable en móvil/escritorio.
+7. **v3.3.17 — Parser ISOBMFF defensivo para AVIF**. Infraestructura de parseo de cajas ISOBMFF con `embedExifInAvifBlob` cableado en el flujo de descarga. Nunca corrompe AVIF. Inyección efectiva del item Exif queda para futura iteración.
+8. **v3.3.18 — Eliminar fondo con IA**. Lazy load total del modelo `@imgly/background-removal` vía `dynamic import`, cero impacto en peso inicial. Toast informativo del tamaño del modelo antes de descargar.
+
+### Pulido visual exclusivo de v3.4.0
+
+Los 5 botones introducidos en v3.3.11–v3.3.18 heredaban clases CSS diseñadas para un contexto distinto (grid compacto de 4 columnas) y se veían rotos. v3.4.0 añade ~164 líneas al final de `css/styles.css` con selectores por ID:
+
+- `#auto-balance-btn` — **ámbar**
+- `#curves-btn` — **morado**
+- `#remove-bg-btn` — **cian/teal**
+- `#download-multisize-btn` — **outlined real** (borde azul + fondo semitransparente) con variante completa para dark mode
+- `#history-toggle-btn` — **índigo**, ancho flexible
+- Focus visible accesible (`outline: 3px solid rgba(99,102,241,0.5)`) en los 5
+- Contenedor de Undo/Redo/Historial con `flex-wrap` para pantallas estrechas
+
+### Otros cambios de v3.4.0
+
+- Cache-bust de `styles.css` via query string (`?v=20260409a`).
+- Service Worker bumpeado a `mnemotag-v3.3.19-css-fix` para invalidar caches anteriores en PWAs instaladas.
+- Copyright actualizado a 2026 en footer HTML, placeholder de `metaCopyright` y README.md.
+- Push a GitHub desbloqueado (scope `workflow` del token) moviendo `.github/workflows/README.md` fuera del directorio de workflows.
+
+### Verificación
+
+- `node tests/run-in-node.js` → **142/142 OK**
+- `node tests/binary-validation.js` → **44/44 OK**
+
+---
+
+## 🐛 v3.1.4 - BUG FIXES CRÍTICOS
 
 ### 📅 Fecha de lanzamiento: 17 de Noviembre de 2025
 

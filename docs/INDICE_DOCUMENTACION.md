@@ -168,24 +168,46 @@ Esta es la guía maestra para toda la documentación de MNEMOTAG. Encuentra ráp
 
 ## 🎨 Por Versión
 
-### v3.1.3 (16 Octubre 2025) - ACTUAL
+### v3.4.0 (9 Abril 2026) - ACTUAL
+
+**Release umbrella** que consolida las 8 features publicadas en v3.3.11–v3.3.18 bajo una sola versión mayor y añade el pulido visual definitivo de los 5 botones nuevos.
+
+**Features consolidadas de v3.3.11–v3.3.18**:
+- Paste portapapeles global + export multi-size ZIP
+- Análisis visual: histograma RGB, paleta dominante, auto-balance
+- Editor de curvas y niveles estilo Photoshop (LUT pixel-level)
+- Historial visual con thumbnails clicables
+- Soporte HEIC/HEIF (fotos iPhone)
+- PWA real con Service Worker (cache híbrido, offline, instalable)
+- Parser ISOBMFF defensivo para AVIF EXIF
+- Eliminar fondo con IA (lazy load total del modelo)
+
+**Cambios exclusivos de v3.4.0**:
+- ~164 líneas de CSS con gradientes propios por botón (ámbar / morado / cian / outlined azul / índigo) + focus accesible + variante dark mode para el multisize
+- Cache-bust de `styles.css` (`?v=20260409a`)
+- Service Worker bumpeado a `mnemotag-v3.3.19-css-fix` para invalidar caches antiguos
+- Copyright 2025 → 2026 (footer HTML, placeholder, README)
+- Push a GitHub desbloqueado moviendo `.github/workflows/README.md` fuera del directorio de workflows
+
+**Documentos actualizados en v3.4.0**:
+- [README.md](../README.md) — badge, NOVEDADES v3.4.0 + v3.3.18 restaurada
+- [CHANGELOG.md](../CHANGELOG.md) — título v3.4, entrada `[3.4.0]` al tope
+- [docs/README.md](README.md) — versión + aviso sobre guías feature-by-feature
+- [docs/RESUMEN_VERSIONES.md](RESUMEN_VERSIONES.md) — tabla y narrativa de v3.4.0 como Actual
+- CLAUDE.md — bloque "Current version" bumpeado
+
+### v3.1.3 (16 Octubre 2025)
 
 **Nuevas características**:
 - Sistema Drag & Drop ultra intuitivo
 - Reglas métricas y coordenadas
 - Zoom optimizado por dispositivo
 
-**Documentos nuevos**:
+**Documentos relacionados**:
 - [GUIA_ARRASTRE.md](GUIA_ARRASTRE.md)
 - [GUIA_REGLAS_METRICAS.md](GUIA_REGLAS_METRICAS.md)
 - [DRAG_DROP_SYSTEM.md](DRAG_DROP_SYSTEM.md)
 - [ZOOM_OPTIMIZADO.md](ZOOM_OPTIMIZADO.md)
-
-**Documentos actualizados**:
-- [README.md](../README.md)
-- [docs/README.md](README.md)
-- [V31_FEATURES.md](V31_FEATURES.md)
-- [CHANGELOG.md](../CHANGELOG.md)
 
 ### v3.1.2 (13 Octubre 2025)
 

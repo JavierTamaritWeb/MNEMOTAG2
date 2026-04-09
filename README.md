@@ -14,6 +14,54 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 
 ## ⭐ NOVEDADES v3.4.0
 
+> **Umbrella release — 8 features nuevas consolidadas + pulido visual de botones.** v3.4.0 empaqueta bajo una sola versión mayor todo el trabajo hecho en v3.3.11 hasta v3.3.18, añade el fix definitivo de estilos para los 5 botones nuevos (con gradientes propios por botón, focus accesible y dark mode) y deja la documentación alineada al nuevo número de versión.
+
+### 🎁 Qué incluye v3.4.0
+
+Las 8 features publicadas en los commits v3.3.11 → v3.3.18 ahora viven bajo la bandera v3.4.0:
+
+1. **📋 Pegar portapapeles** (`Cmd+V` / `Ctrl+V` global) + **export multi-size a ZIP** (checkboxes 256/512/1024/2048 px).
+2. **📊 Análisis visual**: histograma RGB + luminosidad, paleta de colores dominantes con cuantización, y **✨ Auto-mejorar imagen** (percentiles 1%/99% + LUT).
+3. **📈 Editor de curvas y niveles** estilo Photoshop (canvas interactivo 280×280, 4 canales, composición LUT).
+4. **📜 Historial visual con thumbnails** clicables que saltan directamente a cualquier estado previo.
+5. **📱 Soporte HEIC/HEIF** nativo (las fotos del iPhone ya cargan directamente, conversión via `heic2any` CDN).
+6. **⚙️ PWA real con Service Worker** (cache híbrido, offline tras primera visita, instalable en móvil/escritorio).
+7. **🧱 Parser ISOBMFF defensivo** para AVIF (infraestructura lista, nunca corrompe archivos).
+8. **🪄 Eliminar fondo con IA** (lazy load total del modelo `@imgly/background-removal`, cero impacto en peso inicial).
+
+> Si quieres el detalle feature a feature, cada versión tiene su propia entrada más abajo (v3.3.11 a v3.3.18).
+
+### 🎨 Pulido visual de 5 botones nuevos (exclusivo de v3.4.0)
+
+Los botones introducidos en v3.3.11–v3.3.18 arrastraban clases CSS incompatibles con el layout donde se insertaban. v3.4.0 los rediseña con selectores por ID que vencen a los selectores masivos heredados (`.btn-secondary`, `.button--action`, `button[type="button"]`, el reset global `button {...}`) sin afectar al resto de la UI:
+
+- **`#auto-balance-btn`** — gradiente **ámbar** (sugiere "automático/mágico").
+- **`#curves-btn`** — gradiente **morado** (precisión profesional).
+- **`#remove-bg-btn`** — gradiente **cian/teal** (smart/IA).
+- **`#download-multisize-btn`** — estilo **outlined real** (borde azul + fondo semitransparente), con variante completa para dark mode.
+- **`#history-toggle-btn`** — gradiente **índigo**, ancho flexible (elimina el `width:200px` fijo heredado).
+- **Focus ring accesible** (`outline: 3px solid rgba(99,102,241,0.5)`) en los 5 botones.
+- **Iconos con `margin-right: 0`** para anular el override genérico que los separaba demasiado del texto.
+- **Contenedor de Undo/Redo/Historial** con `flex-wrap` para que haga wrap en pantallas estrechas en lugar de romper.
+
+### 🔧 Otros cambios de v3.4.0
+
+- **Cache-bust de `styles.css`** mediante query string (`?v=20260409a`) para que la nueva hoja de estilos invalide cachés de navegador tras el upgrade.
+- **Service Worker** bumpeado a `mnemotag-v3.3.19-css-fix` — el listener `activate` borra automáticamente cualquier cache anterior para que los usuarios que ya instalaron la PWA reciban el CSS nuevo.
+- **Copyright actualizado a 2026** en el footer del HTML, placeholder del campo `metaCopyright` y `README.md`.
+- **Push a GitHub desbloqueado** tras el incidente del scope `workflow` del token (el `README.md` de `.github/workflows/` se movió fuera del directorio de workflows para destapar los 11 commits que quedaban en local).
+
+### 🎯 Verificación
+
+- `node tests/run-in-node.js` → **142/142 OK**
+- `node tests/binary-validation.js` → **44/44 OK**
+
+Cero regresiones. v3.4.0 es el punto estable recomendado para usuarios que no vengan siguiendo cada patch de la serie v3.3.
+
+---
+
+## ⭐ NOVEDADES v3.3.18
+
 > **Feature release — Eliminar fondo con IA (lazy load total).** Botón nuevo en la sección de filtros que elimina automáticamente el fondo de cualquier imagen usando un modelo de IA real. La librería se descarga UNA SOLA VEZ cuando el usuario pulsa el botón por primera vez — cero impacto en el peso inicial de la app.
 
 ### 🪄 Eliminar fondo con un click
@@ -43,7 +91,7 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 - `node tests/run-in-node.js` → **142/142 OK** (137 anteriores + 5 nuevos para v3.3.18)
 - `node tests/binary-validation.js` → 44/44 OK (sin cambios)
 
-Cero regresiones. Esta es la **última versión del bloque de 8 commits** que se han ido publicando: paste/multi-size, análisis visual, curvas, historial visual, HEIC, PWA, AVIF parser, eliminar fondo con IA. La app pasa de ~700 a ~1500 funcionalidades en esta sesión sin tocar la naturaleza static-only del proyecto.
+Cero regresiones. Esta es la **última versión del bloque de 8 commits** que se fueron publicando: paste/multi-size, análisis visual, curvas, historial visual, HEIC, PWA, AVIF parser, eliminar fondo con IA.
 
 ---
 

@@ -1,6 +1,66 @@
-# 📝 CHANGELOG - MNEMOTAG v3.3
+# 📝 CHANGELOG - MNEMOTAG v3.4
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
+
+---
+
+## [3.4.0] - 2026-04-09
+
+### Resumen
+
+Release **umbrella** que consolida bajo una sola versión mayor las 8 features publicadas en v3.3.11–v3.3.18, añade el fix definitivo de estilos para los 5 botones introducidos en esos commits, y sincroniza toda la documentación al nuevo número de versión. Es el punto estable recomendado para usuarios que no vengan siguiendo cada patch de la serie v3.3.
+
+### Features consolidadas de v3.3.11 → v3.3.18
+
+| Versión | Feature | Breve |
+|---|---|---|
+| v3.3.11 | Paste portapapeles + export multi-size ZIP | `Cmd+V`/`Ctrl+V` global + checkboxes 256/512/1024/2048 px |
+| v3.3.12 | Análisis visual | Histograma RGB+luminosidad, paleta dominante, auto-balance con percentiles 1%/99% |
+| v3.3.13 | Editor de curvas estilo Photoshop | Canvas interactivo 280×280, 4 canales, composición LUT |
+| v3.3.14 | Historial visual con thumbnails | Click salta directamente a cualquier estado previo |
+| v3.3.15 | Soporte HEIC/HEIF | Fotos iPhone, conversión via `heic2any` CDN |
+| v3.3.16 | PWA real con Service Worker | Cache híbrido, offline, instalable |
+| v3.3.17 | Parser ISOBMFF defensivo (AVIF) | Infraestructura lista, nunca corrompe |
+| v3.3.18 | Eliminar fondo con IA | Lazy load total del modelo `@imgly/background-removal` |
+
+El detalle completo de cada feature está en las entradas individuales más abajo (`[3.3.18]` hasta `[3.3.11]`).
+
+### Added (exclusivo de v3.4.0)
+
+- **Pulido visual de los 5 botones introducidos en v3.3.11–v3.3.18**, ~164 líneas nuevas en `css/styles.css` al final del archivo:
+  - `#auto-balance-btn` — gradiente **ámbar** (`linear-gradient(135deg, #f59e0b, #d97706)`), hover más oscuro con sombra aumentada.
+  - `#curves-btn` — gradiente **morado** (`linear-gradient(135deg, #8b5cf6, #7c3aed)`).
+  - `#remove-bg-btn` — gradiente **cian/teal** (`linear-gradient(135deg, #06b6d4, #0891b2)`).
+  - `#download-multisize-btn` — **outlined real** con borde azul 2px, fondo semitransparente `rgba(255,255,255,0.95)` y texto azul; en hover pasa a sólido azul con texto blanco. **Variante completa para `[data-theme="dark"]`** (fondo `rgba(30,41,59,0.85)` + texto `#93c5fd`).
+  - `#history-toggle-btn` — gradiente **índigo** (`linear-gradient(135deg, #6366f1, #4f46e5)`) con `!important` para vencer las reglas masivas heredadas. `width: auto` con `min-width: 140px` para eliminar el `width: 200px` fijo que heredaba.
+  - **Todos los 5 botones**: `min-height: 48px`, `padding: 12px 18px`, `font-size: 14px`, `font-weight: 600`, `border-radius: 10px`, `white-space: nowrap`, `text-overflow: ellipsis`, transición `cubic-bezier(0.4, 0, 0.2, 1)`.
+  - **Iconos**: `margin-right: 0` (anula el override genérico de línea 1749 que separaba icono y texto), `font-size: 16px`, `flex-shrink: 0`.
+  - **Focus visible accesible** en los 5 botones con `outline: 3px solid rgba(99,102,241,0.5)` y `outline-offset: 2px`.
+- **Contenedor padre de Undo/Redo/Historial** cambiado a `flex flex-wrap gap-2` en `index.html` para que en pantallas estrechas el botón "Historial" haga wrap a la siguiente línea en lugar de romper el layout.
+
+### Changed
+
+- **`css/styles.css` cargado con cache-bust**: `<link rel="stylesheet" href="css/styles.css?v=20260409a">` para forzar a los navegadores a descargar la hoja de estilos nueva tras el upgrade.
+- **Service Worker bumpeado a `mnemotag-v3.3.19-css-fix`** (`service-worker.js`). El listener `activate` borra automáticamente cualquier cache anterior cuya clave no empiece por esta versión, por lo que los usuarios que ya instalaron la PWA en v3.3.16+ reciben el CSS nuevo en el siguiente arranque.
+- **Copyright actualizado a 2026** en `index.html` (footer + placeholder del campo `metaCopyright`) y `README.md` (pie de licencia).
+- **Título `<title>` del HTML** → `MnemoTag v3.4.0`.
+- **Badge de versión en `README.md`** → `3.4.0`.
+- **`docs/INDICE_DOCUMENTACION.md`** → versión y pie actualizados a v3.4.0.
+- **Footer de `CHANGELOG.md`** → "Versión actual: 3.4.0".
+- **Título de `CHANGELOG.md`** → "MNEMOTAG v3.4" (antes decía "v3.3").
+
+### Fixed
+
+- **5 botones introducidos en v3.3.11–v3.3.18 mostraban layout roto** por heredar clases CSS (`button--feature`, `button--action`, `.btn-secondary`) diseñadas para un contexto distinto (grid compacto de 4 columnas). Corregido en dos fases:
+  1. Commit **`99c5879`** (fase inicial): quitar `.button--feature` de los 4 botones afectados y añadir `flex-wrap` al contenedor de Undo/Redo/Historial. Arregla el layout pero deja todos los botones con el mismo gradiente morado de `.btn-primary`.
+  2. Commit **`c416027`** (pulido definitivo de v3.4.0): añadir ~164 líneas de CSS con selectores por ID para dar a cada botón su propia identidad visual (5 gradientes distintos, focus accesible, variante dark mode para el multisize).
+- **Push a GitHub rechazado** por el scope `workflow` del token durante varios intentos en sesiones anteriores. Resuelto en commit `8ce6d54` moviendo `.github/workflows/README.md` (documentación de los workflows, que NO es un workflow) fuera del directorio, de modo que el OAuth App del token ya no necesita el scope `workflow` para aceptar el push.
+
+### Verificación
+
+- `node tests/run-in-node.js` → **142/142 OK** (sin cambios — v3.4.0 solo toca CSS, HTML editorial y service-worker, no hay tests nuevos ni regresiones).
+- `node tests/binary-validation.js` → **44/44 OK** (sin cambios — no se tocan binarios).
+- Verificación visual browser-real: los 5 botones se ven con sus gradientes propios, focus visible tras Tab, dark mode funciona en `#download-multisize-btn`, wrap del contenedor Undo/Redo/Historial funciona al redimensionar la ventana estrecha.
 
 ---
 

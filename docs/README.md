@@ -1,7 +1,9 @@
 # 📚 MNEMOTAG - DOCUMENTACIÓN TÉCNICA
 
-**Versión:** 3.1.3  
-**Última actualización:** 16 Octubre 2025
+**Versión:** 3.4.0  
+**Última actualización:** 9 de abril de 2026
+
+> **⚠️ Aviso sobre las guías feature-by-feature**: los documentos `GUIA_ARRASTRE.md`, `DRAG_DROP_SYSTEM.md`, `V31_FEATURES.md`, `ZOOM_OPTIMIZADO.md`, etc., describen características de la serie v3.1 que **siguen existiendo y funcionando** en v3.4.0 — su contenido técnico es vigente. Las features nuevas de v3.3.11–v3.4.0 (paste portapapeles, histograma, paleta, curvas, historial visual, HEIC, PWA, AVIF, eliminar fondo con IA) viven principalmente en el [CHANGELOG.md](../CHANGELOG.md) y en el [README.md](../README.md) del proyecto. Consulta esos dos para el detalle de lo más reciente.
 
 ---
 
