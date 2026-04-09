@@ -15,6 +15,65 @@
 
 window.AnalysisManager = (function () {
 
+  // v3.4.12: Worker singleton para pixel ops pesadas.
+  // Se crea lazily la primera vez que alguien llama a _runInWorker.
+  // Si falla (Worker no soportado, CSP bloquea, ruta incorrecta), se
+  // marca como no disponible y todas las llamadas posteriores caen al
+  // fallback main-thread.
+  let _worker = null;
+  let _workerAvailable = (typeof Worker !== 'undefined');
+  let _messageId = 0;
+  const _pendingMessages = new Map();
+
+  function _getWorker() {
+    if (!_workerAvailable) return null;
+    if (_worker) return _worker;
+    try {
+      _worker = new Worker('js/workers/analysis-worker.js');
+      _worker.addEventListener('message', function (e) {
+        const msg = e.data;
+        if (!msg || typeof msg.id === 'undefined') return;
+        const pending = _pendingMessages.get(msg.id);
+        if (!pending) return;
+        _pendingMessages.delete(msg.id);
+        if (msg.ok) pending.resolve(msg.result);
+        else pending.reject(new Error(msg.error || 'Worker error'));
+      });
+      _worker.addEventListener('error', function (e) {
+        console.warn('AnalysisManager worker error:', e.message || e);
+        _workerAvailable = false;
+        _worker = null;
+        // Rechazar todos los pendientes
+        _pendingMessages.forEach(function (p) { p.reject(new Error('Worker murió')); });
+        _pendingMessages.clear();
+      });
+      return _worker;
+    } catch (err) {
+      console.warn('AnalysisManager: no se pudo crear worker, usando main-thread:', err);
+      _workerAvailable = false;
+      return null;
+    }
+  }
+
+  function _runInWorker(op, imageData, extra) {
+    const worker = _getWorker();
+    if (!worker) return Promise.reject(new Error('Worker no disponible'));
+    return new Promise(function (resolve, reject) {
+      const id = ++_messageId;
+      _pendingMessages.set(id, { resolve: resolve, reject: reject });
+      const msg = Object.assign({ id: id, op: op, imageData: imageData }, extra || {});
+      try {
+        // Nota: ImageData no es directamente transferable, pero su
+        // underlying buffer sí. Usamos el buffer del data como
+        // transferable para evitar copia en imágenes grandes.
+        worker.postMessage(msg, [imageData.data.buffer]);
+      } catch (err) {
+        _pendingMessages.delete(id);
+        reject(err);
+      }
+    });
+  }
+
   function _getCanvasImageData() {
     if (typeof canvas === 'undefined' || typeof currentImage === 'undefined') return null;
     if (!canvas || !currentImage) return null;
@@ -189,13 +248,9 @@ window.AnalysisManager = (function () {
     }
   }
 
-  function autoBalanceImage() {
-    const imageData = _getCanvasImageData();
-    if (!imageData) {
-      UIManager.showError('Carga una imagen primero para auto-mejorarla.');
-      return;
-    }
-
+  // Implementación main-thread del auto-balance. Se usa como fallback
+  // si el Worker no está disponible o falla. Síncrona.
+  function _autoBalanceMainThread(imageData) {
     const data = imageData.data;
     const lumHist = new Uint32Array(256);
     let totalPixels = 0;
@@ -207,12 +262,8 @@ window.AnalysisManager = (function () {
       totalPixels++;
     }
 
-    if (totalPixels === 0) {
-      UIManager.showError('La imagen no tiene píxeles visibles para analizar.');
-      return;
-    }
+    if (totalPixels === 0) return { empty: true };
 
-    // Percentiles 1% y 99% de luminosidad.
     const lowCut = totalPixels * 0.01;
     const highCut = totalPixels * 0.99;
     let acc = 0;
@@ -228,12 +279,8 @@ window.AnalysisManager = (function () {
       if (acc >= highCut) { hi = i; break; }
     }
 
-    if (hi <= lo) {
-      UIManager.showInfo('La imagen no tiene rango dinámico suficiente para auto-mejorar.');
-      return;
-    }
+    if (hi <= lo) return { noRange: true, lo: lo, hi: hi };
 
-    // LUT linear mapping [lo, hi] -> [0, 255].
     const lut = new Uint8ClampedArray(256);
     const range = hi - lo;
     for (let i = 0; i < 256; i++) {
@@ -249,13 +296,64 @@ window.AnalysisManager = (function () {
       data[i + 2] = lut[data[i + 2]];
     }
 
-    ctx.putImageData(imageData, 0, 0);
+    return { imageData: imageData, lo: lo, hi: hi };
+  }
+
+  // v3.4.12: autoBalance ahora es async y delega al Web Worker para
+  // no bloquear el main thread en imágenes grandes (4K → ~500 ms que
+  // bloqueaban antes). Con fallback al main-thread si el worker no
+  // está disponible.
+  async function autoBalanceImage() {
+    const imageData = _getCanvasImageData();
+    if (!imageData) {
+      UIManager.showError('Carga una imagen primero para auto-mejorarla.');
+      return;
+    }
+
+    let result;
+    // Intentar en el worker primero (no bloquea UI)
+    if (_workerAvailable) {
+      try {
+        result = await _runInWorker('autoBalance', imageData);
+      } catch (err) {
+        console.warn('AnalysisManager: worker autoBalance falló, fallback main-thread:', err);
+        // Nota: si postMessage transfirió el buffer, el imageData
+        // original en main-thread queda detached. Hacemos una nueva
+        // lectura del canvas para el fallback.
+        const freshData = _getCanvasImageData();
+        if (!freshData) {
+          UIManager.showError('No se pudo leer el canvas para el fallback.');
+          return;
+        }
+        result = _autoBalanceMainThread(freshData);
+      }
+    } else {
+      result = _autoBalanceMainThread(imageData);
+    }
+
+    if (!result || result.empty) {
+      UIManager.showError('La imagen no tiene píxeles visibles para analizar.');
+      return;
+    }
+    if (result.noRange) {
+      UIManager.showInfo('La imagen no tiene rango dinámico suficiente para auto-mejorar.');
+      return;
+    }
+
+    // Pintar el imageData transformado de vuelta al canvas
+    try {
+      ctx.putImageData(result.imageData, 0, 0);
+    } catch (err) {
+      console.error('AnalysisManager: error pintando resultado de autoBalance:', err);
+      UIManager.showError('Error al aplicar auto-balance al canvas.');
+      return;
+    }
 
     if (typeof historyManager !== 'undefined' && historyManager.saveState) {
       historyManager.saveState();
     }
 
-    UIManager.showSuccess('✨ Imagen auto-mejorada (rango lo=' + lo + ', hi=' + hi + ')');
+    UIManager.showSuccess('✨ Imagen auto-mejorada (rango lo=' + result.lo + ', hi=' + result.hi + ')');
   }
 
   return {

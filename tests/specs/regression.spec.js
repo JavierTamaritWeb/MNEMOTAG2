@@ -812,6 +812,46 @@ describe('Regresión — AppState singleton (v3.4.11)', function () {
   });
 });
 
+describe('Regresión — Web Worker para pixel ops (v3.4.12)', function () {
+  it('analysis-worker.js define los 3 handlers (buildHistogram, extractPalette, autoBalance)', async function () {
+    const src = await fetchSource('../js/workers/analysis-worker.js');
+    expect(src).toContain("case 'buildHistogram'");
+    expect(src).toContain("case 'extractPalette'");
+    expect(src).toContain("case 'autoBalance'");
+  });
+
+  it('analysis-worker.js usa el protocolo id/ok/result para postMessage', async function () {
+    const src = await fetchSource('../js/workers/analysis-worker.js');
+    expect(src).toContain('self.addEventListener');
+    expect(src).toContain('self.postMessage');
+    // Protocolo: {id, ok: true/false, result/error}
+    expect(src).toContain('ok: true');
+    expect(src).toContain('ok: false');
+  });
+
+  it('analysis-manager.js crea el Worker lazily con fallback main-thread', async function () {
+    const src = await fetchSource('../js/managers/analysis-manager.js');
+    expect(src).toContain("typeof Worker !== 'undefined'");
+    expect(src).toContain("new Worker('js/workers/analysis-worker.js')");
+    expect(src).toContain('_workerAvailable');
+    expect(src).toContain('_autoBalanceMainThread');
+  });
+
+  it('analysis-manager.js autoBalanceImage es async y delega al worker cuando disponible', async function () {
+    const src = await fetchSource('../js/managers/analysis-manager.js');
+    expect(src).toContain('async function autoBalanceImage');
+    expect(src).toContain("_runInWorker('autoBalance'");
+    // Fallback explícito
+    expect(src).toContain('fallback main-thread');
+  });
+
+  it('analysis-manager.js usa transferable objects para evitar copia', async function () {
+    const src = await fetchSource('../js/managers/analysis-manager.js');
+    expect(src).toContain('imageData.data.buffer');
+    expect(src).toContain('postMessage(msg, [imageData.data.buffer])');
+  });
+});
+
 describe('Regresión — Filter presets (v3.4.5)', function () {
   it('preset-manager.js define la API pública mínima', async function () {
     const src = await fetchSource('../js/managers/preset-manager.js');
