@@ -4,7 +4,7 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos. 100% cliente, sin backend, sin build step, sin npm.
 
-![Version](https://img.shields.io/badge/version-3.4.0-blue.svg)
+![Version](https://img.shields.io/badge/version-3.4.15-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 [![Tests](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml)
@@ -14,48 +14,76 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 
 ---
 
-## ⭐ NOVEDADES v3.4.0
+## ⭐ NOVEDADES v3.4.15
 
-> **Umbrella release — 8 features nuevas consolidadas + pulido visual de botones.** v3.4.0 empaqueta bajo una sola versión mayor todo el trabajo hecho en v3.3.11 hasta v3.3.18, añade el fix definitivo de estilos para los 5 botones nuevos (con gradientes propios por botón, focus accesible y dark mode) y deja la documentación alineada al nuevo número de versión.
+> **Release final del bloque v3.4.x — 15 versiones en 2 sesiones.** Tras v3.4.0 (umbrella de 8 features de v3.3.x + pulido visual), la segunda sesión ha añadido 15 mejoras más: hardening de seguridad, CI lint, accesibilidad real, features nuevas, modularización arquitectónica, performance con Web Workers, testing end-to-end con Playwright y, por fin, la inyección real de EXIF en AVIF.
 
-### 🎁 Qué incluye v3.4.0
+### 🛡️ Seguridad (v3.4.1 + v3.4.14)
 
-Las 8 features publicadas en los commits v3.3.11 → v3.3.18 ahora viven bajo la bandera v3.4.0:
+- **CSP meta tag** con allowlist restrictiva (solo cdnjs, jsdelivr, Google Fonts) + `default-src 'self'`.
+- **SRI hashes sha384** en los 5 recursos CDN externos (jszip, piexifjs, heic2any, Tailwind, Font Awesome). Si jsdelivr se compromete, los recursos se rechazan.
+- `watermark-text-enabled` sin `checked` por defecto (bug latente cerrado).
+- Fixes de 2 errores de consola reportados: `frame-ancestors` (solo funciona como HTTP header) y `'unsafe-eval'` añadido para tolerar `new Function()` de librerías CDN.
 
-1. **📋 Pegar portapapeles** (`Cmd+V` / `Ctrl+V` global) + **export multi-size a ZIP** (checkboxes 256/512/1024/2048 px).
-2. **📊 Análisis visual**: histograma RGB + luminosidad, paleta de colores dominantes con cuantización, y **✨ Auto-mejorar imagen** (percentiles 1%/99% + LUT).
-3. **📈 Editor de curvas y niveles** estilo Photoshop (canvas interactivo 280×280, 4 canales, composición LUT).
-4. **📜 Historial visual con thumbnails** clicables que saltan directamente a cualquier estado previo.
-5. **📱 Soporte HEIC/HEIF** nativo (las fotos del iPhone ya cargan directamente, conversión via `heic2any` CDN).
-6. **⚙️ PWA real con Service Worker** (cache híbrido, offline tras primera visita, instalable en móvil/escritorio).
-7. **🧱 Parser ISOBMFF defensivo** para AVIF (infraestructura lista, nunca corrompe archivos).
-8. **🪄 Eliminar fondo con IA** (lazy load total del modelo `@imgly/background-removal`, cero impacto en peso inicial).
+### ⚙️ CI y linting (v3.4.2)
 
-### 🎨 Pulido visual de 5 botones nuevos (exclusivo de v3.4.0)
+- **ESLint 9** con flat config por tipo de archivo (browser/SW/tests). 0 errors.
+- **Stylelint 16** con reglas mínimas.
+- **`.github/workflows/lint.yml`** corre ambos via `npx --yes` sin `package.json`.
 
-Los botones introducidos en v3.3.11–v3.3.18 arrastraban clases CSS incompatibles con el layout donde se insertaban. v3.4.0 los rediseña con selectores por ID que vencen a los selectores masivos heredados, sin afectar al resto de la UI:
+### ♿ Accesibilidad real (v3.4.3)
 
-- **`#auto-balance-btn`** — gradiente **ámbar**.
-- **`#curves-btn`** — gradiente **morado**.
-- **`#remove-bg-btn`** — gradiente **cian/teal**.
-- **`#download-multisize-btn`** — estilo **outlined real** con variante completa para dark mode.
-- **`#history-toggle-btn`** — gradiente **índigo**, ancho flexible.
-- **Focus ring accesible** + contenedor `flex-wrap` para pantallas estrechas.
+- **Focus trap** en los modales (histogram, palette, curves, history) con `Tab`/`Shift+Tab` wrap-around.
+- **Cierre con `Escape`** y devolución del foco al elemento que lo tenía antes de abrir.
+- **`role`/`aria-live`/`aria-atomic`** en los 4 tipos de toast: errores `assertive`, warnings/éxitos/info `polite`.
 
-### 🔧 Otros cambios de v3.4.0
+### ✨ Features nuevas (v3.4.4 – v3.4.6)
 
-- **Cache-bust de `styles.css`** (`?v=20260409a`) y **Service Worker bumpeado** a `mnemotag-v3.3.19-css-fix` para invalidar caches anteriores en PWAs ya instaladas.
-- **Copyright actualizado a 2026**.
-- **Push a GitHub desbloqueado** tras el incidente del scope `workflow` del token.
+- **Live preview en el editor de curvas**: el canvas principal se actualiza en tiempo real mientras arrastras los puntos de control. Botón "Cancelar" para rollback. Escape/backdrop también restauran.
+- **Filter presets**: nuevo `preset-manager.js` con `savePreset/loadPreset/deletePreset/listPresets` en `localStorage`. UI completa en la sección de filtros (input de nombre + select + 3 botones).
+- **Undo/redo con `ImageBitmap`**: memoria GPU nativa (~10x menos que dataURL en imágenes 4K). `saveState` es async interno con fallback a dataURL. Botón "Vaciar historial" para liberar memoria on-demand.
+
+### 🏗️ Modularización arquitectónica (v3.4.7 – v3.4.11)
+
+**~1162 líneas extraídas de `main.js`** a 4 managers nuevos + 1 utils + 1 worker, usando el patrón **IIFE-con-estado-privado**:
+
+- **`js/managers/analysis-manager.js`** — histograma, paleta, auto-balance.
+- **`js/managers/curves-manager.js`** — editor de curvas + LUT + live preview.
+- **`js/managers/bg-removal-manager.js`** — lazy load del modelo IA + procesado.
+- **`js/managers/export-manager.js`** — `downloadImage`, `downloadImageWithProgress`, `downloadMultipleSizes`. El más grande (~430 líneas).
+- **`js/utils/app-state.js`** — `AppState` singleton con getters/setters a las variables `let` de main.js. Estrategia NO invasiva.
+
+### 🚀 Performance (v3.4.12)
+
+- **`js/workers/analysis-worker.js`** — Web Worker con handlers para `buildHistogram`, `extractPalette`, `autoBalance`.
+- En esta versión se delega **autoBalance** al worker (la operación más crítica: 500 ms → no bloquea UI). Fallback a main-thread si Worker falla.
+- Protocolo con **transferable objects** para evitar copia del buffer.
+
+### 🧪 Testing end-to-end (v3.4.13)
+
+- **Playwright smoke test** con 5 tests que ejecutan un **Chromium real**: carga página, verifica que los 9 managers están vivos, que los 16 botones existen, que subir un PNG sintético no lanza errores, y que `AppState.snapshot()` devuelve estado válido.
+- **`.github/workflows/e2e.yml`** corre Playwright vía `npx --yes` sin `package.json`. Cobertura end-to-end **real por primera vez en el proyecto** (antes todos los tests eran fetch+grep contra el código fuente).
+
+### 📷 AVIF EXIF real (v3.4.15)
+
+**Phase 14 del plan original, retomada y cerrada.** La parte más compleja: inyección efectiva del item `Exif` en el meta box del contenedor ISOBMFF del AVIF.
+
+- **Parser recursivo** del meta box: localiza `hdlr`/`pitm`/`iinf`/`iref`/`iloc`/`iprp`/`idat`.
+- **Lectores byte-level**: `_readPitm`, `_readIinf` (infe v2/v3), `_readIloc` (versions 0/1/2, `offset_size` 4/8, `length_size` 4/8, con y sin `base_offset`).
+- **Builders**: `_buildInfeBoxForExif`, `_buildIinfWithExtra`, `_buildIrefWithCdsc` (sub-box `cdsc` desde Exif al primary), `_buildIlocWithExtra` (**desplaza los offsets absolutos en `metaGrowth` bytes** para compensar el crecimiento del meta box).
+- **Append-only al mdat** con prefijo `exif_tiff_header_offset=0` + bytes TIFF del `piexif.dump`. Reconstruye el archivo: ftyp intacto + meta nuevo + mdat extendido.
+- **42 aserciones binarias nuevas** validan end-to-end con un AVIF sintético realista de 164 bytes. Verifican que primary image data queda intacto en su nuevo offset, payload EXIF correcto, cdsc apunta bien, re-inyección rechazada.
 
 ### 🎯 Verificación
 
-- `node tests/run-in-node.js` → **142/142 OK**
-- `node tests/binary-validation.js` → **44/44 OK**
+- `node tests/run-in-node.js` → **186/186 OK**
+- `node tests/binary-validation.js` → **86/86 OK** (44 antiguas + 42 nuevas de AVIF EXIF)
+- **Playwright E2E** ejecutado en CI tras cada push
+- ESLint: 0 errors, ~70 warnings (deuda histórica tolerada)
 
-Cero regresiones. v3.4.0 es el punto estable recomendado para usuarios que no vengan siguiendo cada patch de la serie v3.3.
+**Con v3.4.15 las 14 fases del plan original v3.4.x quedan TODAS COMPLETADAS sin aborts definitivos.**
 
-> 📜 **Historial completo**: para el detalle de v3.3.11 – v3.3.18, v3.3.0 – v3.3.10, v3.1.0 – v3.1.4 y todas las versiones anteriores, consulta [CHANGELOG.md](CHANGELOG.md).
+> 📜 **Historial completo**: para el detalle de todas las versiones anteriores (v3.4.0, v3.3.11–v3.3.18, v3.3.0–v3.3.10, v3.1.0–v3.1.4, etc.), consulta [CHANGELOG.md](CHANGELOG.md).
 
 ---
 

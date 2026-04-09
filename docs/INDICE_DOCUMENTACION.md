@@ -1,7 +1,7 @@
-# 📚 Índice Completo de Documentación - MNEMOTAG v3.4.0
+# 📚 Índice Completo de Documentación - MNEMOTAG v3.4.15
 
-**Versión**: 3.4.0  
-**Fecha**: 8 de abril de 2026  
+**Versión**: 3.4.15  
+**Fecha**: 9 de abril de 2026  
 **Autor**: Javier Tamarit
 
 ---
@@ -168,33 +168,38 @@ Esta es la guía maestra para toda la documentación de MNEMOTAG. Encuentra ráp
 
 ## 🎨 Por Versión
 
-### v3.4.0 (9 Abril 2026) - ACTUAL
+### v3.4.15 (9 Abril 2026) - ACTUAL
 
-**Release umbrella** que consolida las 8 features publicadas en v3.3.11–v3.3.18 bajo una sola versión mayor y añade el pulido visual definitivo de los 5 botones nuevos.
+**Release final del bloque v3.4.x.** 15 versiones (v3.4.1–v3.4.15) que implementan las 14 fases del plan de mejoras aceptado + fixes de consola reportados por el usuario.
 
-**Features consolidadas de v3.3.11–v3.3.18**:
-- Paste portapapeles global + export multi-size ZIP
-- Análisis visual: histograma RGB, paleta dominante, auto-balance
-- Editor de curvas y niveles estilo Photoshop (LUT pixel-level)
-- Historial visual con thumbnails clicables
-- Soporte HEIC/HEIF (fotos iPhone)
-- PWA real con Service Worker (cache híbrido, offline, instalable)
-- Parser ISOBMFF defensivo para AVIF EXIF
-- Eliminar fondo con IA (lazy load total del modelo)
+**Resumen por categorías**:
+- **Seguridad** (v3.4.1, v3.4.14): CSP meta + SRI hashes en los 5 CDNs + watermark default fix + fixes de `frame-ancestors` y `unsafe-eval`.
+- **CI/lint** (v3.4.2): ESLint 9 flat config + Stylelint 16 sin `package.json`.
+- **Accesibilidad** (v3.4.3): focus trap, Escape, `aria-live` en toasts.
+- **Features nuevas** (v3.4.4–v3.4.6): live preview en curves, filter presets en localStorage, undo/redo con `ImageBitmap`.
+- **Modularización** (v3.4.7–v3.4.11): ~1162 líneas extraídas de `main.js` a 4 managers IIFE + `AppState` singleton.
+- **Performance** (v3.4.12): Web Worker para `autoBalance` con transferable objects.
+- **Testing E2E** (v3.4.13): Playwright smoke test + workflow CI.
+- **AVIF EXIF real** (v3.4.15): Phase 14 cerrada, ~600 líneas de parser/builder ISOBMFF + 42 aserciones binarias nuevas que validan la inyección end-to-end.
 
-**Cambios exclusivos de v3.4.0**:
-- ~164 líneas de CSS con gradientes propios por botón (ámbar / morado / cian / outlined azul / índigo) + focus accesible + variante dark mode para el multisize
-- Cache-bust de `styles.css` (`?v=20260409a`)
-- Service Worker bumpeado a `mnemotag-v3.3.19-css-fix` para invalidar caches antiguos
-- Copyright 2025 → 2026 (footer HTML, placeholder, README)
-- Push a GitHub desbloqueado moviendo `.github/workflows/README.md` fuera del directorio de workflows
+**Archivos nuevos en el bloque v3.4.x**:
+- `.github/workflows/lint.yml`, `.github/workflows/e2e.yml`
+- `eslint.config.js`, `.stylelintrc.json`, `playwright.config.js`
+- `js/managers/preset-manager.js`
+- `js/managers/analysis-manager.js`
+- `js/managers/curves-manager.js`
+- `js/managers/bg-removal-manager.js`
+- `js/managers/export-manager.js`
+- `js/utils/app-state.js`
+- `js/workers/analysis-worker.js`
+- `tests/e2e/smoke.spec.js`, `tests/e2e/fixtures/1x1.png`
 
-**Documentos actualizados en v3.4.0**:
-- [README.md](../README.md) — badge, NOVEDADES v3.4.0 + v3.3.18 restaurada
-- [CHANGELOG.md](../CHANGELOG.md) — título v3.4, entrada `[3.4.0]` al tope
-- [docs/README.md](README.md) — versión + aviso sobre guías feature-by-feature
-- [docs/RESUMEN_VERSIONES.md](RESUMEN_VERSIONES.md) — tabla y narrativa de v3.4.0 como Actual
-- CLAUDE.md — bloque "Current version" bumpeado
+**Verificación**:
+- 186/186 Node + 86/86 binarios + Playwright E2E en CI + 0 eslint errors.
+
+### v3.4.0 (9 Abril 2026)
+
+**Release umbrella** que consolida las 8 features publicadas en v3.3.11–v3.3.18 bajo una sola versión mayor y añade el pulido visual definitivo de los 5 botones nuevos. Ver [CHANGELOG.md](../CHANGELOG.md#340---2026-04-09) para el detalle completo.
 
 ### v3.1.3 (16 Octubre 2025)
 
@@ -350,8 +355,8 @@ Para reportar errores o sugerir mejoras en la documentación, abre un issue en G
 
 ---
 
-**Última actualización**: 8 de abril de 2026  
-**Versión del documento**: 1.1  
+**Última actualización**: 9 de abril de 2026  
+**Versión del documento**: 1.2  
 
-✨ **Documentación completa y actualizada para MNEMOTAG v3.4.0** ✨
+✨ **Documentación completa y actualizada para MNEMOTAG v3.4.15** ✨
 

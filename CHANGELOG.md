@@ -4,6 +4,261 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.4.15] - 2026-04-09
+
+### Added — Phase 14 del plan completada: AVIF EXIF real (inyección ISOBMFF)
+
+Implementa la **inyección efectiva** del item Exif en el meta box del AVIF que había quedado como placeholder en v3.3.17. Es la operación binaria más compleja del proyecto: ~600 líneas nuevas en `js/managers/metadata-manager.js` usando estrategia **append-only** para minimizar riesgo.
+
+- **Parser recursivo ISOBMFF**: `_parseIsobmffBoxesInRange`, `_readFullBoxHeader`, `_parseMetaBox` (extrae `hdlr`, `pitm`, `iinf`, `iref`, `iloc`, `iprp`, `idat`).
+- **Lectores byte-level**: `_readPitm` (v0/v1), `_readIinf` (infe v2/v3), `_readIloc` (versions 0/1/2, `offset_size` 4/8, `length_size` 4/8, `base_offset`, `extents`).
+- **Builders**: `_buildInfeBoxForExif` (infe v2 de 21 bytes con `item_type='Exif'`), `_buildIinfWithExtra` (extiende iinf +1 entry), `_buildIrefWithCdsc` (nuevo iref o extensión con sub-box `cdsc` desde Exif al primary), `_buildIlocWithExtra` (extiende iloc y **desplaza los offsets absolutos de entries existentes en `metaGrowth` bytes**), `_buildNewMetaBox`.
+- **Orquestador `_injectExifInAvifBytes`**: calcula `metaGrowth`, determina el nuevo `extent_offset` del item Exif, reconstruye meta y mdat, ensambla el archivo final.
+- **`embedExifInAvifBlob` efectivo**: construye el TIFF payload desde el formulario via `piexif.dump`, extrae los bytes TIFF puros con `_piexifBinaryToTiffBytes`, llama a `_injectExifInAvifBytes`, valida que el resultado empieza por `ftyp` intacto y devuelve el Blob nuevo.
+
+### Changed
+- **`tests/binary-validation.js`**: de 44/44 a **86/86 aserciones**. 42 nuevas validan la inyección end-to-end con un AVIF sintético realista de 164 bytes (`ftyp` + `meta` con `hdlr`/`pitm`/`iinf`/`iloc` + `mdat` con payload `0xAA BB CC DD ...`). Verifican: ftyp intacto byte por byte, meta crecido, mdat crecido, iinf con 2 entries (`av01` + `Exif`), iloc con 2 items (primary desplazado de offset 156 → 217), payload EXIF con prefijo `tiff_header_offset=0` + bytes TIFF correctos, primary image data intacto en su nuevo offset, iref con sub-box `cdsc` (`from=2` Exif → `to=1` primary), rechazo de re-inyección (no duplica items Exif).
+- **`tests/specs/regression.spec.js`**: tests de v3.3.17 actualizados para validar los nuevos builders y el ajuste de `metaGrowth`.
+- **`service-worker.js`**: `CACHE_VERSION` → `mnemotag-v3.4.15`.
+
+### Notas de implementación
+- **Limitaciones conocidas** (en estos casos devuelve el blob original sin tocar, nunca corrompe):
+  - Solo soporta `construction_method=0` (offsets absolutos al archivo).
+  - Solo soporta orden `ftyp → meta → mdat` (no `ftyp → mdat → meta`).
+  - AVIFs con `offset_size` distinto de 4 u 8 bytes no soportados.
+  - Si `iloc` es v<2 y algún ID excede 16 bits, aborta.
+  - Si el archivo ya tiene un item 'Exif', no duplica (devuelve original).
+- **Cero librerías externas nuevas**: todo el parsing/building es código propio sobre `Uint8Array` + `DataView` big-endian.
+
+### Verificación
+- `node tests/run-in-node.js` → **186/186 OK**
+- `node tests/binary-validation.js` → **86/86 OK**
+- **Browser-real pendiente**: descargar un AVIF desde la app con metadatos rellenos y abrir con `exiftool` o `exifread` para confirmar interoperabilidad con readers externos.
+
+**Con esto, las 14 fases del plan v3.4.x quedan TODAS COMPLETADAS sin aborts definitivos.**
+
+---
+
+## [3.4.14] - 2026-04-09
+
+### Fixed
+- **CSP `frame-ancestors` warning** (repetido 5 veces en la consola): eliminado del meta tag porque `frame-ancestors` solo tiene efecto vía HTTP header, no vía `<meta http-equiv>`. Para protección real contra clickjacking haría falta configurar el header del servidor (no es posible en GitHub Pages sin un proxy).
+- **`EvalError: Evaluating a string as JavaScript violates CSP`**: una librería CDN (probablemente `heic2any` o `@imgly/background-removal`) usa `new Function()` internamente para compilar helpers. Sin `'unsafe-eval'` en `script-src`, esas librerías crasheaban al cargar. Añadido `'unsafe-eval'` a la CSP. Verificado con grep recursivo que nuestro código propio NO usa `eval` ni `new Function`.
+
+### Aborted (luego retomada en v3.4.15)
+- **Phase 14 del plan original (AVIF EXIF real)**: abortada en su momento según el escape hatch explícito del plan. La infraestructura de parsing ISOBMFF de v3.3.17 quedó intacta pero la inyección efectiva se pospuso. **Retomada y cerrada en v3.4.15.**
+
+### Changed
+- `service-worker.js` bumpeado a `mnemotag-v3.4.14` para invalidar la PWA con la CSP actualizada.
+
+### Verificación
+- 183/183 Node + 44/44 binarios sin cambios.
+
+---
+
+## [3.4.13] - 2026-04-09
+
+### Added — Phase 13: Playwright E2E smoke test
+- **`playwright.config.js`** en la raíz con `webServer: python3 -m http.server 8080` (disponible siempre en GitHub Actions, sin añadir dependencias al repo). `baseURL: http://localhost:8080`, `project: chromium` único para minimizar tiempo de CI, `trace: retain-on-failure`, `screenshot: only-on-failure`.
+- **`tests/e2e/smoke.spec.js`** con 5 tests end-to-end que ejecutan un navegador Chromium real:
+  1. Carga `index.html` sin errores en consola (filtra CSP warnings no críticos).
+  2. Verifica que los 9 managers (`SecurityManager`, `MetadataManager`, `historyManager`, `AnalysisManager`, `CurvesManager`, `BgRemovalManager`, `ExportManager`, `PresetManager`, `AppState`) están vivos en `window`.
+  3. Verifica que los 16 botones principales existen en el DOM.
+  4. Sube un PNG 1x1 sintético vía el input de archivo oculto y verifica que no lanza errores.
+  5. Llama a `AppState.snapshot()` desde el browser y valida el estado inicial.
+- **`tests/e2e/fixtures/1x1.png`** (67 bytes) — PNG mínimo 1x1 rojo generado a mano con `printf` para no depender de herramientas externas.
+- **`.github/workflows/e2e.yml`**: workflow que instala Chromium via `npx --yes playwright@latest install --with-deps chromium`, arranca el webServer Python y ejecuta los tests. Si fallan, sube el reporte HTML como artifact (retención 7 días).
+
+**Cobertura end-to-end real por primera vez en el proyecto.** Antes los tests eran fetch+grep contra el código fuente; ahora Playwright lanza un Chromium y verifica que todo se wirea correctamente.
+
+### Verificación
+- 183/183 Node + 44/44 binarios.
+- 5 tests Playwright verificados en CI tras el push.
+
+---
+
+## [3.4.12] - 2026-04-09
+
+### Added — Phase 12: Web Workers para pixel ops (autoBalance)
+- **`js/workers/analysis-worker.js`** (~150 líneas) con 3 handlers (`buildHistogram`, `extractPalette`, `autoBalance`) y protocolo `{id, op, imageData}` → `{id, ok, result/error}`.
+- En esta versión se delega **solo `autoBalance`** al worker. Es la operación más crítica: en imágenes 4K bloqueaba el main thread ~500 ms con el loop de writes sobre `imageData.data`. Los otros 2 handlers quedan disponibles en el worker para usos futuros.
+- **`AnalysisManager`**: singleton del Worker creado lazily en `_getWorker()`. Si Worker no existe, CSP bloquea o la ruta falla, `_workerAvailable` queda `false` y todas las llamadas caen al fallback main-thread (`_autoBalanceMainThread` extraído como función privada síncrona).
+- **`autoBalanceImage` ahora es async**. El listener del botón sigue funcionando sin cambios (fire-and-forget).
+- **Transferable objects**: `postMessage(msg, [imageData.data.buffer])` para evitar copia del buffer en imágenes grandes. Si el worker falla tras transferir, el fallback hace una nueva lectura del canvas.
+
+### Verificación
+- 178/178 Node (+5 nuevos) + 44/44 binarios.
+
+---
+
+## [3.4.11] - 2026-04-09
+
+### Added — Phase 11: AppState singleton
+- **`js/utils/app-state.js`** (~180 líneas): `window.AppState` como `Object.freeze` de getters/setters que delegan a las variables `let` del closure de `main.js` (`canvas`, `ctx`, `currentImage`, `currentFile`, `fileBaseName`, `originalExtension`, `currentRotation`, `isFlipped*`, `currentZoom`, `panX/Y`, `isPanning`, `customImagePosition`, `customTextPosition`, `isPositioningMode`, `showPositioningBorders`, `outputFormat`, `outputQuality`, `isRulerMode`).
+- **Estrategia NO invasiva**: `AppState.canvas === canvas` (misma referencia, solo fachada). Los managers existentes siguen accediendo por nombre directo. La migración es oportunística, no obligatoria.
+- **Defensivo con `typeof` guards**: para que el módulo se cargue sin crashear en el test runner Node (que no carga main.js).
+- Método `AppState.snapshot()` para debugging desde la consola del browser.
+
+### Verificación
+- 173/173 Node (+6 nuevos) + 44/44 binarios.
+
+---
+
+## [3.4.10] - 2026-04-09
+
+### Added — Phase 10: Extraer export-manager.js (el commit más grande del bloque de modularización)
+- **`js/managers/export-manager.js`** (~430 líneas) con patrón IIFE. Expone 3 métodos públicos: `ExportManager.downloadImage()`, `ExportManager.downloadImageWithProgress()`, `ExportManager.downloadMultipleSizes()`.
+- Mueve desde `main.js` ~478 líneas: `downloadMultipleSizes` (101), `downloadImage` (165), `downloadImageWithProgress` (212).
+- Los helpers (`getMimeType`, `determineFallbackFormat`, `flattenCanvasForJpeg`, `canvasToBlob`, `hasImageAlphaChannel`, `redrawCompleteCanvas`, `getFlattenColor`, `sanitizeFileBaseName`, `showError`, `showSuccess`, `showProgressBar`, `updateProgress`, `hideProgressBar`, `simulateProgressSteps`) SE QUEDAN en `main.js` y el manager los referencia por nombre global.
+- Los 5 callsites de main.js actualizados: `#download-multisize-btn`, `#download-image`, `Cmd+S` (handleKeyboardShortcuts), `Cmd+S` (keyboardShortcuts.register), `Cmd+Shift+X`.
+- `eslint.config.js`: añadidos globals compartidos. Warnings ESLint: 139 → 52.
+- Tests de regresión: 12 tests existentes reubicados para buscar los patrones (`embed EXIF chain`, `flattenCanvasForJpeg`, etc.) en `export-manager.js` en lugar de `main.js`.
+
+### Changed
+- Reducción neta de `main.js`: **~478 líneas**. Total acumulado extraído desde v3.4.7: **~1162 líneas (~14% del total)**.
+
+### Verificación
+- 167/167 Node (+5 nuevos) + 44/44 binarios.
+
+---
+
+## [3.4.9] - 2026-04-09
+
+### Added — Phase 9: Extraer bg-removal-manager.js
+- **`js/managers/bg-removal-manager.js`** (~120 líneas) con IIFE. Estado privado de la closure: `_module` (singleton del import ML) y `_loading` (flag de carga en progreso). Encapsulado es MÁS defensivo que variables sueltas en main.js.
+- Mueve `_loadBackgroundRemovalLib` y `removeBackgroundWithAI` (~95 líneas).
+- El lazy load con `await import('...@imgly/background-removal@1.4.5/+esm')` via jsdelivr sigue funcionando idéntico.
+- Main.js: listener del `#remove-bg-btn` delega a `BgRemovalManager.removeBackground()`.
+
+### Verificación
+- 162/162 Node (+3 nuevos) + 44/44 binarios.
+
+---
+
+## [3.4.8] - 2026-04-09
+
+### Added — Phase 8: Extraer curves-manager.js
+- **`js/managers/curves-manager.js`** (~370 líneas) con IIFE. Estado privado `_state` (4 canales + `previewSnapshot` + `previewRafPending`) encapsulado.
+- Mueve ~346 líneas de main.js: `_curvesState`, `openCurvesModal`, `_scheduleCurvesPreview`, `_rollbackCurvesPreview`, `_setupCurvesUI`, `_resetCurves`, `_buildLutFromPoints`, `_redrawCurvesCanvas`, `_applyCurvesToImage` + listeners del canvas del editor.
+- Main.js: shim `openCurvesModal()` que delega a `CurvesManager.open()` (para no romper el listener existente). Si CurvesManager no está cargado, error claro.
+- El live preview de v3.4.4 y el rollback via `onClose` callback siguen funcionando porque el nuevo manager sigue referenciando `_openAccessibleModal/_closeAccessibleModal/renderHistoryPanel` por nombre global.
+
+### Verificación
+- 159/159 Node (+3 nuevos) + 44/44 binarios.
+
+---
+
+## [3.4.7] - 2026-04-09
+
+### Added — Phase 7: Extraer analysis-manager.js (primer commit del bloque de modularización)
+- **`js/managers/analysis-manager.js`** (~260 líneas) con patrón IIFE: `window.AnalysisManager = (function () { ... return {...}; })();`. Expone `showHistogram`, `showPalette`, `autoBalanceImage` + `_extractDominantColors` y `_getCanvasImageData` para tests.
+- Mueve ~240 líneas desde `main.js`: `showHistogram` (~75), `_extractDominantColors` (~33), `showPalette` (~45), `autoBalanceImage` (~70).
+- Main.js conserva una copia local de `_getCanvasImageData` como helper porque curves-manager y futuros consumidores internos lo usan directamente.
+- Los 3 listeners (`histogram-btn`, `palette-btn`, `auto-balance-btn`) delegan a `AnalysisManager.X`.
+- Service Worker precache actualizado.
+
+### Verificación
+- 156/156 Node (+3 nuevos) + 44/44 binarios.
+
+---
+
+## [3.4.6] - 2026-04-09
+
+### Added — Phase 6: Undo/redo con ImageBitmap
+- **`historyManager.saveState()`** usa `createImageBitmap(canvas)` en lugar de `canvas.toDataURL()` cuando el navegador lo soporta. Los `ImageBitmap` viven en memoria GPU nativa, no en el JS heap, ahorrando ~10x el espacio de los dataURLs base64 en imágenes 4K.
+- **Fallback automático a dataURL** si `createImageBitmap` no está disponible. El cap clásico `HISTORY_MAX_TOTAL_SIZE` (100 MB) solo aplica al fallback — con ImageBitmap el límite es `maxStates=20`.
+- **`saveState` es asíncrono internamente** (createImageBitmap devuelve Promise) pero la API pública sigue siendo fire-and-forget.
+- **`restoreState` acepta ambos formatos** (`state.bitmap` sync rápido, `state.imageData` async legacy).
+- **`bitmap.close()` explícito** al rebasar `maxStates`, al `clear()` o al descartar estados futuros tras un nuevo cambio — **crítico** para no fugar memoria GPU.
+- **`_buildThumbnail`** pinta los ImageBitmaps en un canvas 80x80 con `object-fit: contain` manual y devuelve dataURL JPEG calidad 0.8. Thumbnails reales en lugar del dataURL completo.
+- **Botón "Vaciar historial"** (icono `trash-alt`) en el header del panel de historial visual, con `confirm()` antes de ejecutar.
+
+### Verificación
+- 153/153 Node (+6 nuevos) + 44/44 binarios.
+
+---
+
+## [3.4.5] - 2026-04-09
+
+### Added — Phase 5: Filter presets (guardar/cargar en localStorage)
+- **`js/managers/preset-manager.js`** (~180 líneas): API pública `savePreset(name)`, `loadPreset(name)`, `listPresets()`, `deletePreset(name)`, `populateSelect(selectEl)`.
+- Campos persistidos: `brightness`, `contrast`, `saturation`, `blur` (los watermarks NO — son ortogonales).
+- Validación de nombre: 1-40 chars alfanuméricos + espacios + `-_` + tildes.
+- Persistencia en localStorage con prefijo `mnemotag-preset-` + índice `mnemotag-preset-index`.
+- `loadPreset` dispara `input`+`change` events sintéticos para que los listeners existentes recalculen el canvas.
+- **UI en la sección de filtros**: input de nombre + botón "Guardar"; select + botones "Cargar"/"Eliminar". Enter en el input guarda. `confirm()` antes de eliminar.
+
+### Verificación
+- 147/147 Node (+5 nuevos) + 44/44 binarios.
+
+---
+
+## [3.4.4] - 2026-04-09
+
+### Added — Phase 4: Live preview en editor de curvas
+- Al abrir el modal de curvas, **`_curvesState.previewSnapshot`** captura `ctx.getImageData()` del canvas actual (copia limpia, no dataURL).
+- Cada `mousedown`/`mousemove`/`dblclick`/`_resetCurves` dispara `_scheduleCurvesPreview()` que, throttle-ado con `requestAnimationFrame`, reconstruye las 4 LUTs y aplica la composición sobre una **copia del snapshot**, pintando el resultado en el canvas principal. El snapshot original se preserva intacto para el próximo frame y para rollback.
+- **"Aplicar"** ya no reaplica la transformación: el canvas YA tiene el preview. Solo pone `previewSnapshot=null` y llama a `saveState`. Mantiene fallback antiguo por si `previewSnapshot` es null.
+- **Nuevo botón "Cancelar"** en el modal de curvas que hace `_rollbackCurvesPreview()` y cierra.
+- **Escape y click en backdrop/X** también hacen rollback vía un nuevo callback `onClose` en `_openAccessibleModal`: la apertura acepta un segundo parámetro callback que `_closeAccessibleModal` invoca antes de cerrar.
+- `openCurvesModal` resetea los puntos de los 4 canales al abrir.
+
+### Verificación
+- 142/142 Node + 44/44 binarios.
+
+---
+
+## [3.4.3] - 2026-04-09
+
+### Added — Phase 3: A11y (focus trap + Escape + aria-live)
+- **UIManager**: los 4 tipos de toast ahora tienen `role`/`aria-live`/`aria-atomic`. Los errores son `assertive` (lectores de pantalla los interrumpen); warnings/éxitos/info son `polite`. 12 líneas que transforman los toasts de invisibles a accesibles para usuarios de lector de pantalla.
+- **Helpers `_openAccessibleModal(modal, onClose)` y `_closeAccessibleModal(modal)`** en main.js:
+  1. Guardan el `activeElement` previo para devolverle el foco al cerrar.
+  2. Muestran/ocultan el modal y sincronizan `aria-hidden`.
+  3. Enfocan el primer elemento focusable dentro del modal al abrir.
+  4. Atrapan el foco con `Tab`/`Shift+Tab` (wrap-around entre primero y último).
+  5. Cierran con `Escape`.
+  6. Desenganchan el listener `keydown` al cerrar (sin fugas de memoria).
+- Usa una `WeakMap` para mapear `modal → {handler, previouslyFocused, onClose}` para que múltiples modales no interfieran.
+- Los 3 puntos de apertura (histogram, palette, curves) y los 2 de cierre (click en backdrop/X, `_applyCurvesToImage`) usan los helpers en lugar de `classList.add/remove` directo.
+
+### Verificación
+- 142/142 Node + 44/44 binarios.
+
+---
+
+## [3.4.2] - 2026-04-09
+
+### Added — Phase 2: CI lint (eslint + stylelint)
+- **`eslint.config.js`** (flat config, ESLint 9) con 4 bloques de reglas: browser (`js/**`), Service Worker (globals `self`, `caches`, `Response`), tests runner Node (`process`, `require`, `module`), y specs (browser + test runner casero). Todos los globals del proyecto declarados.
+- **Reglas**: bugs reales como `error` (`no-dupe-*`, `no-unreachable`, `use-isnan`, `valid-typeof`, etc.). Mejores prácticas como `warn` (`eqeqeq`, `no-var`, `prefer-const`, `no-unused-vars` con ignore `/^_/`). `no-undef` degradado a `warn` para tolerar deuda sin romper CI.
+- **`.stylelintrc.json`** con reglas mínimas contra bugs reales: `declaration-block-no-duplicate-properties`, `block-no-empty`, `no-duplicate-at-import-rules`, etc.
+- **`.github/workflows/lint.yml`** con 2 jobs (`eslint` + `stylelint`), ambos vía `npx --yes` sin `package.json`.
+
+### Fixed
+- **Dead code en `main.js:3070`**: `handleCanvasClick` tenía 70 líneas de código muerto tras un `return` temprano (el comentario ya lo marcaba como `DESACTIVADO` hace tiempo). Eliminado para que eslint pase limpio.
+- **CSS**: dos bloques con `left: -100%` seguido de `left: 100%` en la misma regla (el segundo ganaba siempre). El primero era código muerto. Eliminado.
+
+### Verificación
+- ESLint: 0 errors, 67 warnings (deuda histórica tolerada). Stylelint: 0 errors. 142/142 Node + 44/44 binarios.
+
+---
+
+## [3.4.1] - 2026-04-09
+
+### Added — Phase 1: Hardening seguridad + slim del README
+- **CSP meta tag** en `<head>` de `index.html` con allowlist restrictiva: `cdnjs`, `jsdelivr`, Google Fonts. `default-src 'self'`. `worker-src 'self' blob:` para los Web Workers del filter pipeline.
+- **SRI hashes sha384** para los 5 recursos CDN externos (jszip, piexifjs, heic2any, Tailwind CSS, Font Awesome). Calculados con `curl + openssl`. `crossorigin="anonymous"` añadido.
+
+### Fixed
+- **`watermark-text-enabled` sin `checked` por defecto**: elimina el bug latente de sesiones anteriores. Ahora el usuario no ve nunca el mensaje de "texto vacío" salvo que active la casilla a propósito.
+- **README.md reducido de 710 a 149 líneas**: las 18 secciones `NOVEDADES vX.Y.Z` movidas a `CHANGELOG.md` (donde ya estaban duplicadas). Mantiene solo v3.4.0 como la última + enlaces al changelog + bloque de características principales condensado + docs + install + licencia.
+
+### Verificación
+- 142/142 Node + 44/44 binarios.
+
+---
+
 ## [3.4.0] - 2026-04-09
 
 ### Resumen
@@ -1479,6 +1734,6 @@ Lanzamiento inicial de MnemoTag.
 
 ---
 
-**Última actualización:** 8 de abril de 2026  
-**Versión actual:** 3.4.0  
+**Última actualización:** 9 de abril de 2026  
+**Versión actual:** 3.4.15  
 **Estado:** ✅ Estable y listo para producción

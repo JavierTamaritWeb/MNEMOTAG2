@@ -9,7 +9,22 @@
 
 | Versión | Fecha | Características Principales | Estado |
 |---------|-------|----------------------------|--------|
-| **v3.4.0** | 9 Abr 2026 | Umbrella: 8 features de v3.3.11–v3.3.18 + pulido visual de 5 botones nuevos | 🟢 **Actual** |
+| **v3.4.15** | 9 Abr 2026 | Phase 14: AVIF EXIF real (inyección ISOBMFF, ~600 líneas + 42 aserciones binarias) | 🟢 **Actual** |
+| **v3.4.14** | 9 Abr 2026 | Fix CSP: `frame-ancestors` + `unsafe-eval` (errores consola reportados) | ✅ Estable |
+| **v3.4.13** | 9 Abr 2026 | Phase 13: Playwright E2E smoke test + workflow CI | ✅ Estable |
+| **v3.4.12** | 9 Abr 2026 | Phase 12: Web Worker para `autoBalance` (transferable objects + fallback) | ✅ Estable |
+| **v3.4.11** | 9 Abr 2026 | Phase 11: `AppState` singleton (`js/utils/app-state.js`) | ✅ Estable |
+| **v3.4.10** | 9 Abr 2026 | Phase 10: Extraer `export-manager.js` (478 líneas, el más grande) | ✅ Estable |
+| **v3.4.9** | 9 Abr 2026 | Phase 9: Extraer `bg-removal-manager.js` | ✅ Estable |
+| **v3.4.8** | 9 Abr 2026 | Phase 8: Extraer `curves-manager.js` | ✅ Estable |
+| **v3.4.7** | 9 Abr 2026 | Phase 7: Extraer `analysis-manager.js` (inicio modularización) | ✅ Estable |
+| **v3.4.6** | 9 Abr 2026 | Phase 6: Undo/redo con `ImageBitmap` (memoria GPU nativa) | ✅ Estable |
+| **v3.4.5** | 9 Abr 2026 | Phase 5: Filter presets (guardar/cargar en `localStorage`) | ✅ Estable |
+| **v3.4.4** | 9 Abr 2026 | Phase 4: Live preview en editor de curvas + botón Cancelar | ✅ Estable |
+| **v3.4.3** | 9 Abr 2026 | Phase 3: A11y — focus trap + Escape + aria-live en modales | ✅ Estable |
+| **v3.4.2** | 9 Abr 2026 | Phase 2: CI lint — ESLint 9 + Stylelint 16 vía npx | ✅ Estable |
+| **v3.4.1** | 9 Abr 2026 | Phase 1: CSP + SRI hashes + watermark default + README slim (710→149) | ✅ Estable |
+| **v3.4.0** | 9 Abr 2026 | Umbrella: 8 features de v3.3.11–v3.3.18 + pulido visual de 5 botones nuevos | ✅ Estable |
 | **v3.3.18** | 8 Abr 2026 | Eliminar fondo con IA (lazy load total del modelo `@imgly/background-removal`) | ✅ Estable |
 | **v3.3.17** | 8 Abr 2026 | Parser ISOBMFF defensivo para AVIF EXIF (infraestructura, nunca corrompe) | ✅ Estable |
 | **v3.3.16** | 8 Abr 2026 | PWA real con Service Worker (cache híbrido, offline, instalable) | ✅ Estable |
@@ -31,7 +46,59 @@
 
 ---
 
-## 🎁 v3.4.0 - UMBRELLA RELEASE (Actual)
+## 🏆 v3.4.15 - CIERRE DE LAS 14 FASES (Actual)
+
+### 📅 Fecha de lanzamiento: 9 de abril de 2026
+
+### Resumen
+
+v3.4.15 es la **última release del bloque v3.4.x** y cierra las **14 fases** del plan de mejoras aceptado por el usuario. Desde v3.4.0 (umbrella de las 8 features de v3.3.x) se han publicado 15 commits más que cubren seguridad, CI, accesibilidad, features nuevas, modularización arquitectónica, performance, testing end-to-end y —finalmente— la inyección real de EXIF en AVIF.
+
+### Hitos principales del bloque v3.4.1 → v3.4.15
+
+| Categoría | Versiones | Resultado |
+|---|---|---|
+| **Seguridad** | v3.4.1, v3.4.14 | CSP meta + SRI sha384 en 5 CDNs + fix de `frame-ancestors` y `unsafe-eval` reportados en consola |
+| **CI lint** | v3.4.2 | ESLint 9 + Stylelint 16 via `npx --yes` sin `package.json` |
+| **Accesibilidad** | v3.4.3 | Focus trap + Escape + `aria-live` en toasts y modales |
+| **Features nuevas** | v3.4.4–v3.4.6 | Live preview en curves, filter presets en localStorage, undo/redo con `ImageBitmap` (memoria GPU) |
+| **Modularización** | v3.4.7–v3.4.11 | **~1162 líneas extraídas** de `main.js` a 4 managers nuevos + `AppState` singleton |
+| **Performance** | v3.4.12 | Web Worker para `autoBalance` con transferable objects + fallback main-thread |
+| **Testing E2E** | v3.4.13 | Playwright smoke test + workflow CI |
+| **AVIF EXIF real** | v3.4.15 | Phase 14 cerrada: parser/builder ISOBMFF completo, 42 aserciones binarias validan end-to-end |
+
+### Archivos nuevos del bloque v3.4.x
+
+- **Workflows CI**: `.github/workflows/lint.yml`, `.github/workflows/e2e.yml`
+- **Configs**: `eslint.config.js`, `.stylelintrc.json`, `playwright.config.js`
+- **Managers**: `js/managers/preset-manager.js`, `js/managers/analysis-manager.js`, `js/managers/curves-manager.js`, `js/managers/bg-removal-manager.js`, `js/managers/export-manager.js`
+- **Utils**: `js/utils/app-state.js`
+- **Workers**: `js/workers/analysis-worker.js`
+- **Tests**: `tests/e2e/smoke.spec.js`, `tests/e2e/fixtures/1x1.png`
+
+### AVIF EXIF real (v3.4.15) — el commit más complejo
+
+Tras v3.3.17 que dejó el parser ISOBMFF como placeholder, v3.4.15 añade **~600 líneas nuevas** en `js/managers/metadata-manager.js` con la **inyección efectiva** del item `Exif` en el meta box del contenedor AVIF:
+
+1. **Parser recursivo** del meta box: localiza `hdlr`/`pitm`/`iinf`/`iref`/`iloc`/`iprp`/`idat`.
+2. **Lectores byte-level**: `_readPitm`, `_readIinf` (infe v2/v3), `_readIloc` (versions 0/1/2, `offset_size` 4/8, `length_size` 4/8).
+3. **Builders**: `_buildInfeBoxForExif` (infe v2 de 21 bytes), `_buildIinfWithExtra`, `_buildIrefWithCdsc` (sub-box `cdsc` desde Exif al primary), `_buildIlocWithExtra` (desplaza offsets absolutos existentes en `metaGrowth` bytes), `_buildNewMetaBox`.
+4. **Orquestador `_injectExifInAvifBytes`**: estrategia **append-only** — añade los bytes EXIF al final del mdat con prefijo `exif_tiff_header_offset=0`, reconstruye el meta box entero, actualiza los offsets del primary item (que se ha desplazado por el crecimiento del meta).
+
+**42 aserciones binarias nuevas** en `tests/binary-validation.js` construyen un AVIF sintético realista de 164 bytes con `ftyp` + `meta(hdlr+pitm+iinf+iloc)` + `mdat` de 8 bytes y validan end-to-end: ftyp intacto byte por byte, iinf con 2 entries, primary item desplazado de offset 156 → 217, payload EXIF correcto, primary image data intacto en su nuevo offset, iref con `cdsc` apuntando en la dirección correcta, re-inyección rechazada.
+
+### Verificación
+
+- `node tests/run-in-node.js` → **186/186 OK** (fetch+grep de regresión)
+- `node tests/binary-validation.js` → **86/86 OK** (44 antiguas + 42 nuevas de AVIF EXIF)
+- **Playwright E2E** → 5 smoke tests que se ejecutan en CI tras cada push
+- **ESLint**: 0 errors, ~70 warnings (deuda histórica tolerada)
+
+**Con v3.4.15 las 14 fases del plan original quedan TODAS COMPLETADAS sin aborts definitivos.**
+
+---
+
+## 🎁 v3.4.0 - UMBRELLA RELEASE
 
 ### 📅 Fecha de lanzamiento: 9 de abril de 2026
 
