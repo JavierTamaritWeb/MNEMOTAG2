@@ -40,8 +40,17 @@
   <meta name="keywords" content="editor imágenes, metadatos EXIF, marca de agua, filtros, JPEG, PNG, WebP, AVIF">
   <meta name="author" content="MnemoTag">
 
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- v3.4.1: Content Security Policy — solo los CDNs que realmente usamos -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' blob: https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; worker-src 'self' blob:; child-src 'self' blob:; manifest-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';">
+
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+        rel="stylesheet"
+        integrity="sha384-HtMZLkYo+pR5/u7zCzXxMJP6QoNnQJt1qkHM0EaOPvGDIzaVZbmYr/TlvUZ/sKAg"
+        crossorigin="anonymous">
+  <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+        integrity="sha384-iw3OoTErCYJJB9mCa8LNS2hbsQ7M3C0EpIsO/H5+EGAkPGc6rk+V8i04oW/K5xq0"
+        crossorigin="anonymous">
   <link rel="stylesheet" href="css/styles.css?v=20260409a">
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -347,7 +356,7 @@
                     <label class="block text-gray-700 font-medium mb-2 form-label">Tipo de marca</label>
                     <div class="flex space-x-4">
                       <label class="inline-flex items-center">
-                        <input type="checkbox" id="watermark-text-enabled" name="watermark-text-enabled" checked
+                        <input type="checkbox" id="watermark-text-enabled" name="watermark-text-enabled"
                                class="form-checkbox text-blue-500">
                         <span class="ml-2 text-content">Texto</span>
                       </label>
@@ -1672,13 +1681,19 @@
       <p class="footer-text">© 2026 MnemoTag. Todos los derechos reservados.</p>
     </footer>
   </div>
-    <!-- External Dependencies -->
+    <!-- External Dependencies (v3.4.1: con SRI para proteger contra CDN tampering) -->
     <!-- JSZip para batch processing -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
+            integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG"
+            crossorigin="anonymous"></script>
     <!-- piexifjs para escribir EXIF en JPEG (lectura/escritura de metadatos reales) -->
-    <script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.min.js"
+            integrity="sha384-gLhg+4HrK9u/j3lhoXMbfugBBxOP2bNlOeGEWvf5QIEDD1qXDMMCU6ruAB2rUN/a"
+            crossorigin="anonymous"></script>
     <!-- v3.3.15: heic2any para convertir HEIC/HEIF (formatos del iPhone) a JPEG en cliente -->
-    <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"
+            integrity="sha384-OTofQ0MEeiSgh62havBcemCIK0gqj809wX6UA0uPISNMRnR6NZyCdGzX3SbLrgwL"
+            crossorigin="anonymous"></script>
     
     <!-- Google Fonts API para text layers -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
