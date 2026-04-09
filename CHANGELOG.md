@@ -4,6 +4,31 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.3.9] - 2026-04-09
+
+### Added
+- **Workflows de GitHub Actions** en `.github/workflows/` para CI/CD + deploy automático. Sin npm, sin secrets, sin tocar el código de la app, sin romper la naturaleza static-only del proyecto.
+  - **`test.yml`** (~25 líneas): test gate del proyecto. Corre los dos runners Node (`tests/run-in-node.js` con 100 aserciones y `tests/binary-validation.js` con 36 aserciones binarias) en cada `push` y `pull_request` a `main`. Si alguno falla, el job queda rojo. Tiempo típico: 30-60 s. Se puede usar como required check en branch protection.
+  - **`deploy.yml`** (~70 líneas): deploy continuo a GitHub Pages tras cada push a `main`. Re-corre los tests como defensa en profundidad antes del deploy. Empaqueta el repo entero como artifact (sin build step, la app es static). Job `deploy` con `actions/deploy-pages@v4`. Permisos mínimos (`contents: read`, `pages: write`, `id-token: write`). Concurrencia configurada para no cancelar deploys en curso.
+  - **`README.md`** (~80 líneas): documentación corta de los dos workflows + las dos acciones manuales necesarias en la UI de GitHub la primera vez (activar Pages con source "GitHub Actions" y, opcional, branch protection).
+- **Badges en README**: dos badges nuevos al inicio del README que muestran el estado de los workflows `Tests` y `Deploy to GitHub Pages` en tiempo real.
+
+### Notes
+- **NO se introduce npm en el código de la app.** El `node` que usan los runners es solo para ejecutar los tests existentes, que están escritos en JavaScript puro sin dependencias. No hay `package.json`, no hay `node_modules`, no hay build step. La naturaleza static-only del proyecto se preserva intacta.
+- **NO se modifica nada del código de `js/`, `css/`, `index.html`** salvo el `<title>` (sincronización editorial). La app es funcionalmente idéntica a v3.3.8.
+- **NO se hace push automático**. La decisión de pushear v3.3.9 al remoto sigue siendo del usuario.
+- **Acción manual obligatoria la primera vez**: tras el primer push, el workflow `deploy.yml` fallará con un error claro porque GitHub Pages no está activado en el repo. Para activarlo: `Repository → Settings → Pages → Source = "GitHub Actions"`, luego re-disparar el workflow desde la pestaña Actions. Documentado paso a paso en `.github/workflows/README.md`.
+
+### Verification
+- `node tests/run-in-node.js` → 100/100 OK (sin cambios)
+- `node tests/binary-validation.js` → 36/36 OK (sin cambios)
+- Validación remota tras el push: ver pestaña Actions de GitHub. El workflow `Tests` debe terminar verde en ~30-60 s. El workflow `Deploy to GitHub Pages` fallará la primera vez (esperado) hasta activar Pages a mano.
+
+### Por qué CI/CD y NO un backend
+El usuario preguntó si era necesario un backend para mejorar la app. Tras analizar el estado real del proyecto (15.000 líneas, 100% client-side, 136 tests verde, EXIF real para JPEG/PNG/WebP), el diagnóstico fue **NO** — un backend rompería las 4 propiedades más valiosas del proyecto (privacidad, coste 0€, latencia 0, offline) sin resolver ningún problema concreto. CI/CD + deploy automático a Pages **no es backend, es DevOps + hosting estático profesional**, y aporta el valor real ("la app funciona mejor en producción") sin tocar la arquitectura.
+
+---
+
 ## [3.3.8] - 2026-04-09
 
 ### Added
@@ -1141,5 +1166,5 @@ Lanzamiento inicial de MnemoTag.
 ---
 
 **Última actualización:** 9 de abril de 2026  
-**Versión actual:** 3.3.8  
+**Versión actual:** 3.3.9  
 **Estado:** ✅ Estable y listo para producción

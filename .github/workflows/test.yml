@@ -1,0 +1,29 @@
+name: Tests
+
+# Corre los dos runners Node sin dependencias en cada push y PR a main.
+# Si alguno falla, el build queda rojo y se puede usar como required check
+# en la branch protection (Settings → Branches → Add rule).
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Run Node test suites
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run main test suite (100 tests)
+        run: node tests/run-in-node.js
+
+      - name: Run binary validation (36 assertions)
+        run: node tests/binary-validation.js

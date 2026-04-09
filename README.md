@@ -4,9 +4,41 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos.
 
-![Version](https://img.shields.io/badge/version-3.3.8-blue.svg)
+![Version](https://img.shields.io/badge/version-3.3.9-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
+[![Tests](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml)
+[![Deploy to GitHub Pages](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml)
+
+---
+
+## ⭐ NOVEDADES v3.3.9
+
+> **Patch release.** CI/CD + deploy automático a GitHub Pages. Sin tocar el código de la app.
+
+### 🚀 CI/CD y deploy automático
+
+Dos workflows nuevos en `.github/workflows/`, sin npm, sin secrets, sin tocar la naturaleza static-only del proyecto:
+
+- **`test.yml`** — Test gate. En cada `push` y `pull_request` a `main`, GitHub Actions ejecuta los **dos runners Node** del proyecto (`tests/run-in-node.js` con 100 aserciones y `tests/binary-validation.js` con 36 aserciones binarias). Si alguno falla, el build queda rojo. Tiempo típico: ~30-60 s.
+- **`deploy.yml`** — Deploy continuo. Tras cada push a `main`, re-ejecuta los tests como defensa adicional y, si pasan, **despliega la app a GitHub Pages**. URL pública: `https://javiertamaritweb.github.io/MNEMOTAG2/`. HTTPS, CDN global, gratis.
+- **`README.md`** — Documentación corta de los dos workflows + las acciones manuales necesarias en la UI de GitHub la primera vez.
+
+**Lo que esto NO toca**:
+- El código de la app es **idéntico funcionalmente** a v3.3.8.
+- **No se introduce npm**. El `node` que usan los runners es solo para ejecutar los tests existentes, que son JavaScript puro sin dependencias.
+- **Sin secrets**. Todo lo necesario está en el repo público.
+- **Sin build step**. El proyecto es static, se despliega directamente.
+
+### ⚠️ Acción manual necesaria la primera vez
+
+La primera ejecución de `deploy.yml` **fallará** porque GitHub Pages no está activado. Es esperado. Para activarlo:
+
+1. `Repository → Settings → Pages → Source = "GitHub Actions"`.
+2. Volver a `Actions → Deploy to GitHub Pages → último run` y `Re-run all jobs`.
+3. Esperar ~2-3 minutos. La URL pública aparecerá en el resumen del workflow.
+
+Documentado paso a paso en [`.github/workflows/README.md`](.github/workflows/README.md).
 
 ---
 

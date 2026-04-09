@@ -1,0 +1,71 @@
+name: Deploy to GitHub Pages
+
+# Despliega la app a GitHub Pages en cada push a main, después de
+# re-correr los dos runners Node como defensa adicional.
+#
+# IMPORTANTE: la primera vez que se ejecuta este workflow FALLARÁ con
+# un error claro porque GitHub Pages no está activado en el repo. Para
+# activarlo, una sola vez, ir a:
+#   Repository → Settings → Pages → Source = "GitHub Actions"
+# Después, re-disparar el workflow desde la pestaña Actions.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:  # Permite re-disparar el deploy a mano desde la UI
+
+# Permisos mínimos para que actions/deploy-pages funcione.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Solo un deploy en vuelo a la vez. No cancelar deploys en curso para
+# no dejar la versión a medio publicar.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Validate and prepare artifact
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Defensa en profundidad: aunque test.yml ya corrió en el push,
+      # re-validamos antes de subir el artifact a Pages. Si los tests
+      # fallan aquí, el deploy no se ejecuta.
+      - name: Run main test suite
+        run: node tests/run-in-node.js
+
+      - name: Run binary validation
+        run: node tests/binary-validation.js
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      # Empaqueta TODO el repo como artifact de Pages. La app es
+      # static-only, no hay build step. tests/ y docs/ también se
+      # sirven (no es problema, son contenido público útil).
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
