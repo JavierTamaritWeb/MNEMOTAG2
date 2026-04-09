@@ -3061,76 +3061,12 @@
       }
     }
 
-    function handleCanvasClick(event) {
+    function handleCanvasClick(_event) {
       // DESACTIVADO: El sistema drag & drop maneja todo automáticamente
-      // Este click inicial ya no es necesario
-      return;
-      
-      // Verificar si estamos en modo de posicionamiento (texto o imagen)
-      if (!isPositioningMode && !isTextPositioningMode) return;
-      
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      
-      const x = (event.clientX - rect.left) * scaleX;
-      const y = (event.clientY - rect.top) * scaleY;
-      
-      // SISTEMA INTUITIVO: Si ambos modos están activos, usar el último activado
-      if (isPositioningMode && isTextPositioningMode) {
-        // Usar el último modo que se activó
-        if (lastPositioningModeActivated === 'image') {
-          // Posicionar IMAGEN (último activado)
-          if (!watermarkImagePreview) {
-            UIManager.showError('Por favor, selecciona primero una imagen de marca de agua');
-            return;
-          }
-          customImagePosition = { x, y };
-          showPositionMarker();
-          updatePreview();
-          UIManager.showSuccess('🖼️ Posición de IMAGEN actualizada (modo activo)');
-        } else if (lastPositioningModeActivated === 'text') {
-          // Posicionar TEXTO (último activado)
-          customTextPosition = { x, y };
-          showTextPositionMarker();
-          updatePreview();
-          UIManager.showSuccess('📝 Posición de TEXTO actualizada (modo activo)');
-        } else {
-          // Fallback: si no hay último, posicionar imagen por defecto
-          if (watermarkImagePreview) {
-            customImagePosition = { x, y };
-            showPositionMarker();
-            updatePreview();
-            UIManager.showSuccess('🖼️ Posición de IMAGEN actualizada');
-          } else {
-            customTextPosition = { x, y };
-            showTextPositionMarker();
-            updatePreview();
-            UIManager.showSuccess('📝 Posición de TEXTO actualizada');
-          }
-        }
-        return;
-      }
-      
-      // Posicionamiento de imagen (solo modo imagen activo)
-      if (isPositioningMode && !isTextPositioningMode) {
-        if (!watermarkImagePreview) {
-          UIManager.showError('Por favor, selecciona primero una imagen de marca de agua');
-          return;
-        }
-        
-        customImagePosition = { x, y };
-        showPositionMarker();
-        updatePreview();
-        UIManager.showSuccess('🖼️ Posición de IMAGEN actualizada');
-      }
-      // Posicionamiento de texto (solo modo texto activo)
-      else if (isTextPositioningMode && !isPositioningMode) {
-        customTextPosition = { x, y };
-        showTextPositionMarker();
-        updatePreview();
-        UIManager.showSuccess('📝 Posición de TEXTO actualizada');
-      }
+      // (ver la sección "SISTEMA DRAG & DROP para marcas de agua" más abajo).
+      // Esta función queda como no-op explícito para no romper el listener
+      // registrado en setupEventListeners → `canvas.addEventListener('click', handleCanvasClick)`.
+      // v3.4.2: código muerto eliminado para satisfacer a eslint no-unreachable.
     }
     
     // ========================================================================

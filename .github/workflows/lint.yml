@@ -1,0 +1,51 @@
+name: Lint
+
+# v3.4.2: ESLint + Stylelint en CI, sin package.json.
+# Los linters corren via `npx --yes`, exactamente igual que los runners Node.
+# El proyecto sigue siendo static-only.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  eslint:
+    name: ESLint (JavaScript)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run ESLint 9 flat config
+        # `npx --yes` instala eslint@9 en el cache de npx y lo ejecuta.
+        # `--no-config-lookup` desactiva búsqueda upward de configs legacy.
+        # El archivo `eslint.config.js` (flat config) se descubre automáticamente.
+        # Solo fail si hay errores (max-warnings=999 ignora warns de deuda histórica).
+        run: npx --yes eslint@9 "js/**/*.js" "service-worker.js" "tests/**/*.js" --max-warnings=999
+
+  stylelint:
+    name: Stylelint (CSS)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run Stylelint 16
+        # Usamos `--yes` para que npx no pregunte antes de instalar.
+        # stylelint-config-recommended es el set mínimo de reglas estándar.
+        run: |
+          npx --yes -p stylelint@16 -p stylelint-config-recommended@14 \
+            stylelint "css/*.css" \
+            --config .stylelintrc.json
