@@ -771,11 +771,12 @@
           });
         }
         // Cerrar modales de análisis (click en backdrop o botón X).
+        // v3.4.3: usa el helper accesible para restaurar foco y limpiar listeners.
         document.querySelectorAll('[data-close-modal]').forEach(el => {
           el.addEventListener('click', function () {
             const which = el.getAttribute('data-close-modal');
             const modal = document.getElementById(which + '-modal');
-            if (modal) modal.classList.add('hidden');
+            _closeAccessibleModal(modal);
           });
         });
 
@@ -4157,6 +4158,91 @@
     }
 
     // ============================================================
+    // v3.4.3 — Helpers de accesibilidad para modales
+    // ============================================================
+    // Cada modal llama a `_openAccessibleModal(modal)` en vez de
+    // `modal.classList.remove('hidden')`. El helper:
+    //   1. Guarda el elemento que tenía el foco antes de abrir.
+    //   2. Muestra el modal.
+    //   3. Enfoca el primer elemento focusable dentro.
+    //   4. Engancha listeners de `keydown` para:
+    //      - `Escape` → cerrar el modal.
+    //      - `Tab` / `Shift+Tab` → atrapar el foco dentro del modal.
+    //   5. Al cerrar (`_closeAccessibleModal(modal)`), desengancha los
+    //      listeners y devuelve el foco al elemento guardado en (1).
+
+    const _modalKeyHandlers = new WeakMap();
+
+    function _getFocusableElements(container) {
+      if (!container) return [];
+      return Array.from(container.querySelectorAll(
+        'a[href], button:not([disabled]), input:not([disabled]), ' +
+        'select:not([disabled]), textarea:not([disabled]), ' +
+        '[tabindex]:not([tabindex="-1"])'
+      )).filter(el => el.offsetParent !== null);
+    }
+
+    function _openAccessibleModal(modal) {
+      if (!modal) return;
+      const previouslyFocused = document.activeElement;
+      modal.classList.remove('hidden');
+      modal.setAttribute('aria-hidden', 'false');
+
+      // Foco inicial: el primer elemento focusable dentro del modal,
+      // o el propio modal si no hay ninguno (con tabindex=-1 implícito).
+      const focusables = _getFocusableElements(modal);
+      if (focusables.length > 0) {
+        focusables[0].focus();
+      } else if (modal.tabIndex < 0) {
+        modal.tabIndex = -1;
+        modal.focus();
+      }
+
+      const keyHandler = function (e) {
+        if (e.key === 'Escape') {
+          e.preventDefault();
+          _closeAccessibleModal(modal);
+          return;
+        }
+        if (e.key === 'Tab') {
+          const currentFocusables = _getFocusableElements(modal);
+          if (currentFocusables.length === 0) {
+            e.preventDefault();
+            return;
+          }
+          const first = currentFocusables[0];
+          const last = currentFocusables[currentFocusables.length - 1];
+          if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      };
+
+      document.addEventListener('keydown', keyHandler);
+      _modalKeyHandlers.set(modal, { handler: keyHandler, previouslyFocused });
+    }
+
+    function _closeAccessibleModal(modal) {
+      if (!modal) return;
+      modal.classList.add('hidden');
+      modal.setAttribute('aria-hidden', 'true');
+
+      const state = _modalKeyHandlers.get(modal);
+      if (state) {
+        document.removeEventListener('keydown', state.handler);
+        _modalKeyHandlers.delete(modal);
+        // Devolver el foco al elemento que lo tenía antes de abrir.
+        if (state.previouslyFocused && typeof state.previouslyFocused.focus === 'function') {
+          try { state.previouslyFocused.focus(); } catch (e) { /* defensive */ }
+        }
+      }
+    }
+
+    // ============================================================
     // v3.3.12 — Análisis visual: histograma + paleta + auto-balance
     // ============================================================
 
@@ -4244,8 +4330,8 @@
       drawChannel(b, 'rgba(59, 130, 246, 0.55)');
       drawChannel(lum, 'rgba(107, 114, 128, 0.55)');
 
-      const modal = document.getElementById('histogram-modal');
-      if (modal) modal.classList.remove('hidden');
+      // v3.4.3: apertura accesible con focus trap + Escape.
+      _openAccessibleModal(document.getElementById('histogram-modal'));
     }
 
     function _extractDominantColors(imageData, count) {
@@ -4322,8 +4408,8 @@
         grid.appendChild(swatch);
       });
 
-      const modal = document.getElementById('palette-modal');
-      if (modal) modal.classList.remove('hidden');
+      // v3.4.3: apertura accesible con focus trap + Escape.
+      _openAccessibleModal(document.getElementById('palette-modal'));
     }
 
     function autoBalanceImage() {
@@ -4426,7 +4512,8 @@
       }
       const modal = document.getElementById('curves-modal');
       if (!modal) return;
-      modal.classList.remove('hidden');
+      // v3.4.3: apertura accesible con focus trap + Escape.
+      _openAccessibleModal(modal);
 
       _setupCurvesUI();
       _redrawCurvesCanvas();
@@ -4660,8 +4747,8 @@
       }
 
       UIManager.showSuccess('📈 Curvas aplicadas a la imagen');
-      const modal = document.getElementById('curves-modal');
-      if (modal) modal.classList.add('hidden');
+      // v3.4.3: cierre accesible (devuelve foco y limpia listeners).
+      _closeAccessibleModal(document.getElementById('curves-modal'));
       // v3.3.14: refresca el panel de historial si está visible
       renderHistoryPanel();
     }

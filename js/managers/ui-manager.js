@@ -94,6 +94,10 @@ const UIManager = {
     const errorContainer = document.createElement('div');
     errorContainer.className = 'error-toast';
     errorContainer.setAttribute('data-category', config.category);
+    // v3.4.3: accesibilidad — los errores son urgentes (assertive).
+    errorContainer.setAttribute('role', 'alert');
+    errorContainer.setAttribute('aria-live', 'assertive');
+    errorContainer.setAttribute('aria-atomic', 'true');
 
     // Construir el HTML SIN el botón de acción para evitar XSS por
     // interpolación de config.action.handler dentro de onclick="..."
@@ -174,6 +178,10 @@ const UIManager = {
     const warningContainer = document.createElement('div');
     warningContainer.className = 'warning-toast';
     warningContainer.setAttribute('data-category', config.category);
+    // v3.4.3: accesibilidad — warnings anunciados con polite.
+    warningContainer.setAttribute('role', 'status');
+    warningContainer.setAttribute('aria-live', 'polite');
+    warningContainer.setAttribute('aria-atomic', 'true');
 
     // HTML sin el botón de acción para evitar XSS (ver showError)
     warningContainer.innerHTML = `
@@ -246,6 +254,10 @@ const UIManager = {
     const successContainer = document.createElement('div');
     successContainer.className = 'success-toast';
     successContainer.setAttribute('data-category', config.category);
+    // v3.4.3: accesibilidad — éxitos anunciados con polite.
+    successContainer.setAttribute('role', 'status');
+    successContainer.setAttribute('aria-live', 'polite');
+    successContainer.setAttribute('aria-atomic', 'true');
 
     // HTML sin el botón de acción para evitar XSS (ver showError)
     successContainer.innerHTML = `
@@ -306,6 +318,10 @@ const UIManager = {
     const infoContainer = document.createElement('div');
     infoContainer.className = 'info-toast';
     infoContainer.setAttribute('data-category', config.category);
+    // v3.4.3: accesibilidad — info anunciada con polite.
+    infoContainer.setAttribute('role', 'status');
+    infoContainer.setAttribute('aria-live', 'polite');
+    infoContainer.setAttribute('aria-atomic', 'true');
     
     infoContainer.innerHTML = `
       <div class="info-content">
