@@ -393,6 +393,273 @@ assert(MM._isAvifFile(notAvif) === false, '_isAvifFile rechaza bytes random');
 const pngSig = new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x00]);
 assert(MM._isAvifFile(pngSig) === false, '_isAvifFile rechaza PNG signature');
 
+// ---- 6. AVIF EXIF injection — AVIF sintético estructurado (v3.4.15) --------
+
+console.log('\n● AVIF EXIF injection (v3.4.15) — parser recursivo y builders');
+
+// Construye un AVIF mínimo realista:
+//   ftyp (24 bytes) + meta (hdlr + pitm + iinf con 1 item 'av01' + iloc) + mdat (con 8 bytes de body)
+//
+// El objetivo es tener un archivo lo suficientemente completo para que
+// _injectExifInAvifBytes pueda parsearlo, construir un item Exif nuevo,
+// ajustar los offsets del primary item y producir un resultado válido
+// que PUEDA RE-PARSEARSE por las mismas funciones.
+
+function buildStructuredAvif() {
+  // === FTYP ===
+  const ftyp = new Uint8Array([
+    0x00, 0x00, 0x00, 0x18, // size=24
+    0x66, 0x74, 0x79, 0x70, // 'ftyp'
+    0x61, 0x76, 0x69, 0x66, // major brand 'avif'
+    0x00, 0x00, 0x00, 0x00, // minor version
+    0x61, 0x76, 0x69, 0x66, // compat 'avif'
+    0x6D, 0x69, 0x66, 0x31  // compat 'mif1'
+  ]);
+
+  // === HDLR (33 bytes) ===
+  // FullBox v0, pre_defined=0, handler_type='pict', reserved[3]=0, name=""
+  const hdlr = new Uint8Array([
+    0x00, 0x00, 0x00, 0x21, // size=33
+    0x68, 0x64, 0x6C, 0x72, // 'hdlr'
+    0x00, 0x00, 0x00, 0x00, // version=0 flags=0
+    0x00, 0x00, 0x00, 0x00, // pre_defined
+    0x70, 0x69, 0x63, 0x74, // handler_type='pict'
+    0x00, 0x00, 0x00, 0x00, // reserved[0]
+    0x00, 0x00, 0x00, 0x00, // reserved[1]
+    0x00, 0x00, 0x00, 0x00, // reserved[2]
+    0x00                    // name=""
+  ]);
+
+  // === PITM (14 bytes): item_ID=1 ===
+  const pitm = new Uint8Array([
+    0x00, 0x00, 0x00, 0x0E, // size=14
+    0x70, 0x69, 0x74, 0x6D, // 'pitm'
+    0x00, 0x00, 0x00, 0x00, // version=0 flags=0
+    0x00, 0x01              // item_ID=1
+  ]);
+
+  // === INFE para item 1 (av01) — version=2 (21 bytes) ===
+  const infe = new Uint8Array([
+    0x00, 0x00, 0x00, 0x15, // size=21
+    0x69, 0x6E, 0x66, 0x65, // 'infe'
+    0x02, 0x00, 0x00, 0x00, // version=2 flags=0
+    0x00, 0x01,             // item_ID=1
+    0x00, 0x00,             // item_protection_index=0
+    0x61, 0x76, 0x30, 0x31, // item_type='av01'
+    0x00                    // item_name=""
+  ]);
+
+  // === IINF (wraps the infe) ===
+  // FullBox v0, entry_count=1, [infe box]
+  // size = 8 + 4 + 2 + 21 = 35
+  const iinf = new Uint8Array(35);
+  // size
+  iinf[0] = 0; iinf[1] = 0; iinf[2] = 0; iinf[3] = 0x23;
+  // 'iinf'
+  iinf[4] = 0x69; iinf[5] = 0x69; iinf[6] = 0x6E; iinf[7] = 0x66;
+  // version=0 flags=0
+  iinf[8] = 0; iinf[9] = 0; iinf[10] = 0; iinf[11] = 0;
+  // entry_count=1
+  iinf[12] = 0; iinf[13] = 1;
+  // infe
+  iinf.set(infe, 14);
+
+  // === ILOC (30 bytes): version=0, 1 item apuntando a un offset
+  // que calcularemos más abajo ===
+  // FullBox v0, offset_size=4, length_size=4, base_offset_size=0, reserved=0,
+  // item_count=1, entries[1]:
+  //   item_ID=1, data_ref_index=0, extent_count=1, extent_offset=?, extent_length=8
+  // size = 8 + 4 + 2 + 2 + 2 + 2 + 2 + 4 + 4 = 30
+  const iloc = new Uint8Array(30);
+  iloc[0] = 0; iloc[1] = 0; iloc[2] = 0; iloc[3] = 0x1E;
+  iloc[4] = 0x69; iloc[5] = 0x6C; iloc[6] = 0x6F; iloc[7] = 0x63; // 'iloc'
+  iloc[8] = 0; iloc[9] = 0; iloc[10] = 0; iloc[11] = 0; // version=0 flags=0
+  iloc[12] = 0x44; // offset_size=4, length_size=4
+  iloc[13] = 0x00; // base_offset_size=0, reserved=0
+  iloc[14] = 0; iloc[15] = 1; // item_count=1
+  iloc[16] = 0; iloc[17] = 1; // item_ID=1
+  iloc[18] = 0; iloc[19] = 0; // data_ref_index=0
+  iloc[20] = 0; iloc[21] = 1; // extent_count=1
+  // extent_offset (placeholder — lo fijamos después de saber el layout)
+  iloc[22] = 0; iloc[23] = 0; iloc[24] = 0; iloc[25] = 0;
+  // extent_length=8
+  iloc[26] = 0; iloc[27] = 0; iloc[28] = 0; iloc[29] = 0x08;
+
+  // === META box: wrap hdlr+pitm+iinf+iloc ===
+  // FullBox v0 + sub-boxes
+  // body = 4 (v/f) + 33 + 14 + 35 + 30 = 116
+  // total = 8 + 116 = 124
+  const meta = new Uint8Array(124);
+  meta[0] = 0; meta[1] = 0; meta[2] = 0; meta[3] = 0x7C; // size=124
+  meta[4] = 0x6D; meta[5] = 0x65; meta[6] = 0x74; meta[7] = 0x61; // 'meta'
+  meta[8] = 0; meta[9] = 0; meta[10] = 0; meta[11] = 0; // version=0 flags=0
+  meta.set(hdlr, 12);
+  meta.set(pitm, 12 + 33);
+  meta.set(iinf, 12 + 33 + 14);
+  meta.set(iloc, 12 + 33 + 14 + 35);
+
+  // === MDAT ===
+  // header 8 bytes + body 8 bytes = 16 total
+  const mdat = new Uint8Array(16);
+  mdat[0] = 0; mdat[1] = 0; mdat[2] = 0; mdat[3] = 0x10; // size=16
+  mdat[4] = 0x6D; mdat[5] = 0x64; mdat[6] = 0x61; mdat[7] = 0x74; // 'mdat'
+  // body: 8 bytes de datos arbitrarios simulando el AV1 primary image
+  mdat[8] = 0xAA; mdat[9] = 0xBB; mdat[10] = 0xCC; mdat[11] = 0xDD;
+  mdat[12] = 0xEE; mdat[13] = 0xFF; mdat[14] = 0x11; mdat[15] = 0x22;
+
+  // === Concatenar ftyp + meta + mdat ===
+  const total = ftyp.length + meta.length + mdat.length;
+  const result = new Uint8Array(total);
+  result.set(ftyp, 0);
+  result.set(meta, ftyp.length);
+  result.set(mdat, ftyp.length + meta.length);
+
+  // El extent_offset del primary item debe ser el offset absoluto
+  // dentro del archivo del mdat body (después del mdat header).
+  // mdat header empieza en ftyp.length + meta.length = 24 + 124 = 148
+  // mdat body empieza en 148 + 8 = 156
+  const primaryOffset = ftyp.length + meta.length + 8;
+  const ilocOffsetInFile = ftyp.length + 12 + 33 + 14 + 35 + 22; // dentro del meta
+  result[ilocOffsetInFile] = (primaryOffset >>> 24) & 0xff;
+  result[ilocOffsetInFile + 1] = (primaryOffset >>> 16) & 0xff;
+  result[ilocOffsetInFile + 2] = (primaryOffset >>> 8) & 0xff;
+  result[ilocOffsetInFile + 3] = primaryOffset & 0xff;
+
+  return result;
+}
+
+const structuredAvif = buildStructuredAvif();
+assert(structuredAvif.length === 164, `AVIF sintético total = 164 bytes — got ${structuredAvif.length}`);
+assert(MM._isAvifFile(structuredAvif), 'AVIF sintético pasa _isAvifFile');
+
+// Parsear el meta box recursivamente
+const top = MM._parseIsobmffBoxes(structuredAvif);
+const metaB = top.find(b => b.type === 'meta');
+const mdatB = top.find(b => b.type === 'mdat');
+assert(metaB && mdatB, 'top-level tiene meta y mdat');
+
+const metaContents = MM._parseMetaBox(structuredAvif, metaB);
+assert(metaContents.hdlr, 'meta contiene hdlr');
+assert(metaContents.pitm, 'meta contiene pitm');
+assert(metaContents.iinf, 'meta contiene iinf');
+assert(metaContents.iloc, 'meta contiene iloc');
+
+const primaryId = MM._readPitm(structuredAvif, metaContents.pitm);
+assert(primaryId === 1, `pitm devuelve primary item_ID=1 — got ${primaryId}`);
+
+const iinfData = MM._readIinf(structuredAvif, metaContents.iinf);
+assert(iinfData.entries.length === 1, `iinf tiene 1 entry — got ${iinfData.entries.length}`);
+assert(iinfData.entries[0].item_type === 'av01', `item_type='av01' — got '${iinfData.entries[0].item_type}'`);
+
+const ilocData = MM._readIloc(structuredAvif, metaContents.iloc);
+assert(ilocData.items.length === 1, `iloc tiene 1 item — got ${ilocData.items.length}`);
+assert(ilocData.offset_size === 4, `iloc offset_size=4 — got ${ilocData.offset_size}`);
+assert(ilocData.length_size === 4, `iloc length_size=4 — got ${ilocData.length_size}`);
+assert(ilocData.items[0].item_ID === 1, `primer item_ID=1 — got ${ilocData.items[0].item_ID}`);
+assert(ilocData.items[0].extents[0].extent_offset === 156, `extent_offset=156 — got ${ilocData.items[0].extents[0].extent_offset}`);
+assert(ilocData.items[0].extents[0].extent_length === 8, `extent_length=8 — got ${ilocData.items[0].extents[0].extent_length}`);
+
+// === INYECCIÓN EXIF ===
+// TIFF bytes mínimos válidos: little-endian header "II*\0" + IFD vacío
+// II*\0 + offset(4)=8 + n_entries(2)=0 + next_ifd(4)=0
+const tiffBytes = new Uint8Array([
+  0x49, 0x49, 0x2A, 0x00,       // 'II*\0' little-endian TIFF magic
+  0x08, 0x00, 0x00, 0x00,       // offset to first IFD = 8
+  0x00, 0x00,                   // 0 entries
+  0x00, 0x00, 0x00, 0x00        // offset to next IFD = 0 (none)
+]);
+
+const injected = MM._injectExifInAvifBytes(structuredAvif, tiffBytes);
+assert(injected !== null, '_injectExifInAvifBytes no devuelve null');
+assert(injected instanceof Uint8Array, 'resultado es Uint8Array');
+assert(injected.length > structuredAvif.length, `resultado es más grande — original=${structuredAvif.length} new=${injected.length}`);
+
+// El ftyp debe ser IDÉNTICO
+for (let i = 0; i < 24; i++) {
+  if (injected[i] !== structuredAvif[i]) {
+    assert(false, `ftyp modificado en offset ${i}`);
+    break;
+  }
+}
+assert(injected[4] === 0x66 && injected[5] === 0x74 && injected[6] === 0x79 && injected[7] === 0x70,
+       'resultado empieza por ftyp intacto');
+
+// Re-parsear el resultado
+const topNew = MM._parseIsobmffBoxes(injected);
+const metaBNew = topNew.find(b => b.type === 'meta');
+const mdatBNew = topNew.find(b => b.type === 'mdat');
+assert(metaBNew, 'resultado tiene meta');
+assert(mdatBNew, 'resultado tiene mdat');
+assert(metaBNew.end - metaBNew.start > metaB.end - metaB.start, 'meta crecido');
+assert(mdatBNew.end - mdatBNew.start > mdatB.end - mdatB.start, 'mdat crecido');
+
+const metaContentsNew = MM._parseMetaBox(injected, metaBNew);
+assert(metaContentsNew.iinf && metaContentsNew.iloc && metaContentsNew.iref,
+       'nuevo meta tiene iinf, iloc y iref');
+
+const iinfNew = MM._readIinf(injected, metaContentsNew.iinf);
+assert(iinfNew.entries.length === 2, `iinf tiene 2 entries — got ${iinfNew.entries.length}`);
+const exifEntry = iinfNew.entries.find(e => e.item_type === 'Exif');
+assert(exifEntry, 'iinf contiene un entry de tipo Exif');
+assert(exifEntry.item_ID === 2, `Exif item_ID=2 — got ${exifEntry.item_ID}`);
+
+const ilocNew = MM._readIloc(injected, metaContentsNew.iloc);
+assert(ilocNew.items.length === 2, `iloc tiene 2 items — got ${ilocNew.items.length}`);
+
+// Primary item_ID=1 debe haber desplazado su offset en metaGrowth
+const primaryItemNew = ilocNew.items.find(it => it.item_ID === 1);
+const exifItemNew = ilocNew.items.find(it => it.item_ID === 2);
+assert(primaryItemNew, 'primary item_ID=1 sigue en iloc');
+assert(exifItemNew, 'Exif item_ID=2 añadido a iloc');
+assert(primaryItemNew.extents[0].extent_offset > 156,
+       `primary extent_offset desplazado — original=156 new=${primaryItemNew.extents[0].extent_offset}`);
+assert(primaryItemNew.extents[0].extent_length === 8, 'primary extent_length sigue siendo 8');
+assert(exifItemNew.extents[0].extent_length === 4 + tiffBytes.length,
+       `Exif extent_length = 4 (prefix) + ${tiffBytes.length} (tiff) — got ${exifItemNew.extents[0].extent_length}`);
+
+// Los bytes del payload EXIF deben estar en el offset que dice iloc
+const exifOffset = exifItemNew.extents[0].extent_offset;
+const exifLength = exifItemNew.extents[0].extent_length;
+assert(exifOffset + exifLength <= injected.length, 'Exif extent queda dentro del archivo');
+// Los primeros 4 bytes en ese offset son el tiff_header_offset=0
+assert(
+  injected[exifOffset] === 0 && injected[exifOffset + 1] === 0 &&
+  injected[exifOffset + 2] === 0 && injected[exifOffset + 3] === 0,
+  'payload EXIF empieza con tiff_header_offset=0'
+);
+// Luego vienen los bytes TIFF originales ('II*\0')
+assert(
+  injected[exifOffset + 4] === 0x49 && injected[exifOffset + 5] === 0x49 &&
+  injected[exifOffset + 6] === 0x2A && injected[exifOffset + 7] === 0x00,
+  'payload EXIF contiene los bytes TIFF ("II*\\0") correctos'
+);
+
+// El primary item debe seguir leyéndose correctamente
+const primaryOffsetNew = primaryItemNew.extents[0].extent_offset;
+assert(
+  injected[primaryOffsetNew] === 0xAA && injected[primaryOffsetNew + 1] === 0xBB &&
+  injected[primaryOffsetNew + 2] === 0xCC && injected[primaryOffsetNew + 3] === 0xDD,
+  'primary image data intacto en el offset desplazado'
+);
+
+// iref debe contener un cdsc del item Exif al primary
+// El nuevo iref tiene: FullBox header + 1 sub-box cdsc
+const irefBox = metaContentsNew.iref;
+const cdscStart = irefBox.bodyStart + 4; // skip FullBox header
+// sub-box cdsc: [size(4)][type'cdsc'(4)][from(2)][count=1(2)][to(2)]
+assert(injected[cdscStart + 4] === 0x63 && injected[cdscStart + 5] === 0x64 &&
+       injected[cdscStart + 6] === 0x73 && injected[cdscStart + 7] === 0x63,
+       'iref contiene sub-box cdsc');
+const cdscFromId = (injected[cdscStart + 8] << 8) | injected[cdscStart + 9];
+const cdscToId = (injected[cdscStart + 12] << 8) | injected[cdscStart + 13];
+assert(cdscFromId === 2, `cdsc from_item_ID=2 (Exif) — got ${cdscFromId}`);
+assert(cdscToId === 1, `cdsc to_item_ID=1 (primary) — got ${cdscToId}`);
+
+// Negativo: inyectar en el mismo archivo 2 veces debe devolver null
+// (porque ya hay un item Exif)
+const reinjected = MM._injectExifInAvifBytes(injected, tiffBytes);
+assert(reinjected === null, '2ª inyección sobre archivo con Exif previo devuelve null');
+
 // ---- Resumen ----------------------------------------------------------------
 
 console.log('\n' + '─'.repeat(60));

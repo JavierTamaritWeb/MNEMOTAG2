@@ -1133,10 +1133,854 @@ const MetadataManager = {
     return false;
   },
 
+  // ============================================================
+  // v3.4.15 — AVIF EXIF real: inyección ISOBMFF completa
+  // ============================================================
+  //
+  // Estrategia APPEND-ONLY para minimizar riesgo:
+  //
+  //   1. Parsear ftyp, meta (recursivo) y mdat del archivo original.
+  //   2. Dentro de meta: localizar pitm, iinf, iref (opcional), iloc.
+  //   3. Leer iloc para entender version, offset_size, length_size,
+  //      base_offset_size y todas las entries existentes. SOLO
+  //      soportamos el formato común: construction_method=0 (absoluto),
+  //      offset_size=4 (uint32), length_size=4 (uint32), base_offset_size=0.
+  //   4. Calcular un item_ID nuevo libre para el item 'Exif'.
+  //   5. Construir 3 sub-boxes nuevos:
+  //      a) infe (dentro de iinf): declara el nuevo item como type='Exif'
+  //      b) cdsc (dentro de iref): referencia desde Exif al primary item
+  //      c) iloc entry: apunta a los bytes EXIF al final del mdat
+  //   6. Calcular el crecimiento total del meta box (Δmeta).
+  //   7. Para el nuevo iloc, las entries antiguas deben desplazar sus
+  //      `extent_offset` en +Δmeta porque el mdat viene DESPUÉS del meta
+  //      y ha crecido el meta box.
+  //   8. El nuevo mdat = mdat original con los bytes EXIF anexados.
+  //      Los bytes EXIF llevan el prefijo ISO/IEC 23008-12 de 4 bytes:
+  //      exif_tiff_header_offset = 0, seguido del TIFF data (II*\0 o MM\0*).
+  //   9. Reconstruir el archivo: ftyp_igual + meta_nuevo + mdat_nuevo.
+  //      Box sizes se recalculan en la cadena de padres.
+  //
+  // Si cualquier paso falla o encontramos un formato no soportado,
+  // devolvemos el blob original sin tocar. NUNCA corrompemos AVIF.
+
   /**
-   * Inserta EXIF en un Blob AVIF. **Best-effort**: si el AVIF no tiene
-   * un slot EXIF preexistente o el parsing falla, devuelve el blob
-   * original sin tocar. NUNCA produce AVIF corruptos.
+   * Parser recursivo: devuelve los boxes dentro de un rango dado.
+   * Misma estructura que _parseIsobmffBoxes pero opera sobre un
+   * sub-rango (usado para parsear el contenido del meta box).
+   */
+  _parseIsobmffBoxesInRange: function(bytes, startOffset, endOffset) {
+    const boxes = [];
+    let offset = startOffset;
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+
+    while (offset < endOffset) {
+      if (offset + 8 > endOffset) break;
+      let size = view.getUint32(offset);
+      const type = String.fromCharCode(
+        bytes[offset + 4], bytes[offset + 5],
+        bytes[offset + 6], bytes[offset + 7]
+      );
+      let headerSize = 8;
+      if (size === 1) {
+        if (offset + 16 > endOffset) break;
+        const high = view.getUint32(offset + 8);
+        const low = view.getUint32(offset + 12);
+        size = high * 0x100000000 + low;
+        headerSize = 16;
+      } else if (size === 0) {
+        size = endOffset - offset;
+      }
+      if (size < headerSize) break;
+      const boxEnd = offset + size;
+      if (boxEnd > endOffset) break;
+      boxes.push({
+        type: type,
+        start: offset,
+        end: boxEnd,
+        headerSize: headerSize,
+        bodyStart: offset + headerSize
+      });
+      offset = boxEnd;
+    }
+    return boxes;
+  },
+
+  /**
+   * Lee version (1 byte) + flags (3 bytes) de un FullBox.
+   * Devuelve {version, flags, bodyStart} donde bodyStart apunta al
+   * primer byte DESPUÉS del FullBox header (4 bytes después del
+   * bodyStart del box normal).
+   */
+  _readFullBoxHeader: function(bytes, box) {
+    const version = bytes[box.bodyStart];
+    const flags = (bytes[box.bodyStart + 1] << 16) |
+                  (bytes[box.bodyStart + 2] << 8) |
+                  bytes[box.bodyStart + 3];
+    return { version: version, flags: flags, bodyStart: box.bodyStart + 4 };
+  },
+
+  /**
+   * Lee la caja `meta` recursivamente para extraer los sub-boxes que
+   * necesitamos: hdlr, pitm, iinf, iref (opcional), iloc.
+   * Devuelve { hdlr, pitm, iinf, iref, iloc, iprp, idat } o null si
+   * la estructura no es la esperada.
+   *
+   * IMPORTANTE: el meta box es un FullBox (tiene 4 bytes de version/flags
+   * antes de sus children). No confundirlo con un Box normal.
+   */
+  _parseMetaBox: function(bytes, metaBox) {
+    // Meta es FullBox: después del header (bodyStart) hay 4 bytes
+    // version/flags y LUEGO los children boxes.
+    const childrenStart = metaBox.bodyStart + 4;
+    const children = this._parseIsobmffBoxesInRange(bytes, childrenStart, metaBox.end);
+    const result = { children: children };
+    for (const child of children) {
+      if (child.type === 'hdlr') result.hdlr = child;
+      else if (child.type === 'pitm') result.pitm = child;
+      else if (child.type === 'iinf') result.iinf = child;
+      else if (child.type === 'iref') result.iref = child;
+      else if (child.type === 'iloc') result.iloc = child;
+      else if (child.type === 'iprp') result.iprp = child;
+      else if (child.type === 'idat') result.idat = child;
+    }
+    return result;
+  },
+
+  /**
+   * Lee la caja pitm (Primary Item) y devuelve el item_ID primario.
+   */
+  _readPitm: function(bytes, pitmBox) {
+    const fb = this._readFullBoxHeader(bytes, pitmBox);
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    if (fb.version === 0) {
+      return view.getUint16(fb.bodyStart);
+    } else {
+      return view.getUint32(fb.bodyStart);
+    }
+  },
+
+  /**
+   * Lee la caja iloc y devuelve la estructura completa:
+   * {
+   *   version, offset_size, length_size, base_offset_size, index_size,
+   *   items: [{ item_ID, construction_method, data_reference_index,
+   *             base_offset, extents: [{extent_index, extent_offset, extent_length}] }]
+   * }
+   * SOLO soporta el formato común (version 0/1/2, índices y offsets
+   * que caben en 32 bits). Devuelve null si encuentra algo más complejo.
+   */
+  _readIloc: function(bytes, ilocBox) {
+    const fb = this._readFullBoxHeader(bytes, ilocBox);
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let p = fb.bodyStart;
+
+    // offset_size(4) + length_size(4) + base_offset_size(4) + index_size OR reserved(4)
+    const byte1 = bytes[p++];
+    const byte2 = bytes[p++];
+    const offset_size = (byte1 >> 4) & 0x0f;
+    const length_size = byte1 & 0x0f;
+    const base_offset_size = (byte2 >> 4) & 0x0f;
+    const index_size_or_reserved = byte2 & 0x0f;
+    const index_size = (fb.version === 1 || fb.version === 2) ? index_size_or_reserved : 0;
+
+    // item_count
+    let item_count;
+    if (fb.version < 2) {
+      item_count = view.getUint16(p); p += 2;
+    } else {
+      item_count = view.getUint32(p); p += 4;
+    }
+
+    const items = [];
+    for (let i = 0; i < item_count; i++) {
+      const item = { extents: [] };
+
+      // item_ID
+      if (fb.version < 2) {
+        item.item_ID = view.getUint16(p); p += 2;
+      } else {
+        item.item_ID = view.getUint32(p); p += 4;
+      }
+
+      // construction_method (solo en version 1 o 2)
+      if (fb.version === 1 || fb.version === 2) {
+        // 2 bytes: 12 bits reserved + 4 bits construction_method
+        const cm = view.getUint16(p); p += 2;
+        item.construction_method = cm & 0x0f;
+      } else {
+        item.construction_method = 0;
+      }
+
+      // data_reference_index
+      item.data_reference_index = view.getUint16(p); p += 2;
+
+      // base_offset
+      item.base_offset = this._readUintN(view, p, base_offset_size);
+      p += base_offset_size;
+
+      // extent_count
+      const extent_count = view.getUint16(p); p += 2;
+
+      for (let j = 0; j < extent_count; j++) {
+        const extent = {};
+        if ((fb.version === 1 || fb.version === 2) && index_size > 0) {
+          extent.extent_index = this._readUintN(view, p, index_size);
+          p += index_size;
+        } else {
+          extent.extent_index = 0;
+        }
+        extent.extent_offset = this._readUintN(view, p, offset_size);
+        p += offset_size;
+        extent.extent_length = this._readUintN(view, p, length_size);
+        p += length_size;
+        item.extents.push(extent);
+      }
+
+      items.push(item);
+    }
+
+    return {
+      version: fb.version,
+      flags: fb.flags,
+      offset_size: offset_size,
+      length_size: length_size,
+      base_offset_size: base_offset_size,
+      index_size: index_size,
+      items: items
+    };
+  },
+
+  /**
+   * Helper: lee un entero unsigned de N bytes (big-endian) desde un
+   * DataView. N puede ser 0, 1, 2, 4 u 8.
+   * Para N=8, devuelve un Number (precisión limitada a 2^53 pero
+   * cubre cualquier offset razonable).
+   */
+  _readUintN: function(view, offset, size) {
+    if (size === 0) return 0;
+    if (size === 1) return view.getUint8(offset);
+    if (size === 2) return view.getUint16(offset);
+    if (size === 4) return view.getUint32(offset);
+    if (size === 8) {
+      const high = view.getUint32(offset);
+      const low = view.getUint32(offset + 4);
+      return high * 0x100000000 + low;
+    }
+    throw new Error('_readUintN: tamaño no soportado ' + size);
+  },
+
+  /**
+   * Helper: escribe un entero unsigned de N bytes (big-endian) en
+   * un Uint8Array. N puede ser 0, 2, 4 u 8.
+   */
+  _writeUintN: function(bytes, offset, value, size) {
+    if (size === 0) return;
+    if (size === 2) {
+      bytes[offset] = (value >>> 8) & 0xff;
+      bytes[offset + 1] = value & 0xff;
+      return;
+    }
+    if (size === 4) {
+      bytes[offset] = (value >>> 24) & 0xff;
+      bytes[offset + 1] = (value >>> 16) & 0xff;
+      bytes[offset + 2] = (value >>> 8) & 0xff;
+      bytes[offset + 3] = value & 0xff;
+      return;
+    }
+    if (size === 8) {
+      const high = Math.floor(value / 0x100000000);
+      const low = value >>> 0;
+      bytes[offset]     = (high >>> 24) & 0xff;
+      bytes[offset + 1] = (high >>> 16) & 0xff;
+      bytes[offset + 2] = (high >>> 8) & 0xff;
+      bytes[offset + 3] = high & 0xff;
+      bytes[offset + 4] = (low >>> 24) & 0xff;
+      bytes[offset + 5] = (low >>> 16) & 0xff;
+      bytes[offset + 6] = (low >>> 8) & 0xff;
+      bytes[offset + 7] = low & 0xff;
+      return;
+    }
+    throw new Error('_writeUintN: tamaño no soportado ' + size);
+  },
+
+  /**
+   * Lee la caja iinf y devuelve sus entries (infe boxes).
+   * Devuelve { version, entries: [{ item_ID, item_type, item_name, box }] }.
+   */
+  _readIinf: function(bytes, iinfBox) {
+    const fb = this._readFullBoxHeader(bytes, iinfBox);
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let p = fb.bodyStart;
+
+    let entry_count;
+    if (fb.version === 0) {
+      entry_count = view.getUint16(p); p += 2;
+    } else {
+      entry_count = view.getUint32(p); p += 4;
+    }
+
+    const infeBoxes = this._parseIsobmffBoxesInRange(bytes, p, iinfBox.end);
+    const entries = [];
+    for (const b of infeBoxes) {
+      if (b.type !== 'infe') continue;
+      const infeFb = this._readFullBoxHeader(bytes, b);
+      let q = infeFb.bodyStart;
+      let item_ID, item_type = '', item_name = '';
+      if (infeFb.version === 2 || infeFb.version === 3) {
+        if (infeFb.version === 2) {
+          item_ID = view.getUint16(q); q += 2;
+        } else {
+          item_ID = view.getUint32(q); q += 4;
+        }
+        // item_protection_index (2 bytes, skip)
+        q += 2;
+        item_type = String.fromCharCode(bytes[q], bytes[q + 1], bytes[q + 2], bytes[q + 3]);
+        q += 4;
+        // item_name es null-terminated
+        let end = q;
+        while (end < b.end && bytes[end] !== 0) end++;
+        item_name = String.fromCharCode.apply(null, bytes.subarray(q, end));
+      }
+      entries.push({ item_ID: item_ID, item_type: item_type, item_name: item_name, box: b });
+    }
+
+    return { version: fb.version, flags: fb.flags, entries: entries };
+  },
+
+  /**
+   * Construye un infe box (ItemInfoEntry) versión 2 para item_type='Exif'.
+   * Layout:
+   *   [size(4)][type='infe'(4)][version=2(1)][flags=0(3)]
+   *   [item_ID(2)][item_protection_index=0(2)][item_type='Exif'(4)]
+   *   [item_name="\0"(1)]
+   * Total: 21 bytes.
+   */
+  _buildInfeBoxForExif: function(item_ID) {
+    const size = 21;
+    const out = new Uint8Array(size);
+    // box size
+    this._writeUintN(out, 0, size, 4);
+    // type 'infe'
+    out[4] = 0x69; out[5] = 0x6e; out[6] = 0x66; out[7] = 0x65;
+    // version=2, flags=0
+    out[8] = 2;
+    out[9] = 0; out[10] = 0; out[11] = 0;
+    // item_ID (uint16)
+    out[12] = (item_ID >>> 8) & 0xff;
+    out[13] = item_ID & 0xff;
+    // item_protection_index = 0
+    out[14] = 0; out[15] = 0;
+    // item_type 'Exif'
+    out[16] = 0x45; out[17] = 0x78; out[18] = 0x69; out[19] = 0x66;
+    // item_name = empty string (null terminator only)
+    out[20] = 0;
+    return out;
+  },
+
+  /**
+   * Construye un nuevo iinf box con todos los infe existentes más uno
+   * nuevo al final. `existingIinf` es la caja original parseada,
+   * `newInfeBytes` es el infe nuevo (output de _buildInfeBoxForExif).
+   */
+  _buildIinfWithExtra: function(bytes, existingIinf, newInfeBytes) {
+    const fb = this._readFullBoxHeader(bytes, existingIinf);
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let p = fb.bodyStart;
+    // Leer y reescribir el entry_count incrementado
+    let entry_count, ecSize;
+    if (fb.version === 0) {
+      entry_count = view.getUint16(p); ecSize = 2;
+    } else {
+      entry_count = view.getUint32(p); ecSize = 4;
+    }
+    const newEntryCount = entry_count + 1;
+
+    // Los infe existentes van desde p+ecSize hasta existingIinf.end
+    const existingInfesStart = p + ecSize;
+    const existingInfesLength = existingIinf.end - existingInfesStart;
+
+    // Nuevo body: FullBox header (4) + entry_count (ecSize) + infes existentes + infe nuevo
+    const newBodyLength = 4 + ecSize + existingInfesLength + newInfeBytes.length;
+    const totalSize = 8 + newBodyLength; // +8 por el header del box (size+type)
+    const out = new Uint8Array(totalSize);
+
+    // box size (big-endian uint32)
+    this._writeUintN(out, 0, totalSize, 4);
+    // box type 'iinf'
+    out[4] = 0x69; out[5] = 0x69; out[6] = 0x6e; out[7] = 0x66;
+    // FullBox header (version + flags) — copiamos del original
+    out[8] = fb.version;
+    out[9] = (fb.flags >>> 16) & 0xff;
+    out[10] = (fb.flags >>> 8) & 0xff;
+    out[11] = fb.flags & 0xff;
+    // entry_count incrementado
+    let off = 12;
+    this._writeUintN(out, off, newEntryCount, ecSize);
+    off += ecSize;
+    // Copiar infes existentes
+    out.set(bytes.subarray(existingInfesStart, existingInfesStart + existingInfesLength), off);
+    off += existingInfesLength;
+    // Concatenar el infe nuevo
+    out.set(newInfeBytes, off);
+
+    return out;
+  },
+
+  /**
+   * Construye un iref box (ItemReferenceBox) con una única referencia
+   * cdsc del item Exif (fromItemId) al item primario (toItemId).
+   * Si ya existía un iref, lo extiende en lugar de crear uno nuevo.
+   *
+   * Layout del box cdsc sub-referencia (version=0):
+   *   [size(4)][type='cdsc'(4)][from_item_ID(2)][count=1(2)][to_item_ID(2)]
+   * = 14 bytes
+   *
+   * El iref box envolvente es FullBox version 0 (para from_ID de 16 bits).
+   */
+  _buildIrefWithCdsc: function(bytes, existingIref, fromItemId, toItemId) {
+    // Construir el sub-box cdsc nuevo
+    const cdscSize = 14;
+    const newCdsc = new Uint8Array(cdscSize);
+    this._writeUintN(newCdsc, 0, cdscSize, 4);
+    // 'cdsc'
+    newCdsc[4] = 0x63; newCdsc[5] = 0x64; newCdsc[6] = 0x73; newCdsc[7] = 0x63;
+    // from_item_ID (uint16)
+    this._writeUintN(newCdsc, 8, fromItemId, 2);
+    // reference_count = 1
+    this._writeUintN(newCdsc, 10, 1, 2);
+    // to_item_ID (uint16)
+    this._writeUintN(newCdsc, 12, toItemId, 2);
+
+    if (!existingIref) {
+      // Crear un iref desde cero: FullBox + sub-box cdsc
+      const totalSize = 12 + cdscSize; // header (8) + full box header (4) + cdsc
+      const out = new Uint8Array(totalSize);
+      this._writeUintN(out, 0, totalSize, 4);
+      // 'iref'
+      out[4] = 0x69; out[5] = 0x72; out[6] = 0x65; out[7] = 0x66;
+      // version=0, flags=0
+      out[8] = 0; out[9] = 0; out[10] = 0; out[11] = 0;
+      // copiar cdsc
+      out.set(newCdsc, 12);
+      return out;
+    }
+
+    // Extender iref existente: leer versión, reusar body + concatenar cdsc
+    const fb = this._readFullBoxHeader(bytes, existingIref);
+    const existingBodyStart = fb.bodyStart;
+    const existingBodyLength = existingIref.end - existingBodyStart;
+    const newBodyLength = 4 + existingBodyLength + cdscSize; // full box header(4) + body original + cdsc
+    const totalSize = 8 + newBodyLength;
+    const out = new Uint8Array(totalSize);
+    this._writeUintN(out, 0, totalSize, 4);
+    out[4] = 0x69; out[5] = 0x72; out[6] = 0x65; out[7] = 0x66; // 'iref'
+    // FullBox header
+    out[8] = fb.version;
+    out[9] = (fb.flags >>> 16) & 0xff;
+    out[10] = (fb.flags >>> 8) & 0xff;
+    out[11] = fb.flags & 0xff;
+    // Copiar body existente (sub-boxes)
+    out.set(bytes.subarray(existingBodyStart, existingBodyStart + existingBodyLength), 12);
+    // Concatenar nuevo cdsc
+    out.set(newCdsc, 12 + existingBodyLength);
+    return out;
+  },
+
+  /**
+   * Construye un iloc nuevo con la misma estructura que el original pero:
+   *   - Añade una entry nueva para el item Exif (newItemEntry).
+   *   - Todos los extent_offsets absolutos (construction_method=0) de las
+   *     entries existentes se desplazan en `metaGrowth` bytes (porque el
+   *     mdat está después del meta box y ha crecido).
+   * Solo soporta configuraciones comunes; si encuentra algo raro,
+   * lanza una excepción que el caller captura y devuelve original.
+   */
+  _buildIlocWithExtra: function(bytes, existingIloc, parsedIloc, newItemEntry, metaGrowth) {
+    // Solo soportamos offset_size y length_size en {0, 4, 8}
+    // y construction_method 0. base_offset_size 0 es lo más común.
+    if (parsedIloc.offset_size !== 4 && parsedIloc.offset_size !== 8) {
+      throw new Error('iloc offset_size ' + parsedIloc.offset_size + ' no soportado');
+    }
+    if (parsedIloc.length_size !== 4 && parsedIloc.length_size !== 8) {
+      throw new Error('iloc length_size ' + parsedIloc.length_size + ' no soportado');
+    }
+
+    // Calcular tamaño del nuevo iloc
+    const entrySizeForVersion = function (v, isz, osz, lsz, bosz) {
+      const itemIdSize = v < 2 ? 2 : 4;
+      const cmSize = (v === 1 || v === 2) ? 2 : 0;
+      const dataRefSize = 2;
+      // base_offset + extent_count(2) — los extents se suman aparte
+      return itemIdSize + cmSize + dataRefSize + bosz + 2;
+    };
+    const extentSizeForVersion = function (v, isz, osz, lsz) {
+      const idxSize = (v === 1 || v === 2) && isz > 0 ? isz : 0;
+      return idxSize + osz + lsz;
+    };
+
+    // Calcular tamaño body total del nuevo iloc
+    const fixedHeaderSize = 2; // 2 bytes de offset_size/length_size/base_offset_size/index_or_reserved
+    const itemCountSize = parsedIloc.version < 2 ? 2 : 4;
+
+    let totalEntriesSize = 0;
+    const allItems = parsedIloc.items.concat([newItemEntry]);
+    for (const item of allItems) {
+      totalEntriesSize += entrySizeForVersion(
+        parsedIloc.version, parsedIloc.index_size,
+        parsedIloc.offset_size, parsedIloc.length_size, parsedIloc.base_offset_size
+      );
+      for (let j = 0; j < item.extents.length; j++) {
+        totalEntriesSize += extentSizeForVersion(
+          parsedIloc.version, parsedIloc.index_size,
+          parsedIloc.offset_size, parsedIloc.length_size
+        );
+      }
+    }
+
+    // FullBox header (4) + fixedHeaderSize + itemCountSize + totalEntriesSize
+    const bodyLength = 4 + fixedHeaderSize + itemCountSize + totalEntriesSize;
+    const totalSize = 8 + bodyLength;
+    const out = new Uint8Array(totalSize);
+
+    this._writeUintN(out, 0, totalSize, 4);
+    // 'iloc'
+    out[4] = 0x69; out[5] = 0x6c; out[6] = 0x6f; out[7] = 0x63;
+    // FullBox header
+    out[8] = parsedIloc.version;
+    out[9] = (parsedIloc.flags >>> 16) & 0xff;
+    out[10] = (parsedIloc.flags >>> 8) & 0xff;
+    out[11] = parsedIloc.flags & 0xff;
+    // offset_size + length_size (un byte)
+    out[12] = ((parsedIloc.offset_size & 0x0f) << 4) | (parsedIloc.length_size & 0x0f);
+    // base_offset_size + index_size (un byte)
+    out[13] = ((parsedIloc.base_offset_size & 0x0f) << 4) | (parsedIloc.index_size & 0x0f);
+    // item_count
+    let p = 14;
+    this._writeUintN(out, p, allItems.length, itemCountSize);
+    p += itemCountSize;
+
+    // Escribir todas las entries
+    for (let idx = 0; idx < allItems.length; idx++) {
+      const item = allItems[idx];
+      const isNewItem = (idx === allItems.length - 1); // el nuevo va al final
+      // item_ID
+      if (parsedIloc.version < 2) {
+        this._writeUintN(out, p, item.item_ID, 2); p += 2;
+      } else {
+        this._writeUintN(out, p, item.item_ID, 4); p += 4;
+      }
+      // construction_method
+      if (parsedIloc.version === 1 || parsedIloc.version === 2) {
+        // 2 bytes: 12 bits reserved + 4 bits construction_method
+        const cmValue = item.construction_method & 0x0f;
+        out[p] = 0; out[p + 1] = cmValue;
+        p += 2;
+      }
+      // data_reference_index
+      this._writeUintN(out, p, item.data_reference_index || 0, 2); p += 2;
+      // base_offset
+      if (parsedIloc.base_offset_size > 0) {
+        // Los base_offsets absolutos deben desplazarse en items existentes
+        // si construction_method === 0
+        let bo = item.base_offset || 0;
+        if (!isNewItem && item.construction_method === 0) {
+          bo += metaGrowth;
+        }
+        this._writeUintN(out, p, bo, parsedIloc.base_offset_size);
+        p += parsedIloc.base_offset_size;
+      }
+      // extent_count
+      this._writeUintN(out, p, item.extents.length, 2); p += 2;
+      // extents
+      for (let j = 0; j < item.extents.length; j++) {
+        const ex = item.extents[j];
+        if ((parsedIloc.version === 1 || parsedIloc.version === 2) && parsedIloc.index_size > 0) {
+          this._writeUintN(out, p, ex.extent_index || 0, parsedIloc.index_size);
+          p += parsedIloc.index_size;
+        }
+        // extent_offset — desplazar si construction_method===0 y NO es el nuevo item
+        let eo = ex.extent_offset;
+        if (!isNewItem && item.construction_method === 0 && (item.base_offset || 0) === 0) {
+          // Si el base_offset es 0, los extent_offsets son absolutos del
+          // archivo y también hay que desplazarlos en metaGrowth.
+          eo += metaGrowth;
+        }
+        this._writeUintN(out, p, eo, parsedIloc.offset_size);
+        p += parsedIloc.offset_size;
+        this._writeUintN(out, p, ex.extent_length, parsedIloc.length_size);
+        p += parsedIloc.length_size;
+      }
+    }
+
+    return out;
+  },
+
+  /**
+   * Construye un nuevo meta box con los sub-boxes originales pero
+   * reemplazando iinf, iref (puede ser null si se crea nuevo) e iloc
+   * con las versiones extendidas.
+   *
+   * @param {Uint8Array} bytes - archivo AVIF original
+   * @param {Object} metaBox - parsed top-level meta box
+   * @param {Object} metaContents - resultado de _parseMetaBox
+   * @param {Uint8Array} newIinfBytes - iinf extendido
+   * @param {Uint8Array} newIrefBytes - iref extendido (nuevo o existente)
+   * @param {Uint8Array} newIlocBytes - iloc extendido
+   * @returns {Uint8Array} meta box completo (incluyendo header)
+   */
+  _buildNewMetaBox: function(bytes, metaBox, metaContents, newIinfBytes, newIrefBytes, newIlocBytes) {
+    // El nuevo body del meta consiste en:
+    //   - FullBox header (4 bytes: version+flags)
+    //   - Todos los sub-boxes originales EXCEPTO iinf/iref/iloc en su
+    //     posición original, PERO con los reemplazados.
+    //   - Si no había iref original, lo insertamos tras iinf.
+    //
+    // Estrategia: iteramos metaContents.children en orden, y sustituimos
+    // las cajas iinf/iref/iloc por sus nuevas versiones. Si iref no
+    // existía en el original pero lo necesitamos, lo insertamos justo
+    // después del iinf en el nuevo flujo.
+    const fullBoxHeader = bytes.subarray(metaBox.bodyStart, metaBox.bodyStart + 4); // version+flags originales
+    const parts = [];
+    parts.push(fullBoxHeader);
+
+    let irefInserted = false;
+    for (const child of metaContents.children) {
+      if (child.type === 'iinf') {
+        parts.push(newIinfBytes);
+        // Si no había iref original, insertar el nuevo aquí tras iinf.
+        if (!metaContents.iref && !irefInserted) {
+          parts.push(newIrefBytes);
+          irefInserted = true;
+        }
+      } else if (child.type === 'iref') {
+        parts.push(newIrefBytes);
+        irefInserted = true;
+      } else if (child.type === 'iloc') {
+        parts.push(newIlocBytes);
+      } else {
+        // Copiar sub-box tal cual
+        parts.push(bytes.subarray(child.start, child.end));
+      }
+    }
+    // Fallback: si iinf no se encontró (imposible para un AVIF válido), abortar.
+    // Si iref nuevo no se insertó (edge case raro), añadir al final.
+    if (!irefInserted && newIrefBytes) {
+      parts.push(newIrefBytes);
+    }
+
+    // Concatenar todo y prepender el box header (size+type) del meta.
+    let bodyLength = 0;
+    for (const p of parts) bodyLength += p.length;
+    const totalSize = 8 + bodyLength;
+    const out = new Uint8Array(totalSize);
+    this._writeUintN(out, 0, totalSize, 4);
+    // 'meta'
+    out[4] = 0x6d; out[5] = 0x65; out[6] = 0x74; out[7] = 0x61;
+    let off = 8;
+    for (const p of parts) {
+      out.set(p, off);
+      off += p.length;
+    }
+    return out;
+  },
+
+  /**
+   * Función core: inyecta EXIF en un Uint8Array AVIF.
+   * Devuelve el nuevo Uint8Array o null si la operación no es segura.
+   * @param {Uint8Array} bytes - AVIF original
+   * @param {Uint8Array} tiffBytes - datos TIFF/EXIF a insertar
+   * @returns {Uint8Array|null}
+   */
+  _injectExifInAvifBytes: function(bytes, tiffBytes) {
+    if (!this._isAvifFile(bytes)) return null;
+    const topBoxes = this._parseIsobmffBoxes(bytes);
+    const metaBox = topBoxes.find(b => b.type === 'meta');
+    const mdatBox = topBoxes.find(b => b.type === 'mdat');
+    if (!metaBox || !mdatBox) return null;
+    // Solo soportamos el orden común: ftyp → meta → mdat
+    if (metaBox.start > mdatBox.start) return null;
+
+    const metaContents = this._parseMetaBox(bytes, metaBox);
+    if (!metaContents.iinf || !metaContents.iloc || !metaContents.pitm) return null;
+
+    const primaryItemId = this._readPitm(bytes, metaContents.pitm);
+    const iinfData = this._readIinf(bytes, metaContents.iinf);
+    const ilocData = this._readIloc(bytes, metaContents.iloc);
+
+    // Soportamos solo construction_method 0 en las entries existentes
+    // (absoluto al archivo). Si algún item usa otra cosa, abortar.
+    for (const item of ilocData.items) {
+      if (item.construction_method !== 0) return null;
+    }
+
+    // Calcular item_ID libre
+    let maxId = primaryItemId;
+    for (const e of iinfData.entries) {
+      if (e.item_ID && e.item_ID > maxId) maxId = e.item_ID;
+    }
+    for (const it of ilocData.items) {
+      if (it.item_ID > maxId) maxId = it.item_ID;
+    }
+    const newItemId = maxId + 1;
+    if (newItemId > 0xffff && ilocData.version < 2) return null; // iloc v0/v1 solo soporta 16-bit IDs
+
+    // Ya existe un item 'Exif'? Si sí, no duplicar.
+    for (const e of iinfData.entries) {
+      if (e.item_type === 'Exif') return null;
+    }
+
+    // Bytes finales a añadir al mdat: prefijo 4 bytes exif_tiff_header_offset + tiffBytes
+    const exifPayload = new Uint8Array(4 + tiffBytes.length);
+    // exif_tiff_header_offset = 0 (el TIFF empieza justo después)
+    this._writeUintN(exifPayload, 0, 0, 4);
+    exifPayload.set(tiffBytes, 4);
+
+    // Construir los sub-boxes nuevos. Algunos necesitan el tamaño final
+    // del mdat ya actualizado, pero como solo ANEXAMOS al mdat, el
+    // primary image data no se mueve — el nuevo extent del item Exif
+    // apunta al OFFSET ABSOLUTO nuevo dentro del archivo. Este offset
+    // depende del tamaño final del meta box + ftyp + cabecera del mdat.
+    //
+    // Para calcularlo necesitamos saber cuánto crece el meta box. Lo
+    // más limpio: construir iinf y iref primero (no dependen del offset),
+    // calcular el crecimiento de iinf+iref, y luego construir iloc con
+    // ese metaGrowth... pero iloc ya modifica su propio tamaño al añadir
+    // una entry, así que es circular.
+    //
+    // Solución: 2 pasadas. Primera pasada construye iloc con un
+    // placeholder para el offset nuevo. Mide el tamaño final de iinf/iref/iloc.
+    // Segunda pasada corrige el extent_offset del item Exif.
+
+    const newInfeBytes = this._buildInfeBoxForExif(newItemId);
+    const newIinfBytes = this._buildIinfWithExtra(bytes, metaContents.iinf, newInfeBytes);
+    const newIrefBytes = this._buildIrefWithCdsc(bytes, metaContents.iref, newItemId, primaryItemId);
+
+    // Calcular el crecimiento del meta box ANTES de reconstruir iloc.
+    // Tamaño original del meta:
+    const oldMetaSize = metaBox.end - metaBox.start;
+    // Tamaño original de iinf/iref/iloc
+    const oldIinfSize = metaContents.iinf ? metaContents.iinf.end - metaContents.iinf.start : 0;
+    const oldIrefSize = metaContents.iref ? metaContents.iref.end - metaContents.iref.start : 0;
+    const oldIlocSize = metaContents.iloc.end - metaContents.iloc.start;
+
+    // Pre-calcular tamaño aproximado del nuevo iloc: una entry extra con
+    // un extent. Necesitamos saber offset_size, etc.
+    let extraIlocBytes;
+    {
+      const itemIdSize = ilocData.version < 2 ? 2 : 4;
+      const cmSize = (ilocData.version === 1 || ilocData.version === 2) ? 2 : 0;
+      const dataRefSize = 2;
+      const entryFixed = itemIdSize + cmSize + dataRefSize + ilocData.base_offset_size + 2; // +2 extent_count
+      const extentSize = ((ilocData.version === 1 || ilocData.version === 2) && ilocData.index_size > 0 ? ilocData.index_size : 0)
+                         + ilocData.offset_size + ilocData.length_size;
+      extraIlocBytes = entryFixed + extentSize;
+    }
+
+    // Crecimiento total de meta: (nuevo iinf - viejo iinf) + (nuevo iref - viejo iref) + (nuevo iloc - viejo iloc)
+    const newIinfSize = newIinfBytes.length;
+    const newIrefSize = newIrefBytes.length;
+    const newIlocSize = oldIlocSize + extraIlocBytes;
+    const metaGrowth = (newIinfSize - oldIinfSize) + (newIrefSize - oldIrefSize) + (newIlocSize - oldIlocSize);
+
+    // Offset absoluto dentro del archivo donde empieza el payload EXIF:
+    // después del ftyp + nuevo meta + mdat header.
+    // new_meta_end = metaBox.start + oldMetaSize + metaGrowth
+    // new_mdat_start = new_meta_end
+    // mdat header size = mdatBox.headerSize (normalmente 8, 16 con largesize)
+    // mdat body original empieza en mdatBox.bodyStart, termina en mdatBox.end.
+    // nuevo extent offset = new_mdat_start + mdatHeaderSize + (mdatBox.end - mdatBox.bodyStart)
+    const newMetaEnd = metaBox.start + oldMetaSize + metaGrowth;
+    const newMdatStart = newMetaEnd;
+    const oldMdatBodyLength = mdatBox.end - mdatBox.bodyStart;
+    const exifExtentOffset = newMdatStart + mdatBox.headerSize + oldMdatBodyLength;
+
+    // Construir el item nuevo para iloc
+    const newItemEntry = {
+      item_ID: newItemId,
+      construction_method: 0,
+      data_reference_index: 0,
+      base_offset: 0,
+      extents: [{
+        extent_index: 0,
+        extent_offset: exifExtentOffset,
+        extent_length: exifPayload.length
+      }]
+    };
+
+    let newIlocBytes;
+    try {
+      newIlocBytes = this._buildIlocWithExtra(bytes, metaContents.iloc, ilocData, newItemEntry, metaGrowth);
+    } catch (err) {
+      console.warn('_injectExifInAvifBytes: error construyendo iloc:', err);
+      return null;
+    }
+
+    // Sanity check: el tamaño real del nuevo iloc debe coincidir con extraIlocBytes
+    const realIlocGrowth = newIlocBytes.length - oldIlocSize;
+    if (realIlocGrowth !== extraIlocBytes) {
+      console.warn('_injectExifInAvifBytes: iloc growth mismatch, predicted=' + extraIlocBytes + ' real=' + realIlocGrowth);
+      return null;
+    }
+
+    // Construir el nuevo meta box
+    const newMetaBytes = this._buildNewMetaBox(bytes, metaBox, metaContents, newIinfBytes, newIrefBytes, newIlocBytes);
+
+    // Sanity check adicional: el tamaño del nuevo meta debe ser oldMetaSize + metaGrowth
+    if (newMetaBytes.length !== oldMetaSize + metaGrowth) {
+      console.warn('_injectExifInAvifBytes: meta size mismatch, expected=' + (oldMetaSize + metaGrowth) + ' real=' + newMetaBytes.length);
+      return null;
+    }
+
+    // Construir el nuevo mdat: header extendido (nuevo size) + body original + exifPayload
+    const newMdatBodyLength = oldMdatBodyLength + exifPayload.length;
+    const mdatHeaderSize = mdatBox.headerSize;
+    // Si el header es compact (8 bytes), el size cabe en uint32 (hasta 4 GB).
+    // Si es largesize (16 bytes), size_field=1 y largesize en bytes 8-15.
+    const newMdatTotalSize = mdatHeaderSize + newMdatBodyLength;
+    const newMdatBytes = new Uint8Array(newMdatTotalSize);
+    if (mdatHeaderSize === 8) {
+      this._writeUintN(newMdatBytes, 0, newMdatTotalSize, 4);
+      newMdatBytes[4] = 0x6d; newMdatBytes[5] = 0x64; newMdatBytes[6] = 0x61; newMdatBytes[7] = 0x74;
+    } else if (mdatHeaderSize === 16) {
+      this._writeUintN(newMdatBytes, 0, 1, 4); // size=1 indica largesize
+      newMdatBytes[4] = 0x6d; newMdatBytes[5] = 0x64; newMdatBytes[6] = 0x61; newMdatBytes[7] = 0x74;
+      this._writeUintN(newMdatBytes, 8, newMdatTotalSize, 8);
+    } else {
+      return null;
+    }
+    // Copiar body original
+    newMdatBytes.set(bytes.subarray(mdatBox.bodyStart, mdatBox.end), mdatHeaderSize);
+    // Anexar el payload EXIF
+    newMdatBytes.set(exifPayload, mdatHeaderSize + oldMdatBodyLength);
+
+    // Reconstruir el archivo: [ftyp + otros boxes antes de meta][nuevo meta][nuevo mdat][otros boxes después de mdat]
+    // Identificamos los rangos de la parte "prologo" (antes de meta) y "epilogo" (después de mdat).
+    const prologEnd = metaBox.start;
+    const oldMdatEnd = mdatBox.end;
+    const epilogStart = oldMdatEnd;
+    const epilogLength = bytes.length - epilogStart;
+
+    const newTotalSize = prologEnd + newMetaBytes.length + newMdatBytes.length + epilogLength;
+    const out = new Uint8Array(newTotalSize);
+    out.set(bytes.subarray(0, prologEnd), 0);
+    out.set(newMetaBytes, prologEnd);
+    out.set(newMdatBytes, prologEnd + newMetaBytes.length);
+    if (epilogLength > 0) {
+      out.set(bytes.subarray(epilogStart, bytes.length), prologEnd + newMetaBytes.length + newMdatBytes.length);
+    }
+
+    // Verificación final: el primer box sigue siendo 'ftyp'
+    if (out.length < 12 ||
+        out[4] !== 0x66 || out[5] !== 0x74 || out[6] !== 0x79 || out[7] !== 0x70) {
+      return null;
+    }
+
+    return out;
+  },
+
+  /**
+   * Inserta EXIF en un Blob AVIF. Devuelve un nuevo Blob o el original
+   * si la inyección no es posible. NUNCA produce AVIF corruptos.
    * @param {Blob} blob
    * @returns {Promise<Blob>}
    */
@@ -1145,37 +1989,59 @@ const MetadataManager = {
     if (!blob || blob.type !== 'image/avif') return blob;
 
     try {
+      // Construir el payload EXIF/TIFF desde el formulario
+      const exifObj = this.buildExifObject(this.getMetadata());
+      if (!exifObj) return blob;
+
+      // piexif.dump devuelve un string binario con el APP1 marker
+      // para JPEG. Necesitamos solo los bytes TIFF (sin el marcador
+      // "Exif\0\0" que piexif añade).
+      const exifBinaryString = piexif.dump(exifObj);
+      // Convertir string binario a Uint8Array
+      const exifWithApp1 = new Uint8Array(exifBinaryString.length);
+      for (let i = 0; i < exifBinaryString.length; i++) {
+        exifWithApp1[i] = exifBinaryString.charCodeAt(i) & 0xff;
+      }
+      // piexif.dump devuelve: [0xFF 0xE1 size_hi size_lo "Exif\0\0" ...TIFF...]
+      // Pero en algunos modos devuelve directamente los bytes TIFF.
+      // Reutilizamos la lógica de _piexifBinaryToTiffBytes si existe.
+      let tiffBytes;
+      if (typeof this._piexifBinaryToTiffBytes === 'function') {
+        tiffBytes = this._piexifBinaryToTiffBytes(exifWithApp1);
+      } else {
+        // Fallback: buscar manualmente "Exif\0\0" y skipear 6 bytes.
+        // También skipear el marker APP1 si está.
+        let start = 0;
+        if (exifWithApp1[0] === 0xff && exifWithApp1[1] === 0xe1) start = 4; // skip marker + size
+        // Buscar "Exif\0\0"
+        if (exifWithApp1[start] === 0x45 && exifWithApp1[start + 1] === 0x78 &&
+            exifWithApp1[start + 2] === 0x69 && exifWithApp1[start + 3] === 0x66 &&
+            exifWithApp1[start + 4] === 0 && exifWithApp1[start + 5] === 0) {
+          start += 6;
+        }
+        tiffBytes = exifWithApp1.subarray(start);
+      }
+      if (!tiffBytes || tiffBytes.length === 0) return blob;
+
       const buffer = await blob.arrayBuffer();
       const bytes = new Uint8Array(buffer);
 
-      if (!this._isAvifFile(bytes)) {
-        console.warn('embedExifInAvifBlob: el archivo no parece AVIF, devolviendo original');
+      const result = this._injectExifInAvifBytes(bytes, tiffBytes);
+      if (!result) {
+        console.warn('embedExifInAvifBlob: _injectExifInAvifBytes devolvió null — estructura no soportada. Devolviendo original.');
         return blob;
       }
 
-      // Parsear las cajas top-level
-      const boxes = this._parseIsobmffBoxes(bytes);
-      const metaBox = boxes.find(b => b.type === 'meta');
-      if (!metaBox) {
-        console.warn('embedExifInAvifBlob: AVIF sin caja `meta` — la inyección de EXIF requiere reescribir todo el contenedor (no soportado en esta versión). Devolviendo original.');
+      // Validación post-construcción: primeros bytes ftyp
+      if (result.length < 12 || result[4] !== 0x66 || result[5] !== 0x74 || result[6] !== 0x79 || result[7] !== 0x70) {
+        console.warn('embedExifInAvifBlob: resultado no empieza por ftyp, devolviendo original');
         return blob;
       }
 
-      // En esta primera versión defensiva, no manipulamos la estructura.
-      // Solo verificamos que el AVIF está bien formado y devolvemos el
-      // blob tal cual. Una versión futura puede implementar la inyección
-      // completa del item Exif + iref + iloc + actualización de iinf.
-      //
-      // Esto cumple el contrato:
-      //   - Función pública existe y se llama.
-      //   - Nunca corrompe el AVIF (devuelve el blob original).
-      //   - Hay infraestructura de parseo ya construida para futuras
-      //     versiones (`_parseIsobmffBoxes`, `_isAvifFile`).
-      console.warn('embedExifInAvifBlob: AVIF EXIF embedding no implementado en v3.3.17 (requiere reescritura ISOBMFF completa). Devolviendo blob original sin tocar para no corromper.');
-      return blob;
+      return new Blob([result], { type: 'image/avif' });
 
     } catch (err) {
-      console.warn('embedExifInAvifBlob: error parseando AVIF, devolviendo original:', err);
+      console.warn('embedExifInAvifBlob: error inyectando EXIF en AVIF, devolviendo original:', err);
       return blob;
     }
   },

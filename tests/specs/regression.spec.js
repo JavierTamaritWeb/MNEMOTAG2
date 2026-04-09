@@ -617,7 +617,7 @@ describe('Regresión — PWA real con Service Worker (v3.3.16)', function () {
   });
 });
 
-describe('Regresión — AVIF EXIF (v3.3.17): parser ISOBMFF defensivo', function () {
+describe('Regresión — AVIF EXIF (v3.3.17 infra → v3.4.15 inyección real)', function () {
   it('metadata-manager.js define las funciones públicas embedExifInAvifBlob/DataUrl', async function () {
     const src = await fetchSource('../js/managers/metadata-manager.js');
     expect(src).toContain('embedExifInAvifBlob: async function');
@@ -634,14 +634,45 @@ describe('Regresión — AVIF EXIF (v3.3.17): parser ISOBMFF defensivo', functio
     expect(src).toContain("'avif'");
   });
 
-  it('metadata-manager.js NUNCA corrompe AVIF: degradación elegante en TODOS los caminos', async function () {
+  it('metadata-manager.js NUNCA corrompe AVIF: degradación elegante en TODOS los caminos (v3.4.15)', async function () {
     const src = await fetchSource('../js/managers/metadata-manager.js');
-    // Si no es AVIF válido → devolver original
-    expect(src).toContain('no parece AVIF, devolviendo original');
-    // Si no encuentra meta box → devolver original
-    expect(src).toContain('AVIF sin caja');
+    // Error inyectando → devolver original
+    expect(src).toContain('error inyectando EXIF en AVIF, devolviendo original');
+    // Validación post-construcción fallida → devolver original
+    expect(src).toContain('resultado no empieza por ftyp');
     // try/catch envuelve TODO el flujo binario
-    expect(src).toContain('error parseando AVIF, devolviendo original');
+    expect(src).toContain('try {');
+    expect(src).toContain('} catch (err) {');
+    // _injectExifInAvifBytes puede devolver null y el caller lo maneja
+    expect(src).toContain('devolvió null');
+  });
+
+  // v3.4.15: la inyección REAL
+  it('metadata-manager.js define el parser recursivo y los builders ISOBMFF (v3.4.15)', async function () {
+    const src = await fetchSource('../js/managers/metadata-manager.js');
+    expect(src).toContain('_parseIsobmffBoxesInRange');
+    expect(src).toContain('_readFullBoxHeader');
+    expect(src).toContain('_parseMetaBox');
+    expect(src).toContain('_readPitm');
+    expect(src).toContain('_readIinf');
+    expect(src).toContain('_readIloc');
+  });
+
+  it('metadata-manager.js define los builders para infe/iref/iloc/meta (v3.4.15)', async function () {
+    const src = await fetchSource('../js/managers/metadata-manager.js');
+    expect(src).toContain('_buildInfeBoxForExif');
+    expect(src).toContain('_buildIinfWithExtra');
+    expect(src).toContain('_buildIrefWithCdsc');
+    expect(src).toContain('_buildIlocWithExtra');
+    expect(src).toContain('_buildNewMetaBox');
+    expect(src).toContain('_injectExifInAvifBytes');
+  });
+
+  it('metadata-manager.js ajusta offsets existentes por metaGrowth (v3.4.15)', async function () {
+    const src = await fetchSource('../js/managers/metadata-manager.js');
+    // El builder de iloc debe desplazar los offsets absolutos en metaGrowth
+    expect(src).toContain('metaGrowth');
+    expect(src).toContain('eo += metaGrowth');
   });
 
   it('export-manager.js llama a embedExifInAvifBlob en el flujo de descarga (v3.4.10)', async function () {
