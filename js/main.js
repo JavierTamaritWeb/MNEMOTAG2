@@ -227,7 +227,6 @@
     // UIManager extraído a js/managers/ui-manager.js
 
     function initializeApp() {
-      console.log('Aplicación cargada');
       
       try {
         // Inicializar UI dinámica desde AppConfig
@@ -256,7 +255,6 @@
         
         // Configurar event listeners de filtros con delay para asegurar DOM
         setTimeout(() => {
-          console.log('=== CONFIGURACIÓN TARDÍA DE FILTROS ===');
           setupFilterListeners();
         }, 500);
         
@@ -311,7 +309,6 @@
         // Configurar atajos de teclado
         setupKeyboardShortcuts();
         
-        console.log('Aplicación inicializada correctamente');
         
       } catch (error) {
         console.error('Error al inicializar la aplicación:', error);
@@ -447,7 +444,6 @@
         // Check format support and disable unsupported formats
         checkAndUpdateFormatSupport();
         
-        console.log('Output controls initialized successfully');
       } catch (error) {
         console.error('Error initializing output controls:', error);
       }
@@ -482,7 +478,6 @@
         }
       }
       
-      console.log('Verificación de soporte de formatos completada - todas las opciones habilitadas con fallback');
     }
 
     // Funciones del tema oscuro
@@ -506,7 +501,6 @@
     }
 
     function setTheme(theme) {
-      console.log('SetTheme llamado con:', theme);
       const themeIcon = document.getElementById('theme-icon');
       const html = document.documentElement;
       
@@ -515,24 +509,20 @@
         if (themeIcon) {
           themeIcon.className = 'fas fa-sun';
         }
-        console.log('Tema oscuro aplicado');
       } else {
         html.removeAttribute('data-theme');
         if (themeIcon) {
           themeIcon.className = 'fas fa-moon';
         }
-        console.log('Tema claro aplicado');
       }
       
       localStorage.setItem('theme', theme);
     }
 
     function toggleTheme() {
-      console.log('Toggle theme llamado');
       const html = document.documentElement;
       const currentTheme = html.getAttribute('data-theme');
       const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-      console.log('Cambiando de', currentTheme, 'a', newTheme);
       setTheme(newTheme);
     }
 
@@ -643,13 +633,10 @@
 
     function setupEventListeners() {
       try {
-        console.log('=== CONFIGURANDO EVENT LISTENERS ===');
         
         // Configurar listeners para controles de filtros
-        console.log('Configurando event listeners para filtros...');
         ['brightness', 'contrast', 'saturation', 'blur'].forEach(filter => {
           const slider = document.getElementById(filter);
-          console.log(`Slider ${filter}:`, slider ? 'encontrado' : 'NO encontrado');
           if (slider) {
             slider.addEventListener('input', (e) => {
               FilterManager.applyFilter(filter, parseInt(e.target.value));
@@ -659,10 +646,8 @@
         
         // Configurar presets de filtros
         const presetButtons = document.querySelectorAll('.filter-preset');
-        console.log(`Botones de presets encontrados: ${presetButtons.length}`);
         presetButtons.forEach(btn => {
           btn.addEventListener('click', () => {
-            console.log(`Aplicando preset: ${btn.dataset.filter}`);
             FilterManager.applyPreset(btn.dataset.filter);
           });
         });
@@ -828,7 +813,6 @@
                       link.href = fontUrl;
                       document.head.appendChild(link);
                       await document.fonts.load(`16px "${fontFamily}"`);
-                      console.log(`✅ Google Font cargada para marca de agua: ${fontFamily}`);
                     }
                   } catch (error) {
                     console.warn(`Error cargando fuente ${fontFamily}:`, error);
@@ -914,7 +898,6 @@
               console.error('❌ openBatchModal no está definida. Verifica que initializeAdvancedUI() se haya ejecutado.');
             }
           });
-          console.log('✅ Event listener de Batch Mode configurado');
         }
         
         if (textLayersBtn) {
@@ -925,7 +908,6 @@
               console.error('❌ openTextLayersPanel no está definida. Verifica que initializeAdvancedUI() se haya ejecutado.');
             }
           });
-          console.log('✅ Event listener de Text Layers configurado');
         }
         
         if (cropModeBtn) {
@@ -936,7 +918,6 @@
               console.error('❌ openCropPanel no está definida. Verifica que initializeAdvancedUI() se haya ejecutado.');
             }
           });
-          console.log('✅ Event listener de Crop Mode configurado');
         }
         
         if (shortcutsHelpBtn) {
@@ -947,13 +928,11 @@
               console.error('❌ openShortcutsModal no está definida. Verifica que initializeAdvancedUI() se haya ejecutado.');
             }
           });
-          console.log('✅ Event listener de Shortcuts configurado');
         }
         
         // Compare and fullscreen buttons
         const fullscreenBtn = document.getElementById('fullscreen-btn');
         
-        console.log('Botón fullscreen encontrado:', fullscreenBtn);
         
         if (fullscreenBtn) {
           fullscreenBtn.addEventListener('click', toggleFullscreen);
@@ -963,7 +942,6 @@
         const themeToggle = document.getElementById('theme-toggle');
         if (themeToggle) {
           themeToggle.addEventListener('click', toggleTheme);
-          console.log('Event listener del tema configurado correctamente');
         } else {
           console.error('Botón de tema no encontrado');
         }
@@ -1035,7 +1013,6 @@
 
     // Configurar sincronización bidireccional para sliders de marca de agua
     function setupWatermarkSliderSync() {
-      console.log('🔧 Configurando sincronización bidireccional para sliders de marca de agua...');
       
       // Definir los sliders que necesitan sincronización
       const sliderConfigs = [
@@ -1049,7 +1026,6 @@
         const numberInput = document.getElementById(numberId);
         
         if (slider && numberInput) {
-          console.log(`✅ Configurando sincronización para ${sliderId}`);
           
           // Copiar atributos del slider al input numérico
           numberInput.min = slider.min;
@@ -1148,7 +1124,6 @@
 
     // Configurar listeners de filtros con retraso para asegurar que el DOM esté listo
     function setupFilterListeners() {
-      console.log('🔧 Configurando listeners de filtros...');
       
       // Listeners para los sliders de filtros
       const filterSliders = ['brightness', 'contrast', 'saturation', 'blur'];
@@ -1157,11 +1132,9 @@
         const valueDisplay = document.getElementById(filterId + '-value');
         
         if (slider && valueDisplay) {
-          console.log(`✅ Configurando listener para ${filterId}`);
           slider.addEventListener('input', (e) => {
             const value = e.target.value;
             valueDisplay.textContent = value;
-            console.log(`🎚️ ${filterId} cambiado a: ${value}`);
             
             if (typeof FilterManager !== 'undefined' && FilterManager.applyFilter) {
               FilterManager.applyFilter();
@@ -1178,12 +1151,10 @@
       
       // Listeners para los botones de presets
       const presetButtons = document.querySelectorAll('.preset-btn');
-      console.log(`🎯 Configurando ${presetButtons.length} botones de preset`);
       
       presetButtons.forEach(btn => {
         btn.addEventListener('click', (e) => {
           const preset = e.target.dataset.preset;
-          console.log(`🎨 Aplicando preset: ${preset}`);
           
           if (typeof FilterManager !== 'undefined' && FilterManager.applyPreset) {
             FilterManager.applyPreset(preset);
@@ -1196,9 +1167,7 @@
       // Listener para el botón de reset
       const resetBtn = document.getElementById('resetFilters');
       if (resetBtn) {
-        console.log('🔄 Configurando botón de reset de filtros');
         resetBtn.addEventListener('click', () => {
-          console.log('🧹 Reseteando filtros');
           if (typeof FilterManager !== 'undefined' && FilterManager.reset) {
             FilterManager.reset();
           } else {
@@ -1295,7 +1264,6 @@
       // Update the slider track color dynamically
       updateSliderBackground(qualityValue);
       
-      console.log('Quality changed to:', qualityValue + '%');
     }
 
     function handleQualityNumberChange() {
@@ -1380,7 +1348,6 @@
         }
       }
       
-      console.log('Format changed to:', outputFormat);
     }
 
     async function getFormatInfo(format) {
@@ -1461,7 +1428,6 @@
       // Actualizar preview del nombre final
       updateFilenamePreview();
       
-      console.log('✅ Nombre de archivo actualizado a:', fileBaseName);
     }
 
     /**
@@ -2155,9 +2121,6 @@
           isFlippedHorizontally = false;
           isFlippedVertically = false;
           
-          console.log('=== IMAGEN CARGADA ===');
-          console.log('currentImage asignado:', !!currentImage);
-          console.log('Dimensiones originales:', originalWidth, 'x', originalHeight);
           
           // Sanitizar y mostrar información del archivo
           const sanitizedFileName = SecurityManager.sanitizeText(fileName);
@@ -2327,7 +2290,6 @@
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
       
-      console.log(`📐 Canvas configurado: ${width}x${height}px (Original: ${originalImageDimensions.width}x${originalImageDimensions.height}px, Ratio: ${ratio.toFixed(2)})`);
       
       // DESACTIVADO: El zoom con rueda del mouse se maneja solo en móviles (<768px)
       // Ver initMouseWheelZoom() para la implementación con detección de dispositivo
@@ -2442,7 +2404,6 @@
           }
           debouncedSaveHistory();
           
-          console.log('✅ Preview actualizado con Worker exitosamente');
         });
         
       } catch (error) {
@@ -2791,7 +2752,6 @@
       
       return { x, y };
     }
-
 
     function toggleWatermarkType() {
       const textOptions = document.getElementById('text-watermark-options');
@@ -3728,7 +3688,6 @@
         // Aquí podrías implementar la lógica para aplicar metadatos a la imagen
         // Por ejemplo, usando ExifWriter.js o similar para escribir metadatos EXIF
         
-        console.log('Metadatos validados y sanitizados:', sanitizedMetadata);
         
         // Mostrar previsualización de metadatos
         showMetadataPreview(sanitizedMetadata);
@@ -4037,10 +3996,6 @@
         const metadata = MetadataManager.getMetadata();
         MetadataManager.applyMetadataToImage(canvas);
 
-        if (metadata.title || metadata.author || metadata.copyright || metadata.latitude) {
-          console.log('Datos del formulario de metadatos:', metadata);
-        }
-        
         // Obtener el título y sanitizar el nombre del archivo
         // Usar fileBaseName personalizado o fallback a metadata/título
         const basenameInput = document.getElementById('file-basename');
@@ -4057,7 +4012,6 @@
           filename = sanitizeFileBaseName(filename);
         }
         
-        console.log('📥 Descargando con nombre:', filename, '(Input:', customBaseName, ', Variable:', fileBaseName, ')');
         
         // Validar que el nombre sea válido (ya está sanitizado por sanitizeFileBaseName)
         if (!SecurityManager.isValidFileBaseName(filename)) {
@@ -4109,15 +4063,12 @@
             await writable.write(blob);
             await writable.close();
 
-            console.log('✅ Archivo guardado correctamente:', fullFilename);
-
             const qualityText = finalFormat === 'png' ? '' : ` (calidad: ${Math.round(outputQuality * 100)}%)`;
             showSuccess(`Imagen guardada exitosamente en formato ${finalFormat.toUpperCase()}${qualityText}!`);
             return;
           } catch (saveError) {
             // Si el usuario cancela, no mostrar error
             if (saveError.name === 'AbortError') {
-              console.log('ℹ️ Descarga cancelada por el usuario');
               return;
             }
             console.warn('Error con File System Access API, usando fallback:', saveError);
@@ -4345,7 +4296,6 @@
           // Show success message
           showSuccessMessage(`Imagen redimensionada a ${newWidth} × ${newHeight}`);
           
-          console.log('Image resized successfully to:', newWidth, 'x', newHeight);
         };
         
         newImage.onerror = function() {
@@ -4491,7 +4441,6 @@
         // Show success message
         showSuccessMessage(`Imagen rotada ${degrees}° (Total: ${currentRotation}°)`);
         
-        console.log('Image rotated:', degrees, 'degrees. Total rotation:', currentRotation);
         
       } catch (error) {
         console.error('Error rotating image:', error);
@@ -4522,7 +4471,6 @@
         const flipText = direction === 'horizontal' ? 'horizontalmente' : 'verticalmente';
         showSuccessMessage(`Imagen volteada ${flipText}`);
         
-        console.log('Image flipped:', direction);
         
       } catch (error) {
         console.error('Error flipping image:', error);
@@ -4814,7 +4762,6 @@
         
         // Mostrar resumen de metadatos si están presentes
         if (metadata.title || metadata.author || metadata.copyright || metadata.latitude) {
-          console.log('Metadatos aplicados:', metadata);
           
           let metaInfo = [];
           if (metadata.title) metaInfo.push(`Título: ${metadata.title}`);
@@ -4824,7 +4771,6 @@
             metaInfo.push(`Ubicación: ${metadata.latitude}, ${metadata.longitude}`);
           }
           
-          console.log('Resumen de metadatos aplicados:\n' + metaInfo.join('\n'));
         }
         
         // Wait for more progress
@@ -4849,7 +4795,6 @@
           }
         }
         
-        console.log('📥 Descarga con progreso - nombre:', filename, '(Input:', customBaseName, ', Variable:', fileBaseName, ')');
         
         // Validar que el nombre sea válido
         if (!SecurityManager.isValidFileBaseName(filename)) {
@@ -4905,8 +4850,6 @@
             await writable.write(blob);
             await writable.close();
 
-            console.log('✅ Archivo guardado correctamente:', fullFilename);
-
             // Hide progress bar
             hideProgressBar();
 
@@ -4916,7 +4859,6 @@
           } catch (saveError) {
             // Si el usuario cancela, no mostrar error
             if (saveError.name === 'AbortError') {
-              console.log('ℹ️ Descarga cancelada por el usuario');
               hideProgressBar();
               return;
             }
@@ -5269,7 +5211,6 @@
       const end = performance.now();
       
       if (end - start > 100) { // Log operations taking more than 100ms
-        console.log(`Performance: ${operation} took ${(end - start).toFixed(2)}ms`);
       }
       
       return result;
@@ -5299,14 +5240,12 @@
     // Función para aplicar filtros al canvas con optimizaciones
     function applyCanvasFilters() {
       if (!canvas) {
-        console.log('No hay canvas disponible para aplicar filtros');
         FilterLoadingManager.hideFilterLoading();
         return;
       }
       
       // Verificar si necesita actualización usando cache
       if (!FilterCache.hasChanged(FilterManager.filters)) {
-        console.log('⚡ Filtros no han cambiado, omitiendo aplicación al canvas');
         FilterLoadingManager.hideFilterLoading();
         return;
       }
@@ -5315,7 +5254,6 @@
       requestAnimationFrame(() => {
         try {
           const filterString = FilterManager.getFilterString();
-          console.log('🎨 Aplicando filtros CSS al canvas:', filterString || 'none');
           
           // Aplicar filtros con transición suave
           canvas.style.transition = 'filter 0.2s ease';
@@ -5530,7 +5468,6 @@
         canvas.addEventListener('wheel', handleWheelZoom, { passive: false });
       }
       
-      console.log('Mouse wheel zoom initialized (solo móvil <768px)');
     }
     
     // ===== PAN FUNCTIONALITY =====
@@ -5629,7 +5566,6 @@
         }
       });
       
-      console.log('Pan navigation initialized');
     }
     
     function resetPan() {
@@ -5661,7 +5597,6 @@
       // Initialize orientation change handling
       initOrientationHandling();
       
-      console.log('Mobile features initialized');
     }
     
     function isMobileDevice() {
@@ -5934,14 +5869,12 @@
     // Limpieza automática de cache cada 5 minutos
     setInterval(() => {
       FilterCache.cleanup();
-      console.log('🧹 Limpieza automática de cache de filtros ejecutada');
     }, 5 * 60 * 1000);
     
     // Cleanup al cerrar/recargar página
     window.addEventListener('beforeunload', () => {
       SmartDebounce.clear();
       FilterLoadingManager.activeLoadings.clear();
-      console.log('🧹 Cleanup de debounce y loading states completado');
     });
     
     // Función para mostrar métricas de rendimiento (desarrollo)
@@ -5966,25 +5899,20 @@
       try {
         // Inicializar Keyboard Shortcuts
         keyboardShortcuts = new KeyboardShortcutManager();
-        console.log('✅ KeyboardShortcutManager inicializado');
         
         // Inicializar Batch Manager
         batchManager = new BatchManager();
-        console.log('✅ BatchManager inicializado');
         
         // Inicializar Text Layer Manager
         textLayerManager = new TextLayerManager();
-        console.log('✅ TextLayerManager inicializado');
         
         // Inicializar Crop Manager con el canvas
         if (canvas) {
           cropManager = new CropManager(canvas);
-          console.log('✅ CropManager inicializado');
         } else {
           console.warn('⚠️ Canvas no disponible, CropManager no inicializado');
         }
         
-        console.log('✅ Managers avanzados listos');
         
       } catch (error) {
         console.error('Error inicializando managers avanzados:', error);
@@ -6176,8 +6104,6 @@
           toggleComparisonMode();
         }, { description: 'Activar/desactivar modo comparación', preventDefault: true });
         
-        console.log('⌨️ Atajos de teclado configurados');
-        console.log('📖 Atajos disponibles:', keyboardShortcuts.getAllShortcuts());
         
       } catch (error) {
         console.error('Error configurando atajos de teclado:', error);
@@ -6204,7 +6130,6 @@
         ]);
         
         UIManager.showSuccess('✅ Imagen copiada al portapapeles');
-        console.log('📋 Imagen copiada al portapapeles');
         
       } catch (error) {
         console.error('Error copiando al portapapeles:', error);
@@ -6834,7 +6759,6 @@
      */
 
     function initializeAdvancedUI() {
-      console.log('🎨 Inicializando UI avanzada v3.1...');
 
       // Exponer funciones globalmente para onclick handlers
       window.openBatchModal = openBatchModal;
@@ -6886,7 +6810,6 @@
         aspectRatioSelect.addEventListener('change', changeCropAspectRatio);
       }
 
-      console.log('✅ UI avanzada inicializada correctamente');
     }
 
     // ===== COMPARISON MODE - ANTES/DESPUÉS CON SLIDER =====
@@ -6955,7 +6878,6 @@
       document.addEventListener('mouseup', stopDraggingSlider);
       document.addEventListener('touchend', stopDraggingSlider);
       
-      console.log('✅ Modo de comparación inicializado');
     }
 
     /**
@@ -7154,5 +7076,3 @@
     }
     
 
-    console.log('🎨 Sistema de filtros optimizado inicializado');
-    console.log('💡 Usa getFilterPerformanceMetrics() para ver métricas de rendimiento');

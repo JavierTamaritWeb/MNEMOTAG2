@@ -56,10 +56,6 @@ const UIManager = {
     document.body.appendChild(loader);
     this.activeLoaders.add(loaderId);
     
-    if (this.config.enableLogging) {
-      console.log(`🔄 Loading state iniciado: ${message} (ID: ${loaderId})`);
-    }
-    
     return loaderId;
   },
 
@@ -73,9 +69,6 @@ const UIManager = {
         loader.remove();
         this.activeLoaders.delete(loaderId);
         
-        if (this.config.enableLogging) {
-          console.log(`✅ Loading state terminado (ID: ${loaderId})`);
-        }
       }
     } else {
       // Ocultar todos los loaders
@@ -83,9 +76,6 @@ const UIManager = {
       loaders.forEach(loader => loader.remove());
       this.activeLoaders.clear();
       
-      if (this.config.enableLogging) {
-        console.log('✅ Todos los loading states terminados');
-      }
     }
   },
 
@@ -300,10 +290,6 @@ const UIManager = {
       }
     }, config.duration);
     
-    if (this.config.enableLogging) {
-      console.log(`✅ Success mostrado [${config.category}]:`, message);
-    }
-    
     this.limitActiveToasts();
     
     return successContainer;
@@ -426,9 +412,6 @@ const UIManager = {
       }
     });
     
-    if (this.config.enableLogging) {
-      console.log(`📝 Formularios ${disabled ? 'deshabilitados' : 'habilitados'}:`, formSelector);
-    }
   },
 
   // Gestión de estado de elementos individuales
@@ -549,9 +532,6 @@ const UIManager = {
   configure: function(newConfig) {
     this.config = { ...this.config, ...newConfig };
     
-    if (this.config.enableLogging) {
-      console.log('⚙️ UIManager configurado:', this.config);
-    }
   },
   
   // Obtener estadísticas del manager
@@ -577,9 +557,6 @@ const UIManager = {
     // Limpiar throttle states
     this.throttleMap.clear();
     
-    if (this.config.enableLogging) {
-      console.log('🧹 UIManager limpiado');
-    }
   }
 };
 

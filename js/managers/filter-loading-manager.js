@@ -25,10 +25,6 @@ const FilterLoadingManager = {
     const key = filterName || 'global';
     this.activeLoadings.add(key);
     
-    if (this.config.enableLogging) {
-      console.log(`🔄 Filter loading iniciado: ${key}`);
-    }
-    
     // Mostrar indicador visual
     const indicator = this.createLoadingIndicator(key);
     if (indicator) {
@@ -46,10 +42,6 @@ const FilterLoadingManager = {
   hideFilterLoading: function(filterName = null) {
     const key = filterName || 'global';
     this.activeLoadings.delete(key);
-    
-    if (this.config.enableLogging) {
-      console.log(`✅ Filter loading terminado: ${key}`);
-    }
     
     // Limpiar timeout
     this.clearLoadingTimeout(key);
@@ -77,9 +69,6 @@ const FilterLoadingManager = {
       indicator.classList.add('worker-processing');
     }
     
-    if (this.config.enableLogging) {
-      console.log('🔧 Worker loading iniciado');
-    }
   },
   
   // Mostrar loading para operaciones pesadas
@@ -369,18 +358,12 @@ const FilterLoadingManager = {
       this.hideFilterLoading(key === 'global' ? null : key);
     });
     
-    if (this.config.enableLogging) {
-      console.log('🧹 Todos los filter loadings limpiados');
-    }
   },
   
   // Configurar el manager
   configure: function(newConfig) {
     this.config = { ...this.config, ...newConfig };
     
-    if (this.config.enableLogging) {
-      console.log('⚙️ FilterLoadingManager configurado:', this.config);
-    }
   },
   
   // Obtener estadísticas
@@ -400,9 +383,6 @@ const FilterLoadingManager = {
     this.activeTimeouts.forEach(timeout => clearTimeout(timeout));
     this.activeTimeouts.clear();
     
-    if (this.config.enableLogging) {
-      console.log('🧹 FilterLoadingManager limpiado');
-    }
   }
 };
 

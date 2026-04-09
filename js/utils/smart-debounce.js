@@ -88,9 +88,6 @@ const SmartDebounce = {
                 this.updateAverageDelay(executionTime);
               }
               
-              if (this.config.enableLogging) {
-                console.log(`⚡ SmartDebounce: Ejecutado [${key}] con delay ${delay}ms`);
-              }
             } catch (error) {
               console.error(`❌ SmartDebounce: Error ejecutando [${key}]:`, error);
             }
@@ -109,9 +106,6 @@ const SmartDebounce = {
             
             this.stats.completedOperations++;
             
-            if (this.config.enableLogging) {
-              console.log(`⚡ SmartDebounce: Ejecutado directamente [${key}]`);
-            }
           } catch (error) {
             console.error(`❌ SmartDebounce: Error ejecutando [${key}]:`, error);
           }
@@ -122,9 +116,6 @@ const SmartDebounce = {
       
       this.timers.set(key, timer);
       
-      if (this.config.enableLogging) {
-        console.log(`🕒 SmartDebounce: Programado [${key}] con delay ${delay}ms`);
-      }
     };
   },
   
@@ -160,9 +151,6 @@ const SmartDebounce = {
             this.updateAverageDelay(executionTime);
           }
           
-          if (this.config.enableLogging) {
-            console.log(`⚡ SmartDebounce: Ejecutado inmediato [${key}]`);
-          }
         } catch (error) {
           console.error(`❌ SmartDebounce: Error ejecutando inmediato [${key}]:`, error);
         }
@@ -220,9 +208,6 @@ const SmartDebounce = {
       
       this.stats.completedOperations++;
       
-      if (this.config.enableLogging) {
-        console.log(`⚡ SmartDebounce: Ejecutado inmediatamente [${key}]`);
-      }
     } catch (error) {
       console.error(`❌ SmartDebounce: Error ejecutando inmediatamente [${key}]:`, error);
     }
@@ -247,9 +232,6 @@ const SmartDebounce = {
     if (cancelled) {
       this.stats.cancelledOperations++;
       
-      if (this.config.enableLogging) {
-        console.log(`❌ SmartDebounce: Cancelado [${key}]`);
-      }
     }
     
     return cancelled;
@@ -287,9 +269,6 @@ const SmartDebounce = {
     
     this.stats.cancelledOperations += totalCleared;
     
-    if (this.config.enableLogging && totalCleared > 0) {
-      console.log(`🧹 SmartDebounce: ${totalCleared} operaciones limpiadas`);
-    }
   },
   
   // Actualizar promedio de delay
@@ -302,9 +281,6 @@ const SmartDebounce = {
   configure: function(newConfig) {
     this.config = { ...this.config, ...newConfig };
     
-    if (this.config.enableLogging) {
-      console.log('⚙️ SmartDebounce configurado:', this.config);
-    }
   },
   
   // Obtener estadísticas detalladas
@@ -331,9 +307,6 @@ const SmartDebounce = {
       averageDelay: 0
     };
     
-    if (this.config.enableLogging) {
-      console.log('📊 SmartDebounce: Estadísticas reseteadas');
-    }
   },
   
   // Cleanup completo
@@ -344,9 +317,6 @@ const SmartDebounce = {
     // Limpiar estado pausado si existe
     this._pausedState = null;
     
-    if (this.config.enableLogging) {
-      console.log('💥 SmartDebounce: Destruido');
-    }
   }
 };
 

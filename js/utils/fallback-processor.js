@@ -30,13 +30,6 @@ const FallbackProcessor = {
       const startTime = performance.now();
       
       try {
-        if (this.config.enableLogging) {
-          console.log('⚠️ FallbackProcessor: Procesando en hilo principal', {
-            operaciones: operations.length,
-            tamaño: `${imageData.width}x${imageData.height}`
-          });
-        }
-        
         // Verificar que tenemos datos válidos
         if (!imageData || !imageData.data) {
           throw new Error('ImageData inválido');
@@ -428,9 +421,6 @@ const FallbackProcessor = {
       this.stats.failedOperations++;
     }
     
-    if (this.config.enableLogging) {
-      console.log(`📊 FallbackProcessor: Operación ${success ? 'exitosa' : 'fallida'} - Tiempo: ${processingTime.toFixed(2)}ms`);
-    }
   },
   
   // Verificar si una operación es soportada
@@ -479,9 +469,6 @@ const FallbackProcessor = {
   configure: function(newConfig) {
     this.config = { ...this.config, ...newConfig };
     
-    if (this.config.enableLogging) {
-      console.log('⚙️ FallbackProcessor configurado:', this.config);
-    }
   },
   
   // Obtener estadísticas
@@ -507,18 +494,12 @@ const FallbackProcessor = {
       failedOperations: 0
     };
     
-    if (this.config.enableLogging) {
-      console.log('📊 FallbackProcessor: Estadísticas reseteadas');
-    }
   },
   
   // Cleanup
   cleanup: function() {
     this.resetStats();
     
-    if (this.config.enableLogging) {
-      console.log('🧹 FallbackProcessor: Limpiado');
-    }
   }
 };
 

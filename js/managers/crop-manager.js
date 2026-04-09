@@ -37,7 +37,6 @@ class CropManager {
       'custom': { name: 'Personalizado', ratio: null }
     };
     
-    console.log('✅ CropManager inicializado');
   }
 
   /**
@@ -66,7 +65,6 @@ class CropManager {
     // Dibujar overlay inicial
     this.draw();
     
-    console.log('✂️ Modo crop activado');
     return this.cropArea;
   }
 
@@ -113,7 +111,6 @@ class CropManager {
     }
     
     this.draw();
-    console.log(`📐 Proporción establecida: ${aspectConfig.name}`);
   }
 
   /**
@@ -559,8 +556,6 @@ class CropManager {
       0, 0, cropWidth, cropHeight
     );
 
-    console.log(`✂️ Crop aplicado: ${Math.round(cropWidth)}x${Math.round(cropHeight)}`);
-
     return {
       canvas: tempCanvas,
       width: cropWidth,
@@ -603,7 +598,6 @@ class CropManager {
       cropArea: smartCrop
     });
 
-    console.log('💡 3 sugerencias de crop generadas');
     return suggestions;
   }
 
@@ -680,7 +674,6 @@ class CropManager {
     this.removeEventListeners();
     this.cropArea = null;
     this.canvas.style.cursor = 'default';
-    console.log('✂️ Modo crop desactivado');
   }
 
   /**

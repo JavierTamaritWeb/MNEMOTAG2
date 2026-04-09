@@ -53,10 +53,6 @@ const FilterCache = {
       this.states.set(key, stateData);
       this.stats.saves++;
       
-      if (this.config.enableLogging) {
-        console.log(`💾 FilterCache: Estado guardado [${key}] - Hash: ${stateHash.substring(0, 8)}...`);
-      }
-      
       // Cleanup automático si está habilitado
       if (this.config.autoCleanup && this.states.size > this.config.maxStates) {
         this.cleanup();
@@ -84,18 +80,10 @@ const FilterCache = {
       this.states.delete(key);
       this.stats.misses++;
       
-      if (this.config.enableLogging) {
-        console.log(`⏰ FilterCache: Estado expirado [${key}]`);
-      }
-      
       return null;
     }
     
     this.stats.hits++;
-    
-    if (this.config.enableLogging) {
-      console.log(`✅ FilterCache: Estado recuperado [${key}]`);
-    }
     
     return state;
   },
@@ -105,10 +93,6 @@ const FilterCache = {
     const currentHash = this.generateHash(currentState);
     const hasChanged = this.lastApplied !== currentHash;
     
-    if (this.config.enableLogging && hasChanged) {
-      console.log('🔄 FilterCache: Estado ha cambiado, requiere actualización');
-    }
-    
     return hasChanged;
   },
   
@@ -117,9 +101,6 @@ const FilterCache = {
     this.lastApplied = this.generateHash(filterState);
     this.isDirty = false;
     
-    if (this.config.enableLogging) {
-      console.log(`✅ FilterCache: Estado marcado como aplicado - Hash: ${this.lastApplied.substring(0, 8)}...`);
-    }
   },
   
   // Generar hash único para estado de filtros con mejoras
@@ -217,10 +198,6 @@ const FilterCache = {
     
     this.stats.cleanups++;
     
-    if (this.config.enableLogging && cleaned > 0) {
-      console.log(`🧹 FilterCache: ${cleaned} estados limpiados. Total restante: ${this.states.size}`);
-    }
-    
     return cleaned;
   },
   
@@ -228,9 +205,6 @@ const FilterCache = {
   markDirty: function() {
     this.isDirty = true;
     
-    if (this.config.enableLogging) {
-      console.log('🟡 FilterCache: Marcado como sucio');
-    }
   },
   
   // Verificar si está sucio
@@ -288,10 +262,6 @@ const FilterCache = {
       config: { ...this.config }
     };
     
-    if (this.config.enableLogging) {
-      console.log(`📤 FilterCache: Exportando ${this.states.size} estados`);
-    }
-    
     return exportData;
   },
   
@@ -315,10 +285,6 @@ const FilterCache = {
         this.stats = { ...this.stats, ...importData.stats };
       }
       
-      if (this.config.enableLogging) {
-        console.log(`📥 FilterCache: Importados ${this.states.size} estados`);
-      }
-      
       return true;
     } catch (error) {
       console.error('Error al importar cache:', error);
@@ -330,9 +296,6 @@ const FilterCache = {
   configure: function(newConfig) {
     this.config = { ...this.config, ...newConfig };
     
-    if (this.config.enableLogging) {
-      console.log('⚙️ FilterCache configurado:', this.config);
-    }
   },
   
   // Obtener estadísticas detalladas
@@ -378,9 +341,6 @@ const FilterCache = {
     // Reset stats pero mantener counters históricos
     this.stats.cleanups++;
     
-    if (this.config.enableLogging) {
-      console.log(`🗑️ FilterCache: Cache limpiado completamente. ${oldSize} estados removidos`);
-    }
   },
   
   // Cleanup al cerrar aplicación
@@ -391,9 +351,6 @@ const FilterCache = {
     this.states = null;
     this.lastApplied = null;
     
-    if (this.config.enableLogging) {
-      console.log('💥 FilterCache: Destruido');
-    }
   }
 };
 

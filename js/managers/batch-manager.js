@@ -18,7 +18,6 @@ class BatchManager {
     // Formatos soportados
     this.supportedFormats = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
     
-    console.log('✅ BatchManager inicializado');
   }
 
   /**
@@ -69,7 +68,6 @@ class BatchManager {
       }
     }
 
-    console.log(`📦 Batch: ${results.added.length} imágenes añadidas, ${results.rejected.length} rechazadas`);
     
     return {
       success: true,
@@ -203,7 +201,6 @@ class BatchManager {
       timestamp: Date.now()
     };
     
-    console.log('📸 Configuración capturada para batch:', this.currentConfig);
     return this.currentConfig;
   }
 
@@ -260,7 +257,6 @@ class BatchManager {
 
     this.isProcessing = false;
     
-    console.log(`✅ Batch procesado: ${this.processedImages.length}/${total} imágenes`);
     
     return {
       success: true,
@@ -408,7 +404,6 @@ class BatchManager {
     const defaultName = zipName || `mnemotag-batch-${this.formatDate()}.zip`;
     this.downloadBlob(content, defaultName);
     
-    console.log(`📦 ZIP exportado: ${defaultName} (${this.processedImages.length} imágenes)`);
     
     return {
       success: true,
@@ -454,7 +449,6 @@ class BatchManager {
     const index = this.imageQueue.findIndex(img => img.id === id);
     if (index !== -1) {
       this.imageQueue.splice(index, 1);
-      console.log(`🗑️ Imagen eliminada de la cola: ${id}`);
       return true;
     }
     return false;
@@ -467,7 +461,6 @@ class BatchManager {
     this.imageQueue = [];
     this.processedImages = [];
     this.currentConfig = null;
-    console.log('🧹 Cola de batch limpiada');
   }
 
   /**

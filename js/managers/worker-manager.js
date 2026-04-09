@@ -57,10 +57,6 @@ const WorkerManager = {
       hardwareConcurrency: navigator.hardwareConcurrency || 0
     };
     
-    if (this.config.enableLogging) {
-      console.log('🔍 Worker Support Check:', support);
-    }
-    
     return support;
   },
   
@@ -88,10 +84,6 @@ const WorkerManager = {
           errors: 0,
           id: i
         });
-      }
-      
-      if (this.config.enableLogging) {
-        console.log(`🔧 Worker pool inicializado con ${this.workers.size} workers`);
       }
       
       return true;
@@ -174,9 +166,6 @@ const WorkerManager = {
       }
       job.reject(new Error(error));
     } else {
-      if (this.config.enableLogging) {
-        console.log(`✅ Job ${id} completado en ${Date.now() - job.startTime}ms`);
-      }
       job.resolve(result);
     }
     
@@ -257,9 +246,6 @@ const WorkerManager = {
           options: options
         }, transferableData.transferables);
         
-        if (this.config.enableLogging) {
-          console.log(`🚀 Job ${jobId} enviado a worker ${workerInfo.id}`);
-        }
       } catch (error) {
         // Limpiar en caso de error
         clearTimeout(timeoutId);
@@ -365,9 +351,6 @@ const WorkerManager = {
     }
     this.activeJobs.clear();
     
-    if (this.config.enableLogging) {
-      console.log('🚫 Todos los jobs cancelados');
-    }
   },
   
   // Reiniciar worker específico
@@ -394,10 +377,6 @@ const WorkerManager = {
           id: workerId
         });
         
-        if (this.config.enableLogging) {
-          console.log(`🔄 Worker ${workerId} reiniciado`);
-        }
-        
         return true;
       } catch (error) {
         console.error(`❌ Error reiniciando worker ${workerId}:`, error);
@@ -421,9 +400,6 @@ const WorkerManager = {
     this.activeJobs.clear();
     this.jobIdCounter = 0;
     
-    if (this.config.enableLogging) {
-      console.log('🔌 Todos los workers terminados');
-    }
   },
   
   // Obtener estadísticas detalladas
@@ -470,9 +446,6 @@ const WorkerManager = {
   configure: function(newConfig) {
     this.config = { ...this.config, ...newConfig };
     
-    if (this.config.enableLogging) {
-      console.log('⚙️ WorkerManager configurado:', this.config);
-    }
   },
   
   // Verificar salud de workers

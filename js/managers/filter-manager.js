@@ -47,11 +47,6 @@ const FilterManager = {
       this.useWorkers = WorkerManager.initializeWorkerPool();
     }
     
-    if (this.useWorkers) {
-      console.log('🔧 FilterManager: Workers habilitados para filtros pesados');
-    } else {
-      console.log('⚠️ FilterManager: Usando procesamiento en hilo principal');
-    }
   },
   
   /**
@@ -77,11 +72,9 @@ const FilterManager = {
    * @param {number} value - Valor del filtro
    */
   applyFilter: function(filterName, value) {
-    console.log(`🎨 Aplicando filtro ${filterName}: ${value}`);
     
     // Verificar si el valor realmente cambió
     if (this.filters[filterName] === value) {
-      console.log(`⚡ Filtro ${filterName} ya tiene el valor ${value}, omitiendo actualización`);
       return;
     }
     
@@ -100,7 +93,6 @@ const FilterManager = {
       FilterCache.saveState(`filter-${filterName}`, this.filters);
     }
     
-    console.log('📊 Estado actual de filtros:', this.filters);
     
     // Aplicar con debounce inteligente o worker
     if (this.shouldUseWorker()) {
@@ -121,7 +113,6 @@ const FilterManager = {
       return;
     }
     
-    console.log(`🎭 Aplicando preset: ${presetName}`);
     
     // Verificar si ya está aplicado usando cache
     if (typeof FilterCache !== 'undefined') {
@@ -129,7 +120,6 @@ const FilterManager = {
       const presetHash = FilterCache.generateHash(preset);
       
       if (currentHash === presetHash) {
-        console.log(`⚡ Preset ${presetName} ya está aplicado, omitiendo actualización`);
         this.highlightActivePreset(presetName);
         return;
       }
@@ -194,7 +184,6 @@ const FilterManager = {
     }
     
     try {
-      console.log('🔧 Aplicando filtros con worker');
       
       // Obtener ImageData actual
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -203,7 +192,6 @@ const FilterManager = {
       const operations = this.prepareWorkerOperations();
       
       if (operations.length === 0) {
-        console.log('⚡ No hay filtros que aplicar');
         if (typeof FilterLoadingManager !== 'undefined') {
           FilterLoadingManager.hideFilterLoading();
         }
@@ -230,7 +218,6 @@ const FilterManager = {
         FilterCache.markApplied(this.filters);
       }
       
-      console.log('✅ Filtros aplicados con worker exitosamente');
       
     } catch (error) {
       console.warn('⚠️ Error en worker, usando fallback:', error);
@@ -255,7 +242,6 @@ const FilterManager = {
     }
     
     try {
-      console.log('⚠️ Aplicando filtros con fallback');
       
       // Obtener ImageData actual
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -281,7 +267,6 @@ const FilterManager = {
         FilterCache.markApplied(this.filters);
       }
       
-      console.log('✅ Filtros aplicados con fallback exitosamente');
       
     } catch (error) {
       console.error('❌ Error en fallback:', error);
@@ -334,7 +319,6 @@ const FilterManager = {
   applyFiltersImmediate: function() {
     // Verificar si realmente necesita actualización usando cache
     if (typeof FilterCache !== 'undefined' && !FilterCache.hasChanged(this.filters)) {
-      console.log('⚡ Estado de filtros no ha cambiado, omitiendo actualización');
       if (typeof FilterLoadingManager !== 'undefined') {
         FilterLoadingManager.hideFilterLoading();
       }
@@ -446,7 +430,6 @@ const FilterManager = {
    * Reset con cache clearing
    */
   reset: function() {
-    console.log('🔄 Reseteando filtros');
     
     // Mostrar loading
     if (typeof FilterLoadingManager !== 'undefined') {
@@ -512,7 +495,6 @@ const FilterManager = {
     }
     
     const finalFilter = filterStr.trim();
-    console.log('🎨 Filtro CSS generado:', finalFilter || 'none');
     
     // Marcar como aplicado en cache
     if (typeof FilterCache !== 'undefined') {

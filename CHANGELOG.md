@@ -4,6 +4,31 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.3.10] - 2026-04-09
+
+### Removed
+- **168 `console.log` ruidosos** del runtime, repartidos por los 13 archivos JavaScript de `js/main.js`, `js/managers/` y `js/utils/`. Eliminados con `sed -i.bak -E '/^[[:space:]]*console\.log\(.*\)[[:space:]]*;?[[:space:]]*$/d'` (BSD/macOS compatible) tras backup completo en `/tmp`. Cubre logs de inicialización (`✅ Worker pool inicializado`, `🎨 Sistema de filtros optimizado`), de cambios de estado (`Format changed to`, `Quality changed to`), de debug interno (`📐 Canvas configurado`, currentImage assignments), y de progreso de operaciones (`📥 Descargando con nombre`, `Image rotated`, etc.).
+- **49 bloques `if (this.config.enableLogging) { }`** que quedaban vacíos en los managers tras eliminar el `console.log` que envolvían. Limpiados en una segunda pasada con un script Python que detecta `if\s*\([^)]+\)\s*\{\s*\}` y los borra incluyendo el indent.
+- **1 caso especial** en `js/managers/filter-manager.js`: bloque `if (X) { } else { }` con AMBAS ramas vacías. Eliminado entero.
+- **Total**: -292 líneas netas en 13 archivos.
+
+### Lo que NO se ha tocado (deliberadamente)
+- **`console.error`**: legítimo para reportar errores reales en producción.
+- **`console.warn`**: legítimo para warnings de degradación elegante (formato no soportado, fallback, fuente no cargada).
+- **`console.log` dentro de `tests/`**: los runners son intencionalmente verbose.
+- **Comentarios que mencionan `console.log`** (1 caso en `smart-debounce.js:256`, dentro de un bloque de comentario que documenta por qué se eliminaron `pauseAll/resumeAll`).
+- **`js/managers/security-manager.js`, `js/managers/metadata-manager.js`, `js/managers/history-manager.js`, `js/utils/helpers.js`, `js/utils/app-config.js`**: ya no tenían `console.log` antes (eran 0).
+
+### Notes
+- Existe el bug del checkbox `watermark-text-enabled` (marcado por defecto) reportado en la sesión anterior, que dispara un toast de error confuso si el usuario solo quiere usar marca de agua de imagen. **Este commit NO lo arregla** porque el usuario no eligió aún cuál de las 3 opciones aplicar (quitar `checked`, mejorar mensaje, o skip silencioso). Pendiente para el próximo turno.
+
+### Verification
+- `node tests/run-in-node.js` → 100/100 OK (sin regresiones)
+- `node tests/binary-validation.js` → 36/36 OK (sin regresiones)
+- Backups intermedios (`*.bak` de sed y `/tmp/js-backup-*`) eliminados tras confirmar que los tests pasan.
+
+---
+
 ## [3.3.9] - 2026-04-09
 
 ### Added
@@ -1166,5 +1191,5 @@ Lanzamiento inicial de MnemoTag.
 ---
 
 **Última actualización:** 9 de abril de 2026  
-**Versión actual:** 3.3.9  
+**Versión actual:** 3.3.10  
 **Estado:** ✅ Estable y listo para producción

@@ -38,7 +38,6 @@ class KeyboardShortcutManager {
       }
     });
     
-    console.log('✅ KeyboardShortcutManager inicializado');
   }
 
   /**
@@ -55,7 +54,6 @@ class KeyboardShortcutManager {
       description: options.description || '',
       preventDefault: options.preventDefault !== false 
     });
-    console.log(`🎹 Atajo registrado: ${this.getDisplayCombo(key, modifiers)}`);
   }
 
   /**
@@ -165,12 +163,10 @@ class KeyboardShortcutManager {
    */
   enable() {
     this.isEnabled = true;
-    console.log('🎹 Atajos de teclado habilitados');
   }
 
   disable() {
     this.isEnabled = false;
-    console.log('🎹 Atajos de teclado deshabilitados');
   }
 
   /**

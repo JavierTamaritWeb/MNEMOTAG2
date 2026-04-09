@@ -4,11 +4,37 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos.
 
-![Version](https://img.shields.io/badge/version-3.3.9-blue.svg)
+![Version](https://img.shields.io/badge/version-3.3.10-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 [![Tests](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml)
 [![Deploy to GitHub Pages](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml)
+
+---
+
+## ⭐ NOVEDADES v3.3.10
+
+> **Patch release.** Limpieza completa de `console.log` ruidosos del runtime. La consola del navegador ya no se llena de mensajes informativos en cada acción del usuario.
+
+### 🧹 Consola limpia
+
+- **Eliminados 168 `console.log`** de los 13 archivos de `js/main.js`, `js/managers/` y `js/utils/`. Ya no aparecen mensajes de inicialización (`✅ Worker pool inicializado`, `🎨 Sistema de filtros optimizado inicializado`, etc.), de cambios de estado (`Format changed to: jpeg`, `Quality changed to: 80%`), ni de operaciones internas (`📐 Canvas configurado`, `📥 Descargando con nombre`, etc.).
+- **49 bloques `if (this.config.enableLogging) { }`** que quedaban vacíos tras eliminar los logs también se han eliminado, junto con un caso `if (X) { } else { }` con ambas ramas vacías en `filter-manager.js`.
+- **Total: -292 líneas** netas eliminadas del código JavaScript.
+
+### Lo que NO se ha tocado (deliberadamente)
+
+- **`console.error`**: legítimo para reportar errores reales que deben verse en producción (errores de carga, fallos del worker, validaciones críticas, etc.).
+- **`console.warn`**: legítimo para advertencias de degradación elegante (formato no soportado, fallback a JPEG, fuente Google Fonts no cargada, etc.).
+- **`console.log` dentro de `tests/`**: los runners de tests son intencionalmente verbose para reportar progreso. Esos no se tocan.
+- **Comentarios que mencionan `console.log`** (un caso en `smart-debounce.js:256`): no es código, es documentación histórica de por qué se eliminó `pauseAll/resumeAll`.
+
+### Verificación
+
+- `node tests/run-in-node.js` → 100/100 OK (sin cambios)
+- `node tests/binary-validation.js` → 36/36 OK (sin cambios)
+
+Cero regresiones. La app se comporta exactamente igual; solo deja de imprimir basura en la consola del navegador.
 
 ---
 

@@ -6,13 +6,11 @@
 class ImageProcessor {
   constructor() {
     this.supportOffscreenCanvas = typeof OffscreenCanvas !== 'undefined';
-    console.log('🔧 ImageProcessor iniciado, OffscreenCanvas support:', this.supportOffscreenCanvas);
   }
 
   // Procesar imagen con filtros específicos
   processImage(imageData, filters) {
     try {
-      console.log('🎨 Worker procesando filtros:', filters);
       
       // Validar entrada
       if (!imageData || !imageData.data) {
@@ -172,7 +170,6 @@ self.onmessage = function(e) {
   const { id, imageData, filters } = e.data;
   
   try {
-    console.log(`🔧 Worker procesando job ${id}`);
     
     // Procesar imagen
     const processedData = processor.processImage(imageData, filters);
@@ -191,7 +188,6 @@ self.onmessage = function(e) {
       }
     }, [clonedBuffer]);
     
-    console.log(`✅ Worker completó job ${id}`);
     
   } catch (error) {
     console.error(`❌ Worker error en job ${id}:`, error);
@@ -206,4 +202,3 @@ self.onmessage = function(e) {
 };
 
 // Worker startup
-console.log('🚀 Image Processing Worker iniciado');

@@ -41,7 +41,6 @@ class TextLayerManager {
     // Plantillas prediseñadas
     this.templates = this.createTemplates();
     
-    console.log('✅ TextLayerManager inicializado');
   }
 
   /**
@@ -208,7 +207,6 @@ class TextLayerManager {
       }
       
       this.loadedFonts.add(fontFamily);
-      console.log(`✅ Google Font cargada: ${fontFamily}`);
       return true;
       
     } catch (error) {
@@ -259,7 +257,6 @@ class TextLayerManager {
     this.layers.push(layer);
     this.activeLayerId = layer.id;
     
-    console.log(`📝 Capa de texto agregada: ${layer.id}`);
     return layer;
   }
 
@@ -289,7 +286,6 @@ class TextLayerManager {
       }
     });
 
-    console.log(`✏️ Capa actualizada: ${id}`);
     return layer;
   }
 
@@ -309,7 +305,6 @@ class TextLayerManager {
       this.activeLayerId = this.layers.length > 0 ? this.layers[0].id : null;
     }
 
-    console.log(`🗑️ Capa eliminada: ${id}`);
     return true;
   }
 
@@ -336,7 +331,6 @@ class TextLayerManager {
     this.layers.push(duplicate);
     this.activeLayerId = duplicate.id;
 
-    console.log(`📋 Capa duplicada: ${id} → ${duplicate.id}`);
     return duplicate;
   }
 
@@ -357,7 +351,6 @@ class TextLayerManager {
       l.zIndex = idx;
     });
 
-    console.log(`🔄 Capa reordenada: ${id} (${currentIndex} → ${newIndex})`);
     return true;
   }
 
@@ -500,7 +493,6 @@ class TextLayerManager {
   clearLayers() {
     this.layers = [];
     this.activeLayerId = null;
-    console.log('🧹 Capas de texto limpiadas');
   }
 
   /**
@@ -539,7 +531,6 @@ class TextLayerManager {
     }
     
     this.activeLayerId = config.activeLayerId;
-    console.log(`📥 Configuración importada: ${this.layers.length} capas`);
   }
 }
 
