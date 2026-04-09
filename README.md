@@ -4,11 +4,37 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos.
 
-![Version](https://img.shields.io/badge/version-3.3.10-blue.svg)
+![Version](https://img.shields.io/badge/version-3.3.11-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 [![Tests](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml)
 [![Deploy to GitHub Pages](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml)
+
+---
+
+## ⭐ NOVEDADES v3.3.11
+
+> **Feature release — Quick wins UX.** Pegar imágenes desde el portapapeles con `Cmd+V` / `Ctrl+V` y exportar la imagen a varios tamaños en un solo ZIP.
+
+### 📋 Pegar desde el portapapeles
+
+- **Listener global de `paste`** en `document`: si copias una imagen en cualquier sitio (captura de pantalla, navegador, otro programa) y vuelves a la app, basta con `Cmd+V` / `Ctrl+V` y la imagen se carga directamente en el editor. El listener ignora pastes en `<input>`, `<textarea>` y campos editables para no robar el comportamiento normal del navegador.
+- **Botón visible "Pegar imagen"** junto a "Seleccionar archivo" en el área de drop. Usa `navigator.clipboard.read()` (la API moderna que pide permiso explícito) para leer el portapapeles bajo demanda. Toast de confirmación y degradación elegante si el navegador no soporta la API.
+- El texto de ayuda del área de drop ahora indica explícitamente: *"Formatos: JPG, JPEG, PNG, WEBP, AVIF · Pega con Cmd+V / Ctrl+V"*.
+
+### 📦 Exportar varios tamaños a la vez (ZIP)
+
+- Nueva sección **"Exportar varios tamaños"** en la configuración de salida (sección 5). Cuatro checkboxes (256, 512, 1024, 2048 px) — por defecto vienen marcados 1024 y 512.
+- Botón **"Descargar varios tamaños (ZIP)"** que genera un canvas temporal redimensionado para cada ancho marcado (manteniendo proporción), aplica el formato/calidad/aplanado/EXIF habituales a cada salida y empaqueta todo en un único `*-multisize.zip` usando JSZip (que ya estaba cargado para batch).
+- Cada archivo del ZIP se nombra `<basename>-<ancho>px.<extensión>` para que sean fáciles de identificar.
+- Cada salida lleva los **metadatos EXIF embebidos correctamente** según el formato (JPEG via piexifjs, PNG via chunks `eXIf` con CRC32 propio, WebP via manipulación RIFF/VP8X). Los tamaños mayores que el original se truncan a la anchura real para no upscalear.
+
+### Verificación
+
+- `node tests/run-in-node.js` → **105/105 OK** (100 originales + 5 nuevos de regresión para v3.3.11)
+- `node tests/binary-validation.js` → 36/36 OK (sin cambios)
+
+Cero regresiones. Todo el flujo de descarga existente se reusa sin tocar.
 
 ---
 

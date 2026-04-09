@@ -708,11 +708,28 @@
           dropArea.addEventListener('dragover', handleDragOver);
           dropArea.addEventListener('dragleave', handleDragLeave);
           dropArea.addEventListener('drop', handleDrop);
-          
+
           // Enhanced file selector
           fileSelector.addEventListener('click', () => fileInput.click());
           fileInput.addEventListener('change', handleFileSelect);
           removeFile.addEventListener('click', removeSelectedFile);
+        }
+
+        // v3.3.11: Paste global desde el portapapeles. Antes solo había un
+        // shortcut Cmd+Shift+V vía keyboardShortcuts; ahora cualquier Cmd+V
+        // natural sobre la página dispara la carga de la imagen pegada.
+        document.addEventListener('paste', handlePasteImage);
+
+        // v3.3.11: Botón visible "Pegar imagen" en el área de drop.
+        const pasteBtn = document.getElementById('paste-image-btn');
+        if (pasteBtn) {
+          pasteBtn.addEventListener('click', handlePasteButtonClick);
+        }
+
+        // v3.3.11: Botón "Descargar varios tamaños" (multi-size export).
+        const multisizeBtn = document.getElementById('download-multisize-btn');
+        if (multisizeBtn) {
+          multisizeBtn.addEventListener('click', downloadMultipleSizes);
         }
         
         // Form submissions with loading states
@@ -1678,6 +1695,64 @@
       const file = e.target.files[0];
       if (file) {
         handleFile(file);
+      }
+    }
+
+    /**
+     * v3.3.11: Handler para el evento `paste` global del documento.
+     * Detecta una imagen en el portapapeles (e.clipboardData.items) y la
+     * pasa al flujo normal de carga. Soporta pegar screenshots, imágenes
+     * copiadas de otras webs, etc., con Cmd+V natural.
+     */
+    function handlePasteImage(e) {
+      if (!e.clipboardData || !e.clipboardData.items) return;
+      // Si el usuario está escribiendo en un input/textarea, NO interceptar.
+      const target = e.target;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+      for (const item of e.clipboardData.items) {
+        if (item.kind === 'file' && item.type && item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            e.preventDefault();
+            handleFile(file);
+            if (typeof UIManager !== 'undefined' && UIManager.showSuccess) {
+              UIManager.showSuccess('📋 Imagen pegada desde el portapapeles');
+            }
+            return;
+          }
+        }
+      }
+    }
+
+    /**
+     * v3.3.11: Click handler del botón "Pegar imagen" del área de drop.
+     * Usa navigator.clipboard.read() (más moderno y permite leer el
+     * portapapeles incluso sin un evento `paste`).
+     */
+    async function handlePasteButtonClick() {
+      if (!navigator.clipboard || !navigator.clipboard.read) {
+        UIManager.showError('Tu navegador no soporta lectura del portapapeles. Usa Cmd+V o arrastra el archivo.');
+        return;
+      }
+      try {
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          for (const type of item.types) {
+            if (type.startsWith('image/')) {
+              const blob = await item.getType(type);
+              const ext = type.split('/')[1] || 'png';
+              const file = new File([blob], `pasted-image.${ext}`, { type });
+              handleFile(file);
+              UIManager.showSuccess('📋 Imagen pegada desde el portapapeles');
+              return;
+            }
+          }
+        }
+        UIManager.showInfo('No hay ninguna imagen en el portapapeles');
+      } catch (err) {
+        UIManager.showError('No se pudo leer el portapapeles: ' + (err.message || err));
       }
     }
 
@@ -3952,6 +4027,116 @@
       const input = document.getElementById('jpeg-flatten-color');
       const value = input && input.value ? String(input.value).trim() : '';
       return /^#[0-9a-fA-F]{6}$/.test(value) ? value : '#ffffff';
+    }
+
+    /**
+     * v3.3.11: Exporta la imagen actual a varios tamaños a la vez,
+     * empaquetando los blobs resultantes en un ZIP con JSZip.
+     *
+     * Lee qué checkboxes "multisize-XXX" están activos, redimensiona el
+     * canvas a cada ancho conservando aspect ratio, aplica el flujo
+     * normal de export (canvasToBlob + EXIF embedding según formato), y
+     * genera un único archivo .zip que el usuario descarga.
+     */
+    async function downloadMultipleSizes() {
+      if (!canvas || !currentImage) {
+        showError('No hay imagen para exportar.');
+        return;
+      }
+      if (typeof JSZip === 'undefined') {
+        showError('JSZip no está cargado. No se puede generar el ZIP.');
+        return;
+      }
+
+      // Recoger los anchos seleccionados
+      const widths = ['multisize-2048', 'multisize-1024', 'multisize-512', 'multisize-256']
+        .map(id => {
+          const el = document.getElementById(id);
+          return el && el.checked ? parseInt(el.value, 10) : null;
+        })
+        .filter(w => w !== null && !isNaN(w));
+
+      if (widths.length === 0) {
+        UIManager.showInfo('Marca al menos un tamaño para exportar.');
+        return;
+      }
+
+      try {
+        UIManager.showInfo(`📦 Generando ZIP con ${widths.length} tamaños…`);
+        showPositioningBorders = false;
+        redrawCompleteCanvas();
+
+        // Determinar formato y MIME elegidos por el usuario, respetando
+        // el flujo defensivo del export normal.
+        const hasAlpha = hasImageAlphaChannel(canvas);
+        const requestedMimeType = getMimeType(outputFormat);
+        const finalMimeType = await determineFallbackFormat(hasAlpha, requestedMimeType);
+        const finalFormat = finalMimeType.split('/')[1];
+        const extension = getFileExtension(finalFormat);
+        const flattenColor = getFlattenColor();
+
+        // Persistir metadatos en localStorage como hace el flujo normal
+        MetadataManager.applyMetadataToImage(canvas);
+
+        // Determinar nombre base
+        const basenameInput = document.getElementById('file-basename');
+        const customBaseName = basenameInput ? basenameInput.value.trim() : '';
+        let baseName = customBaseName || fileBaseName || 'imagen';
+        if (!SecurityManager.isValidFileBaseName(baseName)) baseName = 'imagen';
+
+        const zip = new JSZip();
+        const sourceWidth = canvas.width;
+        const sourceHeight = canvas.height;
+        const aspectRatio = sourceHeight / sourceWidth;
+
+        for (const targetWidth of widths) {
+          // Saltar tamaños mayores que el original (no upscale)
+          const w = Math.min(targetWidth, sourceWidth);
+          const h = Math.round(w * aspectRatio);
+
+          // Canvas temporal con la imagen redimensionada
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = w;
+          tempCanvas.height = h;
+          const tempCtx = tempCanvas.getContext('2d');
+          tempCtx.imageSmoothingEnabled = true;
+          tempCtx.imageSmoothingQuality = 'high';
+          tempCtx.drawImage(canvas, 0, 0, w, h);
+
+          // Aplicar aplanado para JPEG si procede
+          const sourceForExport = (finalMimeType === 'image/jpeg')
+            ? flattenCanvasForJpeg(tempCanvas, flattenColor)
+            : tempCanvas;
+
+          // Generar blob y embeber EXIF según formato
+          let blob = await canvasToBlob(sourceForExport, finalMimeType, outputQuality);
+          blob = await MetadataManager.embedExifInJpegBlob(blob);
+          blob = await MetadataManager.embedExifInPngBlob(blob);
+          blob = await MetadataManager.embedExifInWebpBlob(blob);
+
+          zip.file(`${baseName}-${w}px.${extension}`, blob);
+        }
+
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+        // Descargar el ZIP usando un link <a download>
+        const url = URL.createObjectURL(zipBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${baseName}-multisize.zip`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        showSuccess(`📦 ZIP con ${widths.length} tamaños descargado: ${baseName}-multisize.zip`);
+      } catch (err) {
+        console.error('Error en downloadMultipleSizes:', err);
+        showError('Error al generar el ZIP de varios tamaños: ' + (err.message || err));
+      } finally {
+        showPositioningBorders = true;
+        redrawCompleteCanvas();
+      }
     }
 
     async function downloadImage() {

@@ -4,6 +4,27 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.3.11] - 2026-04-08
+
+### Added
+- **Pegar imagen desde el portapapeles (`Cmd+V` / `Ctrl+V`)**. Listener global de `paste` registrado en `document` desde `setupEventListeners()` (`js/main.js:721`). El handler `handlePasteImage(e)` (`js/main.js:1707`) recorre `e.clipboardData.items`, busca el primer item con `kind === 'file'` y `type.startsWith('image/')`, llama a `getAsFile()` y delega en `handleFile(file)`. **No interfiere** con pastes en `<input>`, `<textarea>` ni elementos `contentEditable` — comprueba `target.tagName` antes de actuar.
+- **Botón "Pegar imagen"** visible en el área de drop, junto a "Seleccionar archivo" (`index.html:106`). Click handler `handlePasteButtonClick()` (`js/main.js:1734`) usa `navigator.clipboard.read()` (la API moderna que pide permiso explícito al usuario) — itera los items del portapapeles, busca uno con `type.startsWith('image/')`, llama a `item.getType(type)` para obtener el blob, lo envuelve en un `File` con nombre `pasted-image.<ext>` y lo pasa a `handleFile`. Toast de confirmación al éxito y degradación elegante si el navegador no soporta la API (`UIManager.showError`).
+- **Texto de ayuda actualizado** en el área de drop: ahora indica explícitamente *"Formatos: JPG, JPEG, PNG, WEBP, AVIF · Pega con Cmd+V / Ctrl+V"* para que la nueva capacidad sea descubrible.
+- **Sección "Exportar varios tamaños"** en la configuración de salida (sección 5 del HTML, `index.html:937+`). Cuatro checkboxes — 256, 512, 1024 y 2048 px — con 1024 y 512 marcados por defecto. Texto explicativo corto sobre qué hace el botón. Botón "Descargar varios tamaños (ZIP)" con icono `fas fa-file-archive`.
+- **`downloadMultipleSizes()`** (`js/main.js:4041`, ~110 líneas). Lee qué checkboxes están marcados, valida que JSZip esté cargado (mismo patrón que el batch processor existente), determina el formato/calidad/aplanado finales reusando `outputFormat`, `getMimeType`, `determineFallbackFormat`, `hasImageAlphaChannel` y `getFlattenColor`. Para cada anchura marcada genera un canvas temporal redimensionado (manteniendo aspect ratio, sin upscalear), aplica aplanado JPEG si toca, exporta con `canvasToBlob`, embebe EXIF para JPEG/PNG/WebP usando los métodos `MetadataManager.embedExifIn*Blob`, y añade el blob al ZIP con nombre `<basename>-<ancho>px.<extensión>`. Al final genera el ZIP completo con `JSZip.generateAsync({ type: 'blob' })` y dispara la descarga vía `<a download>` + `URL.revokeObjectURL`. Restaura `showPositioningBorders = true` y re-dibuja el canvas en `finally` por si algo falla durante la operación.
+- **Tests de regresión** en `tests/specs/regression.spec.js`: nuevo `describe('Regresión — Quick wins UX (v3.3.11): paste + export multi-size')` con 5 aserciones que verifican que `handlePasteImage` está definida y registrada, que `handlePasteButtonClick` usa `navigator.clipboard.read`, que el botón "Pegar imagen" existe en HTML, que `downloadMultipleSizes` usa `new JSZip()` + `zip.generateAsync`, y que los 4 checkboxes + el botón ZIP existen en HTML.
+
+### Notas de implementación
+- **No se ha tocado el flujo de descarga existente**. `downloadMultipleSizes` reusa todas las funciones que ya existían (`getMimeType`, `determineFallbackFormat`, `flattenCanvasForJpeg`, `embedExifIn*Blob`, `canvasToBlob`, `getFlattenColor`). Cero duplicación de la lógica de embebido EXIF binario.
+- **JSZip ya estaba cargado** desde el batch processor, no se añade nueva dependencia CDN. Esto era condición necesaria para implementar multi-size sin romper la promesa "ligera" del proyecto.
+- **El botón paste** abre un picker de permisos del navegador la primera vez (es lo esperado de `navigator.clipboard.read()`). El listener global `paste` no requiere permiso porque viene de un evento de usuario explícito.
+
+### Verificación
+- `node tests/run-in-node.js` → **105/105 OK** (100 originales + 5 nuevos)
+- `node tests/binary-validation.js` → 36/36 OK (sin cambios)
+
+---
+
 ## [3.3.10] - 2026-04-09
 
 ### Removed
@@ -1190,6 +1211,6 @@ Lanzamiento inicial de MnemoTag.
 
 ---
 
-**Última actualización:** 9 de abril de 2026  
-**Versión actual:** 3.3.10  
+**Última actualización:** 8 de abril de 2026  
+**Versión actual:** 3.3.11  
 **Estado:** ✅ Estable y listo para producción

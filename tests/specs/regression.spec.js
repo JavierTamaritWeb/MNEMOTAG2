@@ -323,3 +323,40 @@ describe('Regresión — Conversión de formato JPEG con alpha', function () {
     expect(src).toContain("(finalMimeType === 'image/jpeg')");
   });
 });
+
+describe('Regresión — Quick wins UX (v3.3.11): paste + export multi-size', function () {
+  it('main.js define handlePasteImage para el evento paste global', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('function handlePasteImage');
+    expect(src).toContain("addEventListener('paste', handlePasteImage)");
+  });
+
+  it('main.js define handlePasteButtonClick usando navigator.clipboard.read', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('handlePasteButtonClick');
+    expect(src).toContain('navigator.clipboard.read');
+  });
+
+  it('index.html incluye el botón "Pegar imagen" en el área de drop', async function () {
+    const src = await fetchSource('../index.html');
+    expect(src).toContain('id="paste-image-btn"');
+    expect(src).toContain('Pegar imagen');
+  });
+
+  it('main.js define la función downloadMultipleSizes', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('function downloadMultipleSizes');
+    // Debe usar JSZip y generar el blob final
+    expect(src).toContain('new JSZip()');
+    expect(src).toContain('zip.generateAsync');
+  });
+
+  it('index.html incluye los checkboxes de tamaños múltiples y el botón ZIP', async function () {
+    const src = await fetchSource('../index.html');
+    expect(src).toContain('id="multisize-2048"');
+    expect(src).toContain('id="multisize-1024"');
+    expect(src).toContain('id="multisize-512"');
+    expect(src).toContain('id="multisize-256"');
+    expect(src).toContain('id="download-multisize-btn"');
+  });
+});
