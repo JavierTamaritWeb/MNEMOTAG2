@@ -1645,10 +1645,14 @@
           <canvas id="curves-canvas" width="280" height="280"></canvas>
           <p class="text-xs text-gray-500 mt-2">
             <strong>Click</strong> para añadir un punto. <strong>Arrastra</strong> para moverlo. <strong>Doble-click</strong> sobre un punto para eliminarlo (no puedes eliminar los extremos).
+            <br>v3.4.4: el canvas principal muestra el resultado <strong>en tiempo real</strong> mientras editas la curva.
           </p>
-          <div class="flex gap-2 mt-3">
+          <div class="flex gap-2 mt-3 flex-wrap">
             <button type="button" id="curves-apply-btn" class="btn btn-primary button--action">
               <i class="fas fa-check"></i> Aplicar a la imagen
+            </button>
+            <button type="button" id="curves-cancel-btn" class="btn btn-outline">
+              <i class="fas fa-times"></i> Cancelar
             </button>
             <button type="button" id="curves-reset-btn" class="btn btn-outline">
               <i class="fas fa-undo"></i> Resetear curva

@@ -4182,7 +4182,7 @@
       )).filter(el => el.offsetParent !== null);
     }
 
-    function _openAccessibleModal(modal) {
+    function _openAccessibleModal(modal, onClose) {
       if (!modal) return;
       const previouslyFocused = document.activeElement;
       modal.classList.remove('hidden');
@@ -4223,7 +4223,7 @@
       };
 
       document.addEventListener('keydown', keyHandler);
-      _modalKeyHandlers.set(modal, { handler: keyHandler, previouslyFocused });
+      _modalKeyHandlers.set(modal, { handler: keyHandler, previouslyFocused, onClose });
     }
 
     function _closeAccessibleModal(modal) {
@@ -4235,6 +4235,11 @@
       if (state) {
         document.removeEventListener('keydown', state.handler);
         _modalKeyHandlers.delete(modal);
+        // v3.4.4: dispara el callback onClose del caller si existe
+        // (para rollback de live preview en curves, por ejemplo).
+        if (typeof state.onClose === 'function') {
+          try { state.onClose(); } catch (e) { console.error('onClose callback failed:', e); }
+        }
         // Devolver el foco al elemento que lo tenía antes de abrir.
         if (state.previouslyFocused && typeof state.previouslyFocused.focus === 'function') {
           try { state.previouslyFocused.focus(); } catch (e) { /* defensive */ }
@@ -4502,7 +4507,12 @@
         b:   [{ x: 0, y: 0 }, { x: 255, y: 255 }]
       },
       dragIndex: -1,
-      lastImageDataSnapshot: null
+      // v3.4.4: snapshot "antes de abrir el modal" para live preview.
+      // Se guarda en openCurvesModal() y se restaura si el usuario
+      // cancela. Es un ImageData, no un dataURL, para no pagar el coste
+      // de rasterización en cada frame del preview.
+      previewSnapshot: null,
+      previewRafPending: false
     };
 
     function openCurvesModal() {
@@ -4512,11 +4522,86 @@
       }
       const modal = document.getElementById('curves-modal');
       if (!modal) return;
-      // v3.4.3: apertura accesible con focus trap + Escape.
-      _openAccessibleModal(modal);
+
+      // v3.4.4: resetear puntos de todos los canales al abrir (si no, el
+      // preview arranca ya con una curva aplicada del uso anterior).
+      _curvesState.points.rgb = [{ x: 0, y: 0 }, { x: 255, y: 255 }];
+      _curvesState.points.r   = [{ x: 0, y: 0 }, { x: 255, y: 255 }];
+      _curvesState.points.g   = [{ x: 0, y: 0 }, { x: 255, y: 255 }];
+      _curvesState.points.b   = [{ x: 0, y: 0 }, { x: 255, y: 255 }];
+      _curvesState.activeChannel = 'rgb';
+
+      // v3.4.4: capturar el estado actual del canvas para el live preview.
+      try {
+        _curvesState.previewSnapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      } catch (err) {
+        console.warn('No se pudo capturar snapshot para live preview de curvas:', err);
+        _curvesState.previewSnapshot = null;
+      }
+
+      // v3.4.3+v3.4.4: apertura accesible con focus trap + Escape +
+      // callback onClose que restaura el preview si el usuario cierra
+      // por Escape/backdrop/X sin haber pulsado "Aplicar".
+      _openAccessibleModal(modal, function () {
+        // Si _applyCurvesToImage fue el que cerró, ya puso
+        // previewSnapshot = null antes, así que _rollbackCurvesPreview
+        // es no-op. Si el cierre viene de otro lado, restauramos.
+        _rollbackCurvesPreview();
+      });
+      // Reset visual del tab activo.
+      modal.querySelectorAll('.curves-channel-btn').forEach(b => {
+        b.classList.toggle('active', b.getAttribute('data-channel') === 'rgb');
+      });
 
       _setupCurvesUI();
       _redrawCurvesCanvas();
+    }
+
+    // v3.4.4: aplica las curvas actuales sobre el snapshot original y
+    // pinta el resultado en el canvas principal, con throttle de rAF
+    // para que el preview sea fluido incluso mientras se arrastra.
+    function _scheduleCurvesPreview() {
+      if (_curvesState.previewRafPending) return;
+      if (!_curvesState.previewSnapshot || !canvas || !ctx) return;
+      _curvesState.previewRafPending = true;
+      requestAnimationFrame(function () {
+        _curvesState.previewRafPending = false;
+        const snap = _curvesState.previewSnapshot;
+        if (!snap) return;
+        const lutR = _buildLutFromPoints(_curvesState.points.r);
+        const lutG = _buildLutFromPoints(_curvesState.points.g);
+        const lutB = _buildLutFromPoints(_curvesState.points.b);
+        const lutRGB = _buildLutFromPoints(_curvesState.points.rgb);
+        // Creamos una copia del snapshot para no mutarlo (el original
+        // hace falta para el próximo frame de preview o para rollback).
+        const out = ctx.createImageData(snap.width, snap.height);
+        const src = snap.data;
+        const dst = out.data;
+        for (let i = 0; i < src.length; i += 4) {
+          if (src[i + 3] === 0) {
+            dst[i] = src[i];
+            dst[i + 1] = src[i + 1];
+            dst[i + 2] = src[i + 2];
+            dst[i + 3] = 0;
+            continue;
+          }
+          dst[i]     = lutRGB[lutR[src[i]]];
+          dst[i + 1] = lutRGB[lutG[src[i + 1]]];
+          dst[i + 2] = lutRGB[lutB[src[i + 2]]];
+          dst[i + 3] = src[i + 3];
+        }
+        ctx.putImageData(out, 0, 0);
+      });
+    }
+
+    // v3.4.4: restaura el canvas al estado que tenía al abrir el modal.
+    // Se llama al cancelar o cerrar sin aplicar.
+    function _rollbackCurvesPreview() {
+      if (_curvesState.previewSnapshot && canvas && ctx) {
+        ctx.putImageData(_curvesState.previewSnapshot, 0, 0);
+      }
+      _curvesState.previewSnapshot = null;
+      _curvesState.previewRafPending = false;
     }
 
     function _setupCurvesUI() {
@@ -4570,6 +4655,7 @@
           _curvesState.dragIndex = points.findIndex(p => p.x === x && p.y === y);
         }
         _redrawCurvesCanvas();
+        _scheduleCurvesPreview(); // v3.4.4
       });
 
       cv.addEventListener('mousemove', (e) => {
@@ -4592,6 +4678,7 @@
           };
         }
         _redrawCurvesCanvas();
+        _scheduleCurvesPreview(); // v3.4.4
       });
 
       const stopDrag = () => { _curvesState.dragIndex = -1; };
@@ -4606,8 +4693,18 @@
         if (idx > 0 && idx < points.length - 1) {
           points.splice(idx, 1);
           _redrawCurvesCanvas();
+          _scheduleCurvesPreview(); // v3.4.4
         }
       });
+
+      // v3.4.4: botón Cancelar — rollback del preview y cerrar sin aplicar.
+      const cancelBtn = document.getElementById('curves-cancel-btn');
+      if (cancelBtn) {
+        cancelBtn.addEventListener('click', function () {
+          _rollbackCurvesPreview();
+          _closeAccessibleModal(document.getElementById('curves-modal'));
+        });
+      }
     }
 
     function _resetCurves() {
@@ -4616,6 +4713,7 @@
         { x: 255, y: 255 }
       ];
       _redrawCurvesCanvas();
+      _scheduleCurvesPreview(); // v3.4.4
     }
 
     // Construye una LUT de 256 valores interpolando linealmente entre
@@ -4719,28 +4817,38 @@
     }
 
     function _applyCurvesToImage() {
-      const imageData = _getCanvasImageData();
-      if (!imageData) {
+      if (!canvas || !currentImage) {
         UIManager.showError('No hay imagen sobre la que aplicar las curvas.');
         return;
       }
 
-      // Construir LUTs por canal. La curva 'rgb' se aplica DESPUÉS de
-      // las curvas individuales R/G/B (composición), igual que Photoshop.
-      const lutR = _buildLutFromPoints(_curvesState.points.r);
-      const lutG = _buildLutFromPoints(_curvesState.points.g);
-      const lutB = _buildLutFromPoints(_curvesState.points.b);
-      const lutRGB = _buildLutFromPoints(_curvesState.points.rgb);
-
-      const data = imageData.data;
-      for (let i = 0; i < data.length; i += 4) {
-        if (data[i + 3] === 0) continue;
-        data[i]     = lutRGB[lutR[data[i]]];
-        data[i + 1] = lutRGB[lutG[data[i + 1]]];
-        data[i + 2] = lutRGB[lutB[data[i + 2]]];
+      // v3.4.4: gracias al live preview el canvas YA tiene la
+      // transformación aplicada. Solo necesitamos confirmar (guardar
+      // estado en historial + limpiar el snapshot de rollback).
+      // Si por algún motivo no hay snapshot (error en apertura), hacemos
+      // la aplicación tradicional como fallback.
+      if (!_curvesState.previewSnapshot) {
+        const imageData = _getCanvasImageData();
+        if (!imageData) {
+          UIManager.showError('No hay imagen sobre la que aplicar las curvas.');
+          return;
+        }
+        const lutR = _buildLutFromPoints(_curvesState.points.r);
+        const lutG = _buildLutFromPoints(_curvesState.points.g);
+        const lutB = _buildLutFromPoints(_curvesState.points.b);
+        const lutRGB = _buildLutFromPoints(_curvesState.points.rgb);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i + 3] === 0) continue;
+          data[i]     = lutRGB[lutR[data[i]]];
+          data[i + 1] = lutRGB[lutG[data[i + 1]]];
+          data[i + 2] = lutRGB[lutB[data[i + 2]]];
+        }
+        ctx.putImageData(imageData, 0, 0);
       }
-
-      ctx.putImageData(imageData, 0, 0);
+      // Importante: descartar el snapshot para que el cierre NO haga rollback.
+      _curvesState.previewSnapshot = null;
+      _curvesState.previewRafPending = false;
 
       if (typeof historyManager !== 'undefined' && historyManager.saveState) {
         historyManager.saveState();
