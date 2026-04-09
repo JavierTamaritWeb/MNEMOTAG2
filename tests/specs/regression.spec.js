@@ -710,3 +710,45 @@ describe('Regresión — Filter presets (v3.4.5)', function () {
     expect(src).toContain("PresetManager.populateSelect");
   });
 });
+
+describe('Regresión — Undo/redo con ImageBitmap (v3.4.6)', function () {
+  it('history-manager.js usa createImageBitmap en saveState con fallback a dataURL', async function () {
+    const src = await fetchSource('../js/managers/history-manager.js');
+    expect(src).toContain("typeof createImageBitmap === 'function'");
+    expect(src).toContain('createImageBitmap(canvas)');
+    // Fallback legacy sigue existiendo para navegadores sin la API
+    expect(src).toContain('canvas.toDataURL()');
+  });
+
+  it('history-manager.js restoreState acepta state.bitmap y state.imageData', async function () {
+    const src = await fetchSource('../js/managers/history-manager.js');
+    expect(src).toContain('state.bitmap');
+    expect(src).toContain('ctx.drawImage(state.bitmap');
+    expect(src).toContain('state.imageData');
+  });
+
+  it('history-manager.js cierra ImageBitmaps descartados en saveState/clear (sin fugar memoria GPU)', async function () {
+    const src = await fetchSource('../js/managers/history-manager.js');
+    // Al rebasar maxStates o al limpiar descartes, debe llamar a bitmap.close()
+    expect(src).toContain('bitmap.close');
+  });
+
+  it('history-manager.js _buildThumbnail pinta el bitmap en un canvas 80x80', async function () {
+    const src = await fetchSource('../js/managers/history-manager.js');
+    expect(src).toContain('_buildThumbnail: function');
+    expect(src).toContain("toDataURL('image/jpeg', 0.8)");
+    // object-fit: contain manual
+    expect(src).toContain('Math.min(size / bw, size / bh)');
+  });
+
+  it('index.html incluye el botón "Vaciar historial" en el panel', async function () {
+    const src = await fetchSource('../index.html');
+    expect(src).toContain('id="history-clear-btn"');
+  });
+
+  it('main.js conecta el botón Vaciar historial a historyManager.clear()', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain("getElementById('history-clear-btn')");
+    expect(src).toContain('historyManager.clear()');
+  });
+});

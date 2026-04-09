@@ -821,6 +821,18 @@
             }
           });
         }
+        // v3.4.6: botón "Vaciar historial" — libera memoria GPU.
+        const historyClearBtn = document.getElementById('history-clear-btn');
+        if (historyClearBtn) {
+          historyClearBtn.addEventListener('click', () => {
+            if (typeof historyManager !== 'undefined' && historyManager.clear) {
+              if (window.confirm('¿Vaciar el historial? Se perderán todos los estados guardados.')) {
+                historyManager.clear();
+                renderHistoryPanel();
+              }
+            }
+          });
+        }
         // Cerrar modales de análisis (click en backdrop o botón X).
         // v3.4.3: usa el helper accesible para restaurar foco y limpiar listeners.
         document.querySelectorAll('[data-close-modal]').forEach(el => {
