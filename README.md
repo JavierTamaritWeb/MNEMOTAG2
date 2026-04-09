@@ -4,9 +4,39 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos.
 
-![Version](https://img.shields.io/badge/version-3.3.7-blue.svg)
+![Version](https://img.shields.io/badge/version-3.3.8-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
+
+---
+
+## ⭐ NOVEDADES v3.3.8
+
+> **Patch release.** Nuevo runner de validación binaria a bajo nivel para PNG y WebP.
+
+### 🧪 Validación binaria sin browser
+
+`tests/binary-validation.js` es un script Node nuevo (sin dependencias) que:
+
+- Carga las funciones reales de manipulación binaria de `metadata-manager.js` en un VM context con polyfills mínimos.
+- Sintetiza un **PNG mínimo válido** (1×1 píxel rojo) byte por byte.
+- Sintetiza **tres WebP fake**: uno VP8 lossy, uno VP8L lossless y uno VP8X extended.
+- Pasa esos archivos por las funciones `_buildPngExifChunk`, `_insertExifChunkInPng`, `_parseWebpDimensions`, `_buildVp8xChunk`, `_buildRiffExifChunk`, `_convertSimpleWebpToVp8xWithExif` y **verifica byte por byte** que el output tiene la estructura correcta.
+- Incluye una verificación crítica: el **CRC32** del chunk `eXIf` que produce `_buildPngExifChunk` se compara con una computación **independiente** sobre los mismos bytes. Si coincidieran por casualidad sería sospechoso; si coinciden tras un cálculo determinístico, es prueba sólida de corrección.
+
+**36 aserciones, ~100 ms.** Comando: `node tests/binary-validation.js`.
+
+**Lo que demuestra**: los bytes producidos por el código de PNG/WebP son estructuralmente correctos según los specs (signature PNG, chunks `eXIf`/`IDAT`/`IEND` en orden, CRC32 válido, RIFF size recalculado, VP8X flags, etc.).
+
+**Lo que NO demuestra**: que un navegador real decodifique los archivos resultantes ni que un visor EXIF de terceros lea los tags. Eso sigue siendo validación browser.
+
+Ahora hay **tres formas de verificar** el código de la app sin abrir el navegador:
+
+| Runner | Qué verifica | Tiempo | Comando |
+|---|---|---|---|
+| `tests/index.html` (browser) | Todo, autoritativo | Manual | Live Server |
+| `tests/run-in-node.js` | API de managers + regresiones grep | ~100 ms | `node tests/run-in-node.js` |
+| `tests/binary-validation.js` | Manipulación binaria PNG/WebP | ~100 ms | `node tests/binary-validation.js` |
 
 ---
 

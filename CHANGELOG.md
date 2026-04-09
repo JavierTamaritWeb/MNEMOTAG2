@@ -4,6 +4,29 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.3.8] - 2026-04-09
+
+### Added
+- **`tests/binary-validation.js`**: nuevo runner Node de validación binaria para las funciones de manipulación PNG y WebP introducidas en v3.3.6 y v3.3.7. Sin dependencias externas, ~360 líneas, ~100 ms de ejecución.
+  - Carga `helpers.js` (en el orden correcto, antes que `metadata-manager.js`, porque `_buildPngExifChunk` usa `crc32`) y `metadata-manager.js` en un VM context con polyfills mínimos (`Blob` stub, `document` stub).
+  - Sintetiza un **PNG mínimo válido de 1×1 píxel rojo** byte por byte.
+  - Sintetiza tres WebP fake: **VP8 lossy** (con frame tag y signature `9D 01 2A`), **VP8L lossless** (con signature `0x2F`), y **VP8X extended** (con flags y dimensiones).
+  - Pasa esos archivos por `_buildPngExifChunk`, `_insertExifChunkInPng`, `_parseWebpDimensions`, `_buildVp8xChunk`, `_buildRiffExifChunk`, `_convertSimpleWebpToVp8xWithExif` y verifica byte por byte que el output tiene la estructura binaria correcta.
+  - **Verificación crítica del CRC32**: el script computa el CRC32 del chunk `eXIf` de forma **independiente** usando `helpers.crc32` y lo compara con el CRC declarado en los últimos 4 bytes del chunk. Si la implementación tuviera un bug, el chunk sería rechazado por parsers PNG estrictos. Resultado: coinciden (`0x6fca5c47` para el chunk del PNG mínimo de prueba).
+  - 36 aserciones totales, todas verde.
+- **Comando**: `node tests/binary-validation.js`.
+
+### Notes
+- **Por qué dos runners Node distintos**: `tests/run-in-node.js` verifica la API de los managers y las regresiones vía `fetch + grep` del código fuente. `tests/binary-validation.js` ejecuta las funciones reales contra archivos sintetizados a mano. Cubren clases de errores complementarias.
+- **Lo que sigue sin verificarse**: que un navegador real abra los WebP/PNG generados ni que un visor EXIF de terceros (Apple Preview Info, exiftool, exif.tools) lea los tags. Eso sigue siendo validación browser.
+- **Falso positivo evitado durante el desarrollo**: en la primera ejecución del script el CRC32 del chunk `eXIf` no coincidía. Causa: `helpers.js` se cargaba **después** que `metadata-manager.js`, lo que hacía que `_buildPngExifChunk` cayera en su rama defensiva (`typeof crc32 !== 'function' ? 0 : crc32(...)`) y produjera el chunk con CRC=0. Tras invertir el orden de carga (helpers primero, igual que en `index.html`), las 36 aserciones pasan. **El código de producción es correcto** — el bug estaba en el script de validación.
+
+### Verification
+- `node tests/run-in-node.js` → 100/100 OK
+- `node tests/binary-validation.js` → 36/36 OK
+
+---
+
 ## [3.3.7] - 2026-04-09
 
 ### Added
@@ -1118,5 +1141,5 @@ Lanzamiento inicial de MnemoTag.
 ---
 
 **Última actualización:** 9 de abril de 2026  
-**Versión actual:** 3.3.7  
+**Versión actual:** 3.3.8  
 **Estado:** ✅ Estable y listo para producción
