@@ -541,3 +541,41 @@ describe('Regresión — Soporte HEIC/HEIF (v3.3.15)', function () {
     expect(src).toContain("'image/heif'");
   });
 });
+
+describe('Regresión — PWA real con Service Worker (v3.3.16)', function () {
+  it('service-worker.js existe en la raíz del proyecto', async function () {
+    const res = await fetch('../service-worker.js');
+    expect(res.ok).toBe(true);
+  });
+
+  it('service-worker.js define las 3 estrategias y los listeners principales', async function () {
+    const src = await fetchSource('../service-worker.js');
+    expect(src).toContain('CACHE_VERSION');
+    expect(src).toContain('mnemotag-v3.3');
+    expect(src).toContain("addEventListener('install'");
+    expect(src).toContain("addEventListener('activate'");
+    expect(src).toContain("addEventListener('fetch'");
+    expect(src).toContain('cacheFirst');
+    expect(src).toContain('networkFirst');
+  });
+
+  it('service-worker.js precachea index.html y los managers principales', async function () {
+    const src = await fetchSource('../service-worker.js');
+    expect(src).toContain("'./index.html'");
+    expect(src).toContain("'./js/main.js'");
+    expect(src).toContain("'./css/styles.css'");
+  });
+
+  it('main.js registra el Service Worker en window.load', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain("'serviceWorker' in navigator");
+    expect(src).toContain("navigator.serviceWorker.register('./service-worker.js'");
+  });
+
+  it('index.html incluye los meta tags PWA para iOS', async function () {
+    const src = await fetchSource('../index.html');
+    expect(src).toContain('apple-mobile-web-app-capable');
+    expect(src).toContain('apple-mobile-web-app-title');
+    expect(src).toContain('mobile-web-app-capable');
+  });
+});

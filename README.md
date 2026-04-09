@@ -4,11 +4,45 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos.
 
-![Version](https://img.shields.io/badge/version-3.3.15-blue.svg)
+![Version](https://img.shields.io/badge/version-3.3.16-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 [![Tests](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml)
 [![Deploy to GitHub Pages](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml)
+
+---
+
+## ⭐ NOVEDADES v3.3.16
+
+> **Feature release — PWA real con Service Worker.** La app ahora funciona offline tras la primera visita, se puede instalar como aplicación standalone (escritorio o móvil) y carga instantáneamente en visitas posteriores.
+
+### 📲 Service Worker con cache híbrido
+
+- **Nuevo archivo `service-worker.js`** en la raíz del proyecto con dos estrategias de cache configurables por tipo de recurso:
+  - **Cache-first** para assets propios (`index.html`, `css/styles.css`, todos los `js/utils/*` y `js/managers/*`, `js/main.js`, manifest, favicon). Una vez descargados, se sirven desde cache y la red solo se usa como fallback. Esto hace que la app cargue prácticamente al instante en visitas repetidas.
+  - **Network-first** para CDNs externas conocidas (jsdelivr, cdnjs, cdn.tailwindcss.com, fonts.google). Se intenta primero la red para captar actualizaciones de Tailwind, FontAwesome, JSZip, piexifjs, heic2any, etc., y si falla se sirve la versión cacheada.
+- **Versión del cache codificada** como `mnemotag-v3.3.16-app` y `mnemotag-v3.3.16-cdn`. Cuando se publique una versión nueva, el listener `activate` borra automáticamente cualquier cache que no coincida con el `CACHE_VERSION` actual.
+- **Precache de assets críticos en `install`**: lista explícita de los 22 archivos mínimos necesarios para que la app arranque offline. La descarga es tolerante a errores: si algún recurso falla, se loggea un warning y se continúa con el resto.
+- **`skipWaiting()` + `clients.claim()`**: el SW nuevo toma control inmediatamente de las pestañas abiertas tras la activación, sin requerir un refresh manual.
+- **Ignora peticiones no-GET y esquemas distintos de http(s)**: POST/PUT/DELETE pasan directos al network sin tocar el cache. URLs `data:`, `blob:`, `chrome-extension:`, etc., también se respetan.
+
+### 📱 Meta tags PWA para iOS
+
+- Añadidos `apple-mobile-web-app-capable`, `apple-mobile-web-app-status-bar-style`, `apple-mobile-web-app-title` y `mobile-web-app-capable` en `<head>` para que iOS Safari permita "Añadir a pantalla de inicio" como app standalone con icono y splash propio.
+- `site.webmanifest` actualizado: `start_url` y `scope` ahora son relativos (`../../`) para que la app instalada funcione tanto en `localhost`, en `file://`, como bajo GitHub Pages en `/MNEMOTAG2/`.
+
+### 🚀 Registro del Service Worker
+
+- El registro se hace desde `js/main.js` en el evento `window.load` (no en `DOMContentLoaded`) para no competir con la carga inicial de assets críticos.
+- Si el navegador no soporta Service Workers, el código se omite silenciosamente. La app sigue funcionando exactamente igual.
+- Errores de registro se loggean con `console.warn` (sin romper nada).
+
+### Verificación
+
+- `node tests/run-in-node.js` → **132/132 OK** (127 anteriores + 5 nuevos para v3.3.16)
+- `node tests/binary-validation.js` → 36/36 OK (sin cambios)
+
+Cero regresiones. La app sigue funcionando exactamente igual sin Service Worker (degradación elegante total).
 
 ---
 

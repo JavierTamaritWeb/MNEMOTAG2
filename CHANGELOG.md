@@ -4,6 +4,36 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.3.16] - 2026-04-08
+
+### Added
+- **PWA real con Service Worker**. Nuevo archivo `service-worker.js` en la raíz del proyecto, ~150 líneas.
+- **Estrategias de cache híbridas**:
+  - **Cache-first** para recursos del mismo origen (HTML, CSS, JS, imágenes locales, manifest). Devuelve la versión cacheada si existe; si no, va a red y la añade al cache.
+  - **Network-first** para CDNs externas listadas en `CDN_HOSTS` (cdn.jsdelivr.net, cdnjs.cloudflare.com, cdn.tailwindcss.com, fonts.googleapis.com, fonts.gstatic.com). Va primero a red para captar actualizaciones; si falla, sirve la versión cacheada.
+- **Versionado del cache**: `CACHE_VERSION = 'mnemotag-v3.3.16'`. Los buckets se llaman `mnemotag-v3.3.16-app` y `mnemotag-v3.3.16-cdn`. El listener `activate` borra automáticamente cualquier cache anterior cuya clave no empiece por la versión actual.
+- **Listener `install`** precachea 22 assets críticos (`./`, `./index.html`, `./css/styles.css`, todos los `js/utils/*` y `js/managers/*`, `./js/main.js`, manifest, favicon, ico) con tolerancia a errores: cada `cache.add()` se hace individual y los fallos se loggean sin abortar el resto.
+- **`skipWaiting()` + `clients.claim()`** para que la versión nueva del SW tome control inmediatamente de las pestañas abiertas tras la activación.
+- **Listener `fetch` defensivo**: solo intercepta GET, ignora esquemas no http(s), y deja pasar terceros desconocidos sin cachear ni interferir.
+- **Helpers `cacheFirst(request, cacheName)` y `networkFirst(request, cacheName)`** que abstraen las dos estrategias. Solo cachean respuestas con `status === 200`. En `cacheFirst`, además, solo se cachean respuestas con `type === 'basic'` (mismo origen).
+- **Registro del SW desde `js/main.js`** al final del archivo (`window.addEventListener('load', ...)`). Scope `./`. Errores se loggean con `console.warn` y no rompen la app.
+- **Meta tags PWA para iOS** añadidos a `index.html`: `apple-mobile-web-app-capable`, `apple-mobile-web-app-status-bar-style`, `apple-mobile-web-app-title`, `mobile-web-app-capable`. Permiten instalar la app desde Safari como standalone con icono propio.
+- **`site.webmanifest` actualizado**: `start_url` cambiado de `"/"` a `"../../"` y se añade `"scope": "../../"` para que la app instalada funcione bajo `localhost`, `file://`, y GitHub Pages en `/MNEMOTAG2/`.
+- **Tests de regresión** en `tests/specs/regression.spec.js`: nuevo `describe('Regresión — PWA real con Service Worker (v3.3.16)')` con 5 aserciones que verifican que el archivo existe, define las 3 estrategias y los listeners principales, precachea los managers, está registrado desde `js/main.js`, y los meta tags iOS están en HTML.
+
+### Notas de implementación
+- **Por qué no `addAll`**: `cache.addAll(urls)` falla si CUALQUIER recurso no se puede descargar (atomic). Para ser tolerantes en dev (donde a veces falta un archivo o el favicon), hacemos `add(url)` individual con `.catch()` que loggea el error y continúa.
+- **Por qué network-first para CDNs**: Tailwind, FA, JSZip, piexifjs y heic2any pueden actualizarse en sus respectivos CDNs sin avisarnos. La estrategia network-first prioriza siempre la última versión disponible y solo cae a cache en modo offline.
+- **Por qué registrar en `window.load`**: el registro del SW dispara el evento `install` que descarga 22+ archivos. En `load` ya hemos terminado de pintar todo y el usuario no nota la descarga.
+- **Por qué `clients.claim()`**: sin él, la versión nueva del SW solo se activa para pestañas que se abran DESPUÉS del despliegue. Con `clients.claim()`, las pestañas abiertas también empiezan a usar la nueva versión inmediatamente.
+- **Por qué `start_url: "../../"` en el manifest**: el manifest está en `images/favicon_io/site.webmanifest`, así que un path relativo `../../` resuelve correctamente a la raíz del proyecto sea cual sea la URL pública. Un path absoluto `"/"` rompe en GitHub Pages porque la app vive bajo `/MNEMOTAG2/`.
+
+### Verificación
+- `node tests/run-in-node.js` → **132/132 OK** (127 anteriores + 5 nuevos)
+- `node tests/binary-validation.js` → 36/36 OK (sin cambios)
+
+---
+
 ## [3.3.15] - 2026-04-08
 
 ### Added
@@ -1319,5 +1349,5 @@ Lanzamiento inicial de MnemoTag.
 ---
 
 **Última actualización:** 8 de abril de 2026  
-**Versión actual:** 3.3.15  
+**Versión actual:** 3.3.16  
 **Estado:** ✅ Estable y listo para producción

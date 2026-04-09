@@ -7918,5 +7918,20 @@
       initializeAdvancedUI();
       initializeComparisonMode();
     }
+
+    // v3.3.16: Registrar Service Worker para soporte PWA / offline.
+    // El registro se hace en `load` (no en DOMContentLoaded) para no
+    // competir con la carga inicial de assets críticos.
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js', { scope: './' })
+          .then((reg) => {
+            console.warn('[App] Service Worker registrado:', reg.scope);
+          })
+          .catch((err) => {
+            console.warn('[App] Service Worker no se pudo registrar:', err);
+          });
+      });
+    }
     
 

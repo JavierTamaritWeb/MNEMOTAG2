@@ -26,5 +26,6 @@
   "background_color": "#fafafa",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "start_url": "/"
+  "start_url": "../../",
+  "scope": "../../"
 }
