@@ -346,6 +346,53 @@ assert(dimsVp8x && dimsVp8x.width === 4, `Width VP8X: ${dimsVp8x && dimsVp8x.wid
 assert(dimsVp8x && dimsVp8x.height === 6, `Height VP8X: ${dimsVp8x && dimsVp8x.height} (esperado 6)`);
 assert(dimsVp8x && dimsVp8x.hasAlpha === true, `hasAlpha VP8X: ${dimsVp8x && dimsVp8x.hasAlpha} (esperado true)`);
 
+// ---- 5. AVIF / ISOBMFF parser (v3.3.17) -------------------------------------
+
+console.log('\n● ISOBMFF box parser (v3.3.17)');
+
+// AVIF mínimo: ftyp con major brand 'avif' + meta box vacía + mdat vacía.
+//
+//   00 00 00 18  ftyp size = 24
+//   66 74 79 70  'ftyp'
+//   61 76 69 66  major brand = 'avif'
+//   00 00 00 00  minor version = 0
+//   61 76 69 66  compat brand = 'avif'
+//   6D 69 66 31  compat brand = 'mif1'
+//
+//   00 00 00 08  meta size = 8 (vacío, no realista pero válido para parser)
+//   6D 65 74 61  'meta'
+//
+//   00 00 00 08  mdat size = 8 (vacío)
+//   6D 64 61 74  'mdat'
+const minimalAvif = new Uint8Array([
+  // ftyp box (24 bytes)
+  0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70,
+  0x61, 0x76, 0x69, 0x66, 0x00, 0x00, 0x00, 0x00,
+  0x61, 0x76, 0x69, 0x66, 0x6D, 0x69, 0x66, 0x31,
+  // meta box (8 bytes, vacía)
+  0x00, 0x00, 0x00, 0x08, 0x6D, 0x65, 0x74, 0x61,
+  // mdat box (8 bytes, vacía)
+  0x00, 0x00, 0x00, 0x08, 0x6D, 0x64, 0x61, 0x74
+]);
+
+const avifBoxes = MM._parseIsobmffBoxes(minimalAvif);
+assert(avifBoxes.length === 3, `_parseIsobmffBoxes devuelve 3 boxes (ftyp, meta, mdat) — got ${avifBoxes.length}`);
+assert(avifBoxes[0].type === 'ftyp', `Box 0 es ftyp — got ${avifBoxes[0].type}`);
+assert(avifBoxes[0].start === 0 && avifBoxes[0].end === 24, `ftyp start=0 end=24 — got ${avifBoxes[0].start}/${avifBoxes[0].end}`);
+assert(avifBoxes[1].type === 'meta', `Box 1 es meta — got ${avifBoxes[1].type}`);
+assert(avifBoxes[2].type === 'mdat', `Box 2 es mdat — got ${avifBoxes[2].type}`);
+
+// _isAvifFile debe detectar este archivo como AVIF válido
+assert(MM._isAvifFile(minimalAvif) === true, '_isAvifFile detecta AVIF mínimo');
+
+// Negativo: bytes random NO son AVIF
+const notAvif = new Uint8Array([0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+assert(MM._isAvifFile(notAvif) === false, '_isAvifFile rechaza bytes random');
+
+// Negativo: PNG signature NO es AVIF
+const pngSig = new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x00]);
+assert(MM._isAvifFile(pngSig) === false, '_isAvifFile rechaza PNG signature');
+
 // ---- Resumen ----------------------------------------------------------------
 
 console.log('\n' + '─'.repeat(60));

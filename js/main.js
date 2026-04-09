@@ -4188,6 +4188,7 @@
           blob = await MetadataManager.embedExifInJpegBlob(blob);
           blob = await MetadataManager.embedExifInPngBlob(blob);
           blob = await MetadataManager.embedExifInWebpBlob(blob);
+          blob = await MetadataManager.embedExifInAvifBlob(blob); // v3.3.17
 
           zip.file(`${baseName}-${w}px.${extension}`, blob);
         }
@@ -4904,6 +4905,7 @@
             blob = await MetadataManager.embedExifInJpegBlob(blob);
             blob = await MetadataManager.embedExifInPngBlob(blob);  // v3.3.6
             blob = await MetadataManager.embedExifInWebpBlob(blob); // v3.3.7
+            blob = await MetadataManager.embedExifInAvifBlob(blob); // v3.3.17
             await writable.write(blob);
             await writable.close();
 
@@ -4930,7 +4932,7 @@
         const fallbackCanvas = (finalMimeType === 'image/jpeg')
           ? flattenCanvasForJpeg(canvas, flattenColorFallback)
           : canvas;
-        // Embeber EXIF según formato. JPEG es sync, PNG y WebP son async.
+        // Embeber EXIF según formato. JPEG es sync, PNG/WebP/AVIF son async.
         let fallbackHref = MetadataManager.embedExifInJpegDataUrl(
           fallbackCanvas.toDataURL(finalMimeType, outputQuality)
         );
@@ -4938,6 +4940,8 @@
           fallbackHref = await MetadataManager.embedExifInPngDataUrl(fallbackHref); // v3.3.6
         } else if (finalMimeType === 'image/webp') {
           fallbackHref = await MetadataManager.embedExifInWebpDataUrl(fallbackHref); // v3.3.7
+        } else if (finalMimeType === 'image/avif') {
+          fallbackHref = await MetadataManager.embedExifInAvifDataUrl(fallbackHref); // v3.3.17
         }
         link.href = fallbackHref;
 
@@ -5691,6 +5695,7 @@
             blob = await MetadataManager.embedExifInJpegBlob(blob);
             blob = await MetadataManager.embedExifInPngBlob(blob);  // v3.3.6
             blob = await MetadataManager.embedExifInWebpBlob(blob); // v3.3.7
+            blob = await MetadataManager.embedExifInAvifBlob(blob); // v3.3.17
             await writable.write(blob);
             await writable.close();
 
@@ -5721,7 +5726,7 @@
         const fallbackCanvas = (finalMimeType === 'image/jpeg')
           ? flattenCanvasForJpeg(canvas, flattenColorFallback)
           : canvas;
-        // Embeber EXIF según formato. JPEG es sync, PNG y WebP son async.
+        // Embeber EXIF según formato. JPEG es sync, PNG/WebP/AVIF son async.
         let fallbackHrefP = MetadataManager.embedExifInJpegDataUrl(
           fallbackCanvas.toDataURL(finalMimeType, outputQuality)
         );
@@ -5729,6 +5734,8 @@
           fallbackHrefP = await MetadataManager.embedExifInPngDataUrl(fallbackHrefP); // v3.3.6
         } else if (finalMimeType === 'image/webp') {
           fallbackHrefP = await MetadataManager.embedExifInWebpDataUrl(fallbackHrefP); // v3.3.7
+        } else if (finalMimeType === 'image/avif') {
+          fallbackHrefP = await MetadataManager.embedExifInAvifDataUrl(fallbackHrefP); // v3.3.17
         }
         link.href = fallbackHrefP;
         

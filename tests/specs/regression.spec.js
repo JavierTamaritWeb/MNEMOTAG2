@@ -579,3 +579,45 @@ describe('Regresión — PWA real con Service Worker (v3.3.16)', function () {
     expect(src).toContain('mobile-web-app-capable');
   });
 });
+
+describe('Regresión — AVIF EXIF (v3.3.17): parser ISOBMFF defensivo', function () {
+  it('metadata-manager.js define las funciones públicas embedExifInAvifBlob/DataUrl', async function () {
+    const src = await fetchSource('../js/managers/metadata-manager.js');
+    expect(src).toContain('embedExifInAvifBlob: async function');
+    expect(src).toContain('embedExifInAvifDataUrl: async function');
+  });
+
+  it('metadata-manager.js define el parser ISOBMFF y el detector AVIF', async function () {
+    const src = await fetchSource('../js/managers/metadata-manager.js');
+    expect(src).toContain('_parseIsobmffBoxes');
+    expect(src).toContain('_isAvifFile');
+    // El parser debe manejar el caso largesize (size === 1 con 64-bit body size)
+    expect(src).toContain('size === 1');
+    // Debe verificar el major brand `avif`
+    expect(src).toContain("'avif'");
+  });
+
+  it('metadata-manager.js NUNCA corrompe AVIF: degradación elegante en TODOS los caminos', async function () {
+    const src = await fetchSource('../js/managers/metadata-manager.js');
+    // Si no es AVIF válido → devolver original
+    expect(src).toContain('no parece AVIF, devolviendo original');
+    // Si no encuentra meta box → devolver original
+    expect(src).toContain('AVIF sin caja');
+    // try/catch envuelve TODO el flujo binario
+    expect(src).toContain('error parseando AVIF, devolviendo original');
+  });
+
+  it('main.js llama a embedExifInAvifBlob en el flujo de descarga', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('MetadataManager.embedExifInAvifBlob');
+    // Debe haber al menos 3 llamadas (downloadImage saveFilePicker, downloadImageWithProgress saveFilePicker, downloadMultipleSizes)
+    const matches = src.match(/MetadataManager\.embedExifInAvifBlob/g) || [];
+    expect(matches.length).toBeGreaterThan(2);
+  });
+
+  it('main.js llama a embedExifInAvifDataUrl en los caminos fallback', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('MetadataManager.embedExifInAvifDataUrl');
+    expect(src).toContain("finalMimeType === 'image/avif'");
+  });
+});

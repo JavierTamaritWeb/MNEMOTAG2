@@ -4,6 +4,46 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.3.17] - 2026-04-08
+
+### Added
+- **Parser ISOBMFF defensivo para AVIF**. Nuevas funciones públicas en `MetadataManager` (`js/managers/metadata-manager.js`):
+  - **`_parseIsobmffBoxes(bytes)`** — recorre los boxes top-level del archivo. Maneja los 3 formatos de cabecera de ISOBMFF: compacta de 8 bytes (`[size:4][type:4]`), large-size de 16 bytes (`[size=1:4][type:4][largesize:8]` para boxes >4 GB), y `size=0` (hasta el final del archivo). Devuelve `{type, start, end, headerSize, bodyStart}` por cada box. Se detiene defensivamente al primer header trunco o box corrupto.
+  - **`_isAvifFile(bytes)`** — verifica que el primer box es `ftyp` y que su major brand es `avif`/`avis`, o que cualquiera de los compatible brands posteriores es `avif`/`avis`/`mif1`/`miaf`.
+  - **`embedExifInAvifBlob(blob)`** — async, pública. Detecta AVIF, parsea boxes, busca el meta box. **En esta versión defensiva siempre devuelve el blob original** con `console.warn` explicando que la inyección completa de Exif requiere reescritura del meta box (iinf + iref + iloc + mdat + actualización de cabeceras anidadas), trabajo que se deja para una versión futura. Toda la chain de errores devuelve el blob original sin tocar — **NUNCA produce AVIF corruptos**.
+  - **`embedExifInAvifDataUrl(dataUrl)`** — wrapper que convierte el dataURL a blob, llama a `embedExifInAvifBlob`, y vuelve a convertir a dataURL si hay cambios. Patrón idéntico al de PNG/WebP.
+- **Integración en los 4 puntos del flujo de descarga** existentes en `js/main.js`:
+  - `downloadMultipleSizes()` — bucle ZIP, llamada `embedExifInAvifBlob` después de WebP.
+  - `downloadImage()` — rama showSaveFilePicker, llamada después de WebP.
+  - `downloadImage()` — rama fallback `<a download>`, llamada `embedExifInAvifDataUrl` con condicional `finalMimeType === 'image/avif'`.
+  - `downloadImageWithProgress()` — rama showSaveFilePicker, llamada después de WebP.
+  - `downloadImageWithProgress()` — rama fallback `<a download>`, llamada `embedExifInAvifDataUrl` con condicional.
+- **8 aserciones binarias nuevas** en `tests/binary-validation.js`. Sintetizan un AVIF mínimo válido a mano (`ftyp` con brand `avif` + `meta` vacía + `mdat` vacía, 40 bytes totales) y validan: que `_parseIsobmffBoxes` devuelve exactamente 3 boxes en las posiciones correctas, que `_isAvifFile` lo detecta como AVIF, y que rechaza correctamente bytes random y la signature PNG (negative tests).
+- **Tests de regresión** en `tests/specs/regression.spec.js`: nuevo `describe('Regresión — AVIF EXIF (v3.3.17): parser ISOBMFF defensivo')` con 5 aserciones que verifican las funciones públicas, la presencia del parser y detector AVIF (incluyendo manejo de `size === 1` largesize), los 3 caminos defensivos en metadata-manager, las llamadas en el flujo de descarga (≥3 ocurrencias de `embedExifInAvifBlob`), y la rama condicional `finalMimeType === 'image/avif'` para el fallback dataURL.
+
+### Notas de implementación
+- **Por qué defensiva total y no inyección real**: la inyección real de un item `Exif` en un contenedor ISOBMFF requiere:
+  1. Localizar el meta box.
+  2. Dentro de meta, localizar (o crear) `iinf` (item info), `iref` (item references), `iloc` (item locations), `idat`/`mdat` (data storage).
+  3. Añadir un nuevo entry en `iinf` con type `Exif`.
+  4. Añadir un `cdsc` reference en `iref` desde el nuevo Exif item al item primario.
+  5. Añadir una entrada a `iloc` apuntando a la zona del mdat donde van los bytes EXIF.
+  6. Concatenar los bytes EXIF (con el offset TIFF prefix de 4 bytes 0) al mdat o a un nuevo idat.
+  7. **Reescribir TODAS las cabeceras de los boxes padre** porque sus tamaños han cambiado.
+  8. Actualizar offset tables en `iloc` que pueden estar codificadas como 4 u 8 bytes según un flag de la cabecera de `iloc`.
+  9. Manejar boxes anidados con su propia versión de full-box header (4 bytes adicionales).
+
+  Esto es ~400-600 líneas de código binario muy frágil. Los AVIF generados por encoders distintos (libavif, x265, AOM) tienen estructuras ligeramente distintas, con o sin `idat`, con `iref` antes o después de `iloc`, etc. Cualquier error en la actualización de offsets produce un AVIF que el navegador no puede decodificar.
+
+  Esta versión opta por construir la **infraestructura de parseo correctamente** (validada con 8 aserciones binarias) y dejar la inyección real para cuando se pueda probar exhaustivamente con AVIF reales en un browser real. La cadena de degradación elegante es honesta: el usuario que descarga AVIF obtiene exactamente el mismo AVIF que tendría sin esta versión, sin metadatos pero sin corrupciones.
+- **Por qué probar con un AVIF mínimo sintetizado a mano**: garantiza que el parser funciona contra una estructura conocida byte a byte. Si en el futuro se añade inyección real, los mismos tests pueden extenderse para validar el AVIF de salida sin tener que cargar archivos binarios reales del disco.
+
+### Verificación
+- `node tests/run-in-node.js` → **137/137 OK** (132 anteriores + 5 nuevos)
+- `node tests/binary-validation.js` → **44/44 OK** (36 anteriores + 8 nuevos del parser ISOBMFF)
+
+---
+
 ## [3.3.16] - 2026-04-08
 
 ### Added
@@ -1349,5 +1389,5 @@ Lanzamiento inicial de MnemoTag.
 ---
 
 **Última actualización:** 8 de abril de 2026  
-**Versión actual:** 3.3.16  
+**Versión actual:** 3.3.17  
 **Estado:** ✅ Estable y listo para producción

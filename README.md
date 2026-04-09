@@ -4,11 +4,48 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos.
 
-![Version](https://img.shields.io/badge/version-3.3.16-blue.svg)
+![Version](https://img.shields.io/badge/version-3.3.17-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 [![Tests](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml)
 [![Deploy to GitHub Pages](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml)
+
+---
+
+## ⭐ NOVEDADES v3.3.17
+
+> **Infrastructure release — Parser ISOBMFF defensivo para AVIF EXIF.** Esta versión añade la infraestructura de parseo de cajas ISOBMFF (el contenedor que usa AVIF, HEIC y MP4) y el cableado completo de las funciones `embedExifInAvif*` en el flujo de descarga, con degradación elegante total. **La inyección efectiva de EXIF en AVIF no está activada todavía** — requiere una reescritura completa del meta box que se deja para una versión futura. La buena noticia: ningún AVIF se corrompe nunca, y la infraestructura está lista.
+
+### 🧱 Parser ISOBMFF (Box parser)
+
+- **`_parseIsobmffBoxes(bytes)`** — recorre los boxes top-level del archivo. Maneja correctamente los 3 formatos de cabecera de ISOBMFF:
+  - **Cabecera compacta** (8 bytes): `[size:4][type:4]` con `size` ≥ 8.
+  - **Large size** (16 bytes): `[size=1:4][type:4][largesize:8]` para boxes mayores que 4 GB.
+  - **Size 0** (8 bytes): el box ocupa hasta el final del archivo.
+- Devuelve un array con `{type, start, end, headerSize, bodyStart}` para cada box, suficiente para que las funciones de inyección sepan dónde empieza y acaba cada zona.
+- **`_isAvifFile(bytes)`** — verifica que el archivo es realmente AVIF leyendo el primer box `ftyp` y comprobando el major brand (`avif`/`avis`) o cualquiera de los compatible brands (`avif`, `avis`, `mif1`, `miaf`).
+
+### 🛡️ Inyección defensiva (degradación elegante)
+
+- **`MetadataManager.embedExifInAvifBlob(blob)`** y **`embedExifInAvifDataUrl(dataUrl)`** — públicas, async, integradas en los 4 puntos del flujo de descarga existente (igual que JPEG/PNG/WebP).
+- **NUNCA producen AVIF corruptos**. En esta primera versión:
+  1. Si el blob no es AVIF → devuelven el blob original con warning.
+  2. Si el parseo ISOBMFF lanza → devuelven el blob original con warning.
+  3. Si el archivo no tiene caja `meta` → devuelven el blob original con warning.
+  4. Si el archivo tiene caja `meta` válida → **devuelven el blob original sin tocar** + warning explicando que la inyección completa de Exif requiere reescritura del meta box (no implementada en v3.3.17).
+- Esto cumple el contrato público: la función existe, está cableada, y nunca rompe nada.
+- Cualquier futura versión puede sustituir el "return blob" del paso 4 por la lógica real de añadir un item `Exif` a `iinf` + referencia `cdsc` en `iref` + entrada en `iloc` + datos en `mdat` + actualización de cabeceras.
+
+### 🧪 8 aserciones binarias nuevas
+
+- `tests/binary-validation.js` ahora sintetiza un AVIF mínimo a mano (ftyp + meta vacía + mdat vacía) y valida que `_parseIsobmffBoxes` devuelve los 3 boxes correctos con sus posiciones, que `_isAvifFile` lo detecta como AVIF, y que rechaza correctamente bytes random y la signature PNG.
+
+### Verificación
+
+- `node tests/run-in-node.js` → **137/137 OK** (132 anteriores + 5 nuevos para v3.3.17)
+- `node tests/binary-validation.js` → **44/44 OK** (36 anteriores + 8 nuevos del parser ISOBMFF)
+
+Cero regresiones. Los formatos JPEG, PNG y WebP siguen escribiendo EXIF al 100% como antes. AVIF queda como infraestructura lista para una versión futura.
 
 ---
 
