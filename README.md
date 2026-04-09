@@ -4,11 +4,39 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos.
 
-![Version](https://img.shields.io/badge/version-3.3.12-blue.svg)
+![Version](https://img.shields.io/badge/version-3.3.13-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 [![Tests](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml)
 [![Deploy to GitHub Pages](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml)
+
+---
+
+## ⭐ NOVEDADES v3.3.13
+
+> **Feature release — Curvas y niveles estilo Photoshop.** Editor interactivo de curvas tonales por canal con LUT pixel-level.
+
+### 📈 Editor de curvas y niveles
+
+- Botón **"Curvas y niveles"** en la sección de filtros, justo debajo de "Auto-mejorar imagen". Abre un modal con un editor interactivo 280×280.
+- **4 canales editables** mediante tabs en la cabecera del modal: **RGB combinado**, **Rojo**, **Verde** y **Azul**. Cada canal mantiene su propia curva (su propio array de puntos de control) y se preserva al cambiar de tab.
+- **Interacción tipo Photoshop**:
+  - **Click** sobre la cuadrícula → añade un punto de control nuevo en esa posición.
+  - **Click + arrastre** sobre un punto existente → mueve el punto. Los puntos interiores no pueden cruzar a sus vecinos en el eje X (se mantienen ordenados).
+  - **Doble-click** sobre un punto → lo elimina (excepto los extremos en x=0 y x=255, que son permanentes).
+- **Curva renderizada en tiempo real** con interpolación lineal segmentada entre los puntos de control, cuadrícula 4×4 sutil de fondo y línea diagonal punteada como referencia (curva identidad).
+- Cada canal se pinta con su color característico (rojo, verde, azul, gris oscuro para RGB combinado).
+- **Aplicación con composición Photoshop-style**: al pulsar "Aplicar a la imagen", se construyen 4 LUTs `Uint8ClampedArray(256)` (una por canal) y se aplican en cadena: primero la LUT individual del canal R/G/B y, sobre el resultado, la LUT del canal RGB combinado. Esto reproduce el comportamiento del editor de curvas de Photoshop.
+- **Píxeles totalmente transparentes preservados** sin tocar.
+- **El cambio se persiste en `historyManager.saveState()`**, por lo que el botón Deshacer revierte la curva.
+- Botón "Resetear curva" reinicia el canal activo a la línea identidad sin cerrar el modal.
+
+### Verificación
+
+- `node tests/run-in-node.js` → **117/117 OK** (111 anteriores + 6 nuevos para v3.3.13)
+- `node tests/binary-validation.js` → 36/36 OK (sin cambios)
+
+Cero regresiones. El editor de curvas opera sobre `ctx.getImageData()` directo, sin tocar el sistema de filtros CSS existente.
 
 ---
 

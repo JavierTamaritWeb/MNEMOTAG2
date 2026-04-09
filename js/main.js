@@ -745,6 +745,11 @@
         if (autoBalanceBtn) {
           autoBalanceBtn.addEventListener('click', autoBalanceImage);
         }
+        // v3.3.13: Curvas y niveles.
+        const curvesBtn = document.getElementById('curves-btn');
+        if (curvesBtn) {
+          curvesBtn.addEventListener('click', openCurvesModal);
+        }
         // Cerrar modales de análisis (click en backdrop o botón X).
         document.querySelectorAll('[data-close-modal]').forEach(el => {
           el.addEventListener('click', function () {
@@ -4402,6 +4407,271 @@
       }
 
       UIManager.showSuccess('✨ Imagen auto-mejorada (rango lo=' + lo + ', hi=' + hi + ')');
+    }
+
+    // ============================================================
+    // v3.3.13 — Curvas y niveles (LUT pixel-level)
+    // ============================================================
+
+    // Estado del editor de curvas. Cada canal mantiene su propio array
+    // de puntos de control en coordenadas {x, y} ∈ [0, 255]. Los puntos
+    // están siempre ordenados por x. Los extremos (x=0 y x=255) son
+    // permanentes y no se pueden eliminar.
+    const _curvesState = {
+      activeChannel: 'rgb',
+      points: {
+        rgb: [{ x: 0, y: 0 }, { x: 255, y: 255 }],
+        r:   [{ x: 0, y: 0 }, { x: 255, y: 255 }],
+        g:   [{ x: 0, y: 0 }, { x: 255, y: 255 }],
+        b:   [{ x: 0, y: 0 }, { x: 255, y: 255 }]
+      },
+      dragIndex: -1,
+      lastImageDataSnapshot: null
+    };
+
+    function openCurvesModal() {
+      if (!canvas || !currentImage) {
+        UIManager.showError('Carga una imagen primero para editar curvas.');
+        return;
+      }
+      const modal = document.getElementById('curves-modal');
+      if (!modal) return;
+      modal.classList.remove('hidden');
+
+      _setupCurvesUI();
+      _redrawCurvesCanvas();
+    }
+
+    function _setupCurvesUI() {
+      // Idempotente: si ya enganchamos los listeners, no los volvemos a
+      // enganchar. Marcamos con un atributo data-* en el modal.
+      const modal = document.getElementById('curves-modal');
+      if (!modal || modal.dataset.curvesInitialized === '1') return;
+      modal.dataset.curvesInitialized = '1';
+
+      // Tabs de canal
+      modal.querySelectorAll('.curves-channel-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          modal.querySelectorAll('.curves-channel-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          _curvesState.activeChannel = btn.getAttribute('data-channel');
+          _redrawCurvesCanvas();
+        });
+      });
+
+      // Botones acción
+      const applyBtn = document.getElementById('curves-apply-btn');
+      const resetBtn = document.getElementById('curves-reset-btn');
+      if (applyBtn) applyBtn.addEventListener('click', _applyCurvesToImage);
+      if (resetBtn) resetBtn.addEventListener('click', _resetCurves);
+
+      // Interacción con el canvas
+      const cv = document.getElementById('curves-canvas');
+      if (!cv) return;
+
+      const getCanvasCoords = (evt) => {
+        const rect = cv.getBoundingClientRect();
+        const x = ((evt.clientX - rect.left) / rect.width) * 255;
+        const y = 255 - ((evt.clientY - rect.top) / rect.height) * 255;
+        return {
+          x: Math.max(0, Math.min(255, x)),
+          y: Math.max(0, Math.min(255, y))
+        };
+      };
+
+      cv.addEventListener('mousedown', (e) => {
+        const { x, y } = getCanvasCoords(e);
+        const points = _curvesState.points[_curvesState.activeChannel];
+        // ¿Click sobre un punto existente? (radio = 8 unidades)
+        const idx = points.findIndex(p => Math.abs(p.x - x) < 8 && Math.abs(p.y - y) < 8);
+        if (idx !== -1) {
+          _curvesState.dragIndex = idx;
+        } else {
+          // Añadir punto nuevo (preservando orden por x)
+          points.push({ x, y });
+          points.sort((a, b) => a.x - b.x);
+          _curvesState.dragIndex = points.findIndex(p => p.x === x && p.y === y);
+        }
+        _redrawCurvesCanvas();
+      });
+
+      cv.addEventListener('mousemove', (e) => {
+        if (_curvesState.dragIndex === -1) return;
+        const { x, y } = getCanvasCoords(e);
+        const points = _curvesState.points[_curvesState.activeChannel];
+        const i = _curvesState.dragIndex;
+        // Los extremos no pueden cambiar de x (0 o 255), solo de y.
+        if (i === 0) {
+          points[i] = { x: 0, y };
+        } else if (i === points.length - 1) {
+          points[i] = { x: 255, y };
+        } else {
+          // Punto interior: respetamos la x del vecino para no cruzar.
+          const minX = points[i - 1].x + 1;
+          const maxX = points[i + 1].x - 1;
+          points[i] = {
+            x: Math.max(minX, Math.min(maxX, x)),
+            y
+          };
+        }
+        _redrawCurvesCanvas();
+      });
+
+      const stopDrag = () => { _curvesState.dragIndex = -1; };
+      cv.addEventListener('mouseup', stopDrag);
+      cv.addEventListener('mouseleave', stopDrag);
+
+      cv.addEventListener('dblclick', (e) => {
+        const { x, y } = getCanvasCoords(e);
+        const points = _curvesState.points[_curvesState.activeChannel];
+        const idx = points.findIndex(p => Math.abs(p.x - x) < 8 && Math.abs(p.y - y) < 8);
+        // No permitir eliminar los extremos
+        if (idx > 0 && idx < points.length - 1) {
+          points.splice(idx, 1);
+          _redrawCurvesCanvas();
+        }
+      });
+    }
+
+    function _resetCurves() {
+      _curvesState.points[_curvesState.activeChannel] = [
+        { x: 0, y: 0 },
+        { x: 255, y: 255 }
+      ];
+      _redrawCurvesCanvas();
+    }
+
+    // Construye una LUT de 256 valores interpolando linealmente entre
+    // puntos de control. Para curvas suaves se podría usar Catmull-Rom,
+    // pero la interpolación lineal segmentada es predecible, rápida y
+    // suficiente para edición visual.
+    function _buildLutFromPoints(points) {
+      const lut = new Uint8ClampedArray(256);
+      // Asegurar puntos ordenados por x
+      const pts = points.slice().sort((a, b) => a.x - b.x);
+      let segIdx = 0;
+      for (let i = 0; i < 256; i++) {
+        // Avanzar al segmento que contiene i
+        while (segIdx < pts.length - 2 && pts[segIdx + 1].x < i) {
+          segIdx++;
+        }
+        const p0 = pts[segIdx];
+        const p1 = pts[segIdx + 1];
+        if (!p1) {
+          lut[i] = p0.y;
+          continue;
+        }
+        if (i <= p0.x) {
+          lut[i] = p0.y;
+        } else if (i >= p1.x) {
+          lut[i] = p1.y;
+        } else {
+          const t = (i - p0.x) / (p1.x - p0.x);
+          lut[i] = p0.y + t * (p1.y - p0.y);
+        }
+      }
+      return lut;
+    }
+
+    function _redrawCurvesCanvas() {
+      const cv = document.getElementById('curves-canvas');
+      if (!cv) return;
+      const cctx = cv.getContext('2d');
+      const W = cv.width;
+      const H = cv.height;
+
+      cctx.clearRect(0, 0, W, H);
+
+      // Cuadrícula 4×4
+      cctx.strokeStyle = 'rgba(107,114,128,0.25)';
+      cctx.lineWidth = 1;
+      for (let i = 1; i < 4; i++) {
+        const x = (W * i) / 4;
+        const y = (H * i) / 4;
+        cctx.beginPath();
+        cctx.moveTo(x, 0); cctx.lineTo(x, H);
+        cctx.moveTo(0, y); cctx.lineTo(W, y);
+        cctx.stroke();
+      }
+
+      // Línea diagonal de referencia (identidad)
+      cctx.strokeStyle = 'rgba(107,114,128,0.4)';
+      cctx.setLineDash([4, 4]);
+      cctx.beginPath();
+      cctx.moveTo(0, H);
+      cctx.lineTo(W, 0);
+      cctx.stroke();
+      cctx.setLineDash([]);
+
+      // Curva del canal activo
+      const ch = _curvesState.activeChannel;
+      const points = _curvesState.points[ch];
+      const colorMap = {
+        rgb: '#111827',
+        r: '#ef4444',
+        g: '#10b981',
+        b: '#3b82f6'
+      };
+      const curveColor = colorMap[ch] || '#111827';
+
+      const lut = _buildLutFromPoints(points);
+
+      cctx.strokeStyle = curveColor;
+      cctx.lineWidth = 2;
+      cctx.beginPath();
+      for (let i = 0; i < 256; i++) {
+        const x = (i / 255) * W;
+        const y = H - (lut[i] / 255) * H;
+        if (i === 0) cctx.moveTo(x, y);
+        else cctx.lineTo(x, y);
+      }
+      cctx.stroke();
+
+      // Puntos de control
+      cctx.fillStyle = curveColor;
+      cctx.strokeStyle = '#ffffff';
+      cctx.lineWidth = 2;
+      points.forEach(p => {
+        const x = (p.x / 255) * W;
+        const y = H - (p.y / 255) * H;
+        cctx.beginPath();
+        cctx.arc(x, y, 5, 0, Math.PI * 2);
+        cctx.fill();
+        cctx.stroke();
+      });
+    }
+
+    function _applyCurvesToImage() {
+      const imageData = _getCanvasImageData();
+      if (!imageData) {
+        UIManager.showError('No hay imagen sobre la que aplicar las curvas.');
+        return;
+      }
+
+      // Construir LUTs por canal. La curva 'rgb' se aplica DESPUÉS de
+      // las curvas individuales R/G/B (composición), igual que Photoshop.
+      const lutR = _buildLutFromPoints(_curvesState.points.r);
+      const lutG = _buildLutFromPoints(_curvesState.points.g);
+      const lutB = _buildLutFromPoints(_curvesState.points.b);
+      const lutRGB = _buildLutFromPoints(_curvesState.points.rgb);
+
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i + 3] === 0) continue;
+        data[i]     = lutRGB[lutR[data[i]]];
+        data[i + 1] = lutRGB[lutG[data[i + 1]]];
+        data[i + 2] = lutRGB[lutB[data[i + 2]]];
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+
+      if (typeof historyManager !== 'undefined' && historyManager.saveState) {
+        historyManager.saveState();
+      }
+
+      UIManager.showSuccess('📈 Curvas aplicadas a la imagen');
+      const modal = document.getElementById('curves-modal');
+      if (modal) modal.classList.add('hidden');
     }
 
     async function downloadImage() {

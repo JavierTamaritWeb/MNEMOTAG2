@@ -411,3 +411,54 @@ describe('Regresión — Análisis visual (v3.3.12): histograma + paleta + auto-
     expect(src).toContain('.palette-swatch');
   });
 });
+
+describe('Regresión — Curvas y niveles (v3.3.13): editor de curvas con LUT', function () {
+  it('main.js define el estado _curvesState con los 4 canales', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('_curvesState');
+    expect(src).toContain("activeChannel: 'rgb'");
+    // Cada canal debe arrancar con los 2 puntos extremos
+    expect(src).toContain('rgb: [{ x: 0, y: 0 }, { x: 255, y: 255 }]');
+  });
+
+  it('main.js define _buildLutFromPoints con interpolación lineal segmentada', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('function _buildLutFromPoints');
+    expect(src).toContain('Uint8ClampedArray(256)');
+  });
+
+  it('main.js define openCurvesModal y _applyCurvesToImage con composición LUT', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('function openCurvesModal');
+    expect(src).toContain('function _applyCurvesToImage');
+    // Composición: primero la LUT por canal, luego la LUT RGB combinada
+    expect(src).toContain('lutRGB[lutR[data[i]]]');
+    expect(src).toContain('historyManager.saveState');
+  });
+
+  it('main.js define _redrawCurvesCanvas con cuadrícula y línea identidad', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('function _redrawCurvesCanvas');
+    // Línea diagonal de referencia
+    expect(src).toContain('setLineDash([4, 4])');
+  });
+
+  it('index.html incluye el modal de curvas con tabs de canal y canvas interactivo', async function () {
+    const src = await fetchSource('../index.html');
+    expect(src).toContain('id="curves-modal"');
+    expect(src).toContain('id="curves-canvas"');
+    expect(src).toContain('id="curves-apply-btn"');
+    expect(src).toContain('id="curves-reset-btn"');
+    expect(src).toContain('data-channel="rgb"');
+    expect(src).toContain('data-channel="r"');
+    expect(src).toContain('data-channel="g"');
+    expect(src).toContain('data-channel="b"');
+  });
+
+  it('css/styles.css define las clases del editor de curvas', async function () {
+    const src = await fetchSource('../css/styles.css');
+    expect(src).toContain('.curves-channel-tabs');
+    expect(src).toContain('.curves-channel-btn');
+    expect(src).toContain('#curves-canvas');
+  });
+});

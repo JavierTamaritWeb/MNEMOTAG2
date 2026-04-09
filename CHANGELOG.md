@@ -4,6 +4,32 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.3.13] - 2026-04-08
+
+### Added
+- **Editor de curvas y niveles estilo Photoshop**. Botón "Curvas y niveles" en la sección de filtros (`index.html:643`, debajo de "Auto-mejorar imagen") que abre `#curves-modal`. El modal contiene:
+  - **Tabs de canal** (RGB combinado, R, G, B individuales). Cada canal mantiene su propio array de puntos de control en `_curvesState.points[channel]`. El estado es persistente entre cambios de tab pero se resetea al cerrar el modal.
+  - **Canvas interactivo 280×280** con cuadrícula 4×4 sutil, línea diagonal punteada de referencia (curva identidad), y la curva del canal activo renderizada en tiempo real con su color característico (`#ef4444` rojo, `#10b981` verde, `#3b82f6` azul, `#111827` gris oscuro para RGB combinado).
+  - **Click** añade un punto de control en la coordenada del cursor. **Drag** sobre un punto existente lo mueve, respetando que los puntos interiores no crucen a sus vecinos en X (clamp `points[i-1].x + 1` a `points[i+1].x - 1`). Los extremos (`x=0` y `x=255`) solo pueden cambiar de Y. **Doble-click** sobre un punto interior lo elimina; los extremos no se pueden eliminar.
+  - **Botones "Aplicar a la imagen"** (cierra el modal y aplica) y **"Resetear curva"** (reinicia solo el canal activo a la línea identidad).
+- **Función `_buildLutFromPoints(points)`** en `js/main.js`. Construye una `Uint8ClampedArray(256)` interpolando linealmente entre los puntos de control ordenados por X. Algoritmo: para cada `i` de 0 a 255, encuentra el segmento `[p0, p1]` que lo contiene y calcula `lut[i] = p0.y + t * (p1.y - p0.y)` con `t = (i - p0.x) / (p1.x - p0.x)`. Maneja los casos de borde (`i <= p0.x`, `i >= p1.x`).
+- **Función `_applyCurvesToImage()`**. Construye 4 LUTs (R, G, B y RGB combinado) y las aplica a `ctx.getImageData()` con **composición Photoshop-style**: primero la LUT individual del canal y luego la LUT RGB combinada encima (`data[i] = lutRGB[lutR[data[i]]]`). Píxeles totalmente transparentes preservados. Persiste en `historyManager.saveState()`.
+- **Función `_redrawCurvesCanvas()`**. Pinta la cuadrícula, la línea diagonal punteada (`setLineDash([4, 4])`), la curva del canal activo a partir de la LUT, y los círculos blancos rellenados con el color del canal en cada punto de control.
+- **Idempotencia de los listeners**: `_setupCurvesUI()` marca `modal.dataset.curvesInitialized = '1'` para no re-enganchar listeners en aperturas posteriores.
+- **Estilos completos** en `css/styles.css`: `.analysis-modal__content--curves` (max-width 380px), `.curves-controls`, `.curves-channel-tabs`, `.curves-channel-btn` (con estado `.active`), `#curves-canvas` (cursor crosshair, fondo blanco, bordes redondeados). Variantes para tema oscuro.
+- **Tests de regresión** en `tests/specs/regression.spec.js`: nuevo `describe('Regresión — Curvas y niveles (v3.3.13)')` con 6 aserciones que verifican el estado `_curvesState`, las funciones `_buildLutFromPoints`, `openCurvesModal`, `_applyCurvesToImage` con composición LUT, `_redrawCurvesCanvas` con `setLineDash`, el modal HTML con tabs y canvas, y las clases CSS dedicadas.
+
+### Notas de implementación
+- **Por qué interpolación lineal segmentada y no Catmull-Rom**: la interpolación lineal es predecible (sin overshooting), rápida (sin cómputo de splines en cada redraw), y suficiente para edición visual. El usuario añade más puntos si quiere curvas más suaves — es exactamente lo que hace Photoshop por defecto.
+- **Por qué composición R/G/B luego RGB**: replica la composición de Photoshop. La curva RGB combinada actúa como un ajuste global que se aplica DESPUÉS de las correcciones individuales de canal. Esto permite, por ejemplo, corregir el balance de blancos canal por canal y luego ajustar el contraste global con una S-curve en RGB.
+- **Detección de click sobre punto existente**: radio de 8 unidades en el espacio [0,255] (no en píxeles del canvas), lo que se traduce en ~9 píxeles visuales para un canvas de 280×280.
+
+### Verificación
+- `node tests/run-in-node.js` → **117/117 OK** (111 anteriores + 6 nuevos)
+- `node tests/binary-validation.js` → 36/36 OK (sin cambios)
+
+---
+
 ## [3.3.12] - 2026-04-08
 
 ### Added
@@ -1235,5 +1261,5 @@ Lanzamiento inicial de MnemoTag.
 ---
 
 **Última actualización:** 8 de abril de 2026  
-**Versión actual:** 3.3.12  
+**Versión actual:** 3.3.13  
 **Estado:** ✅ Estable y listo para producción

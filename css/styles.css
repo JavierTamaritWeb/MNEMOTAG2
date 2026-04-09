@@ -6691,3 +6691,81 @@
   color: #d1d5db;
 }
 
+/* ============================================================
+   v3.3.13 — Modal de curvas y niveles
+   ============================================================ */
+
+.analysis-modal__content--curves {
+  max-width: 380px;
+}
+
+.curves-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.curves-channel-tabs {
+  display: inline-flex;
+  background: #f3f4f6;
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+
+[data-theme="dark"] .curves-channel-tabs {
+  background: #374151;
+}
+
+.curves-channel-btn {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #4b5563;
+  transition: all 0.15s;
+}
+
+[data-theme="dark"] .curves-channel-btn {
+  color: #d1d5db;
+}
+
+.curves-channel-btn:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+[data-theme="dark"] .curves-channel-btn:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.curves-channel-btn.active {
+  background: #ffffff;
+  color: #111827;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="dark"] .curves-channel-btn.active {
+  background: #1f2937;
+  color: #f9fafb;
+}
+
+#curves-canvas {
+  display: block;
+  width: 280px;
+  height: 280px;
+  background: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  cursor: crosshair;
+  margin: 0 auto;
+}
+
+[data-theme="dark"] #curves-canvas {
+  background: #111827;
+  border-color: #374151;
+}
+

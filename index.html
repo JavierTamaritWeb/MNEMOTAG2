@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MnemoTag v3.3.12</title>
+  <title>MnemoTag v3.3.13</title>
   
   <!-- Favicon moderno con SVG -->
   <link rel="icon" type="image/svg+xml" href="images/favicon.svg">
@@ -640,6 +640,11 @@
                       <button type="button" id="auto-balance-btn" class="btn btn-primary button--feature" title="Mejora automáticamente brillo y contraste analizando los percentiles 1% y 99% de luminosidad">
                         <i class="fas fa-magic" aria-hidden="true"></i>
                         Auto-mejorar imagen
+                      </button>
+                      <!-- v3.3.13: Curvas y niveles -->
+                      <button type="button" id="curves-btn" class="btn btn-primary button--feature" title="Editor de curvas y niveles (estilo Photoshop) por canal o RGB combinado">
+                        <i class="fas fa-chart-line" aria-hidden="true"></i>
+                        Curvas y niveles
                       </button>
                       <button type="button" id="resetFilters" class="reset-filters-btn">
                         <i class="fas fa-undo" aria-hidden="true"></i>
@@ -1573,6 +1578,44 @@
             <span class="analysis-modal__legend-item" style="--swatch:#6b7280;">Lum</span>
           </div>
           <p class="text-xs text-gray-500 mt-2">El histograma se calcula sobre el canvas actual (con filtros y marcas de agua aplicados).</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- v3.3.13: Modal de Curvas y niveles -->
+    <div id="curves-modal" class="analysis-modal hidden" role="dialog" aria-modal="true" aria-labelledby="curves-modal-title">
+      <div class="analysis-modal__backdrop" data-close-modal="curves"></div>
+      <div class="analysis-modal__content analysis-modal__content--curves">
+        <div class="analysis-modal__header">
+          <h3 id="curves-modal-title" class="analysis-modal__title">
+            <i class="fas fa-chart-line"></i> Curvas y niveles
+          </h3>
+          <button type="button" class="analysis-modal__close" data-close-modal="curves" aria-label="Cerrar">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="analysis-modal__body">
+          <div class="curves-controls mb-3">
+            <label class="text-sm font-medium mr-2">Canal:</label>
+            <div class="curves-channel-tabs" role="tablist">
+              <button type="button" class="curves-channel-btn active" data-channel="rgb">RGB</button>
+              <button type="button" class="curves-channel-btn" data-channel="r">Rojo</button>
+              <button type="button" class="curves-channel-btn" data-channel="g">Verde</button>
+              <button type="button" class="curves-channel-btn" data-channel="b">Azul</button>
+            </div>
+          </div>
+          <canvas id="curves-canvas" width="280" height="280"></canvas>
+          <p class="text-xs text-gray-500 mt-2">
+            <strong>Click</strong> para añadir un punto. <strong>Arrastra</strong> para moverlo. <strong>Doble-click</strong> sobre un punto para eliminarlo (no puedes eliminar los extremos).
+          </p>
+          <div class="flex gap-2 mt-3">
+            <button type="button" id="curves-apply-btn" class="btn btn-primary button--action">
+              <i class="fas fa-check"></i> Aplicar a la imagen
+            </button>
+            <button type="button" id="curves-reset-btn" class="btn btn-outline">
+              <i class="fas fa-undo"></i> Resetear curva
+            </button>
+          </div>
         </div>
       </div>
     </div>
