@@ -361,9 +361,9 @@ describe('Regresión — Quick wins UX (v3.3.11): paste + export multi-size', fu
   });
 });
 
-describe('Regresión — Análisis visual (v3.3.12): histograma + paleta + auto-fix', function () {
-  it('main.js define showHistogram con cómputo de histogramas RGB+luminosidad', async function () {
-    const src = await fetchSource('../js/main.js');
+describe('Regresión — Análisis visual (v3.3.12 → v3.4.7 extraído a AnalysisManager)', function () {
+  it('analysis-manager.js define showHistogram con cómputo RGB+luminosidad', async function () {
+    const src = await fetchSource('../js/managers/analysis-manager.js');
     expect(src).toContain('function showHistogram');
     // Coeficientes ITU-R BT.601 para luminosidad
     expect(src).toContain('0.299');
@@ -371,21 +371,20 @@ describe('Regresión — Análisis visual (v3.3.12): histograma + paleta + auto-
     expect(src).toContain('0.114');
   });
 
-  it('main.js define _extractDominantColors usando cuantización por buckets', async function () {
-    const src = await fetchSource('../js/main.js');
+  it('analysis-manager.js define _extractDominantColors usando cuantización por buckets', async function () {
+    const src = await fetchSource('../js/managers/analysis-manager.js');
     expect(src).toContain('_extractDominantColors');
     expect(src).toContain('function showPalette');
     // Cuantización shift >> 5 (8 niveles por canal)
     expect(src).toContain('>> 5');
   });
 
-  it('main.js define autoBalanceImage con percentiles 1% y 99% y LUT', async function () {
-    const src = await fetchSource('../js/main.js');
+  it('analysis-manager.js define autoBalanceImage con percentiles 1% y 99% y LUT', async function () {
+    const src = await fetchSource('../js/managers/analysis-manager.js');
     expect(src).toContain('function autoBalanceImage');
     expect(src).toContain('totalPixels * 0.01');
     expect(src).toContain('totalPixels * 0.99');
     expect(src).toContain('Uint8ClampedArray(256)');
-    // Tras aplicar la LUT debe persistir el cambio en historial
     expect(src).toContain('historyManager.saveState');
   });
 
@@ -409,6 +408,30 @@ describe('Regresión — Análisis visual (v3.3.12): histograma + paleta + auto-
     expect(src).toContain('.analysis-modal');
     expect(src).toContain('.palette-grid');
     expect(src).toContain('.palette-swatch');
+  });
+
+  // v3.4.7: la extracción a manager
+  it('v3.4.7: analysis-manager.js expone window.AnalysisManager con IIFE', async function () {
+    const src = await fetchSource('../js/managers/analysis-manager.js');
+    expect(src).toContain('window.AnalysisManager = (function');
+    expect(src).toContain('showHistogram: showHistogram');
+    expect(src).toContain('showPalette: showPalette');
+    expect(src).toContain('autoBalanceImage: autoBalanceImage');
+  });
+
+  it('v3.4.7: main.js delega los 3 botones de análisis a AnalysisManager', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('AnalysisManager.showHistogram');
+    expect(src).toContain('AnalysisManager.showPalette');
+    expect(src).toContain('AnalysisManager.autoBalanceImage');
+  });
+
+  it('v3.4.7: index.html carga analysis-manager.js antes de main.js', async function () {
+    const src = await fetchSource('../index.html');
+    const analysisIdx = src.indexOf('analysis-manager.js');
+    const mainIdx = src.indexOf('js/main.js');
+    expect(analysisIdx).toBeGreaterThan(0);
+    expect(mainIdx).toBeGreaterThan(analysisIdx);
   });
 });
 

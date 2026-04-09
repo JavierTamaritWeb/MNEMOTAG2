@@ -160,6 +160,7 @@ load('js/managers/security-manager.js');
 load('js/managers/metadata-manager.js');
 load('js/managers/history-manager.js');
 load('js/managers/preset-manager.js');
+load('js/managers/analysis-manager.js');
 
 // ---- 2) Test runner casero -------------------------------------------------
 
