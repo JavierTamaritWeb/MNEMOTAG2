@@ -41,7 +41,13 @@ const SecurityManager = {
 
   // Validación de archivos de imagen mejorada
   validateImageFile: function(file) {
+    // v3.3.15: HEIC/HEIF se aceptan SOLO si la librería heic2any está
+    // cargada en la página. Si no, el flujo principal mostrará un error
+    // claro antes incluso de llegar aquí.
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/avif'];
+    if (typeof heic2any !== 'undefined') {
+      allowedTypes.push('image/heic', 'image/heif');
+    }
     const maxSize = AppConfig.maxFileSize; // Usar AppConfig como fuente única
     
     const validation = {

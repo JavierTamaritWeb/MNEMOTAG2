@@ -1799,10 +1799,43 @@
     }
 
     // Enhanced file handling with security validation and preview
-    function handleFile(file) {
+    async function handleFile(file) {
       // Limpiar errores anteriores
       UIManager.hideError();
-      
+
+      // v3.3.15: Soporte HEIC/HEIF (formatos del iPhone). Si la imagen
+      // es HEIC/HEIF y la librería heic2any está cargada, convertimos a
+      // JPEG ANTES de validar. La validación posterior verá un JPEG
+      // estándar y todo el flujo de carga / EXIF / filtros / descarga
+      // sigue funcionando sin tocar nada más.
+      const isHeic = (file && (
+        file.type === 'image/heic' ||
+        file.type === 'image/heif' ||
+        /\.heic$|\.heif$/i.test(file.name || '')
+      ));
+      if (isHeic) {
+        if (typeof heic2any === 'undefined') {
+          UIManager.showError('Soporte HEIC no disponible: la librería heic2any no se ha cargado. Recarga la página o usa otro formato.');
+          return;
+        }
+        try {
+          UIManager.showInfo('🔄 Convirtiendo HEIC/HEIF a JPEG...');
+          const converted = await heic2any({
+            blob: file,
+            toType: 'image/jpeg',
+            quality: 0.92
+          });
+          const blob = Array.isArray(converted) ? converted[0] : converted;
+          const newName = (file.name || 'imagen').replace(/\.heic$|\.heif$/i, '.jpg');
+          file = new File([blob], newName, { type: 'image/jpeg' });
+          UIManager.showSuccess('✅ HEIC convertido a JPEG correctamente');
+        } catch (err) {
+          console.error('Error al convertir HEIC:', err);
+          UIManager.showError('Error al convertir HEIC: ' + (err.message || err));
+          return;
+        }
+      }
+
       // Validación completa del archivo
       const validation = SecurityManager.validateImageFile(file);
       

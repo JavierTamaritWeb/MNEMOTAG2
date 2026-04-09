@@ -4,6 +4,35 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.3.15] - 2026-04-08
+
+### Added
+- **Soporte HEIC/HEIF (formatos del iPhone)**. La app ahora carga directamente las fotos `.heic` que iOS genera por defecto.
+- **Carga de la librería [heic2any](https://github.com/alexcorvi/heic2any) v0.0.4 desde CDN** en `index.html:1564`: `<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js">`. Sigue siendo un proyecto static-only (sin npm).
+- **`handleFile(file)` ahora es `async function`** (`js/main.js:1802`). Antes de validar, comprueba si el archivo es HEIC/HEIF (vía MIME `image/heic|heif` o extensión `.heic|.heif`). Si lo es:
+  - Verifica que `heic2any` esté definido (degradación elegante con error claro si no).
+  - Muestra `UIManager.showInfo('🔄 Convirtiendo HEIC/HEIF a JPEG...')`.
+  - Llama a `await heic2any({blob: file, toType: 'image/jpeg', quality: 0.92})`. La librería devuelve un Blob (o un Array de Blobs si la imagen original tiene varias páginas — toma el primero).
+  - Envuelve el blob resultante en un nuevo `File` con la extensión cambiada de `.heic`/`.heif` a `.jpg` y MIME `image/jpeg`.
+  - Reasigna `file = nuevoFile` y deja que el resto del flujo de validación, preview, carga y EXIF actúe sobre un JPEG estándar.
+  - Toast de éxito `✅ HEIC convertido a JPEG correctamente`.
+  - Si la conversión lanza, muestra `UIManager.showError('Error al convertir HEIC: ' + ...)` y aborta la carga sin tocar el resto de la app.
+- **`SecurityManager.validateImageFile`** (`js/managers/security-manager.js:43+`) añade `'image/heic'` e `'image/heif'` a `allowedTypes` solo si `typeof heic2any !== 'undefined'`. Esto evita que se acepte un HEIC en runtime cuando la librería no está cargada (offline, CDN bloqueado, etc.).
+- **Atributo `accept` del `<input id="file-input">`** actualizado a `.jpg,.jpeg,.png,.webp,.avif,.heic,.heif` para que el picker nativo del SO muestre los archivos HEIC seleccionables.
+- **Texto informativo** del área de drop actualizado: *"Formatos: JPG, JPEG, PNG, WEBP, AVIF, HEIC, HEIF · Pega con Cmd+V / Ctrl+V"*.
+- **Tests de regresión** en `tests/specs/regression.spec.js`: nuevo `describe('Regresión — Soporte HEIC/HEIF (v3.3.15)')` con 4 aserciones que verifican la carga de heic2any desde CDN, el `accept` del input + texto informativo en HTML, la conversión HEIC en `handleFile` (incluyendo `async function` y `await heic2any`), y la lógica condicional de `allowedTypes` en SecurityManager.
+
+### Notas de implementación
+- **Por qué `handleFile` async no rompe los callers**: los 5 puntos donde se llama a `handleFile` (drop area, file input, paste, paste button, batch) ya hacían fire-and-forget (no esperaban return value), por lo que devolver una Promise no cambia su comportamiento. La validación de errores sigue ocurriendo via toasts dentro de `handleFile`, igual que antes.
+- **Por qué calidad 0.92 y no 1.0**: 1.0 produce JPEGs casi del mismo tamaño que el HEIC original (que ya está muy comprimido) sin ganancia visual perceptible. 0.92 mantiene fidelidad y reduce el tamaño ~30%, lo que mejora el rendimiento del resto del pipeline (filtros, redimensionado, descarga).
+- **Por qué heic2any@0.0.4 y no la versión más nueva**: la 0.0.4 es la última estable publicada en npm. Las versiones siguientes (1.x) cambian la API y rompen el patrón `await heic2any({blob, toType, quality})`. Si en el futuro la librería se actualiza, hay que adaptar el caller.
+
+### Verificación
+- `node tests/run-in-node.js` → **127/127 OK** (123 anteriores + 4 nuevos)
+- `node tests/binary-validation.js` → 36/36 OK (sin cambios)
+
+---
+
 ## [3.3.14] - 2026-04-08
 
 ### Added
@@ -1290,5 +1319,5 @@ Lanzamiento inicial de MnemoTag.
 ---
 
 **Última actualización:** 8 de abril de 2026  
-**Versión actual:** 3.3.14  
+**Versión actual:** 3.3.15  
 **Estado:** ✅ Estable y listo para producción

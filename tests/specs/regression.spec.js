@@ -508,3 +508,36 @@ describe('Regresión — Histórico visual con thumbnails (v3.3.14)', function (
     expect(src).toContain('.history-thumb.is-current');
   });
 });
+
+describe('Regresión — Soporte HEIC/HEIF (v3.3.15)', function () {
+  it('index.html carga heic2any desde CDN', async function () {
+    const src = await fetchSource('../index.html');
+    expect(src).toContain('heic2any');
+    expect(src).toContain('heic2any.min.js');
+  });
+
+  it('index.html acepta .heic y .heif en el input de archivo', async function () {
+    const src = await fetchSource('../index.html');
+    expect(src).toContain('.heic,.heif');
+    // El texto informativo del área de drop debe mencionar HEIC/HEIF
+    expect(src).toContain('HEIC');
+    expect(src).toContain('HEIF');
+  });
+
+  it('main.js convierte HEIC a JPEG antes de validar (handleFile async)', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('async function handleFile');
+    expect(src).toContain("file.type === 'image/heic'");
+    expect(src).toContain("file.type === 'image/heif'");
+    expect(src).toContain('await heic2any');
+    // Conversión a JPEG con quality 0.92
+    expect(src).toContain("toType: 'image/jpeg'");
+  });
+
+  it('security-manager.js añade HEIC/HEIF a allowedTypes solo si heic2any está disponible', async function () {
+    const src = await fetchSource('../js/managers/security-manager.js');
+    expect(src).toContain("typeof heic2any !== 'undefined'");
+    expect(src).toContain("'image/heic'");
+    expect(src).toContain("'image/heif'");
+  });
+});

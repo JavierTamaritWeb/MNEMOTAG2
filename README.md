@@ -4,11 +4,35 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos.
 
-![Version](https://img.shields.io/badge/version-3.3.14-blue.svg)
+![Version](https://img.shields.io/badge/version-3.3.15-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 [![Tests](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml)
 [![Deploy to GitHub Pages](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml)
+
+---
+
+## ⭐ NOVEDADES v3.3.15
+
+> **Feature release — Soporte HEIC/HEIF (formatos del iPhone).** Ahora puedes arrastrar (o pegar, o seleccionar) directamente las fotos `.heic` que tu iPhone genera por defecto: la app las convierte a JPEG en cliente y todo el flujo (filtros, marcas de agua, EXIF, descarga) sigue funcionando sin tocar nada más.
+
+### 📱 Conversión HEIC/HEIF transparente
+
+- **Detección automática** en `handleFile`: si el archivo tiene MIME `image/heic` o `image/heif`, o el nombre acaba en `.heic` o `.heif`, se dispara la conversión ANTES de validar.
+- **Conversión vía librería [heic2any](https://github.com/alexcorvi/heic2any) cargada desde CDN** (no se añade dependencia npm — sigue siendo un proyecto static-only). La librería usa la API `Web Workers` internamente, así que la conversión no bloquea el hilo principal.
+- **Calidad de salida 0.92** para mantener fidelidad sin inflar el tamaño. El archivo resultante se envuelve en un `File` con la extensión cambiada a `.jpg` y se pasa al flujo de carga normal.
+- **Toasts informativos** durante la conversión: `🔄 Convirtiendo HEIC/HEIF a JPEG...` y al éxito `✅ HEIC convertido a JPEG correctamente`.
+- **Degradación elegante** si la librería no se ha cargado (offline, bloqueo CDN, etc.): mensaje claro al usuario en lugar de un error genérico.
+- **`SecurityManager.validateImageFile`** añade `image/heic` e `image/heif` a la lista de tipos permitidos SOLO si `typeof heic2any !== 'undefined'`, así nunca se permite un HEIC sin la librería que sabe leerlo.
+- **Atributo `accept` del input de archivo** actualizado a `.jpg,.jpeg,.png,.webp,.avif,.heic,.heif` para que el picker nativo del sistema operativo muestre los HEIC seleccionables.
+- **Texto informativo** del área de drop actualizado: *"Formatos: JPG, JPEG, PNG, WEBP, AVIF, HEIC, HEIF · Pega con Cmd+V / Ctrl+V"*.
+
+### Verificación
+
+- `node tests/run-in-node.js` → **127/127 OK** (123 anteriores + 4 nuevos para v3.3.15)
+- `node tests/binary-validation.js` → 36/36 OK (sin cambios)
+
+Cero regresiones en los formatos existentes. JPEG, PNG, WebP y AVIF siguen funcionando exactamente igual.
 
 ---
 
