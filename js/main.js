@@ -2408,7 +2408,7 @@
             z-index: 9999;
           }
           
-          .preview-container {
+          .file-preview-modal .preview-container {
             position: relative;
             background: var(--bg-card, #ffffff);
             border-radius: 12px;
@@ -2422,7 +2422,7 @@
             z-index: 10000;
           }
           
-          .preview-header {
+          .file-preview-modal .preview-header {
             padding: 20px;
             border-bottom: 1px solid var(--border-color, #e2e8f0);
             display: flex;
@@ -2431,14 +2431,14 @@
             background: var(--bg-secondary, #f8f9fa);
           }
           
-          .preview-header h3 {
+          .file-preview-modal .preview-header h3 {
             margin: 0;
             color: var(--text-primary, #0f172a);
             font-size: 1.25rem;
             font-weight: 600;
           }
           
-          .preview-close {
+          .file-preview-modal .preview-close {
             background: none;
             border: none;
             font-size: 20px;
@@ -2450,11 +2450,11 @@
             flex-shrink: 0;
           }
           
-          .preview-close:hover {
+          .file-preview-modal .preview-close:hover {
             color: var(--text-primary, #0f172a);
           }
           
-          .preview-content {
+          .file-preview-modal .preview-content {
             padding: 20px;
             display: flex;
             gap: 20px;
@@ -2462,7 +2462,7 @@
             overflow: auto;
           }
           
-          .preview-image-container {
+          .file-preview-modal .preview-image-container {
             flex: 1;
             display: flex;
             align-items: center;
@@ -2472,47 +2472,47 @@
             min-height: 200px;
           }
           
-          .preview-image {
+          .file-preview-modal .preview-image {
             max-width: 100%;
             max-height: 300px;
             border-radius: 4px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
           }
           
-          .preview-info {
+          .file-preview-modal .preview-info {
             flex: 1;
             min-width: 250px;
           }
           
-          .preview-info h4 {
+          .file-preview-modal .preview-info h4 {
             margin: 0 0 12px 0;
             color: var(--text-primary, #0f172a);
             font-size: 1rem;
             font-weight: 600;
           }
           
-          .preview-info ul {
+          .file-preview-modal .preview-info ul {
             list-style: none;
             padding: 0;
             margin: 0;
           }
           
-          .preview-info li {
+          .file-preview-modal .preview-info li {
             padding: 6px 0;
             color: var(--text-secondary, #64748b);
             font-size: 0.875rem;
             border-bottom: 1px solid var(--border-color, #e2e8f0);
           }
           
-          .preview-info li:last-child {
+          .file-preview-modal .preview-info li:last-child {
             border-bottom: none;
           }
           
-          .preview-info strong {
+          .file-preview-modal .preview-info strong {
             color: var(--text-primary, #0f172a);
           }
           
-          .preview-actions {
+          .file-preview-modal .preview-actions {
             padding: 20px;
             border-top: 1px solid var(--border-color, #e2e8f0);
             display: flex;
@@ -2522,62 +2522,62 @@
           }
           
           @media (max-width: 768px) {
-            .preview-container {
+            .file-preview-modal .preview-container {
               width: 95%;
               max-height: 90vh;
             }
             
-            .preview-content {
+            .file-preview-modal .preview-content {
               flex-direction: column;
               padding: 15px;
             }
             
-            .preview-header {
+            .file-preview-modal .preview-header {
               padding: 10px 12px;
             }
             
-            .preview-header h3 {
+            .file-preview-modal .preview-header h3 {
               font-size: 0.875rem;
               line-height: 1.2;
               margin: 0;
             }
             
-            .preview-close {
+            .file-preview-modal .preview-close {
               font-size: 14px;
               padding: 2px 4px;
               margin-left: 8px;
               flex-shrink: 0;
             }
             
-            .preview-actions {
+            .file-preview-modal .preview-actions {
               padding: 12px;
               flex-direction: column;
             }
             
-            .preview-actions button {
+            .file-preview-modal .preview-actions button {
               width: 100%;
             }
             
-            .preview-info {
+            .file-preview-modal .preview-info {
               min-width: auto;
             }
             
-            .preview-info h4 {
+            .file-preview-modal .preview-info h4 {
               font-size: 0.875rem;
             }
             
-            .preview-info li {
+            .file-preview-modal .preview-info li {
               font-size: 0.75rem;
               padding: 4px 0;
             }
           }
           
           @media (max-width: 480px) {
-            .preview-header h3 {
+            .file-preview-modal .preview-header h3 {
               font-size: 0.8rem;
             }
             
-            .preview-close {
+            .file-preview-modal .preview-close {
               font-size: 12px;
             }
           }

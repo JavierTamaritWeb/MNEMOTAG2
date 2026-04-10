@@ -2844,10 +2844,6 @@
       max-width: 100%;
       height: auto;
       max-height: 75vh;
-      /* display: block ELIMINADO — rompía el centrado del flex parent.
-         Sin display explícito, el canvas es un flex item que se centra
-         con justify-content: center del contenedor. */
-      margin: 0 auto; /* centrado explícito como fallback */
       border: none;
       background-color: transparent;
       transition: box-shadow 0.3s ease;
@@ -2858,6 +2854,8 @@
         0 0 0 1px rgba(0, 0, 0, 0.04);
       position: relative;
       z-index: 1;
+      /* Flex child centering — the parent uses justify-content:center */
+      flex-shrink: 0;
     }
 
     .preview__canvas:hover {
@@ -2876,6 +2874,7 @@
       width: 100%;
       padding: 24px;
       min-height: 550px;
+      box-sizing: border-box;
 
       /* Subtle transparent checkerboard (Photoshop-style) */
       --checker-light: rgba(200, 200, 210, 0.15);
