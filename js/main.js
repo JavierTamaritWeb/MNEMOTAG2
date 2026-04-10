@@ -3670,14 +3670,15 @@
 
       // Drag activo
       if (dragTarget && dragTarget.layerId) {
-        // Arrastrando una capa de texto
+        // Arrastrando una capa de texto — render ligero (sin watermarks
+        // ni filters) para evitar interferencias async y mantener 60 fps.
         var newX = x - dragOffsetX;
         var newY = y - dragOffsetY;
         var layer = textLayerManager.getLayer(dragTarget.layerId);
         if (layer) {
           layer.position.x = Math.round(newX);
           layer.position.y = Math.round(newY);
-          renderCanvasWithLayers();
+          renderCanvasWithLayersLightweight();
         }
       } else if (dragTarget === 'text') {
         customTextPosition = { x: x - dragOffsetX, y: y - dragOffsetY };
@@ -3699,9 +3700,9 @@
       if (isDragging) {
         isDragging = false;
         if (dragTarget && dragTarget.layerId) {
-          // Era una capa de texto
+          // Era una capa de texto — render completo al soltar
+          renderCanvasWithLayers();
           UIManager.showSuccess('📝 Capa de texto reposicionada');
-          // Actualizar el editor si esta capa está seleccionada
           if (activeLayerId === dragTarget.layerId) {
             selectTextLayer(dragTarget.layerId);
           }
@@ -7120,6 +7121,42 @@
       UIManager.showSuccess('✅ Capa eliminada');
     }
 
+    // Render ligero para el drag: solo imagen base + capas de texto.
+    // Salta watermarks y filters (son pesados y causan interferencias
+    // async con requestAnimationFrame durante el drag).
+    function renderCanvasWithLayersLightweight() {
+      if (!currentImage || !canvas || !ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
+      textLayerManager.renderLayers(ctx, canvas);
+      // Recalcular bounds para el siguiente mousemove
+      _updateTextLayerBounds();
+    }
+
+    function _updateTextLayerBounds() {
+      textLayerBounds = [];
+      var layers = textLayerManager.getAllLayers();
+      for (var i = 0; i < layers.length; i++) {
+        var layer = layers[i];
+        if (!layer.visible) continue;
+        var family = (layer.font && layer.font.family) || 'Roboto';
+        var size = (layer.font && layer.font.size) || 40;
+        var weight = (layer.font && layer.font.weight) || 'normal';
+        ctx.font = weight + ' ' + size + 'px "' + family + '", sans-serif';
+        var metrics = ctx.measureText(layer.text || '');
+        var posX = (layer.position && layer.position.x) || 0;
+        var posY = (layer.position && layer.position.y) || 0;
+        textLayerBounds.push({
+          layerId: layer.id,
+          x: posX, y: posY,
+          width: metrics.width,
+          height: size * 1.2
+        });
+      }
+    }
+
     function renderCanvasWithLayers() {
       if (!currentImage || !canvas || !ctx) return;
 
@@ -7136,27 +7173,8 @@
       // Renderizar capas de texto — requiere ctx Y canvas
       textLayerManager.renderLayers(ctx, canvas);
 
-      // Calcular bounds de cada capa visible para hit-testing del drag
-      textLayerBounds = [];
-      var layers = textLayerManager.getAllLayers();
-      for (var i = 0; i < layers.length; i++) {
-        var layer = layers[i];
-        if (!layer.visible) continue;
-        var family = (layer.font && layer.font.family) || 'Roboto';
-        var size = (layer.font && layer.font.size) || 40;
-        var weight = (layer.font && layer.font.weight) || 'normal';
-        ctx.font = weight + ' ' + size + 'px "' + family + '", sans-serif';
-        var metrics = ctx.measureText(layer.text || '');
-        var posX = (layer.position && layer.position.x) || 0;
-        var posY = (layer.position && layer.position.y) || 0;
-        textLayerBounds.push({
-          layerId: layer.id,
-          x: posX,
-          y: posY,
-          width: metrics.width,
-          height: size * 1.2
-        });
-      }
+      // Calcular bounds para hit-testing del drag
+      _updateTextLayerBounds();
     }
 
     /**
