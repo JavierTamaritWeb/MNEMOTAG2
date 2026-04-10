@@ -4881,19 +4881,21 @@
     
     /* Controles de Zoom */
     .zoom-controls {
-      position: absolute;
-      bottom: 16px;
-      right: 16px;
+      /* v3.4.x: barra independiente debajo del preview, alineada a la izquierda */
       display: flex;
       align-items: center;
+      justify-content: flex-start;
+      flex-wrap: wrap;
       gap: 8px;
+      width: fit-content;
+      max-width: 100%;
+      margin: 12px 0 0;
       background: linear-gradient(135deg, rgba(59, 130, 246, 0.95) 0%, rgba(37, 99, 235, 0.95) 100%);
       backdrop-filter: blur(10px);
       border-radius: 12px;
       padding: 8px 12px;
       box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3), 0 2px 6px rgba(0, 0, 0, 0.1);
       border: 1px solid rgba(255, 255, 255, 0.2);
-      z-index: 10;
     }
     
     .zoom-btn {
@@ -6900,6 +6902,97 @@
 
 [data-theme="dark"] .history-panel__empty {
   color: #9ca3af;
+}
+
+/* ================================================================== */
+/* Fix dark mode para el modal de batch processing                     */
+/* El proyecto usa [data-theme="dark"], NO las variantes dark: de      */
+/* Tailwind (que no funcionan con Tailwind 2.2.19 CDN sin dark mode    */
+/* habilitado). Las clases dark:bg-gray-800, dark:text-gray-300 del   */
+/* HTML no tienen efecto, así que lo forzamos aquí con selectores.    */
+/* ================================================================== */
+
+[data-theme="dark"] #batch-config {
+  background: #1f2937;
+  color: #e5e7eb;
+}
+
+[data-theme="dark"] #batch-config h3 {
+  color: #d1d5db;
+}
+
+[data-theme="dark"] #batch-config label span {
+  color: #d1d5db;
+}
+
+[data-theme="dark"] #batch-modal .modal-container {
+  background: #1f2937;
+  color: #e5e7eb;
+}
+
+[data-theme="dark"] #batch-modal .modal-header {
+  border-bottom-color: #374151;
+}
+
+[data-theme="dark"] #batch-modal .modal-title {
+  color: #f3f4f6;
+}
+
+[data-theme="dark"] #batch-modal .modal-close {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] #batch-modal .modal-close:hover {
+  color: #f9fafb;
+  background: #374151;
+}
+
+[data-theme="dark"] #batch-modal .dropzone {
+  background: #111827;
+  border-color: #374151;
+  color: #d1d5db;
+}
+
+[data-theme="dark"] #batch-modal .dropzone p {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] #batch-images-list h3 {
+  color: #d1d5db;
+}
+
+[data-theme="dark"] #batch-images-list .text-red-600 {
+  color: #f87171;
+}
+
+[data-theme="dark"] .batch-item {
+  background: #111827;
+  border-color: #374151;
+}
+
+[data-theme="dark"] .batch-item-name {
+  color: #e5e7eb;
+}
+
+[data-theme="dark"] .batch-item-size {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .batch-item-remove {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] .batch-item-remove:hover {
+  color: #f87171;
+}
+
+[data-theme="dark"] #batch-progress .text-gray-600 {
+  color: #9ca3af;
+}
+
+[data-theme="dark"] #batch-modal .form-checkbox {
+  background: #374151;
+  border-color: #4b5563;
 }
 
 /* ================================================================== */
