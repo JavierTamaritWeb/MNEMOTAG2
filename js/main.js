@@ -7058,13 +7058,20 @@
       // textLayerManager.updateLayer(): font.{family,size}, position.{x,y},
       // effects.{shadow,stroke,gradient}.
       var e;
-      var fontFamily = (e = document.getElementById('text-layer-font')) ? e.value : 'Roboto';
-      var fontSize = (e = document.getElementById('text-layer-size')) ? parseInt(e.value) || 40 : 40;
-      var posX = (e = document.getElementById('text-layer-x')) ? parseInt(e.value) || 0 : 0;
-      var posY = (e = document.getElementById('text-layer-y')) ? parseInt(e.value) || 0 : 0;
-      var hasShadow = (e = document.getElementById('text-layer-shadow')) ? e.checked : false;
-      var hasStroke = (e = document.getElementById('text-layer-stroke')) ? e.checked : false;
-      var hasGradient = (e = document.getElementById('text-layer-gradient')) ? e.checked : false;
+      e = document.getElementById('text-layer-font');
+      var fontFamily = e ? e.value : 'Roboto';
+      e = document.getElementById('text-layer-size');
+      var fontSize = e ? parseInt(e.value) || 40 : 40;
+      e = document.getElementById('text-layer-x');
+      var posX = e ? parseInt(e.value) || 0 : 0;
+      e = document.getElementById('text-layer-y');
+      var posY = e ? parseInt(e.value) || 0 : 0;
+      e = document.getElementById('text-layer-shadow');
+      var hasShadow = e ? e.checked : false;
+      e = document.getElementById('text-layer-stroke');
+      var hasStroke = e ? e.checked : false;
+      e = document.getElementById('text-layer-gradient');
+      var hasGradient = e ? e.checked : false;
 
       // Para shadow/stroke/gradient: si el checkbox está activo pero el
       // layer ya tenía un objeto previo, lo reutilizamos. Si no tenía,
@@ -7080,13 +7087,21 @@
         ? (currentLayer && currentLayer.effects && currentLayer.effects.gradient) || { type: 'linear', colors: ['#ff0000', '#0000ff'], angle: 0 }
         : null;
 
+      e = document.getElementById('text-layer-text');
+      var textVal = e ? e.value : '';
+      e = document.getElementById('text-layer-color');
+      var colorVal = e ? e.value : '#ffffff';
+      e = document.getElementById('text-layer-rotation');
+      var rotationVal = e ? parseInt(e.value) || 0 : 0;
+      e = document.getElementById('text-layer-opacity');
+      var opacityVal = e ? (parseInt(e.value) || 100) / 100 : 1;
       const updates = {
-        text: (e = document.getElementById('text-layer-text')) ? e.value : '',
+        text: textVal,
         font: { family: fontFamily, size: fontSize },
         position: { x: posX, y: posY },
-        color: (e = document.getElementById('text-layer-color')) ? e.value : '#ffffff',
-        rotation: (e = document.getElementById('text-layer-rotation')) ? parseInt(e.value) || 0 : 0,
-        opacity: (e = document.getElementById('text-layer-opacity')) ? (parseInt(e.value) || 100) / 100 : 1,
+        color: colorVal,
+        rotation: rotationVal,
+        opacity: opacityVal,
         effects: { shadow: shadowVal, stroke: strokeVal, gradient: gradientVal }
       };
 
