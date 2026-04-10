@@ -445,33 +445,80 @@
     }
 
     // Defensa contra reloads automáticos de Live Server en localhost.
-    // Solo se activa en dev local — en producción no interfiere.
+    // Live Server inyecta un <script> DESPUÉS de </body> que abre un
+    // WebSocket a ws://host:port/ws y llama a location.reload() cuando
+    // recibe el mensaje "reload". Nuestros scripts se ejecutan ANTES
+    // que el de Live Server, así que podemos monkey-patchear WebSocket
+    // para impedir que Live Server abra su conexión.
+    //
+    // Solo se activa en dev local. En producción no interfiere.
     (function () {
       try {
-        const hostname = location.hostname;
-        const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' ||
-                        hostname === '0.0.0.0' || hostname === '::1' ||
-                        hostname.endsWith('.localhost');
+        var hostname = location.hostname;
+        var isLocal = hostname === 'localhost' || hostname === '127.0.0.1' ||
+                      hostname === '0.0.0.0' || hostname === '::1' ||
+                      hostname.endsWith('.localhost');
         if (!isLocal) return;
 
-        let lastUserAction = 0;
-        ['click', 'keydown', 'touchstart'].forEach(function (evt) {
-          document.addEventListener(evt, function () { lastUserAction = Date.now(); }, true);
-        });
+        // 1) Monkey-patch WebSocket para bloquear conexiones de Live Reload.
+        //    Live Server conecta a ws://host:port/ws. Browser-sync usa
+        //    /browser-sync/socket.io. Detectamos ambos patrones.
+        var OrigWebSocket = window.WebSocket;
+        window.WebSocket = function (url, protocols) {
+          if (typeof url === 'string') {
+            // Patrón Live Server: ws://localhost:PORT/ws
+            var isLiveServer = /\/ws\/?$/.test(url);
+            // Patrón browser-sync
+            var isBrowserSync = url.indexOf('browser-sync') !== -1;
 
-        const origReload = location.reload;
-        Object.defineProperty(location, 'reload', {
-          configurable: true,
-          value: function (force) {
-            // Si el usuario interactuó en los últimos 2 s → es Cmd+R manual → permitir.
-            if (Date.now() - lastUserAction < 2000) {
-              origReload.call(location, force);
-            } else {
-              console.warn('[MnemoTag] Reload automático bloqueado (Live Server). Usa Cmd+R si quieres recargar.');
+            if (isLiveServer || isBrowserSync) {
+              console.warn(
+                '%c[MnemoTag] WebSocket de Live Reload BLOQUEADO: ' + url,
+                'background:#f59e0b;color:#000;font-weight:bold;padding:2px 6px;border-radius:4px;'
+              );
+              // Devolver un objeto fake que no hace nada.
+              // Live Server asignará onmessage/onopen pero nunca recibirá
+              // el mensaje "reload" porque la conexión no existe.
+              var fake = {
+                send: function () {},
+                close: function () {},
+                addEventListener: function () {},
+                removeEventListener: function () {},
+                onopen: null,
+                onclose: null,
+                onmessage: null,
+                onerror: null,
+                readyState: 3, // CLOSED
+                CONNECTING: 0,
+                OPEN: 1,
+                CLOSING: 2,
+                CLOSED: 3,
+                url: url,
+                protocol: '',
+                extensions: '',
+                bufferedAmount: 0,
+                binaryType: 'blob'
+              };
+              return fake;
             }
           }
-        });
-      } catch (e) { /* defensivo — en algunos iframes location no es configurable */ }
+          // Cualquier otro WebSocket (ej: Web Workers, librerías reales)
+          // pasa al constructor original sin modificar.
+          if (protocols !== undefined) {
+            return new OrigWebSocket(url, protocols);
+          }
+          return new OrigWebSocket(url);
+        };
+        // Preservar las constantes estáticas del WebSocket original.
+        window.WebSocket.CONNECTING = 0;
+        window.WebSocket.OPEN = 1;
+        window.WebSocket.CLOSING = 2;
+        window.WebSocket.CLOSED = 3;
+        window.WebSocket.prototype = OrigWebSocket.prototype;
+
+      } catch (e) {
+        console.warn('[MnemoTag] No se pudo monkey-patchear WebSocket:', e);
+      }
     })();
 
     function initializeApp() {
