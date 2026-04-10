@@ -1630,7 +1630,6 @@
       transform: none !important;
       animation: none !important;
       position: relative;
-      overflow: hidden;
     }
     
     /* Estados hover con cambios de color más dramáticos */
@@ -3902,12 +3901,16 @@
       }
     }
 
-    /* Uniform button heights for all buttons */
+    /* Uniform button heights for all buttons.
+       height: 48px ELIMINADO — forzaba una altura fija que cortaba
+       el texto de botones con contenido largo ("Limpiar todo",
+       "Descargar varios tamaños (ZIP)", etc.) cuando se combinaba
+       con overflow: hidden. Ahora se usa min-height para que los
+       botones PUEDAN crecer si el texto necesita más espacio. */
     .btn,
     .upload__button,
     .button--action,
     button {
-      height: 48px;
       min-height: 48px;
       display: flex;
       align-items: center;
@@ -3915,7 +3918,7 @@
       gap: 0.5rem;
       font-size: 0.875rem;
       font-weight: 500;
-      line-height: 1;
+      line-height: 1.3;
       box-sizing: border-box;
     }
 
