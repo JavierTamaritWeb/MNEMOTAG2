@@ -5179,6 +5179,8 @@
       transition: var(--transition);
       color: var(--text-secondary);
       font-weight: 500;
+      text-decoration: none;
+      cursor: pointer;
     }
 
     .hero-feature:hover {
@@ -5186,6 +5188,7 @@
       border-color: var(--accent-primary);
       transform: translateY(-2px);
       box-shadow: var(--shadow-md);
+      color: var(--accent-primary);
     }
 
     .hero-feature i {

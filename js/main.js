@@ -1131,7 +1131,30 @@
           removeBgBtn.addEventListener('click', function () { BgRemovalManager.removeBackground(); });
         }
 
-        // Botón global "Limpiar todo" al principio de la app.
+        // Hero feature links: scroll suave + expandir sección colapsada.
+        document.querySelectorAll('.hero-feature[data-scroll-to]').forEach(function (link) {
+          link.addEventListener('click', function (e) {
+            e.preventDefault();
+            const targetId = link.getAttribute('data-scroll-to');
+            const target = document.getElementById(targetId);
+            if (!target) return;
+            // Si la sección está colapsada, expandirla antes de hacer scroll.
+            const content = target.getAttribute('aria-controls');
+            if (content) {
+              const contentEl = document.getElementById(content);
+              if (contentEl && !contentEl.classList.contains('section__content--open')) {
+                // Simular click en el header para expandir (usa toggleCollapsible).
+                target.click();
+              }
+            }
+            // Scroll suave con un pequeño delay para que la sección se expanda
+            setTimeout(function () {
+              target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+          });
+        });
+
+        // Botón global "Limpiar todo" en el hero.
         const clearAllBtn = document.getElementById('clear-all-btn');
         if (clearAllBtn) {
           clearAllBtn.addEventListener('click', function () {
