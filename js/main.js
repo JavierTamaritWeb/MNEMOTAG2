@@ -2886,15 +2886,25 @@
           canvas.style.height = height + 'px';
         }
       } else {
-        // En pantallas grandes, mostrar tamaño real del canvas
-        canvas.style.width = width + 'px';
-        canvas.style.height = height + 'px';
+        // Desktop: hacer que el canvas ocupe todo el ancho del contenedor.
+        // Calculamos el tamaño explícito en píxeles para que no quede
+        // limitado por el max-width CSS ni por el tamaño intrínseco.
+        var container = canvas.parentElement;
+        if (container) {
+          var containerWidth = container.clientWidth - 8; // -8 por padding
+          var aspectRatio = height / width;
+          var displayW = Math.min(containerWidth, width * 2); // hasta 2x el tamaño real
+          var displayH = Math.round(displayW * aspectRatio);
+          canvas.style.width = displayW + 'px';
+          canvas.style.height = displayH + 'px';
+        } else {
+          canvas.style.width = '100%';
+          canvas.style.height = 'auto';
+        }
       }
-      
-      // Configuración para mantener calidad de renderizado
+
+      canvas.style.maxWidth = 'none'; // Override del CSS max-width: 100%
       canvas.style.objectFit = 'contain';
-      canvas.style.maxWidth = '100%';
-      canvas.style.height = 'auto';
       
       // Mejorar calidad de renderizado del canvas
       ctx.imageSmoothingEnabled = true;
