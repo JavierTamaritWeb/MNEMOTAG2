@@ -6944,35 +6944,37 @@
         editor.classList.remove('hidden');
       }
 
-      // Cargar valores en el editor
-      document.getElementById('layer-text').value = layer.text;
-      document.getElementById('layer-font').value = layer.fontFamily;
-      document.getElementById('layer-size').value = layer.fontSize;
-      document.getElementById('layer-color').value = layer.color;
-      document.getElementById('layer-x').value = Math.round(layer.x);
-      document.getElementById('layer-y').value = Math.round(layer.y);
-      document.getElementById('layer-rotation').value = layer.rotation;
-      document.getElementById('layer-opacity').value = Math.round(layer.opacity * 100);
-      document.getElementById('layer-shadow').checked = layer.shadow;
-      document.getElementById('layer-stroke').checked = layer.stroke;
-      document.getElementById('layer-gradient').checked = layer.gradient;
+      // Cargar valores en el editor (IDs con prefijo text-layer- para coincidir con HTML)
+      var el;
+      el = document.getElementById('text-layer-text');     if (el) el.value = layer.text;
+      el = document.getElementById('text-layer-font');     if (el) el.value = layer.fontFamily;
+      el = document.getElementById('text-layer-size');     if (el) el.value = layer.fontSize;
+      el = document.getElementById('text-layer-color');    if (el) el.value = layer.color;
+      el = document.getElementById('text-layer-x');        if (el) el.value = Math.round(layer.x);
+      el = document.getElementById('text-layer-y');        if (el) el.value = Math.round(layer.y);
+      el = document.getElementById('text-layer-rotation'); if (el) el.value = layer.rotation || 0;
+      el = document.getElementById('text-layer-opacity');  if (el) el.value = Math.round((layer.opacity || 1) * 100);
+      el = document.getElementById('text-layer-shadow');   if (el) el.checked = !!layer.shadow;
+      el = document.getElementById('text-layer-stroke');   if (el) el.checked = !!layer.stroke;
+      el = document.getElementById('text-layer-gradient'); if (el) el.checked = !!layer.gradient;
     }
 
     function updateActiveTextLayer() {
       if (!activeLayerId) return;
 
+      var e;
       const updates = {
-        text: document.getElementById('layer-text').value,
-        fontFamily: document.getElementById('layer-font').value,
-        fontSize: parseInt(document.getElementById('layer-size').value),
-        color: document.getElementById('layer-color').value,
-        x: parseInt(document.getElementById('layer-x').value),
-        y: parseInt(document.getElementById('layer-y').value),
-        rotation: parseInt(document.getElementById('layer-rotation').value),
-        opacity: parseInt(document.getElementById('layer-opacity').value) / 100,
-        shadow: document.getElementById('layer-shadow').checked,
-        stroke: document.getElementById('layer-stroke').checked,
-        gradient: document.getElementById('layer-gradient').checked
+        text: (e = document.getElementById('text-layer-text')) ? e.value : '',
+        fontFamily: (e = document.getElementById('text-layer-font')) ? e.value : 'Roboto',
+        fontSize: (e = document.getElementById('text-layer-size')) ? parseInt(e.value) || 40 : 40,
+        color: (e = document.getElementById('text-layer-color')) ? e.value : '#ffffff',
+        x: (e = document.getElementById('text-layer-x')) ? parseInt(e.value) || 0 : 0,
+        y: (e = document.getElementById('text-layer-y')) ? parseInt(e.value) || 0 : 0,
+        rotation: (e = document.getElementById('text-layer-rotation')) ? parseInt(e.value) || 0 : 0,
+        opacity: (e = document.getElementById('text-layer-opacity')) ? (parseInt(e.value) || 100) / 100 : 1,
+        shadow: (e = document.getElementById('text-layer-shadow')) ? e.checked : false,
+        stroke: (e = document.getElementById('text-layer-stroke')) ? e.checked : false,
+        gradient: (e = document.getElementById('text-layer-gradient')) ? e.checked : false
       };
 
       textLayerManager.updateLayer(activeLayerId, updates);

@@ -1415,15 +1415,31 @@
               </div>
             </div>
             
+            <!-- Rotación y opacidad -->
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Rotación (°)</label>
+                <input type="number" id="text-layer-rotation" min="-360" max="360" value="0" class="w-full px-2 py-1 border rounded-md dark:bg-gray-700 dark:border-gray-600">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Opacidad (%)</label>
+                <input type="number" id="text-layer-opacity" min="0" max="100" value="100" class="w-full px-2 py-1 border rounded-md dark:bg-gray-700 dark:border-gray-600">
+              </div>
+            </div>
+
             <!-- Efectos -->
             <div>
               <label class="flex items-center gap-2 mb-2">
                 <input type="checkbox" id="text-layer-shadow" class="form-checkbox">
                 <span class="text-xs font-medium">Sombra</span>
               </label>
-              <label class="flex items-center gap-2">
+              <label class="flex items-center gap-2 mb-2">
                 <input type="checkbox" id="text-layer-stroke" class="form-checkbox">
                 <span class="text-xs font-medium">Borde</span>
+              </label>
+              <label class="flex items-center gap-2">
+                <input type="checkbox" id="text-layer-gradient" class="form-checkbox">
+                <span class="text-xs font-medium">Degradado</span>
               </label>
             </div>
             
