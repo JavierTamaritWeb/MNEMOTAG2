@@ -1119,43 +1119,21 @@
         const shortcutsHelpBtn = document.getElementById('shortcuts-help-btn');
         
         if (batchModeBtn) {
-          batchModeBtn.addEventListener('click', () => {
-            if (typeof window.openBatchModal === 'function') {
-              window.openBatchModal();
-            } else {
-              console.error('❌ openBatchModal no está definida. Verifica que initializeAdvancedUI() se haya ejecutado.');
-            }
-          });
+          // v3.4.20: llamada directa en lugar de via window.openBatchModal
+          // para evitar timing issue si initializeAdvancedUI() aún no se ejecutó.
+          batchModeBtn.addEventListener('click', () => openBatchModal());
         }
         
         if (textLayersBtn) {
-          textLayersBtn.addEventListener('click', () => {
-            if (typeof window.openTextLayersPanel === 'function') {
-              window.openTextLayersPanel();
-            } else {
-              console.error('❌ openTextLayersPanel no está definida. Verifica que initializeAdvancedUI() se haya ejecutado.');
-            }
-          });
+          textLayersBtn.addEventListener('click', () => openTextLayersPanel());
         }
-        
+
         if (cropModeBtn) {
-          cropModeBtn.addEventListener('click', () => {
-            if (typeof window.openCropPanel === 'function') {
-              window.openCropPanel();
-            } else {
-              console.error('❌ openCropPanel no está definida. Verifica que initializeAdvancedUI() se haya ejecutado.');
-            }
-          });
+          cropModeBtn.addEventListener('click', () => openCropPanel());
         }
-        
+
         if (shortcutsHelpBtn) {
-          shortcutsHelpBtn.addEventListener('click', () => {
-            if (typeof window.openShortcutsModal === 'function') {
-              window.openShortcutsModal();
-            } else {
-              console.error('❌ openShortcutsModal no está definida. Verifica que initializeAdvancedUI() se haya ejecutado.');
-            }
-          });
+          shortcutsHelpBtn.addEventListener('click', () => openShortcutsModal());
         }
         
         // Compare and fullscreen buttons
