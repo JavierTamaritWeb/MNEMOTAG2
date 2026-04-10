@@ -6325,19 +6325,32 @@
     }
 
     function updateBatchImagesList() {
-      const container = document.getElementById('batch-images-list');
-      if (!container) return;
+      // v3.4.20 fix: los items van en #batch-items (el grid interior),
+      // NO en #batch-images-list (el contenedor padre que tiene el header
+      // "N imágenes cargadas" y el botón "Limpiar todo"). Antes,
+      // replaceChildren() destruía ese header.
+      const listContainer = document.getElementById('batch-images-list');
+      const itemsGrid = document.getElementById('batch-items');
+      const configSection = document.getElementById('batch-config');
+      const countSpan = document.getElementById('batch-count');
 
-      // Limpiar contenedor sin innerHTML (evita XSS por nombre de archivo)
-      container.replaceChildren();
+      if (!listContainer || !itemsGrid) return;
+
+      // Limpiar solo el grid de items (sin tocar el header)
+      itemsGrid.replaceChildren();
 
       if (batchImages.length === 0) {
-        const empty = document.createElement('p');
-        empty.className = 'text-sm text-gray-500 text-center py-4';
-        empty.textContent = 'No hay imágenes agregadas';
-        container.appendChild(empty);
+        // Ocultar la lista y la configuración
+        listContainer.style.display = 'none';
+        if (configSection) configSection.style.display = 'none';
+        if (countSpan) countSpan.textContent = '0';
         return;
       }
+
+      // Mostrar la lista y la configuración
+      listContainer.style.display = 'block';
+      if (configSection) configSection.style.display = 'block';
+      if (countSpan) countSpan.textContent = String(batchImages.length);
 
       // Construir cada item con DOM API: img.name y img.dataUrl son datos
       // controlados por el usuario y NUNCA deben interpolarse en HTML.
@@ -6377,7 +6390,7 @@
         removeBtn.appendChild(icon);
 
         item.appendChild(removeBtn);
-        container.appendChild(item);
+        itemsGrid.appendChild(item);
       });
     }
 
