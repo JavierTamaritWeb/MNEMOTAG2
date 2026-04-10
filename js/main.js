@@ -325,6 +325,155 @@
 
     // UIManager extraído a js/managers/ui-manager.js
 
+    // ================================================================
+    // Persistencia del formulario de watermark en localStorage.
+    // Los datos se mantienen entre reloads y sesiones hasta que el
+    // usuario pulse el botón "Limpiar" explícitamente.
+    // ================================================================
+
+    const WATERMARK_STORAGE_KEY = 'mnemotag-watermark-state';
+    const WATERMARK_PERSIST_FIELDS = [
+      'watermark-text-enabled',
+      'watermark-image-enabled',
+      'watermark-auto-scale',
+      'watermark-text',
+      'watermark-font',
+      'watermark-color',
+      'watermark-position',
+      'watermark-size',
+      'watermark-opacity',
+      'watermark-image-size',
+      'watermark-image-opacity',
+      'watermark-image-position',
+      'watermark-image-width',
+      'watermark-image-height'
+    ];
+
+    function setupWatermarkPersistence() {
+      let saveTimer = null;
+      const handler = function () {
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = setTimeout(function () {
+          saveTimer = null;
+          const state = {};
+          WATERMARK_PERSIST_FIELDS.forEach(function (id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            if (el.type === 'checkbox') {
+              state[id] = el.checked;
+            } else {
+              state[id] = el.value;
+            }
+          });
+          try {
+            localStorage.setItem(WATERMARK_STORAGE_KEY, JSON.stringify(state));
+          } catch (e) { /* localStorage lleno o no disponible */ }
+        }, 500);
+      };
+
+      WATERMARK_PERSIST_FIELDS.forEach(function (id) {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('input', handler);
+          el.addEventListener('change', handler);
+        }
+      });
+    }
+
+    function restoreWatermarkState() {
+      try {
+        const raw = localStorage.getItem(WATERMARK_STORAGE_KEY);
+        if (!raw) return;
+        const state = JSON.parse(raw);
+        if (!state || typeof state !== 'object') return;
+
+        WATERMARK_PERSIST_FIELDS.forEach(function (id) {
+          if (state[id] === undefined) return;
+          const el = document.getElementById(id);
+          if (!el) return;
+          if (el.type === 'checkbox') {
+            el.checked = !!state[id];
+          } else {
+            el.value = state[id];
+          }
+        });
+
+        // Sincronizar los campos numéricos espejo (range ↔ number).
+        const syncPairs = [
+          ['watermark-size', 'watermark-size-num'],
+          ['watermark-opacity', 'watermark-opacity-num'],
+          ['watermark-image-opacity', 'watermark-image-opacity-num']
+        ];
+        syncPairs.forEach(function (pair) {
+          const slider = document.getElementById(pair[0]);
+          const num = document.getElementById(pair[1]);
+          if (slider && num) num.value = slider.value;
+        });
+
+        // Disparar los toggles de visibilidad del form para que la UI
+        // refleje el estado restaurado (ej: mostrar/ocultar los campos
+        // de texto o imagen según los checkboxes).
+        if (typeof toggleWatermarkType === 'function') {
+          toggleWatermarkType();
+        }
+      } catch (e) {
+        console.warn('restoreWatermarkState: error restaurando:', e);
+      }
+    }
+
+    function clearWatermarkState() {
+      try { localStorage.removeItem(WATERMARK_STORAGE_KEY); } catch (e) { /* ok */ }
+      const form = document.getElementById('watermark-form');
+      if (form) form.reset();
+      // Sincronizar campos espejo
+      const syncPairs = [
+        ['watermark-size', 'watermark-size-num'],
+        ['watermark-opacity', 'watermark-opacity-num'],
+        ['watermark-image-opacity', 'watermark-image-opacity-num']
+      ];
+      syncPairs.forEach(function (pair) {
+        const slider = document.getElementById(pair[0]);
+        const num = document.getElementById(pair[1]);
+        if (slider && num) num.value = slider.value;
+      });
+      if (typeof toggleWatermarkType === 'function') {
+        toggleWatermarkType();
+      }
+      if (typeof UIManager !== 'undefined' && UIManager.showSuccess) {
+        UIManager.showSuccess('🧹 Datos de marca de agua limpiados');
+      }
+    }
+
+    // Defensa contra reloads automáticos de Live Server en localhost.
+    // Solo se activa en dev local — en producción no interfiere.
+    (function () {
+      try {
+        const hostname = location.hostname;
+        const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' ||
+                        hostname === '0.0.0.0' || hostname === '::1' ||
+                        hostname.endsWith('.localhost');
+        if (!isLocal) return;
+
+        let lastUserAction = 0;
+        ['click', 'keydown', 'touchstart'].forEach(function (evt) {
+          document.addEventListener(evt, function () { lastUserAction = Date.now(); }, true);
+        });
+
+        const origReload = location.reload;
+        Object.defineProperty(location, 'reload', {
+          configurable: true,
+          value: function (force) {
+            // Si el usuario interactuó en los últimos 2 s → es Cmd+R manual → permitir.
+            if (Date.now() - lastUserAction < 2000) {
+              origReload.call(location, force);
+            } else {
+              console.warn('[MnemoTag] Reload automático bloqueado (Live Server). Usa Cmd+R si quieres recargar.');
+            }
+          }
+        });
+      } catch (e) { /* defensivo — en algunos iframes location no es configurable */ }
+    })();
+
     function initializeApp() {
       
       try {
@@ -372,7 +521,12 @@
         // Engancha los listeners para auto-guardar el formulario en cada
         // cambio (debounced 500ms). Antes solo se guardaba al descargar.
         MetadataManager.setupAutoSave();
-        
+
+        // Persistencia de watermark en localStorage (sobrevive a reloads).
+        // Los datos se mantienen hasta que el usuario pulse el botón "Limpiar".
+        restoreWatermarkState();
+        setupWatermarkPersistence();
+
         // Initialize character counters
         initCharacterCounters();
         
@@ -853,6 +1007,12 @@
         const removeBgBtn = document.getElementById('remove-bg-btn');
         if (removeBgBtn) {
           removeBgBtn.addEventListener('click', function () { BgRemovalManager.removeBackground(); });
+        }
+
+        // Botón "Limpiar" del watermark form.
+        const clearWatermarkBtn = document.getElementById('clear-watermark-btn');
+        if (clearWatermarkBtn) {
+          clearWatermarkBtn.addEventListener('click', clearWatermarkState);
         }
 
         // v3.4.5: Filter presets (guardar/cargar/eliminar en localStorage)
