@@ -2,7 +2,7 @@
 
 ## 📌 Descripción General
 
-IMGCRAFT incluye un sistema **ultra intuitivo** para posicionar marcas de agua (texto e imagen) mediante **arrastre directo** con el mouse o gestos táctiles.
+MNEMOTAG incluye un sistema **ultra intuitivo** para posicionar marcas de agua (texto e imagen) mediante **arrastre directo** con el mouse o gestos táctiles.
 
 ---
 

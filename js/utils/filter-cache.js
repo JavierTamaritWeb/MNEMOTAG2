@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * ImgCraft v3.0 - Filter Cache
+ * MnemoTag v3.0 - Filter Cache
  * Sistema de cache inteligente para estados de filtros
  * Características: Hash generation, state management, cleanup automático, performance optimization
  */

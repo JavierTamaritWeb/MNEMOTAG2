@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * ImgCraft v3.0 - Smart Debounce
+ * MnemoTag v3.0 - Smart Debounce
  * Sistema de debouncing inteligente con optimization frames y gestión avanzada
  * Características: Animation frames, intelligent timing, performance optimization, memory management
  */

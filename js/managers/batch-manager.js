@@ -380,7 +380,7 @@ class BatchManager {
     }
 
     const zip = new JSZip();
-    const folder = zip.folder('imgcraft-batch');
+    const folder = zip.folder('mnemotag-batch');
     
     // Agregar imágenes al ZIP
     let index = 1;
@@ -401,7 +401,7 @@ class BatchManager {
     });
     
     // Descargar ZIP
-    const defaultName = zipName || `imgcraft-batch-${this.formatDate()}.zip`;
+    const defaultName = zipName || `mnemotag-batch-${this.formatDate()}.zip`;
     this.downloadBlob(content, defaultName);
     
     

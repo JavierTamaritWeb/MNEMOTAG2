@@ -587,8 +587,8 @@ describe('Regresión — PWA real con Service Worker (v3.3.16)', function () {
   it('service-worker.js define las 3 estrategias y los listeners principales', async function () {
     const src = await fetchSource('../service-worker.js');
     expect(src).toContain('CACHE_VERSION');
-    // Nombre del cache prefijado con 'imgcraft-v' seguido de versión (v3.3.x, v3.4.x, etc.)
-    expect(src).toMatch(/imgcraft-v\d+\.\d+/);
+    // Nombre del cache prefijado con 'mnemotag-v' seguido de versión (v3.3.x, v3.4.x, etc.)
+    expect(src).toMatch(/mnemotag-v\d+\.\d+/);
     expect(src).toContain("addEventListener('install'");
     expect(src).toContain("addEventListener('activate'");
     expect(src).toContain("addEventListener('fetch'");
@@ -932,7 +932,7 @@ describe('Regresión — Filter presets (v3.4.5)', function () {
 
   it('preset-manager.js persiste en localStorage con prefijo propio', async function () {
     const src = await fetchSource('../js/managers/preset-manager.js');
-    expect(src).toContain("STORAGE_PREFIX: 'imgcraft-preset-'");
+    expect(src).toContain("STORAGE_PREFIX: 'mnemotag-preset-'");
     expect(src).toContain('localStorage.setItem');
     expect(src).toContain('localStorage.getItem');
   });

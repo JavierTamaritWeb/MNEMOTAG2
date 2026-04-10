@@ -1,7 +1,7 @@
 'use strict';
 
 // ===== APP CONFIG =====
-// Configuración global para ImgCraft v3.0
+// Configuración global para MnemoTag v3.0
 
 /**
  * AppConfig - Configuración centralizada de la aplicación

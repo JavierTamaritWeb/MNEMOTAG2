@@ -2,7 +2,7 @@
 
 ## 📋 Descripción
 
-Sistema profesional de medición y coordenadas para posicionamiento preciso de elementos en IMGCRAFT. Permite visualizar coordenadas exactas, medidas y guías visuales sobre la imagen de vista previa.
+Sistema profesional de medición y coordenadas para posicionamiento preciso de elementos en MNEMOTAG. Permite visualizar coordenadas exactas, medidas y guías visuales sobre la imagen de vista previa.
 
 ---
 
@@ -40,7 +40,7 @@ Sistema profesional de medición y coordenadas para posicionamiento preciso de e
 ### Paso 1: Activar el Sistema
 
 ```
-1. Carga una imagen en IMGCRAFT
+1. Carga una imagen en MNEMOTAG
 2. Ve a la Sección 6: "Vista Previa"
 3. Busca los controles de zoom (esquina inferior derecha)
 4. Haz clic en el botón 📐 (icono de regla)
@@ -397,7 +397,7 @@ return brightness > 128 ? '#000000' : '#FFFFFF';
 
 **Versión**: 1.0  
 **Fecha**: 2025-10-15  
-**Incluido en**: IMGCRAFT v3.1.3
+**Incluido en**: MNEMOTAG v3.1.3
 
 ✨ **Sistema profesional para medición y posicionamiento preciso** ✨
 

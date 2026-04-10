@@ -1,4 +1,4 @@
-# ImgCraft v3.0 - Optimización de Filtros Inteligente
+# MnemoTag v3.0 - Optimización de Filtros Inteligente
 
 ## 🚀 **Implementación Completada**
 
@@ -319,7 +319,7 @@ window.addEventListener('beforeunload', () => {
 
 ## 🎉 **Implementación Exitosa**
 
-El sistema de filtros de ImgCraft v3.0 ahora cuenta con:
+El sistema de filtros de MnemoTag v3.0 ahora cuenta con:
 
 - ⚡ **Debouncing inteligente** de 150ms con requestAnimationFrame
 - 🧠 **Cache de estados** para evitar aplicaciones redundantes  

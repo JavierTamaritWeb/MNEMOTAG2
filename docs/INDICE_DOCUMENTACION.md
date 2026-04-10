@@ -1,4 +1,4 @@
-# 📚 Índice Completo de Documentación - IMGCRAFT v3.4.20
+# 📚 Índice Completo de Documentación - MNEMOTAG v3.4.20
 
 **Versión**: 3.4.20  
 **Fecha**: 10 de abril de 2026  
@@ -8,7 +8,7 @@
 
 ## 📖 Guía de Navegación Rápida
 
-Esta es la guía maestra para toda la documentación de IMGCRAFT. Encuentra rápidamente lo que necesitas según tu objetivo.
+Esta es la guía maestra para toda la documentación de MNEMOTAG. Encuentra rápidamente lo que necesitas según tu objetivo.
 
 ---
 
@@ -255,8 +255,8 @@ docs/
 
 ## 🔗 Enlaces Externos
 
-- **Repositorio GitHub**: [IMGCRAFT2](https://github.com/JavierTamaritWeb/IMGCRAFT2)
-- **Demo en Vivo**: [ImgCraft App](https://javierTamaritWeb.github.io/IMGCRAFT2)
+- **Repositorio GitHub**: [MNEMOTAG2](https://github.com/JavierTamaritWeb/MNEMOTAG2)
+- **Demo en Vivo**: [MnemoTag App](https://javierTamaritWeb.github.io/MNEMOTAG2)
 
 ---
 
@@ -358,5 +358,5 @@ Para reportar errores o sugerir mejoras en la documentación, abre un issue en G
 **Última actualización**: 9 de abril de 2026  
 **Versión del documento**: 1.2  
 
-✨ **Documentación completa y actualizada para IMGCRAFT v3.4.20** ✨
+✨ **Documentación completa y actualizada para MNEMOTAG v3.4.20** ✨
 

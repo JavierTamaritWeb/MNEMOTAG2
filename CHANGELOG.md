@@ -1,4 +1,4 @@
-# 📝 CHANGELOG - IMGCRAFT v3.4
+# 📝 CHANGELOG - MNEMOTAG v3.4
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
 
@@ -11,7 +11,7 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 - **Batch modal: imágenes no se mostraban al cargar**: `updateBatchImagesList()` ponía los items en `#batch-images-list` (contenedor padre, destruyendo el header "N imágenes cargadas" con `replaceChildren()`) en lugar de `#batch-items` (grid interior). Además, nunca cambiaba `display: none` de los contenedores al añadir imágenes. Ahora los items van al grid correcto, los contenedores se muestran/ocultan automáticamente, y el contador `batch-count` se actualiza.
 - **Botones de herramientas avanzadas (Lote/Texto/Recortar/Atajos) no hacían nada**: dependían de que `initializeAdvancedUI()` expusiera las funciones a `window.*` antes de que el usuario clicara. Si había un timing issue, `window.openBatchModal` quedaba `undefined` y el click no hacía nada. Fix: llamada directa a las funciones del closure en lugar de indirecta vía `window.*`.
 - **Reinicios aleatorios de la app (~1-2 min)**: causados por el Live Reload de VS Code Live Server que disparaba `location.reload()` ante cualquier cambio de archivos del proyecto. Fix: `.vscode/settings.json` con `"liveServer.settings.NoReload": true` + `ignoreFiles` para docs/tests/.git.
-- **Service Worker interfiriendo con Live Server en localhost**: el SW con `skipWaiting() + clients.claim()` causaba inconsistencias de cache en dev local. Fix: el registro del SW ahora detecta localhost y auto-desregistra cualquier SW fantasma + borra caches `imgcraft-*`.
+- **Service Worker interfiriendo con Live Server en localhost**: el SW con `skipWaiting() + clients.claim()` causaba inconsistencias de cache en dev local. Fix: el registro del SW ahora detecta localhost y auto-desregistra cualquier SW fantasma + borra caches `mnemotag-*`.
 
 ### Added
 - **Diagnóstico de reinicios** (v3.4.17/v3.4.18): banners amarillo/rojo/azul en consola al arrancar, handlers globales de `error`/`unhandledrejection`/`beforeunload`/`visibilitychange`/`pagehide`, monitor de memoria JS heap cada 10 s, detector automático de scripts Live Reload, y `console.trace()` en `beforeunload`.
@@ -41,7 +41,7 @@ Implementa la **inyección efectiva** del item Exif en el meta box del AVIF que 
 ### Changed
 - **`tests/binary-validation.js`**: de 44/44 a **86/86 aserciones**. 42 nuevas validan la inyección end-to-end con un AVIF sintético realista de 164 bytes (`ftyp` + `meta` con `hdlr`/`pitm`/`iinf`/`iloc` + `mdat` con payload `0xAA BB CC DD ...`). Verifican: ftyp intacto byte por byte, meta crecido, mdat crecido, iinf con 2 entries (`av01` + `Exif`), iloc con 2 items (primary desplazado de offset 156 → 217), payload EXIF con prefijo `tiff_header_offset=0` + bytes TIFF correctos, primary image data intacto en su nuevo offset, iref con sub-box `cdsc` (`from=2` Exif → `to=1` primary), rechazo de re-inyección (no duplica items Exif).
 - **`tests/specs/regression.spec.js`**: tests de v3.3.17 actualizados para validar los nuevos builders y el ajuste de `metaGrowth`.
-- **`service-worker.js`**: `CACHE_VERSION` → `imgcraft-v3.4.15`.
+- **`service-worker.js`**: `CACHE_VERSION` → `mnemotag-v3.4.15`.
 
 ### Notas de implementación
 - **Limitaciones conocidas** (en estos casos devuelve el blob original sin tocar, nunca corrompe):
@@ -71,7 +71,7 @@ Implementa la **inyección efectiva** del item Exif en el meta box del AVIF que 
 - **Phase 14 del plan original (AVIF EXIF real)**: abortada en su momento según el escape hatch explícito del plan. La infraestructura de parsing ISOBMFF de v3.3.17 quedó intacta pero la inyección efectiva se pospuso. **Retomada y cerrada en v3.4.15.**
 
 ### Changed
-- `service-worker.js` bumpeado a `imgcraft-v3.4.14` para invalidar la PWA con la CSP actualizada.
+- `service-worker.js` bumpeado a `mnemotag-v3.4.14` para invalidar la PWA con la CSP actualizada.
 
 ### Verificación
 - 183/183 Node + 44/44 binarios sin cambios.
@@ -206,7 +206,7 @@ Implementa la **inyección efectiva** del item Exif en el meta box del AVIF que 
 - **`js/managers/preset-manager.js`** (~180 líneas): API pública `savePreset(name)`, `loadPreset(name)`, `listPresets()`, `deletePreset(name)`, `populateSelect(selectEl)`.
 - Campos persistidos: `brightness`, `contrast`, `saturation`, `blur` (los watermarks NO — son ortogonales).
 - Validación de nombre: 1-40 chars alfanuméricos + espacios + `-_` + tildes.
-- Persistencia en localStorage con prefijo `imgcraft-preset-` + índice `imgcraft-preset-index`.
+- Persistencia en localStorage con prefijo `mnemotag-preset-` + índice `mnemotag-preset-index`.
 - `loadPreset` dispara `input`+`change` events sintéticos para que los listeners existentes recalculen el canvas.
 - **UI en la sección de filtros**: input de nombre + botón "Guardar"; select + botones "Cargar"/"Eliminar". Enter en el input guarda. `confirm()` antes de eliminar.
 
@@ -318,13 +318,13 @@ El detalle completo de cada feature está en las entradas individuales más abaj
 ### Changed
 
 - **`css/styles.css` cargado con cache-bust**: `<link rel="stylesheet" href="css/styles.css?v=20260409a">` para forzar a los navegadores a descargar la hoja de estilos nueva tras el upgrade.
-- **Service Worker bumpeado a `imgcraft-v3.3.19-css-fix`** (`service-worker.js`). El listener `activate` borra automáticamente cualquier cache anterior cuya clave no empiece por esta versión, por lo que los usuarios que ya instalaron la PWA en v3.3.16+ reciben el CSS nuevo en el siguiente arranque.
+- **Service Worker bumpeado a `mnemotag-v3.3.19-css-fix`** (`service-worker.js`). El listener `activate` borra automáticamente cualquier cache anterior cuya clave no empiece por esta versión, por lo que los usuarios que ya instalaron la PWA en v3.3.16+ reciben el CSS nuevo en el siguiente arranque.
 - **Copyright actualizado a 2026** en `index.html` (footer + placeholder del campo `metaCopyright`) y `README.md` (pie de licencia).
-- **Título `<title>` del HTML** → `ImgCraft v3.4.0`.
+- **Título `<title>` del HTML** → `MnemoTag v3.4.0`.
 - **Badge de versión en `README.md`** → `3.4.0`.
 - **`docs/INDICE_DOCUMENTACION.md`** → versión y pie actualizados a v3.4.0.
 - **Footer de `CHANGELOG.md`** → "Versión actual: 3.4.0".
-- **Título de `CHANGELOG.md`** → "IMGCRAFT v3.4" (antes decía "v3.3").
+- **Título de `CHANGELOG.md`** → "MNEMOTAG v3.4" (antes decía "v3.3").
 
 ### Fixed
 
@@ -351,7 +351,7 @@ El detalle completo de cada feature está en las entradas individuales más abaj
   2. Hace `await import('https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.5/+esm')`. El sufijo `+esm` de jsdelivr sirve la versión ESM de la librería para que `dynamic import()` funcione sin bundler.
   3. Cachea el módulo en `_bgRemovalModule` y resetea `_bgRemovalLoading` en `finally` (para que un fallo no deje el flag bloqueado).
 - **Llamadas concurrentes** se manejan con un poller corto: si `_bgRemovalLoading === true`, se espera (con `setTimeout` 100ms) hasta que la otra carga termine y se devuelve el módulo cacheado.
-- **Cero impacto en peso inicial de la app**: el módulo NUNCA se descarga al arrancar. El bundle inicial de ImgCraft sigue siendo idéntico al de v3.3.17. Solo los usuarios que pulsen el botón pagan el coste de los ~10-15 MB.
+- **Cero impacto en peso inicial de la app**: el módulo NUNCA se descarga al arrancar. El bundle inicial de MnemoTag sigue siendo idéntico al de v3.3.17. Solo los usuarios que pulsen el botón pagan el coste de los ~10-15 MB.
 - **Degradación elegante completa**:
   - Si la descarga del módulo falla → `console.error` + `UIManager.showError('No se pudo cargar el modelo de IA: ... Comprueba tu conexión y vuelve a intentarlo.')`.
   - Si la librería carga pero no expone `removeBackground` ni `default` → error de versión incompatible.
@@ -419,14 +419,14 @@ El detalle completo de cada feature está en las entradas individuales más abaj
 - **Estrategias de cache híbridas**:
   - **Cache-first** para recursos del mismo origen (HTML, CSS, JS, imágenes locales, manifest). Devuelve la versión cacheada si existe; si no, va a red y la añade al cache.
   - **Network-first** para CDNs externas listadas en `CDN_HOSTS` (cdn.jsdelivr.net, cdnjs.cloudflare.com, cdn.tailwindcss.com, fonts.googleapis.com, fonts.gstatic.com). Va primero a red para captar actualizaciones; si falla, sirve la versión cacheada.
-- **Versionado del cache**: `CACHE_VERSION = 'imgcraft-v3.3.16'`. Los buckets se llaman `imgcraft-v3.3.16-app` y `imgcraft-v3.3.16-cdn`. El listener `activate` borra automáticamente cualquier cache anterior cuya clave no empiece por la versión actual.
+- **Versionado del cache**: `CACHE_VERSION = 'mnemotag-v3.3.16'`. Los buckets se llaman `mnemotag-v3.3.16-app` y `mnemotag-v3.3.16-cdn`. El listener `activate` borra automáticamente cualquier cache anterior cuya clave no empiece por la versión actual.
 - **Listener `install`** precachea 22 assets críticos (`./`, `./index.html`, `./css/styles.css`, todos los `js/utils/*` y `js/managers/*`, `./js/main.js`, manifest, favicon, ico) con tolerancia a errores: cada `cache.add()` se hace individual y los fallos se loggean sin abortar el resto.
 - **`skipWaiting()` + `clients.claim()`** para que la versión nueva del SW tome control inmediatamente de las pestañas abiertas tras la activación.
 - **Listener `fetch` defensivo**: solo intercepta GET, ignora esquemas no http(s), y deja pasar terceros desconocidos sin cachear ni interferir.
 - **Helpers `cacheFirst(request, cacheName)` y `networkFirst(request, cacheName)`** que abstraen las dos estrategias. Solo cachean respuestas con `status === 200`. En `cacheFirst`, además, solo se cachean respuestas con `type === 'basic'` (mismo origen).
 - **Registro del SW desde `js/main.js`** al final del archivo (`window.addEventListener('load', ...)`). Scope `./`. Errores se loggean con `console.warn` y no rompen la app.
 - **Meta tags PWA para iOS** añadidos a `index.html`: `apple-mobile-web-app-capable`, `apple-mobile-web-app-status-bar-style`, `apple-mobile-web-app-title`, `mobile-web-app-capable`. Permiten instalar la app desde Safari como standalone con icono propio.
-- **`site.webmanifest` actualizado**: `start_url` cambiado de `"/"` a `"../../"` y se añade `"scope": "../../"` para que la app instalada funcione bajo `localhost`, `file://`, y GitHub Pages en `/IMGCRAFT2/`.
+- **`site.webmanifest` actualizado**: `start_url` cambiado de `"/"` a `"../../"` y se añade `"scope": "../../"` para que la app instalada funcione bajo `localhost`, `file://`, y GitHub Pages en `/MNEMOTAG2/`.
 - **Tests de regresión** en `tests/specs/regression.spec.js`: nuevo `describe('Regresión — PWA real con Service Worker (v3.3.16)')` con 5 aserciones que verifican que el archivo existe, define las 3 estrategias y los listeners principales, precachea los managers, está registrado desde `js/main.js`, y los meta tags iOS están en HTML.
 
 ### Notas de implementación
@@ -434,7 +434,7 @@ El detalle completo de cada feature está en las entradas individuales más abaj
 - **Por qué network-first para CDNs**: Tailwind, FA, JSZip, piexifjs y heic2any pueden actualizarse en sus respectivos CDNs sin avisarnos. La estrategia network-first prioriza siempre la última versión disponible y solo cae a cache en modo offline.
 - **Por qué registrar en `window.load`**: el registro del SW dispara el evento `install` que descarga 22+ archivos. En `load` ya hemos terminado de pintar todo y el usuario no nota la descarga.
 - **Por qué `clients.claim()`**: sin él, la versión nueva del SW solo se activa para pestañas que se abran DESPUÉS del despliegue. Con `clients.claim()`, las pestañas abiertas también empiezan a usar la nueva versión inmediatamente.
-- **Por qué `start_url: "../../"` en el manifest**: el manifest está en `images/favicon_io/site.webmanifest`, así que un path relativo `../../` resuelve correctamente a la raíz del proyecto sea cual sea la URL pública. Un path absoluto `"/"` rompe en GitHub Pages porque la app vive bajo `/IMGCRAFT2/`.
+- **Por qué `start_url: "../../"` en el manifest**: el manifest está en `images/favicon_io/site.webmanifest`, así que un path relativo `../../` resuelve correctamente a la raíz del proyecto sea cual sea la URL pública. Un path absoluto `"/"` rompe en GitHub Pages porque la app vive bajo `/MNEMOTAG2/`.
 
 ### Verificación
 - `node tests/run-in-node.js` → **132/132 OK** (127 anteriores + 5 nuevos)
@@ -667,7 +667,7 @@ Las funciones WebP son ultra-defensivas. Validan signature RIFF/WEBP antes de ma
 
 ### ⚠️ Validación manual OBLIGATORIA pendiente
 A diferencia de JPEG y PNG, la validación visual con un browser real es **indispensable** para WebP antes de confiar en producción. El runner Node solo verifica que el código está en su sitio, no que los WebP generados sean abribles. Pasos:
-1. Cargar una imagen en ImgCraft.
+1. Cargar una imagen en MnemoTag.
 2. Rellenar metadatos (título, autor, copyright, GPS).
 3. Seleccionar "WebP" como formato de salida.
 4. Descargar.
@@ -1724,7 +1724,7 @@ Segunda versión con mejoras de UI y nuevos filtros.
 
 ## [1.0.0] - 2023-12-01
 
-Lanzamiento inicial de ImgCraft.
+Lanzamiento inicial de MnemoTag.
 
 ---
 

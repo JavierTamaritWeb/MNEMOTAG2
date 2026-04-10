@@ -1,7 +1,7 @@
 'use strict';
 
 // ===== HISTORY MANAGER =====
-// Gestión de historial para deshacer/rehacer en ImgCraft v3.0
+// Gestión de historial para deshacer/rehacer en MnemoTag v3.0
 
 /**
  * HistoryManager - Sistema de historial para deshacer/rehacer

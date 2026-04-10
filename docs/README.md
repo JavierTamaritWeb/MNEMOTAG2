@@ -1,4 +1,4 @@
-# 📚 IMGCRAFT - DOCUMENTACIÓN TÉCNICA
+# 📚 MNEMOTAG - DOCUMENTACIÓN TÉCNICA
 
 **Versión:** 3.4.20  
 **Última actualización:** 10 de abril de 2026
@@ -162,7 +162,7 @@
 ### ESTRUCTURA DEL PROYECTO
 
 ```
-IMGCRAFT2/
+MNEMOTAG2/
 ├── index.html                 # Aplicación principal
 ├── README.md                  # Documentación de usuario
 ├── css/
@@ -192,8 +192,8 @@ IMGCRAFT2/
 
 ## 🔗 ENLACES ÚTILES
 
-- **Repositorio:** [GitHub - IMGCRAFT2](https://github.com/JavierTamaritWeb/IMGCRAFT2)
-- **Demo en vivo:** [ImgCraft App](https://javierTamaritWeb.github.io/IMGCRAFT2)
+- **Repositorio:** [GitHub - MNEMOTAG2](https://github.com/JavierTamaritWeb/MNEMOTAG2)
+- **Demo en vivo:** [MnemoTag App](https://javierTamaritWeb.github.io/MNEMOTAG2)
 - **CHANGELOG:** [Ver historial de cambios](../CHANGELOG.md)
 
 ---

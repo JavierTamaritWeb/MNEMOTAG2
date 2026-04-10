@@ -9,34 +9,34 @@
     // script). Con el delta sabemos exactamente cada cuánto ocurre.
     try {
       const now = Date.now();
-      const prevBootRaw = sessionStorage.getItem('imgcraft-boot-info');
+      const prevBootRaw = sessionStorage.getItem('mnemotag-boot-info');
       const prev = prevBootRaw ? JSON.parse(prevBootRaw) : null;
       const bootCount = prev ? (prev.count + 1) : 1;
       const deltaMs = prev ? (now - prev.ts) : null;
-      sessionStorage.setItem('imgcraft-boot-info', JSON.stringify({ ts: now, count: bootCount }));
-      const label = '%c[ImgCraft diag] Arranque #' + bootCount + ' @ ' + new Date(now).toLocaleTimeString() +
+      sessionStorage.setItem('mnemotag-boot-info', JSON.stringify({ ts: now, count: bootCount }));
+      const label = '%c[MnemoTag diag] Arranque #' + bootCount + ' @ ' + new Date(now).toLocaleTimeString() +
                     (deltaMs !== null ? (' (hace ' + Math.round(deltaMs / 1000) + ' s del anterior)') : '');
       console.warn(label, 'background:#fbbf24;color:#000;font-weight:bold;padding:4px 8px;border-radius:4px;');
       if (deltaMs !== null && deltaMs < 5 * 60 * 1000) {
-        console.warn('[ImgCraft diag] Reinicio detectado. Si no lo has provocado tú (reload manual, edición de archivo), revisa los listeners de error abajo ↓');
+        console.warn('[MnemoTag diag] Reinicio detectado. Si no lo has provocado tú (reload manual, edición de archivo), revisa los listeners de error abajo ↓');
       }
     } catch (e) { /* sessionStorage puede fallar en modo privado */ }
 
     // v3.4.17: Handler global de errores JavaScript no capturados.
     // Loggea con un banner rojo y retiene la pila completa para facilitar
     // el diagnóstico del usuario.
-    if (typeof window !== 'undefined' && !window._imgcraftDiagErrorInstalled) {
-      window._imgcraftDiagErrorInstalled = true;
+    if (typeof window !== 'undefined' && !window._mnemotagDiagErrorInstalled) {
+      window._mnemotagDiagErrorInstalled = true;
       window.addEventListener('error', function (e) {
         console.error(
-          '%c[ImgCraft diag] ERROR NO CAPTURADO: ' + (e && e.message) + ' en ' + (e && e.filename) + ':' + (e && e.lineno),
+          '%c[MnemoTag diag] ERROR NO CAPTURADO: ' + (e && e.message) + ' en ' + (e && e.filename) + ':' + (e && e.lineno),
           'background:#dc2626;color:#fff;font-weight:bold;padding:4px 8px;border-radius:4px;',
           e && e.error
         );
       });
       window.addEventListener('unhandledrejection', function (e) {
         console.error(
-          '%c[ImgCraft diag] PROMISE RECHAZADA SIN HANDLER: ' + (e && e.reason && (e.reason.message || e.reason)),
+          '%c[MnemoTag diag] PROMISE RECHAZADA SIN HANDLER: ' + (e && e.reason && (e.reason.message || e.reason)),
           'background:#dc2626;color:#fff;font-weight:bold;padding:4px 8px;border-radius:4px;',
           e && e.reason
         );
@@ -44,23 +44,23 @@
       // Loggear cualquier beforeunload (usuario cerrando, reload, etc.)
       window.addEventListener('beforeunload', function (e) {
         console.warn(
-          '%c[ImgCraft diag] beforeunload disparado — la página se va a recargar/cerrar ahora (persistido=' + (e.persisted === true) + ')',
+          '%c[MnemoTag diag] beforeunload disparado — la página se va a recargar/cerrar ahora (persistido=' + (e.persisted === true) + ')',
           'background:#3b82f6;color:#fff;font-weight:bold;padding:4px 8px;border-radius:4px;'
         );
         // Dump de la pila si es posible — a veces ayuda a ver quién lo disparó
-        try { console.trace('[ImgCraft diag] Stack trace del beforeunload:'); } catch (_) {}
+        try { console.trace('[MnemoTag diag] Stack trace del beforeunload:'); } catch (_) {}
       });
 
       // Loggear visibilitychange y pagehide (complementa beforeunload)
       document.addEventListener('visibilitychange', function () {
         console.warn(
-          '%c[ImgCraft diag] visibilitychange → ' + document.visibilityState,
+          '%c[MnemoTag diag] visibilitychange → ' + document.visibilityState,
           'background:#8b5cf6;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;'
         );
       });
       window.addEventListener('pagehide', function (e) {
         console.warn(
-          '%c[ImgCraft diag] pagehide (persisted=' + e.persisted + ') — bfcache eviction?',
+          '%c[MnemoTag diag] pagehide (persisted=' + e.persisted + ') — bfcache eviction?',
           'background:#3b82f6;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;'
         );
       });
@@ -72,7 +72,7 @@
           const used = (performance.memory.usedJSHeapSize / 1048576).toFixed(1);
           const total = (performance.memory.totalJSHeapSize / 1048576).toFixed(1);
           const limit = (performance.memory.jsHeapSizeLimit / 1048576).toFixed(0);
-          console.info('[ImgCraft diag] memoria JS heap: ' + used + ' / ' + total + ' MB (límite ' + limit + ' MB)');
+          console.info('[MnemoTag diag] memoria JS heap: ' + used + ' / ' + total + ' MB (límite ' + limit + ' MB)');
         }, 10000);
       }
 
@@ -89,10 +89,10 @@
         });
         if (liveReload) {
           console.warn(
-            '%c[ImgCraft diag] DETECTADO script de Live Reload en la página: ' + (liveReload.src || '(inline)'),
+            '%c[MnemoTag diag] DETECTADO script de Live Reload en la página: ' + (liveReload.src || '(inline)'),
             'background:#f59e0b;color:#000;font-weight:bold;padding:4px 8px;border-radius:4px;'
           );
-          console.warn('[ImgCraft diag] Este script puede ser la causa de los reinicios si está recargando ante cambios de archivos del proyecto.');
+          console.warn('[MnemoTag diag] Este script puede ser la causa de los reinicios si está recargando ante cambios de archivos del proyecto.');
         }
       } catch (_) { /* defensivo */ }
     }
@@ -331,7 +331,7 @@
     // usuario pulse el botón "Limpiar" explícitamente.
     // ================================================================
 
-    const WATERMARK_STORAGE_KEY = 'imgcraft-watermark-state';
+    const WATERMARK_STORAGE_KEY = 'mnemotag-watermark-state';
     const WATERMARK_PERSIST_FIELDS = [
       'watermark-text-enabled',
       'watermark-image-enabled',
@@ -495,14 +495,14 @@
       }
 
       // 7. Limpiar sessionStorage de diagnóstico
-      try { sessionStorage.removeItem('imgcraft-boot-info'); } catch (e) { /* ok */ }
+      try { sessionStorage.removeItem('mnemotag-boot-info'); } catch (e) { /* ok */ }
 
-      // 8. Limpiar cualquier otra clave de localStorage que empiece por 'imgcraft-'
+      // 8. Limpiar cualquier otra clave de localStorage que empiece por 'mnemotag-'
       try {
         const keysToRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
-          if (key && key.startsWith('imgcraft-')) {
+          if (key && key.startsWith('mnemotag-')) {
             keysToRemove.push(key);
           }
         }
@@ -548,7 +548,7 @@
 
             if (isLiveServer || isBrowserSync) {
               console.warn(
-                '%c[ImgCraft] WebSocket de Live Reload BLOQUEADO: ' + url,
+                '%c[MnemoTag] WebSocket de Live Reload BLOQUEADO: ' + url,
                 'background:#f59e0b;color:#000;font-weight:bold;padding:2px 6px;border-radius:4px;'
               );
               // Devolver un objeto fake que no hace nada.
@@ -592,7 +592,7 @@
         window.WebSocket.prototype = OrigWebSocket.prototype;
 
       } catch (e) {
-        console.warn('[ImgCraft] No se pudo monkey-patchear WebSocket:', e);
+        console.warn('[MnemoTag] No se pudo monkey-patchear WebSocket:', e);
       }
     })();
 
@@ -6815,7 +6815,7 @@
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `imgcraft-batch-${Date.now()}.zip`;
+        link.download = `mnemotag-batch-${Date.now()}.zip`;
         link.click();
         URL.revokeObjectURL(url);
         
@@ -7537,7 +7537,7 @@
         // También borrar los caches asociados al SW para dejar el entorno limpio.
         if (typeof caches !== 'undefined' && caches.keys) {
           caches.keys().then((names) => {
-            names.filter((n) => n.startsWith('imgcraft-')).forEach((n) => caches.delete(n));
+            names.filter((n) => n.startsWith('mnemotag-')).forEach((n) => caches.delete(n));
           }).catch(() => { /* defensivo */ });
         }
       } else {

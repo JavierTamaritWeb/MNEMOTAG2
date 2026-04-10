@@ -1,7 +1,7 @@
 'use strict';
 
 // ===== METADATA MANAGER =====
-// Gestión de metadatos EXIF y geolocalización para ImgCraft v3.0
+// Gestión de metadatos EXIF y geolocalización para MnemoTag v3.0
 
 /**
  * MetadataManager - Sistema de gestión de metadatos EXIF
@@ -239,7 +239,7 @@ const MetadataManager = {
       longitude: parseFloat(document.getElementById('metaLongitude')?.value) || null,
       altitude: parseFloat(document.getElementById('metaAltitude')?.value) || null,
       createdAt: createdAt,
-      software: 'ImgCraft v3.0'
+      software: 'MnemoTag v3.0'
     };
   },
   

@@ -1,8 +1,8 @@
-// ImgCraft — Playwright E2E smoke test (v3.4.13).
+// MnemoTag — Playwright E2E smoke test (v3.4.13).
 //
 // Verifica end-to-end (con un navegador real) que:
 //   1. La app carga sin errores en consola.
-//   2. El título dice "ImgCraft v3.4.x".
+//   2. El título dice "MnemoTag v3.4.x".
 //   3. Los scripts críticos están cargados (managers, utils).
 //   4. Los botones principales son clicables sin lanzar excepciones.
 //   5. Subir una imagen sintética 1x1 via el input de archivo arranca
@@ -20,7 +20,7 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-test.describe('ImgCraft smoke test', () => {
+test.describe('MnemoTag smoke test', () => {
   test('carga index.html sin errores en consola', async ({ page }) => {
     const consoleErrors = [];
     page.on('console', (msg) => {
@@ -35,7 +35,7 @@ test.describe('ImgCraft smoke test', () => {
     await page.goto('/index.html', { waitUntil: 'networkidle' });
 
     // Título contiene la versión actual
-    await expect(page).toHaveTitle(/ImgCraft v3\.4\.\d+/);
+    await expect(page).toHaveTitle(/MnemoTag v3\.4\.\d+/);
 
     // Filtrar errores conocidos que no son bugs: CSP warnings sobre
     // scripts inline de Tailwind en modo CDN, errores de fuentes
