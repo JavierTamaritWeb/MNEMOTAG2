@@ -109,6 +109,15 @@ EXIF writing is implemented para **JPEG** (via `piexifjs@1.0.6` cargado por CDN)
 
 Theme is controlled via `[data-theme="dark"]` on the root, **not** Tailwind's `dark:` variants. Tailwind dark utilities will not work — write theme overrides as `[data-theme="dark"] .selector { ... }` in `css/styles.css`. This caused a real bug fixed in 3.1.4.
 
+### Creating new buttons — IMPORTANT
+
+The `.btn` class and the mass selector `button[type="button"]` in `css/styles.css` apply to ALL buttons. When creating a new `<button>` **ALWAYS check**:
+
+1. **Text truncation**: `.btn` historically had `white-space: nowrap` which cut long text with ellipsis. Fixed in v3.4.21 to `white-space: normal`, but if it ever reverts, buttons with more than ~15 characters will be truncated. Always test with real text.
+2. **Dark mode**: use `[data-theme="dark"] #your-btn { ... }` in CSS. **Never** use Tailwind `dark:` classes (they don't work — Tailwind 2.2.19 CDN has no dark mode).
+3. **The mass selector** at line ~1584 (`button[type="button"], .btn-secondary, .btn-outline, .button--action, ...`) overrides many properties: `min-height: 56px`, `min-width: 160px`, `padding: 16px 36px`, `background: linear-gradient(...)`. If your new button looks wrong, this selector is probably the culprit. Use a more specific selector (ID) to override.
+4. **The `.button--feature` class** applies `flex-direction: column` (icon above text) + reduced padding. Only use it for compact grid buttons (batch/text-layers/crop/shortcuts), NOT for full-width action buttons.
+
 ### Zoom by device
 
 Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to avoid accidental zoom from Magic Mouse / trackpads. Desktop users zoom only via the on-screen +/-/100% buttons. Mobile keeps pinch and wheel zoom. Don't "fix" this by re-enabling wheel zoom on desktop.
