@@ -1,4 +1,4 @@
-// ESLint 9 flat config para MnemoTag
+// ESLint 9 flat config para ImgCraft
 // Sin package.json en el repo — se ejecuta vía `npx --yes eslint` en CI.
 // Reglas conservadoras: solo marcamos como `error` los bugs reales.
 // Los estilos y preferencias van como `warn` o están desactivados.

@@ -1,5 +1,5 @@
 // =============================================================================
-// MnemoTag — Validación binaria de las funciones EXIF de PNG y WebP
+// ImgCraft — Validación binaria de las funciones EXIF de PNG y WebP
 // =============================================================================
 //
 // Este script NO sustituye a la validación browser real. Lo que hace es:

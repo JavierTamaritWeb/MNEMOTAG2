@@ -1,14 +1,14 @@
-# 📊 Validación Avanzada MnemoTag v3.0
+# 📊 Validación Avanzada ImgCraft v3.0
 
 ## Descripción General
 
-El sistema de validación avanzada de MnemoTag v3.0 proporciona múltiples capas de verificación para garantizar la seguridad, integridad y calidad de las imágenes procesadas, incorporando las últimas mejoras de formato fallback y validación de contenido.
+El sistema de validación avanzada de ImgCraft v3.0 proporciona múltiples capas de verificación para garantizar la seguridad, integridad y calidad de las imágenes procesadas, incorporando las últimas mejoras de formato fallback y validación de contenido.
 
 ## 🎯 Características Implementadas en v3.0
 
 ### ✅ Sistema de Validación Multi-capa
 
-La arquitectura de validación de MnemoTag v3.0 incluye validaciones exhaustivas con retroalimentación específica y detallada:
+La arquitectura de validación de ImgCraft v3.0 incluye validaciones exhaustivas con retroalimentación específica y detallada:
 
 #### **Capas de Validación:**
 
@@ -245,7 +245,7 @@ Nueva función `validateImageDimensions()` que verifica:
 
 ## 🚀 **Resultado Final**
 
-El sistema de validación de archivos de MnemoTag v3.0 ahora proporciona:
+El sistema de validación de archivos de ImgCraft v3.0 ahora proporciona:
 
 - **Validación exhaustiva** con 15 tipos de verificación
 - **Mensajes de error específicos** con información detallada

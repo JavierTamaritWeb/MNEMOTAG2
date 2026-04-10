@@ -1,5 +1,5 @@
 // =============================================================================
-// MnemoTag - Mini test runner casero (sin dependencias, sin npm)
+// ImgCraft - Mini test runner casero (sin dependencias, sin npm)
 // =============================================================================
 //
 // Uso:

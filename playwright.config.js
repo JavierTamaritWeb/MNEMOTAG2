@@ -1,4 +1,4 @@
-// Playwright config para el smoke test E2E de MnemoTag (v3.4.13).
+// Playwright config para el smoke test E2E de ImgCraft (v3.4.13).
 //
 // Sin package.json: se ejecuta via `npx playwright@latest test`.
 // El webServer arranca un HTTP server simple con Python (siempre

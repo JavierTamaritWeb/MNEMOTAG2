@@ -1,4 +1,4 @@
-# 📦 MNEMOTAG V3.1 - NUEVAS CARACTERÍSTICAS
+# 📦 IMGCRAFT V3.1 - NUEVAS CARACTERÍSTICAS
 
 **Versión:** 3.1.3  
 **Fecha:** Octubre 2025  
@@ -8,7 +8,7 @@
 
 ## 🎯 RESUMEN EJECUTIVO
 
-La versión 3.1 de MnemoTag introduce 10 características principales que transforman la aplicación en una herramienta profesional completa:
+La versión 3.1 de ImgCraft introduce 10 características principales que transforman la aplicación en una herramienta profesional completa:
 
 1. **Sistema de Atajos de Teclado** - Navegación rápida optimizada para Mac
 2. **Batch Processing** - Procesamiento por lotes de hasta 50 imágenes
@@ -206,7 +206,7 @@ async function processBatchImages(files, config) {
   
   // Generar ZIP
   const zipBlob = await zip.generateAsync({ type: 'blob' });
-  downloadZip(zipBlob, 'mnemotag_batch.zip');
+  downloadZip(zipBlob, 'imgcraft_batch.zip');
 }
 ```
 

@@ -375,7 +375,7 @@ El sistema de zoom optimizado equilibra perfectamente:
 
 **Versión**: 1.0  
 **Fecha**: 2025-10-15  
-**Incluido en**: MNEMOTAG v3.1.3
+**Incluido en**: IMGCRAFT v3.1.3
 
 ✨ **Zoom inteligente que se adapta a tu dispositivo** ✨
 

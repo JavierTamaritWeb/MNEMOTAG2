@@ -7,8 +7,8 @@
 // encargan de recalcular el canvas con los nuevos valores).
 
 const PresetManager = {
-  STORAGE_PREFIX: 'mnemotag-preset-',
-  INDEX_KEY: 'mnemotag-preset-index',
+  STORAGE_PREFIX: 'imgcraft-preset-',
+  INDEX_KEY: 'imgcraft-preset-index',
 
   // IDs de los inputs cuyos valores forman parte de un preset.
   // Son los sliders + selects de la sección de filtros. Los watermarks

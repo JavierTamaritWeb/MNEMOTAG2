@@ -1,6 +1,6 @@
 {
-  "name": "MnemoTag - Editor de metadatos e imágenes",
-  "short_name": "MnemoTag",
+  "name": "ImgCraft - Editor de metadatos e imágenes",
+  "short_name": "ImgCraft",
   "description": "Editor profesional de metadatos e imágenes. Añade metadatos EXIF, marcas de agua y aplica filtros profesionales.",
   "icons": [
     {

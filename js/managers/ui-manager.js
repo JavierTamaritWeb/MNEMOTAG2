@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MnemoTag v3.0 - UI Manager
+ * ImgCraft v3.0 - UI Manager
  * Sistema de gestión de interfaz de usuario con notificaciones, loading states y utilidades
  * Características: Toasts, loading states, form management, debounce/throttle, error handling
  */

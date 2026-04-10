@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MnemoTag v3.0 - Sistema de gestión de workers
+ * ImgCraft v3.0 - Sistema de gestión de workers
  * Sistema avanzado de workers para procesamiento de imágenes con optimizaciones
  * Características: Pool de workers, transferable objects, jobs management, fallbacks
  */

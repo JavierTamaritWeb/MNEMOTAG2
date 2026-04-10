@@ -1,7 +1,7 @@
 'use strict';
 
 // ===== HELPERS =====
-// Funciones utilitarias para MnemoTag v3.0
+// Funciones utilitarias para ImgCraft v3.0
 
 /**
  * Helpers - Funciones utilitarias y de apoyo

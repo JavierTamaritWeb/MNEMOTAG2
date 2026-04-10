@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MnemoTag v3.4.20</title>
+  <title>ImgCraft v3.4.20</title>
   
   <!-- Favicon moderno con SVG -->
   <link rel="icon" type="image/svg+xml" href="images/favicon.svg">
@@ -31,14 +31,14 @@
   <!-- v3.3.16: Meta tags PWA para iOS Safari -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="MnemoTag">
+  <meta name="apple-mobile-web-app-title" content="ImgCraft">
   <meta name="mobile-web-app-capable" content="yes">
 
   <!-- Meta tags para PWA y redes sociales -->
   <meta name="theme-color" content="#20b2aa">
   <meta name="description" content="Editor profesional de metadatos e imágenes. Añade metadatos EXIF, marcas de agua y aplica filtros. Soporte completo para JPEG, PNG, WebP y AVIF.">
   <meta name="keywords" content="editor imágenes, metadatos EXIF, marca de agua, filtros, JPEG, PNG, WebP, AVIF">
-  <meta name="author" content="MnemoTag">
+  <meta name="author" content="ImgCraft">
 
   <!-- v3.4.1 (hardening inicial) + v3.4.14 (fixes de console errors):
        - `frame-ancestors` eliminado: solo tiene efecto vía HTTP header, no vía <meta>.
@@ -47,7 +47,7 @@
        - `'unsafe-eval'` añadido a script-src: alguna librería CDN (probablemente
          heic2any o @imgly/background-removal) usa `new Function()` internamente
          para compilar helpers. Sin unsafe-eval esas libs fallan con EvalError.
-         Es una concesión de seguridad aceptable porque MnemoTag no procesa
+         Es una concesión de seguridad aceptable porque ImgCraft no procesa
          input de terceros que pueda contener código malicioso. -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' blob: https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; worker-src 'self' blob:; child-src 'self' blob:; manifest-src 'self'; base-uri 'self'; form-action 'self';">
 
@@ -79,10 +79,10 @@
     <section class="hero-section mb-12">
       <div class="hero-content">
         <div class="hero-logo">
-          <img src="images/applicacion.png" alt="MnemoTag Logo" class="hero-logo-image">
+          <img src="images/applicacion.png" alt="ImgCraft Logo" class="hero-logo-image">
         </div>
         <div class="hero-text">
-          <h1 class="hero-title">MnemoTag</h1>
+          <h1 class="hero-title">ImgCraft</h1>
           <p class="hero-subtitle">Editor profesional de metadatos e imágenes</p>
           <p class="hero-description">
             Añade metadatos EXIF, marcas de agua y aplica filtros profesionales a tus imágenes. 
@@ -1734,7 +1734,7 @@
     </div>
 
     <footer class="mt-12 text-center text-gray-500 text-sm">
-      <p class="footer-text">© 2026 MnemoTag. Todos los derechos reservados.</p>
+      <p class="footer-text">© 2026 ImgCraft. Todos los derechos reservados.</p>
     </footer>
   </div>
     <!-- External Dependencies (v3.4.1: con SRI para proteger contra CDN tampering) -->

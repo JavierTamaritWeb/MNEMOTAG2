@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * MnemoTag v3.0 - Fallback Processor
+ * ImgCraft v3.0 - Fallback Processor
  * Sistema de procesamiento fallback para navegadores sin soporte de Workers
  * Características: Main thread processing, filter fallbacks, watermark fallbacks, performance optimization
  */

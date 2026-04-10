@@ -1,4 +1,4 @@
-# 🚀 Resumen Ejecutivo de Versiones - MNEMOTAG
+# 🚀 Resumen Ejecutivo de Versiones - IMGCRAFT
 
 **Documento**: Resumen de evolución del proyecto  
 **Última actualización**: 9 de abril de 2026
@@ -154,7 +154,7 @@ Los 5 botones introducidos en v3.3.11–v3.3.18 heredaban clases CSS diseñadas 
 ### Otros cambios de v3.4.0
 
 - Cache-bust de `styles.css` via query string (`?v=20260409a`).
-- Service Worker bumpeado a `mnemotag-v3.3.19-css-fix` para invalidar caches anteriores en PWAs instaladas.
+- Service Worker bumpeado a `imgcraft-v3.3.19-css-fix` para invalidar caches anteriores en PWAs instaladas.
 - Copyright actualizado a 2026 en footer HTML, placeholder de `metaCopyright` y README.md.
 - Push a GitHub desbloqueado (scope `workflow` del token) moviendo `.github/workflows/README.md` fuera del directorio de workflows.
 

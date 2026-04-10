@@ -1,4 +1,4 @@
-# 🖼️ MNEMOTAG
+# 🖼️ IMGCRAFT
 
 **EDITOR PROFESIONAL DE METADATOS E IMÁGENES**
 
@@ -7,10 +7,10 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 ![Version](https://img.shields.io/badge/version-3.4.20-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
-[![Tests](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml)
-[![Deploy to GitHub Pages](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml)
+[![Tests](https://github.com/JavierTamaritWeb/IMGCRAFT2/actions/workflows/test.yml/badge.svg)](https://github.com/JavierTamaritWeb/IMGCRAFT2/actions/workflows/test.yml)
+[![Deploy to GitHub Pages](https://github.com/JavierTamaritWeb/IMGCRAFT2/actions/workflows/deploy.yml/badge.svg)](https://github.com/JavierTamaritWeb/IMGCRAFT2/actions/workflows/deploy.yml)
 
-**🌐 Demo en vivo:** [javiertamaritweb.github.io/MNEMOTAG2](https://javiertamaritweb.github.io/MNEMOTAG2/)
+**🌐 Demo en vivo:** [javiertamaritweb.github.io/IMGCRAFT2](https://javiertamaritweb.github.io/IMGCRAFT2/)
 
 ---
 
@@ -154,8 +154,8 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 ## 🔧 INSTALACIÓN
 
 ```bash
-git clone https://github.com/JavierTamaritWeb/MNEMOTAG2.git
-cd MNEMOTAG2
+git clone https://github.com/JavierTamaritWeb/IMGCRAFT2.git
+cd IMGCRAFT2
 open index.html
 ```
 

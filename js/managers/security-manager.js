@@ -1,7 +1,7 @@
 'use strict';
 
 // ===== SECURITY MANAGER =====
-// Módulo de seguridad y validación para MnemoTag v3.0
+// Módulo de seguridad y validación para ImgCraft v3.0
 
 /**
  * SecurityManager - Gestión de validación y seguridad

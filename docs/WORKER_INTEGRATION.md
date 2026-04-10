@@ -1,4 +1,4 @@
-# 🚀 MnemoTag v3.0 - Worker Integration COMPLETADO
+# 🚀 ImgCraft v3.0 - Worker Integration COMPLETADO
 
 ## ✅ Implementaciones Finalizadas
 
@@ -92,7 +92,7 @@ self.postMessage({result}, [imageData.data.buffer]);
 ## ✨ Arquitectura Final
 
 ```
-MnemoTag v3.0
+ImgCraft v3.0
 ├── Enhanced File Validation ✅
 ├── CSS Performance Optimization ✅
 ├── Smart Debouncing (150ms) ✅

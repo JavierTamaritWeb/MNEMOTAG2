@@ -1,5 +1,5 @@
 // =============================================================================
-// MnemoTag — Runner Node para los tests del browser
+// ImgCraft — Runner Node para los tests del browser
 // =============================================================================
 //
 // Ejecuta toda la suite tests/specs/*.spec.js en Node con polyfills mínimos:

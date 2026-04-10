@@ -1,13 +1,13 @@
-# 🔧 Arquitectura Modular MnemoTag v3.0
+# 🔧 Arquitectura Modular ImgCraft v3.0
 
 ## Descripción General
 
-MnemoTag v3.0 implementa una arquitectura modular robusta que separa responsabilidades, facilita el mantenimiento y permite escalabilidad futura. El sistema está diseñado siguiendo principios SOLID y patrones de diseño modernos, incorporando las últimas mejoras visuales y funcionales.
+ImgCraft v3.0 implementa una arquitectura modular robusta que separa responsabilidades, facilita el mantenimiento y permite escalabilidad futura. El sistema está diseñado siguiendo principios SOLID y patrones de diseño modernos, incorporando las últimas mejoras visuales y funcionales.
 
 ## Estructura del Proyecto Actualizada
 
 ```
-mnemotag-v3/
+imgcraft-v3/
 ├── index.html                 # Punto de entrada con hero section
 ├── css/
 │   └── styles.css            # Estilos centralizados + hero styling
@@ -42,7 +42,7 @@ mnemotag-v3/
 
 ### Estructura Objetivo
 ```
-MnemoTag/
+ImgCraft/
 ├── index.html
 ├── css/
 │   └── styles.css
@@ -250,4 +250,4 @@ canvasToBlob_fallback(canvas, mimeType, quality)
 
 ---
 
-> **Nota**: Esta documentación se actualiza conforme avanza el proceso de modularización. Versión actual: MnemoTag v3.0 - Modularización Fase 1 Completada.
+> **Nota**: Esta documentación se actualiza conforme avanza el proceso de modularización. Versión actual: ImgCraft v3.0 - Modularización Fase 1 Completada.
