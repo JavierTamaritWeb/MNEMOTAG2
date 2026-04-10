@@ -3700,7 +3700,9 @@
       if (isDragging) {
         isDragging = false;
         if (dragTarget && dragTarget.layerId) {
-          // Era una capa de texto — render completo al soltar
+          // Era una capa de texto — render completo CON capas al soltar.
+          // NO llamar a updatePreview() después porque sobreescribiría
+          // el canvas sin las capas de texto (updatePreview no las pinta).
           renderCanvasWithLayers();
           UIManager.showSuccess('📝 Capa de texto reposicionada');
           if (activeLayerId === dragTarget.layerId) {
@@ -3708,17 +3710,14 @@
           }
           updateTextLayersList();
         } else {
+          // Era un watermark — updatePreview incluye watermarks pero no capas.
           const elementType = dragTarget === 'text' ? 'TEXTO' : 'IMAGEN';
           const emoji = dragTarget === 'text' ? '📝' : '🖼️';
           UIManager.showSuccess(emoji + ' ' + elementType + ' reposicionado correctamente');
+          updatePreview();
         }
         dragTarget = null;
         canvas.style.cursor = 'default';
-
-        // Render completo final: durante el drag se saltaron applyCanvasFilters
-        // y debouncedSaveHistory para reducir lag. Ahora que terminó el drag,
-        // los volvemos a aplicar (P2).
-        updatePreview();
       }
     }
     
