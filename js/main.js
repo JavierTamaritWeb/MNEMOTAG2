@@ -7130,8 +7130,36 @@
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
       ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
-      textLayerManager.renderLayers(ctx, canvas);
-      // Recalcular bounds para el siguiente mousemove
+
+      // Dibujar las capas de texto directamente (sin pasar por el
+      // manager's renderLayers que puede fallar silenciosamente).
+      // Es un render simplificado: solo texto con fuente, color y
+      // posición. Los efectos (shadow, stroke, gradient) se aplican
+      // en el render completo al soltar el drag.
+      try {
+        if (textLayerManager) {
+          var layers = textLayerManager.getAllLayers();
+          for (var i = 0; i < layers.length; i++) {
+            var layer = layers[i];
+            if (!layer || !layer.visible) continue;
+            ctx.save();
+            ctx.globalAlpha = (typeof layer.opacity === 'number') ? layer.opacity : 1;
+            var family = (layer.font && layer.font.family) || 'Roboto';
+            var size = (layer.font && layer.font.size) || 40;
+            var weight = (layer.font && layer.font.weight) || 'normal';
+            ctx.font = weight + ' ' + size + 'px "' + family + '", sans-serif';
+            ctx.textBaseline = 'top';
+            ctx.fillStyle = layer.color || '#ffffff';
+            var px = (layer.position && layer.position.x) || 0;
+            var py = (layer.position && layer.position.y) || 0;
+            ctx.fillText(layer.text || '', px, py);
+            ctx.restore();
+          }
+        }
+      } catch (err) {
+        console.error('[MnemoTag] Error en render ligero de capas:', err);
+      }
+
       _updateTextLayerBounds();
     }
 
