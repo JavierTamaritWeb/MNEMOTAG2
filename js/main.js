@@ -152,6 +152,10 @@
     let imageWatermarkBounds = null; // { x, y, width, height }
     let showPositioningBorders = true; // Controla si se muestran los bordes de guía (false al descargar)
     let hoveredWatermark = null; // v3.3.5: 'text' | 'image' | null — para hover state visual del borde guía
+
+    // Bounds de las capas de texto para hit-testing del drag en el canvas.
+    // Se recalculan cada vez que renderCanvasWithLayers() pinta las capas.
+    let textLayerBounds = []; // [{ layerId, x, y, width, height }]
     
     // Variables para sistema de Reglas Métricas
     let isRulerMode = false;
@@ -3543,46 +3547,70 @@
       return x >= bounds.x && x <= bounds.x + bounds.width &&
              y >= bounds.y && y <= bounds.y + bounds.height;
     }
-    
+
+    /**
+     * Detecta si un punto está dentro de alguna capa de texto visible.
+     * Recorre textLayerBounds en orden inverso (la capa pintada encima
+     * tiene prioridad). Devuelve {layerId, bounds} o null.
+     */
+    function isPointInTextLayer(x, y) {
+      for (let i = textLayerBounds.length - 1; i >= 0; i--) {
+        const b = textLayerBounds[i];
+        if (x >= b.x && x <= b.x + b.width &&
+            y >= b.y && y <= b.y + b.height) {
+          return b;
+        }
+      }
+      return null;
+    }
+
     /**
      * Maneja el inicio del arrastre (mousedown)
      */
     function handleDragStart(event) {
       // No interferir con el pan del zoom
       if (isZoomed) return;
-      
-      // Verificar si hay elementos con posición personalizada
-      const textPosition = document.getElementById('watermark-position')?.value;
-      const imagePosition = document.getElementById('watermark-image-position')?.value;
-      
-      const textInCustomMode = textPosition === 'custom';
-      const imageInCustomMode = imagePosition === 'custom';
-      
-      if (!textInCustomMode && !imageInCustomMode) return;
-      
+
       const rect = canvas.getBoundingClientRect();
       const scaleX = canvas.width / rect.width;
       const scaleY = canvas.height / rect.height;
-      
       const x = (event.clientX - rect.left) * scaleX;
       const y = (event.clientY - rect.top) * scaleY;
-      
-      // NUEVO: Si no hay posición personalizada definida, establecer una inicial
+
+      // 1) Prioridad máxima: capas de texto (siempre arrastrables)
+      const hitLayer = isPointInTextLayer(x, y);
+      if (hitLayer) {
+        isDragging = true;
+        dragTarget = hitLayer; // { layerId, x, y, width, height }
+        dragOffsetX = x - hitLayer.x;
+        dragOffsetY = y - hitLayer.y;
+        canvas.style.cursor = 'grabbing';
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+
+      // 2) Watermarks en modo custom (lógica original)
+      const textPosition = document.getElementById('watermark-position')?.value;
+      const imagePosition = document.getElementById('watermark-image-position')?.value;
+      const textInCustomMode = textPosition === 'custom';
+      const imageInCustomMode = imagePosition === 'custom';
+
+      if (!textInCustomMode && !imageInCustomMode) return;
+
       if (textInCustomMode && !customTextPosition && textWatermarkBounds) {
         customTextPosition = {
           x: textWatermarkBounds.x + textWatermarkBounds.width / 2,
           y: textWatermarkBounds.y + textWatermarkBounds.height
         };
       }
-      
       if (imageInCustomMode && !customImagePosition && imageWatermarkBounds) {
         customImagePosition = {
           x: imageWatermarkBounds.x + imageWatermarkBounds.width / 2,
           y: imageWatermarkBounds.y + imageWatermarkBounds.height / 2
         };
       }
-      
-      // Detectar sobre qué elemento se hizo click (Prioridad: texto > imagen)
+
       if (textInCustomMode && isPointInText(x, y)) {
         isDragging = true;
         dragTarget = 'text';
@@ -3606,74 +3634,61 @@
      * Maneja el movimiento del arrastre (mousemove)
      */
     function handleDragMove(event) {
-      if (!isDragging) {
-        // Cambiar cursor si está sobre un elemento arrastrable
-        const textPosition = document.getElementById('watermark-position')?.value;
-        const imagePosition = document.getElementById('watermark-image-position')?.value;
-
-        if (textPosition !== 'custom' && imagePosition !== 'custom') {
-          canvas.style.cursor = 'default';
-          // v3.3.5: salir de hover si cambiamos a modo no-custom
-          if (hoveredWatermark !== null) {
-            hoveredWatermark = null;
-            updatePreview();
-          }
-          return;
-        }
-
-        const rect = canvas.getBoundingClientRect();
-        const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
-
-        const x = (event.clientX - rect.left) * scaleX;
-        const y = (event.clientY - rect.top) * scaleY;
-
-        // v3.3.5: detectar hover sobre texto o imagen para feedback visual
-        let newHover = null;
-        if (textPosition === 'custom' && isPointInText(x, y)) {
-          newHover = 'text';
-        } else if (imagePosition === 'custom' && isPointInImage(x, y)) {
-          newHover = 'image';
-        }
-
-        if (newHover) {
-          canvas.style.cursor = 'grab';
-        } else {
-          canvas.style.cursor = 'default';
-        }
-
-        // Solo re-renderizar si el estado de hover cambió, para no disparar
-        // updatePreview en cada mousemove sin causa.
-        if (newHover !== hoveredWatermark) {
-          hoveredWatermark = newHover;
-          updatePreview();
-        }
-        return;
-      }
-      
       const rect = canvas.getBoundingClientRect();
       const scaleX = canvas.width / rect.width;
       const scaleY = canvas.height / rect.height;
-      
       const x = (event.clientX - rect.left) * scaleX;
       const y = (event.clientY - rect.top) * scaleY;
-      
-      if (dragTarget === 'text') {
-        customTextPosition = {
-          x: x - dragOffsetX,
-          y: y - dragOffsetY
-        };
+
+      if (!isDragging) {
+        // Hover cursor: capas de texto o watermarks
+        var cursorSet = false;
+        if (isPointInTextLayer(x, y)) {
+          canvas.style.cursor = 'grab';
+          cursorSet = true;
+        }
+        if (!cursorSet) {
+          const textPosition = document.getElementById('watermark-position')?.value;
+          const imagePosition = document.getElementById('watermark-image-position')?.value;
+          let newHover = null;
+          if (textPosition === 'custom' && isPointInText(x, y)) {
+            newHover = 'text';
+            canvas.style.cursor = 'grab';
+          } else if (imagePosition === 'custom' && isPointInImage(x, y)) {
+            newHover = 'image';
+            canvas.style.cursor = 'grab';
+          } else if (!cursorSet) {
+            canvas.style.cursor = 'default';
+          }
+          if (newHover !== hoveredWatermark) {
+            hoveredWatermark = newHover;
+            updatePreview();
+          }
+        }
+        return;
+      }
+
+      // Drag activo
+      if (dragTarget && dragTarget.layerId) {
+        // Arrastrando una capa de texto
+        var newX = x - dragOffsetX;
+        var newY = y - dragOffsetY;
+        var layer = textLayerManager.getLayer(dragTarget.layerId);
+        if (layer) {
+          layer.position.x = Math.round(newX);
+          layer.position.y = Math.round(newY);
+          renderCanvasWithLayers();
+        }
+      } else if (dragTarget === 'text') {
+        customTextPosition = { x: x - dragOffsetX, y: y - dragOffsetY };
         showTextPositionMarker();
         updatePreview();
       } else if (dragTarget === 'image') {
-        customImagePosition = {
-          x: x - dragOffsetX,
-          y: y - dragOffsetY
-        };
+        customImagePosition = { x: x - dragOffsetX, y: y - dragOffsetY };
         showPositionMarker();
         updatePreview();
       }
-      
+
       event.preventDefault();
     }
     
@@ -3683,9 +3698,19 @@
     function handleDragEnd(event) {
       if (isDragging) {
         isDragging = false;
-        const elementType = dragTarget === 'text' ? 'TEXTO' : 'IMAGEN';
-        const emoji = dragTarget === 'text' ? '📝' : '🖼️';
-        UIManager.showSuccess(`${emoji} ${elementType} reposicionado correctamente`);
+        if (dragTarget && dragTarget.layerId) {
+          // Era una capa de texto
+          UIManager.showSuccess('📝 Capa de texto reposicionada');
+          // Actualizar el editor si esta capa está seleccionada
+          if (activeLayerId === dragTarget.layerId) {
+            selectTextLayer(dragTarget.layerId);
+          }
+          updateTextLayersList();
+        } else {
+          const elementType = dragTarget === 'text' ? 'TEXTO' : 'IMAGEN';
+          const emoji = dragTarget === 'text' ? '📝' : '🖼️';
+          UIManager.showSuccess(emoji + ' ' + elementType + ' reposicionado correctamente');
+        }
         dragTarget = null;
         canvas.style.cursor = 'default';
 
@@ -6930,6 +6955,45 @@
         var textDiv = document.createElement('div');
         textDiv.className = 'text-layer-text';
         textDiv.textContent = layer.text || '';
+        // Doble-click para edición inline directa
+        textDiv.addEventListener('dblclick', (function (layerRef, divRef) {
+          return function (ev) {
+            ev.stopPropagation();
+            divRef.contentEditable = 'true';
+            divRef.focus();
+            // Seleccionar todo el texto
+            var range = document.createRange();
+            range.selectNodeContents(divRef);
+            var sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+            // Al perder foco o pulsar Enter, guardar
+            var save = function () {
+              divRef.contentEditable = 'false';
+              var newText = divRef.textContent.trim();
+              if (newText && newText !== layerRef.text) {
+                layerRef.text = newText;
+                renderCanvasWithLayers();
+                // Actualizar el editor si esta capa está seleccionada
+                var el = document.getElementById('text-layer-text');
+                if (el && activeLayerId === layerRef.id) el.value = newText;
+              }
+              divRef.removeEventListener('blur', save);
+              divRef.removeEventListener('keydown', onKey);
+            };
+            var onKey = function (ke) {
+              if (ke.key === 'Enter') {
+                ke.preventDefault();
+                divRef.blur();
+              } else if (ke.key === 'Escape') {
+                divRef.textContent = layerRef.text || '';
+                divRef.blur();
+              }
+            };
+            divRef.addEventListener('blur', save);
+            divRef.addEventListener('keydown', onKey);
+          };
+        })(layer, textDiv));
         preview.appendChild(textDiv);
 
         var fontDiv = document.createElement('div');
@@ -6965,10 +7029,10 @@
       // Actualizar lista
       updateTextLayersList();
 
-      // Mostrar editor
+      // Mostrar editor (tiene style="display:none" inline, no una clase)
       const editor = document.getElementById('text-layer-editor');
       if (editor) {
-        editor.classList.remove('hidden');
+        editor.style.display = 'block';
       }
 
       // Cargar valores en el editor. La estructura del layer es anidada:
@@ -7045,10 +7109,10 @@
 
       textLayerManager.removeLayer(activeLayerId);
       activeLayerId = null;
-      
+
       const editor = document.getElementById('text-layer-editor');
       if (editor) {
-        editor.classList.add('hidden');
+        editor.style.display = 'none';
       }
 
       updateTextLayersList();
@@ -7071,6 +7135,28 @@
 
       // Renderizar capas de texto — requiere ctx Y canvas
       textLayerManager.renderLayers(ctx, canvas);
+
+      // Calcular bounds de cada capa visible para hit-testing del drag
+      textLayerBounds = [];
+      var layers = textLayerManager.getAllLayers();
+      for (var i = 0; i < layers.length; i++) {
+        var layer = layers[i];
+        if (!layer.visible) continue;
+        var family = (layer.font && layer.font.family) || 'Roboto';
+        var size = (layer.font && layer.font.size) || 40;
+        var weight = (layer.font && layer.font.weight) || 'normal';
+        ctx.font = weight + ' ' + size + 'px "' + family + '", sans-serif';
+        var metrics = ctx.measureText(layer.text || '');
+        var posX = (layer.position && layer.position.x) || 0;
+        var posY = (layer.position && layer.position.y) || 0;
+        textLayerBounds.push({
+          layerId: layer.id,
+          x: posX,
+          y: posY,
+          width: metrics.width,
+          height: size * 1.2
+        });
+      }
     }
 
     /**
