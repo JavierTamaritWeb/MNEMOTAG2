@@ -6871,30 +6871,32 @@
       }
     }
 
-    function applyTextTemplate(templateName) {
+    async function applyTextTemplate(templateName) {
       if (!currentImage) {
         UIManager.showError('Carga una imagen primero');
         return;
       }
 
       try {
-        textLayerManager.applyTemplate(templateName, canvas.width, canvas.height);
+        await textLayerManager.applyTemplate(templateName, canvas.width, canvas.height);
         updateTextLayersList();
         renderCanvasWithLayers();
-        UIManager.showSuccess(`✅ Plantilla "${templateName}" aplicada`);
+        UIManager.showSuccess('✅ Plantilla "' + templateName + '" aplicada');
       } catch (error) {
         console.error('Error aplicando plantilla:', error);
         UIManager.showError('Error al aplicar la plantilla');
       }
     }
 
-    function addNewTextLayer() {
+    async function addNewTextLayer() {
       if (!currentImage) {
         UIManager.showError('Carga una imagen primero');
         return;
       }
 
-      const newLayer = textLayerManager.addLayer({
+      // addLayer es async (carga la fuente de Google Fonts).
+      // Sin await, newLayer sería una Promise y newLayer.id = undefined.
+      const newLayer = await textLayerManager.addLayer({
         text: 'Nuevo texto',
         position: { x: Math.round(canvas.width / 2), y: Math.round(canvas.height / 2) }
       });
@@ -6985,7 +6987,7 @@
       el = document.getElementById('text-layer-gradient'); if (el) el.checked = !!(layer.effects && layer.effects.gradient);
     }
 
-    function updateActiveTextLayer() {
+    async function updateActiveTextLayer() {
       if (!activeLayerId) return;
 
       // Construir el objeto updates con la estructura anidada que espera
@@ -7024,7 +7026,7 @@
         effects: { shadow: shadowVal, stroke: strokeVal, gradient: gradientVal }
       };
 
-      textLayerManager.updateLayer(activeLayerId, updates);
+      await textLayerManager.updateLayer(activeLayerId, updates);
       updateTextLayersList();
       renderCanvasWithLayers();
     }
