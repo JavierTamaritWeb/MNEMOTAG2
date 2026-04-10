@@ -109,14 +109,18 @@ EXIF writing is implemented para **JPEG** (via `piexifjs@1.0.6` cargado por CDN)
 
 Theme is controlled via `[data-theme="dark"]` on the root, **not** Tailwind's `dark:` variants. Tailwind dark utilities will not work — write theme overrides as `[data-theme="dark"] .selector { ... }` in `css/styles.css`. This caused a real bug fixed in 3.1.4.
 
-### Creating new buttons — IMPORTANT
+### Creating new buttons — CRITICAL RULES
 
-The `.btn` class and the mass selector `button[type="button"]` in `css/styles.css` apply to ALL buttons. When creating a new `<button>` **ALWAYS check**:
+The button CSS in this project is complex: `.btn` has `white-space: nowrap`, `overflow: hidden`, `height: 48px` and `text-overflow: ellipsis`. A mass selector (`button[type="button"], .btn-secondary, .btn-outline, .button--action, ...`) at line ~1584 adds `min-width: 160px`, `padding: 16px 36px`, `min-height: 56px`, `overflow: hidden`. These make buttons look good but **truncate any text longer than ~15 characters**.
 
-1. **Text truncation**: `.btn` historically had `white-space: nowrap` which cut long text with ellipsis. Fixed in v3.4.21 to `white-space: normal`, but if it ever reverts, buttons with more than ~15 characters will be truncated. Always test with real text.
-2. **Dark mode**: use `[data-theme="dark"] #your-btn { ... }` in CSS. **Never** use Tailwind `dark:` classes (they don't work — Tailwind 2.2.19 CDN has no dark mode).
-3. **The mass selector** at line ~1584 (`button[type="button"], .btn-secondary, .btn-outline, .button--action, ...`) overrides many properties: `min-height: 56px`, `min-width: 160px`, `padding: 16px 36px`, `background: linear-gradient(...)`. If your new button looks wrong, this selector is probably the culprit. Use a more specific selector (ID) to override.
-4. **The `.button--feature` class** applies `flex-direction: column` (icon above text) + reduced padding. Only use it for compact grid buttons (batch/text-layers/crop/shortcuts), NOT for full-width action buttons.
+**NEVER change these global rules to fix a single button.** That destroys the appearance of ALL existing buttons.
+
+When creating a new button:
+
+1. **ALWAYS add a specific CSS rule by ID** at the end of `css/styles.css` to override the globals: `#my-btn { height: auto; min-width: 0; white-space: nowrap; padding: 8px 16px; ... }`. See `#clear-all-btn`, `#auto-balance-btn`, `#curves-btn` etc. as examples.
+2. **Dark mode**: use `[data-theme="dark"] #my-btn { ... }`. **Never** use Tailwind `dark:` classes (they don't work — Tailwind 2.2.19 CDN has no dark mode).
+3. **The `.button--feature` class** applies `flex-direction: column` (icon above text) + reduced padding. Only use it for compact grid buttons (batch/text-layers/crop/shortcuts), NOT for full-width action buttons.
+4. **Test the button** in both light and dark mode, on both desktop and mobile widths, before committing.
 
 ### Zoom by device
 
