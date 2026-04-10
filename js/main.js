@@ -2903,8 +2903,11 @@
         }
       }
 
-      canvas.style.maxWidth = 'none'; // Override del CSS max-width: 100%
+      canvas.style.maxWidth = '100%';
       canvas.style.objectFit = 'contain';
+      canvas.style.display = 'block';
+      canvas.style.marginLeft = 'auto';
+      canvas.style.marginRight = 'auto';
       
       // Mejorar calidad de renderizado del canvas
       ctx.imageSmoothingEnabled = true;
