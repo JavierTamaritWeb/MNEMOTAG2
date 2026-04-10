@@ -4,7 +4,7 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos. 100% cliente, sin backend, sin build step, sin npm.
 
-![Version](https://img.shields.io/badge/version-3.4.15-blue.svg)
+![Version](https://img.shields.io/badge/version-3.4.20-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 [![Tests](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml)
@@ -14,7 +14,7 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 
 ---
 
-## ⭐ NOVEDADES v3.4.15
+## ⭐ NOVEDADES v3.4.20
 
 > **Release final del bloque v3.4.x — 15 versiones en 2 sesiones.** Tras v3.4.0 (umbrella de 8 features de v3.3.x + pulido visual), la segunda sesión ha añadido 15 mejoras más: hardening de seguridad, CI lint, accesibilidad real, features nuevas, modularización arquitectónica, performance con Web Workers, testing end-to-end con Playwright y, por fin, la inyección real de EXIF en AVIF.
 

@@ -115,7 +115,7 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 
 ## Versioning and commits
 
-**Current version: v3.4.15** (final del bloque de 15 releases v3.4.x). Tras v3.4.0 (umbrella de 8 features de v3.3.11–v3.3.18 + pulido visual de botones), la sesión v3.4.1–v3.4.15 añadió 15 mejoras más, cubriendo las 14 fases del plan de mejoras aceptado:
+**Current version: v3.4.20** (patch release: fixes de batch modal, dark mode del batch, botones de herramientas avanzadas, reinicios por Live Server y SW en localhost). Bloque anterior v3.4.1–v3.4.15 cubrió las 14 fases del plan de mejoras. Contenido acumulado:
 - **Seguridad (v3.4.1, v3.4.14)**: CSP + SRI hashes en los 5 CDNs + fix de watermark-text-enabled default + fix de `frame-ancestors` y `'unsafe-eval'` reportados en consola.
 - **CI (v3.4.2)**: ESLint 9 flat config + Stylelint 16 en workflow `.github/workflows/lint.yml` vía `npx --yes` sin package.json. 0 errors.
 - **Accesibilidad (v3.4.3)**: focus trap + Escape + aria-live en modales. Helpers `_openAccessibleModal(modal, onClose)` / `_closeAccessibleModal(modal)` con `WeakMap` para tracking.
@@ -126,6 +126,8 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 - **AVIF EXIF real (v3.4.15)**: Phase 14 del plan retomada y cerrada. ~600 líneas nuevas en `metadata-manager.js` con parser ISOBMFF recursivo, lectores `_readPitm`/`_readIinf`/`_readIloc`, builders `_buildInfeBoxForExif`/`_buildIinfWithExtra`/`_buildIrefWithCdsc`/`_buildIlocWithExtra`/`_buildNewMetaBox`, y orquestador `_injectExifInAvifBytes`. Estrategia append-only: añade un item `Exif` al iinf, crea un `cdsc` ref en iref, añade entry en iloc con offset al final del mdat, extiende el mdat con `[exif_tiff_header_offset=0][TIFF bytes]`, reconstruye el archivo con los offsets de items existentes desplazados en `metaGrowth`. 42 aserciones binarias nuevas con un AVIF sintético realista de 164 bytes validan end-to-end (primary image data intacto en nuevo offset, payload EXIF correcto, cdsc from/to IDs correctos, re-injection rechazada).
 
 Sources kept in sync: `index.html` `<title>`, `README.md` badge + NOVEDADES reescrita como resumen v3.4.1→v3.4.15, `CHANGELOG.md` con entradas individuales [3.4.1]–[3.4.15] + footer, `docs/INDICE_DOCUMENTACION.md`, `docs/RESUMEN_VERSIONES.md`, `docs/README.md`. Service Worker `CACHE_VERSION = 'mnemotag-v3.4.15'`.
+
+- **Fixes post-v3.4.15 (v3.4.16–v3.4.20)**: SW deshabilitado en localhost (fix reinicios por Live Server), diagnóstico de reinicios con banners en consola + monitor de memoria, `.vscode/settings.json` con `NoReload: true`, botones herramientas avanzadas con llamada directa (timing fix), batch modal corregido (items al grid correcto + display toggle), dark mode del batch modal con `[data-theme="dark"]`.
 
 **Tests**: 186/186 Node (fetch+grep de regresión) + 86/86 binarios (44 antiguas + 42 AVIF EXIF) + Playwright E2E (5 tests smoke). **`main.js` reducido de ~8000 a ~7080 líneas** (-1162 extraídas a managers + pequeños fixes de dead code). `git log` remains the authoritative source for the actual commit version.
 

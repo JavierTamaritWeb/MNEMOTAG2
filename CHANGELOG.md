@@ -4,6 +4,28 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.4.20] - 2026-04-10
+
+### Fixed
+- **Dark mode del modal de batch processing**: el batch-config y todo el modal usaban clases `dark:` de Tailwind (que no funcionan en este proyecto — usa `[data-theme="dark"]` en CSS). Añadidos ~80 selectores `[data-theme="dark"]` para el modal, la dropzone, los items, el config, el progress y los checkboxes.
+- **Batch modal: imágenes no se mostraban al cargar**: `updateBatchImagesList()` ponía los items en `#batch-images-list` (contenedor padre, destruyendo el header "N imágenes cargadas" con `replaceChildren()`) en lugar de `#batch-items` (grid interior). Además, nunca cambiaba `display: none` de los contenedores al añadir imágenes. Ahora los items van al grid correcto, los contenedores se muestran/ocultan automáticamente, y el contador `batch-count` se actualiza.
+- **Botones de herramientas avanzadas (Lote/Texto/Recortar/Atajos) no hacían nada**: dependían de que `initializeAdvancedUI()` expusiera las funciones a `window.*` antes de que el usuario clicara. Si había un timing issue, `window.openBatchModal` quedaba `undefined` y el click no hacía nada. Fix: llamada directa a las funciones del closure en lugar de indirecta vía `window.*`.
+- **Reinicios aleatorios de la app (~1-2 min)**: causados por el Live Reload de VS Code Live Server que disparaba `location.reload()` ante cualquier cambio de archivos del proyecto. Fix: `.vscode/settings.json` con `"liveServer.settings.NoReload": true` + `ignoreFiles` para docs/tests/.git.
+- **Service Worker interfiriendo con Live Server en localhost**: el SW con `skipWaiting() + clients.claim()` causaba inconsistencias de cache en dev local. Fix: el registro del SW ahora detecta localhost y auto-desregistra cualquier SW fantasma + borra caches `mnemotag-*`.
+
+### Added
+- **Diagnóstico de reinicios** (v3.4.17/v3.4.18): banners amarillo/rojo/azul en consola al arrancar, handlers globales de `error`/`unhandledrejection`/`beforeunload`/`visibilitychange`/`pagehide`, monitor de memoria JS heap cada 10 s, detector automático de scripts Live Reload, y `console.trace()` en `beforeunload`.
+- **Cache-bust en `main.js`** (`?v=20260410-diag`) para forzar al browser a descargar la versión nueva.
+
+### Changed
+- `.gitignore`: ahora permite versionar `.vscode/settings.json` (el resto de `.vscode/` sigue ignorado).
+
+### Verificación
+- `node tests/run-in-node.js` → **186/186 OK**
+- `node tests/binary-validation.js` → **86/86 OK**
+
+---
+
 ## [3.4.15] - 2026-04-09
 
 ### Added — Phase 14 del plan completada: AVIF EXIF real (inyección ISOBMFF)
@@ -1734,6 +1756,6 @@ Lanzamiento inicial de MnemoTag.
 
 ---
 
-**Última actualización:** 9 de abril de 2026  
-**Versión actual:** 3.4.15  
+**Última actualización:** 10 de abril de 2026  
+**Versión actual:** 3.4.20  
 **Estado:** ✅ Estable y listo para producción

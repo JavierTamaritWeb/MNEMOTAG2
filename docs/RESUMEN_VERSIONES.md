@@ -9,7 +9,8 @@
 
 | Versión | Fecha | Características Principales | Estado |
 |---------|-------|----------------------------|--------|
-| **v3.4.15** | 9 Abr 2026 | Phase 14: AVIF EXIF real (inyección ISOBMFF, ~600 líneas + 42 aserciones binarias) | 🟢 **Actual** |
+| **v3.4.20** | 10 Abr 2026 | Fixes: batch modal + dark mode batch + botones herramientas + reinicios Live Server + SW localhost | 🟢 **Actual** |
+| **v3.4.15** | 9 Abr 2026 | Phase 14: AVIF EXIF real (inyección ISOBMFF, ~600 líneas + 42 aserciones binarias) | ✅ Estable |
 | **v3.4.14** | 9 Abr 2026 | Fix CSP: `frame-ancestors` + `unsafe-eval` (errores consola reportados) | ✅ Estable |
 | **v3.4.13** | 9 Abr 2026 | Phase 13: Playwright E2E smoke test + workflow CI | ✅ Estable |
 | **v3.4.12** | 9 Abr 2026 | Phase 12: Web Worker para `autoBalance` (transferable objects + fallback) | ✅ Estable |
@@ -46,7 +47,28 @@
 
 ---
 
-## 🏆 v3.4.15 - CIERRE DE LAS 14 FASES (Actual)
+## 🔧 v3.4.20 - PATCH FIXES (Actual)
+
+### 📅 Fecha de lanzamiento: 10 de abril de 2026
+
+### Resumen
+
+Bloque de 5 commits de fixes (v3.4.16–v3.4.20) tras el cierre de las 14 fases. Atiende bugs reportados en testing browser-real por el usuario:
+
+| Fix | Causa | Solución |
+|---|---|---|
+| **Reinicios aleatorios (~1-2 min)** | VS Code Live Server con Live Reload activado | `.vscode/settings.json` con `NoReload: true` |
+| **SW interfiriendo en localhost** | `skipWaiting()` + `clients.claim()` causaban inconsistencias de cache | SW desregistrado en localhost + caches borrados |
+| **Botones herramientas avanzadas no hacían nada** | `window.openBatchModal` dependía de timing de `initializeAdvancedUI()` | Llamada directa a funciones del closure |
+| **Batch modal: imágenes no se veían al cargar** | Items iban al contenedor padre en vez del grid + `display: none` nunca cambiaba | Items a `#batch-items` + toggle de visibilidad |
+| **Batch modal sin dark mode** | Clases `dark:` de Tailwind no funcionan (proyecto usa `[data-theme="dark"]`) | ~80 selectores CSS con `[data-theme="dark"]` |
+
+### Verificación
+- 186/186 Node + 86/86 binarios sin cambios.
+
+---
+
+## 🏆 v3.4.15 - CIERRE DE LAS 14 FASES
 
 ### 📅 Fecha de lanzamiento: 9 de abril de 2026
 
