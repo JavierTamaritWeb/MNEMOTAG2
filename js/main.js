@@ -425,7 +425,6 @@
       try { localStorage.removeItem(WATERMARK_STORAGE_KEY); } catch (e) { /* ok */ }
       const form = document.getElementById('watermark-form');
       if (form) form.reset();
-      // Sincronizar campos espejo
       const syncPairs = [
         ['watermark-size', 'watermark-size-num'],
         ['watermark-opacity', 'watermark-opacity-num'],
@@ -439,8 +438,84 @@
       if (typeof toggleWatermarkType === 'function') {
         toggleWatermarkType();
       }
+    }
+
+    /**
+     * Limpia ABSOLUTAMENTE TODOS los datos de la app:
+     * - Imagen cargada (canvas + currentImage)
+     * - Formulario de metadatos
+     * - Formulario de watermark + localStorage
+     * - Filtros (brightness, contrast, saturation, blur)
+     * - Historial de undo/redo (libera ImageBitmaps)
+     * - Presets guardados
+     * - sessionStorage de diagnóstico
+     * - Toda la clave localStorage de la app
+     */
+    function clearAllData() {
+      // 1. Limpiar la imagen cargada
+      if (typeof removeSelectedFile === 'function') {
+        removeSelectedFile();
+      }
+
+      // 2. Limpiar formulario de metadatos + su localStorage
+      const metaForm = document.getElementById('metadata-form');
+      if (metaForm) metaForm.reset();
+      try { localStorage.removeItem('imageMetadata'); } catch (e) { /* ok */ }
+
+      // 3. Limpiar formulario de watermark + su localStorage
+      clearWatermarkState();
+
+      // 4. Resetear filtros (brightness, contrast, saturation, blur → 0)
+      ['brightness', 'contrast', 'saturation', 'blur'].forEach(function (id) {
+        const el = document.getElementById(id);
+        if (el) {
+          el.value = id === 'blur' ? '0' : '0';
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        const valSpan = document.getElementById(id + '-value');
+        if (valSpan) valSpan.textContent = '0';
+      });
+      if (typeof resetFilters === 'function') {
+        resetFilters();
+      }
+
+      // 5. Limpiar historial de undo/redo (libera ImageBitmaps)
+      if (typeof historyManager !== 'undefined' && historyManager.clear) {
+        historyManager.clear();
+      }
+
+      // 6. Limpiar presets guardados
+      if (typeof PresetManager !== 'undefined') {
+        const presets = PresetManager.listPresets();
+        presets.forEach(function (name) {
+          PresetManager.deletePreset(name);
+        });
+        const presetSelect = document.getElementById('preset-select');
+        if (presetSelect) PresetManager.populateSelect(presetSelect);
+      }
+
+      // 7. Limpiar sessionStorage de diagnóstico
+      try { sessionStorage.removeItem('mnemotag-boot-info'); } catch (e) { /* ok */ }
+
+      // 8. Limpiar cualquier otra clave de localStorage que empiece por 'mnemotag-'
+      try {
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('mnemotag-')) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(function (key) { localStorage.removeItem(key); });
+      } catch (e) { /* ok */ }
+
+      // 9. Refrescar UI
+      if (typeof updatePreview === 'function' && canvas && currentImage) {
+        updatePreview();
+      }
+
       if (typeof UIManager !== 'undefined' && UIManager.showSuccess) {
-        UIManager.showSuccess('🧹 Datos de marca de agua limpiados');
+        UIManager.showSuccess('🗑️ Todos los datos limpiados. La app está como nueva.');
       }
     }
 
@@ -1056,10 +1131,14 @@
           removeBgBtn.addEventListener('click', function () { BgRemovalManager.removeBackground(); });
         }
 
-        // Botón "Limpiar" del watermark form.
-        const clearWatermarkBtn = document.getElementById('clear-watermark-btn');
-        if (clearWatermarkBtn) {
-          clearWatermarkBtn.addEventListener('click', clearWatermarkState);
+        // Botón global "Limpiar todo" al principio de la app.
+        const clearAllBtn = document.getElementById('clear-all-btn');
+        if (clearAllBtn) {
+          clearAllBtn.addEventListener('click', function () {
+            if (window.confirm('¿Limpiar absolutamente TODOS los datos? Se borrarán la imagen, metadatos, marcas de agua, filtros, historial, presets y datos guardados.')) {
+              clearAllData();
+            }
+          });
         }
 
         // v3.4.5: Filter presets (guardar/cargar/eliminar en localStorage)

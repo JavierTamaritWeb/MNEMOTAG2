@@ -111,6 +111,16 @@
     </section>
 
     <main>
+      <!-- Botón global "Limpiar todo" — resetea absolutamente todos los datos -->
+      <div class="mb-4 flex justify-end">
+        <button type="button" id="clear-all-btn"
+                class="btn btn-outline text-sm"
+                title="Limpiar absolutamente todos los datos: imagen, metadatos, marcas de agua, filtros, historial, presets y localStorage">
+          <i class="fas fa-trash-alt" aria-hidden="true"></i>
+          Limpiar todo
+        </button>
+      </div>
+
       <!-- Upload Zone -->
       <section class="mb-8">
         <div class="bg-white rounded-lg shadow-md p-6 card">
@@ -562,17 +572,11 @@
                     </div>
                   </div>
 
-                  <div class="flex gap-2 flex-wrap">
+                  <div>
                     <button type="submit"
                             class="btn btn-primary button--action">
                       <i class="fas fa-paint-brush" aria-hidden="true"></i>
                       Aplicar marca de agua
-                    </button>
-                    <button type="button" id="clear-watermark-btn"
-                            class="btn btn-outline"
-                            title="Limpiar todos los campos de marca de agua y borrar los datos guardados">
-                      <i class="fas fa-eraser" aria-hidden="true"></i>
-                      Limpiar
                     </button>
                   </div>
                 </form>
