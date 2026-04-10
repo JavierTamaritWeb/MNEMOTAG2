@@ -6255,6 +6255,14 @@
       }
     }
 
+    // Fix: el botón "Limpiar todo" del batch modal usaba
+    // onclick="clearBatchQueue()" pero la función no existía.
+    function clearBatchQueue() {
+      batchImages = [];
+      updateBatchImagesList();
+      UIManager.showSuccess('🗑️ Cola de imágenes vaciada');
+    }
+
     function setupBatchDropzone() {
       const dropzone = document.getElementById('batch-dropzone');
       const fileInput = document.getElementById('batch-file-input');
@@ -6339,6 +6347,10 @@
       // Limpiar solo el grid de items (sin tocar el header)
       itemsGrid.replaceChildren();
 
+      // Habilitar/deshabilitar el botón Procesar según haya imágenes
+      const processBtn = document.getElementById('batch-process-btn');
+      if (processBtn) processBtn.disabled = batchImages.length === 0;
+
       if (batchImages.length === 0) {
         // Ocultar la lista y la configuración
         listContainer.style.display = 'none';
@@ -6394,64 +6406,97 @@
       });
     }
 
+    function getCurrentFilters() {
+      const b = document.getElementById('brightness');
+      const c = document.getElementById('contrast');
+      const s = document.getElementById('saturation');
+      return {
+        brightness: b ? Number(b.value) + 100 : 100,
+        contrast: c ? Number(c.value) + 100 : 100,
+        saturation: s ? Number(s.value) + 100 : 100
+      };
+    }
+
+    function getCurrentWatermarks() {
+      const text = document.getElementById('watermarkText');
+      if (!text || !text.value) return null;
+      return {
+        text: {
+          enabled: true,
+          value: text.value,
+          size: Number(document.getElementById('watermarkSize')?.value || 24),
+          color: document.getElementById('watermarkColor')?.value || '#ffffff',
+          opacity: Number(document.getElementById('watermarkOpacity')?.value || 70) / 100
+        }
+      };
+    }
+
     async function processBatch() {
       if (batchImages.length === 0) {
         UIManager.showError('Agrega imágenes al lote primero');
         return;
       }
 
+      const progressSection = document.getElementById('batch-progress');
       const progressBar = document.getElementById('batch-progress-bar');
       const progressText = document.getElementById('batch-progress-text');
       const processBtn = document.getElementById('batch-process-btn');
       const downloadBtn = document.getElementById('batch-download-btn');
-      
+
       if (!progressBar || !progressText || !processBtn) return;
 
-      // Obtener configuración
+      // Obtener configuración (IDs deben coincidir con index.html)
       const config = {
-        applyFilters: document.getElementById('batch-apply-filters').checked,
-        applyBorder: document.getElementById('batch-apply-border').checked,
-        applyMetadata: document.getElementById('batch-apply-metadata').checked,
-        applyWatermark: document.getElementById('batch-apply-watermark').checked
+        applyFilters: document.getElementById('batch-apply-filters')?.checked ?? false,
+        applyWatermarks: document.getElementById('batch-apply-watermarks')?.checked ?? false,
+        applyTextLayers: document.getElementById('batch-apply-text-layers')?.checked ?? false,
+        applyMetadata: document.getElementById('batch-apply-metadata')?.checked ?? false
       };
 
       // UI feedback
       processBtn.disabled = true;
-      processBtn.classList.add('loading');
+      if (progressSection) progressSection.style.display = 'block';
       progressBar.style.width = '0%';
-      progressText.textContent = 'Procesando 0/0 (0%)';
+      progressText.textContent = 'Preparando...';
 
       try {
-        // Preparar imágenes para BatchManager
-        const imagesToProcess = [];
-        
+        // Sincronizar batchImages → batchManager.imageQueue
+        batchManager.clearQueue();
         for (const img of batchImages) {
-          const imageObj = await loadImageFromFile(img.file);
-          imagesToProcess.push({
-            image: imageObj,
-            name: img.name
+          const imageObj = await batchManager.loadImageFromFile(img.file);
+          batchManager.imageQueue.push({
+            id: img.id,
+            file: img.file,
+            name: img.name,
+            size: img.size,
+            type: img.file.type,
+            imageData: imageObj,
+            processed: false,
+            error: null
           });
         }
 
-        // Procesar con BatchManager
-        await batchManager.processQueue(
-          imagesToProcess,
-          (current, total, percentage) => {
-            progressBar.style.width = `${percentage}%`;
-            progressText.textContent = `Procesando ${current}/${total} (${percentage}%)`;
-          }
-        );
+        // Capturar configuración antes de procesar
+        // Leer filtros actuales del editor (si el checkbox está marcado)
+        const filters = config.applyFilters ? getCurrentFilters() : null;
+        const watermarks = config.applyWatermarks ? getCurrentWatermarks() : null;
+        batchManager.captureCurrentConfig(filters, watermarks, null, null);
 
-        // Mostrar botón de descarga
-        downloadBtn.classList.remove('hidden');
-        UIManager.showSuccess(`✅ ${batchImages.length} imágenes procesadas`);
+        // Procesar — processQueue recibe un callback con objeto {current, total, percentage}
+        await batchManager.processQueue((progress) => {
+          progressBar.style.width = `${progress.percentage}%`;
+          progressText.textContent = `Procesando ${progress.current}/${progress.total} (${progress.percentage}%)`;
+        });
+
+        // Mostrar botón de descarga (usa style, no classList, porque el HTML usa style="display:none")
+        if (downloadBtn) downloadBtn.style.display = 'flex';
+        UIManager.showSuccess(`${batchImages.length} imágenes procesadas`);
 
       } catch (error) {
         console.error('Error procesando lote:', error);
-        UIManager.showError('Error al procesar el lote de imágenes');
+        UIManager.showError('Error al procesar el lote: ' + error.message);
       } finally {
         processBtn.disabled = false;
-        processBtn.classList.remove('loading');
       }
     }
 
@@ -6842,9 +6887,7 @@
       // Exponer funciones globalmente para onclick handlers
       window.openBatchModal = openBatchModal;
       window.closeBatchModal = closeBatchModal;
-      // removeBatchImage ya no necesita exponerse globalmente: tras el fix XSS,
-      // el botón de eliminar se engancha vía addEventListener directo (main.js
-      // updateBatchImagesList), en lugar del antiguo onclick="removeBatchImage(...)".
+      window.clearBatchQueue = clearBatchQueue;
       window.processBatch = processBatch;
       window.downloadBatchZip = downloadBatchZip;
 
