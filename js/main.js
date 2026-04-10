@@ -6896,8 +6896,7 @@
 
       const newLayer = textLayerManager.addLayer({
         text: 'Nuevo texto',
-        x: canvas.width / 2,
-        y: canvas.height / 2
+        position: { x: Math.round(canvas.width / 2), y: Math.round(canvas.height / 2) }
       });
 
       updateTextLayersList();
@@ -6916,17 +6915,43 @@
         return;
       }
 
-      container.innerHTML = layers.map(layer => `
-        <div class="text-layer-item ${layer.id === activeLayerId ? 'active' : ''}" onclick="selectTextLayer('${layer.id}')">
-          <div class="text-layer-preview">
-            <div class="text-layer-text">${layer.text}</div>
-            <div class="text-layer-font">${layer.fontFamily} - ${layer.fontSize}px</div>
-          </div>
-          <button class="text-layer-visibility" onclick="event.stopPropagation(); toggleLayerVisibility('${layer.id}')">
-            <i class="fas fa-${layer.visible ? 'eye' : 'eye-slash'}"></i>
-          </button>
-        </div>
-      `).join('');
+      // Construir la lista con DOM API segura (evita XSS por layer.text)
+      container.replaceChildren();
+      layers.forEach(function (layer) {
+        var item = document.createElement('div');
+        item.className = 'text-layer-item' + (layer.id === activeLayerId ? ' active' : '');
+        item.addEventListener('click', function () { selectTextLayer(layer.id); });
+
+        var preview = document.createElement('div');
+        preview.className = 'text-layer-preview';
+
+        var textDiv = document.createElement('div');
+        textDiv.className = 'text-layer-text';
+        textDiv.textContent = layer.text || '';
+        preview.appendChild(textDiv);
+
+        var fontDiv = document.createElement('div');
+        fontDiv.className = 'text-layer-font';
+        var family = (layer.font && layer.font.family) || '?';
+        var size = (layer.font && layer.font.size) || '?';
+        fontDiv.textContent = family + ' - ' + size + 'px';
+        preview.appendChild(fontDiv);
+
+        item.appendChild(preview);
+
+        var visBtn = document.createElement('button');
+        visBtn.className = 'text-layer-visibility';
+        visBtn.addEventListener('click', function (ev) {
+          ev.stopPropagation();
+          toggleLayerVisibility(layer.id);
+        });
+        var icon = document.createElement('i');
+        icon.className = 'fas fa-' + (layer.visible ? 'eye' : 'eye-slash');
+        visBtn.appendChild(icon);
+        item.appendChild(visBtn);
+
+        container.appendChild(item);
+      });
     }
 
     function selectTextLayer(layerId) {
@@ -6944,37 +6969,59 @@
         editor.classList.remove('hidden');
       }
 
-      // Cargar valores en el editor (IDs con prefijo text-layer- para coincidir con HTML)
+      // Cargar valores en el editor. La estructura del layer es anidada:
+      // layer.font.family, layer.font.size, layer.position.x, layer.effects.shadow, etc.
       var el;
-      el = document.getElementById('text-layer-text');     if (el) el.value = layer.text;
-      el = document.getElementById('text-layer-font');     if (el) el.value = layer.fontFamily;
-      el = document.getElementById('text-layer-size');     if (el) el.value = layer.fontSize;
-      el = document.getElementById('text-layer-color');    if (el) el.value = layer.color;
-      el = document.getElementById('text-layer-x');        if (el) el.value = Math.round(layer.x);
-      el = document.getElementById('text-layer-y');        if (el) el.value = Math.round(layer.y);
+      el = document.getElementById('text-layer-text');     if (el) el.value = layer.text || '';
+      el = document.getElementById('text-layer-font');     if (el) el.value = (layer.font && layer.font.family) || 'Roboto';
+      el = document.getElementById('text-layer-size');     if (el) el.value = (layer.font && layer.font.size) || 40;
+      el = document.getElementById('text-layer-color');    if (el) el.value = layer.color || '#ffffff';
+      el = document.getElementById('text-layer-x');        if (el) el.value = Math.round((layer.position && layer.position.x) || 0);
+      el = document.getElementById('text-layer-y');        if (el) el.value = Math.round((layer.position && layer.position.y) || 0);
       el = document.getElementById('text-layer-rotation'); if (el) el.value = layer.rotation || 0;
       el = document.getElementById('text-layer-opacity');  if (el) el.value = Math.round((layer.opacity || 1) * 100);
-      el = document.getElementById('text-layer-shadow');   if (el) el.checked = !!layer.shadow;
-      el = document.getElementById('text-layer-stroke');   if (el) el.checked = !!layer.stroke;
-      el = document.getElementById('text-layer-gradient'); if (el) el.checked = !!layer.gradient;
+      el = document.getElementById('text-layer-shadow');   if (el) el.checked = !!(layer.effects && layer.effects.shadow);
+      el = document.getElementById('text-layer-stroke');   if (el) el.checked = !!(layer.effects && layer.effects.stroke);
+      el = document.getElementById('text-layer-gradient'); if (el) el.checked = !!(layer.effects && layer.effects.gradient);
     }
 
     function updateActiveTextLayer() {
       if (!activeLayerId) return;
 
+      // Construir el objeto updates con la estructura anidada que espera
+      // textLayerManager.updateLayer(): font.{family,size}, position.{x,y},
+      // effects.{shadow,stroke,gradient}.
       var e;
+      var fontFamily = (e = document.getElementById('text-layer-font')) ? e.value : 'Roboto';
+      var fontSize = (e = document.getElementById('text-layer-size')) ? parseInt(e.value) || 40 : 40;
+      var posX = (e = document.getElementById('text-layer-x')) ? parseInt(e.value) || 0 : 0;
+      var posY = (e = document.getElementById('text-layer-y')) ? parseInt(e.value) || 0 : 0;
+      var hasShadow = (e = document.getElementById('text-layer-shadow')) ? e.checked : false;
+      var hasStroke = (e = document.getElementById('text-layer-stroke')) ? e.checked : false;
+      var hasGradient = (e = document.getElementById('text-layer-gradient')) ? e.checked : false;
+
+      // Para shadow/stroke/gradient: si el checkbox está activo pero el
+      // layer ya tenía un objeto previo, lo reutilizamos. Si no tenía,
+      // creamos uno con defaults razonables.
+      var currentLayer = textLayerManager.getLayer(activeLayerId);
+      var shadowVal = hasShadow
+        ? (currentLayer && currentLayer.effects && currentLayer.effects.shadow) || { offsetX: 2, offsetY: 2, blur: 4, color: 'rgba(0,0,0,0.3)' }
+        : null;
+      var strokeVal = hasStroke
+        ? (currentLayer && currentLayer.effects && currentLayer.effects.stroke) || { width: 2, color: '#000000' }
+        : null;
+      var gradientVal = hasGradient
+        ? (currentLayer && currentLayer.effects && currentLayer.effects.gradient) || { type: 'linear', colors: ['#ff0000', '#0000ff'], angle: 0 }
+        : null;
+
       const updates = {
         text: (e = document.getElementById('text-layer-text')) ? e.value : '',
-        fontFamily: (e = document.getElementById('text-layer-font')) ? e.value : 'Roboto',
-        fontSize: (e = document.getElementById('text-layer-size')) ? parseInt(e.value) || 40 : 40,
+        font: { family: fontFamily, size: fontSize },
+        position: { x: posX, y: posY },
         color: (e = document.getElementById('text-layer-color')) ? e.value : '#ffffff',
-        x: (e = document.getElementById('text-layer-x')) ? parseInt(e.value) || 0 : 0,
-        y: (e = document.getElementById('text-layer-y')) ? parseInt(e.value) || 0 : 0,
         rotation: (e = document.getElementById('text-layer-rotation')) ? parseInt(e.value) || 0 : 0,
         opacity: (e = document.getElementById('text-layer-opacity')) ? (parseInt(e.value) || 100) / 100 : 1,
-        shadow: (e = document.getElementById('text-layer-shadow')) ? e.checked : false,
-        stroke: (e = document.getElementById('text-layer-stroke')) ? e.checked : false,
-        gradient: (e = document.getElementById('text-layer-gradient')) ? e.checked : false
+        effects: { shadow: shadowVal, stroke: strokeVal, gradient: gradientVal }
       };
 
       textLayerManager.updateLayer(activeLayerId, updates);
@@ -7014,11 +7061,14 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
 
-      // Aplicar filtros actuales si existen
-      applyFilters();
+      // Aplicar marcas de agua (watermark) si hay
+      applyWatermarkOptimized();
 
-      // Renderizar capas de texto
-      textLayerManager.renderLayers(ctx);
+      // Aplicar filtros actuales si existen
+      applyCanvasFilters();
+
+      // Renderizar capas de texto — requiere ctx Y canvas
+      textLayerManager.renderLayers(ctx, canvas);
     }
 
     /**
