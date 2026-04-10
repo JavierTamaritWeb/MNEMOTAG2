@@ -2844,7 +2844,10 @@
       max-width: 100%;
       height: auto;
       max-height: 75vh;
-      display: block;
+      /* display: block ELIMINADO — rompía el centrado del flex parent.
+         Sin display explícito, el canvas es un flex item que se centra
+         con justify-content: center del contenedor. */
+      margin: 0 auto; /* centrado explícito como fallback */
       border: none;
       background-color: transparent;
       transition: box-shadow 0.3s ease;
