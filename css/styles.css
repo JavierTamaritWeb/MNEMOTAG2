@@ -2835,10 +2835,9 @@
       font-size: 0.75rem;
     }
     
-    /* Preview Block - Enhanced */
+    /* Preview Block - Enhanced (tamaño grande) */
     .preview__canvas {
       max-width: 100%;
-      max-height: 80vh;
       height: auto;
       border: 1px solid var(--border-color);
       background-color: var(--bg-accent);
@@ -2856,8 +2855,8 @@
       display: flex;
       justify-content: center;
       align-items: center;
-      padding: 0.5rem;
-      min-height: 400px;
+      padding: 0.25rem;
+      min-height: 600px;
       background:
         linear-gradient(45deg, var(--bg-tertiary) 25%, transparent 25%),
         linear-gradient(-45deg, var(--bg-tertiary) 25%, transparent 25%),
