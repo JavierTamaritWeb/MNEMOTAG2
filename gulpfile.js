@@ -5,7 +5,9 @@ const sourcemaps = require('gulp-sourcemaps');
 const sass = require('gulp-sass')(require('sass'));
 const cleanCSS = require('gulp-clean-css');
 const rename = require('gulp-rename');
-const { rm } = require('fs/promises');
+const { rm, mkdir, readdir, copyFile, stat } = require('fs/promises');
+const path = require('path');
+const sharp = require('sharp');
 
 // ============================================================
 // Paths
@@ -14,6 +16,8 @@ const { rm } = require('fs/promises');
 const DIST = 'dist';
 const DIST_CSS = DIST + '/css';
 const DIST_JS = DIST + '/js';
+const DIST_IMAGES = DIST + '/images';
+const SRC_IMAGES = 'images';
 
 // ============================================================
 // JS Bundle — Orden EXACTO de concatenación (dependencias)
@@ -77,9 +81,62 @@ function scssCompile() {
     .pipe(dest(DIST_CSS));
 }
 
+// ============================================================
+// Images — copiar originales + generar WebP y AVIF
+// ============================================================
+
+const CONVERTIBLE_EXT = new Set(['.png', '.jpg', '.jpeg']);
+
+async function walkDir(dir) {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...await walkDir(full));
+    } else {
+      files.push(full);
+    }
+  }
+  return files;
+}
+
+async function images() {
+  const files = await walkDir(SRC_IMAGES);
+  let copied = 0;
+  let converted = 0;
+
+  for (const file of files) {
+    const rel = path.relative(SRC_IMAGES, file);
+    const destPath = path.join(DIST_IMAGES, rel);
+    const destDir = path.dirname(destPath);
+    await mkdir(destDir, { recursive: true });
+
+    // Copiar original
+    await copyFile(file, destPath);
+    copied++;
+
+    // Convertir PNG/JPEG a WebP y AVIF
+    const ext = path.extname(file).toLowerCase();
+    if (CONVERTIBLE_EXT.has(ext)) {
+      const baseName = destPath.replace(/\.[^.]+$/, '');
+      try {
+        await sharp(file).webp({ quality: 80 }).toFile(baseName + '.webp');
+        await sharp(file).avif({ quality: 65 }).toFile(baseName + '.avif');
+        converted++;
+      } catch (err) {
+        console.error('sharp error on ' + rel + ':', err.message);
+      }
+    }
+  }
+
+  console.log('  ' + copied + ' copied, ' + converted + ' converted to WebP+AVIF');
+}
+
 function watchFiles() {
   watch(['js/**/*.js', '!' + DIST_JS + '/**'], jsBundle);
   watch('src/scss/**/*.scss', scssCompile);
+  watch(SRC_IMAGES + '/**/*', images);
 }
 
 // ============================================================
@@ -125,7 +182,8 @@ function dev(cb) {
 exports.clean = clean;
 exports.js = jsBundle;
 exports.scss = scssCompile;
-exports.build = series(clean, parallel(jsBundle, scssCompile));
+exports.images = images;
+exports.build = series(clean, parallel(jsBundle, scssCompile, images));
 exports.watch = series(exports.build, watchFiles);
 exports.serve = serve;
 exports.dev = series(exports.build, dev);
