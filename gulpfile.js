@@ -139,8 +139,11 @@ async function images() {
 async function html() {
   let content = await readFile('index.html', 'utf8');
 
-  // Reescribir rutas: dist/X → X (dist/index.html ya está dentro de dist/)
-  content = content.replace(/dist\//g, '');
+  // Reescribir SOLO rutas locales: dist/X → X
+  // No tocar URLs absolutas (CDN) que contengan dist/ en su path
+  content = content.replace(/href="dist\//g, 'href="');
+  content = content.replace(/src="dist\//g, 'src="');
+  content = content.replace(/srcset="dist\//g, 'srcset="');
 
   // Eliminar comentarios HTML de desarrollo (excepto condicionales IE)
   // y el bloque CSP comment que es largo

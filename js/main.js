@@ -30,6 +30,8 @@
     
     // Variables para redimensionado
     let originalImageDimensions = { width: 0, height: 0 };
+    let originalWidth = 0;
+    let originalHeight = 0;
     let isResizing = false;
     
     // Variables para rotación
