@@ -6,19 +6,22 @@
   "scripts": {
     "build": "gulp build",
     "watch": "gulp watch",
+    "dev": "gulp dev",
+    "serve": "gulp serve",
     "scss": "gulp scss",
     "js": "gulp js",
     "test": "node tests/run-in-node.js && node tests/binary-validation.js"
   },
   "devDependencies": {
+    "browser-sync": "^3.0.4",
     "gulp": "^5.0.0",
-    "gulp-concat": "^2.6.1",
-    "gulp-terser": "^2.1.0",
-    "gulp-sourcemaps": "^3.0.0",
-    "sass": "^1.77.0",
-    "gulp-sass": "^6.0.0",
     "gulp-clean-css": "^4.3.0",
-    "gulp-rename": "^2.0.0"
+    "gulp-concat": "^2.6.1",
+    "gulp-rename": "^2.0.0",
+    "gulp-sass": "^6.0.0",
+    "gulp-sourcemaps": "^3.0.0",
+    "gulp-terser": "^2.1.0",
+    "sass": "^1.77.0"
   },
   "author": "Javier Tamarit",
   "license": "MIT"

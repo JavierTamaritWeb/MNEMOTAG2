@@ -69,8 +69,50 @@ function watchFiles() {
   watch('src/scss/**/*.scss', scssCompile);
 }
 
+// ============================================================
+// Browser-Sync — reemplaza VS Code Live Server
+// ============================================================
+// SIN live reload automático (el usuario lo pidió explícitamente).
+// Solo sirve los archivos estáticos por HTTP.
+
+const browserSync = require('browser-sync').create();
+
+function serve(cb) {
+  browserSync.init({
+    server: { baseDir: './' },
+    port: 5507,
+    open: false,           // no abrir el browser automáticamente
+    notify: false,         // no mostrar notificaciones en el browser
+    ghostMode: false,      // no sincronizar scroll/clicks entre tabs
+    // NO live reload — el usuario recarga manualmente con Cmd+R
+    injectChanges: false,
+    reloadOnRestart: false,
+    watchEvents: []        // no observar nada
+  });
+  cb();
+}
+
+// Dev: build + watch + servidor local
+function dev(cb) {
+  browserSync.init({
+    server: { baseDir: './' },
+    port: 5507,
+    open: false,
+    notify: false,
+    ghostMode: false,
+    injectChanges: false,
+    reloadOnRestart: false,
+    watchEvents: []
+  });
+  watch(['js/**/*.js', '!js/app.min.js', '!js/app.min.js.map'], jsBundle);
+  watch('src/scss/**/*.scss', scssCompile);
+  cb();
+}
+
 exports.js = jsBundle;
 exports.scss = scssCompile;
 exports.build = parallel(jsBundle, scssCompile);
 exports.watch = series(exports.build, watchFiles);
+exports.serve = serve;
+exports.dev = series(exports.build, dev);
 exports.default = exports.build;
