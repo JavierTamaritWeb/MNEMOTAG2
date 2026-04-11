@@ -3,10 +3,14 @@
 // ============================================================
 // Compilado por Gulp: npm run build → css/styles.css
 // NO editar css/styles.css directamente — editar estos archivos.
+//
+// Orden de importación: variables primero, luego de general a específico.
 // ============================================================
 
-// Variables van primero porque el resto las necesita
-@use 'variables' as *;
-
-// Todo el resto (se irá dividiendo en partials incrementalmente)
-@use 'main_content' as *;
+@use 'variables';       // :root CSS custom properties (light + dark)
+@use 'base';            // Global styles, body, scrollbar, selection, animations
+@use 'layout';          // Upload zone, watermark buttons, cards, forms
+@use 'components';      // Button system, filters, progress, validation
+@use 'preview';         // Canvas, zoom controls, ruler, comparison, mobile responsive
+@use 'hero';            // Hero section, features, clear-all button
+@use 'modals';          // Side panels, modals, text layers, batch, analysis, buttons specific
