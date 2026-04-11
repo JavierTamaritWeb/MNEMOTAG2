@@ -6463,17 +6463,37 @@
     }
 
     function getCurrentWatermarks() {
-      const text = document.getElementById('watermarkText');
-      if (!text || !text.value) return null;
-      return {
-        text: {
-          enabled: true,
-          value: text.value,
-          size: Number(document.getElementById('watermarkSize')?.value || 24),
-          color: document.getElementById('watermarkColor')?.value || '#ffffff',
-          opacity: Number(document.getElementById('watermarkOpacity')?.value || 70) / 100
+      const textEnabled = document.getElementById('watermark-text-enabled')?.checked;
+      const imageEnabled = document.getElementById('watermark-image-enabled')?.checked;
+      if (!textEnabled && !imageEnabled) return null;
+
+      const result = {};
+
+      if (textEnabled) {
+        const textVal = document.getElementById('watermark-text')?.value;
+        if (textVal) {
+          result.text = {
+            enabled: true,
+            value: textVal,
+            font: document.getElementById('watermark-font')?.value || 'Arial',
+            size: Number(document.getElementById('watermark-size')?.value || 30),
+            color: document.getElementById('watermark-color')?.value || '#000000',
+            opacity: Number(document.getElementById('watermark-opacity')?.value || 50) / 100,
+            position: document.getElementById('watermark-position')?.value || 'center'
+          };
         }
-      };
+      }
+
+      if (imageEnabled && watermarkImagePreview) {
+        result.image = {
+          enabled: true,
+          img: watermarkImagePreview,
+          opacity: Number(document.getElementById('watermark-opacity')?.value || 50) / 100,
+          position: document.getElementById('watermark-position')?.value || 'center'
+        };
+      }
+
+      return Object.keys(result).length > 0 ? result : null;
     }
 
     async function processBatch() {
@@ -6547,15 +6567,8 @@
 
     async function downloadBatchZip() {
       try {
-        const blob = await batchManager.exportToZip();
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `mnemotag-batch-${Date.now()}.zip`;
-        link.click();
-        URL.revokeObjectURL(url);
-        
-        UIManager.showSuccess('✅ ZIP descargado correctamente');
+        // exportToZip() ya descarga internamente via downloadBlob
+        await batchManager.exportToZip();
       } catch (error) {
         console.error('Error descargando ZIP:', error);
         UIManager.showError('Error al descargar el archivo ZIP');

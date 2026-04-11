@@ -346,24 +346,74 @@ class BatchManager {
   }
 
   /**
-   * Aplicar watermarks a canvas
+   * Aplicar watermarks a canvas (texto e imagen)
    */
   applyWatermarks(ctx, canvas, watermarks) {
-    // Esta función se integrará con el sistema de watermarks existente
-    // Por ahora implementación básica
-    
     if (watermarks.text && watermarks.text.enabled) {
       const text = watermarks.text.value;
-      const size = watermarks.text.size || 24;
-      const color = watermarks.text.color || '#ffffff';
-      const opacity = watermarks.text.opacity || 0.7;
-      
-      ctx.font = `${size}px Arial`;
+      const font = watermarks.text.font || 'Arial';
+      const size = watermarks.text.size || 30;
+      const color = watermarks.text.color || '#000000';
+      const opacity = watermarks.text.opacity || 0.5;
+      const position = watermarks.text.position || 'center';
+
+      ctx.save();
+      ctx.font = size + 'px ' + font;
       ctx.fillStyle = color;
       ctx.globalAlpha = opacity;
-      ctx.fillText(text, 20, canvas.height - 20);
-      ctx.globalAlpha = 1;
+
+      const metrics = ctx.measureText(text);
+      const textWidth = metrics.width;
+      const textHeight = size;
+      const pos = this._getWatermarkPosition(position, textWidth, textHeight, canvas.width, canvas.height);
+      ctx.fillText(text, pos.x, pos.y);
+      ctx.restore();
     }
+
+    if (watermarks.image && watermarks.image.enabled && watermarks.image.img) {
+      const img = watermarks.image.img;
+      const opacity = watermarks.image.opacity || 0.5;
+      const position = watermarks.image.position || 'center';
+
+      ctx.save();
+      ctx.globalAlpha = opacity;
+      const pos = this._getWatermarkPosition(position, img.width, img.height, canvas.width, canvas.height);
+      ctx.drawImage(img, pos.x, pos.y - img.height);
+      ctx.restore();
+    }
+  }
+
+  /**
+   * Calcular posicion del watermark segun la configuracion
+   */
+  _getWatermarkPosition(position, width, height, canvasWidth, canvasHeight) {
+    const margin = 20;
+    let x, y;
+
+    switch (position) {
+      case 'top-left':
+        x = margin; y = margin + height; break;
+      case 'top-center':
+        x = (canvasWidth - width) / 2; y = margin + height; break;
+      case 'top-right':
+        x = canvasWidth - width - margin; y = margin + height; break;
+      case 'center-left':
+        x = margin; y = (canvasHeight + height) / 2; break;
+      case 'center':
+        x = (canvasWidth - width) / 2; y = (canvasHeight + height) / 2; break;
+      case 'center-right':
+        x = canvasWidth - width - margin; y = (canvasHeight + height) / 2; break;
+      case 'bottom-left':
+        x = margin; y = canvasHeight - margin; break;
+      case 'bottom-center':
+        x = (canvasWidth - width) / 2; y = canvasHeight - margin; break;
+      case 'bottom-right':
+        x = canvasWidth - width - margin; y = canvasHeight - margin; break;
+      default:
+        x = (canvasWidth - width) / 2; y = (canvasHeight + height) / 2;
+    }
+
+    return { x, y };
   }
 
   /**
