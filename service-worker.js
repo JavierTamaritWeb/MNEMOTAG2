@@ -27,39 +27,19 @@
 // `js/main.js`.
 // =============================================================================
 
-const CACHE_VERSION = 'mnemotag-v3.4.16-preview-fix2';
+const CACHE_VERSION = 'mnemotag-v3.5.0';
 const CACHE_NAME_APP = CACHE_VERSION + '-app';
 const CACHE_NAME_CDN = CACHE_VERSION + '-cdn';
 
-// Archivos críticos a precachear en `install`. Sólo lo mínimo para que la
-// app arranque offline. El resto se cachea on-demand.
+// Archivos críticos a precachear en `install`.
+// v3.5.0: los 23 JS individuales ahora se sirven como un solo bundle
+// (app.min.js generado por Gulp). Los Workers siguen separados.
 const PRECACHE_URLS = [
   './',
   './index.html',
   './css/styles.css',
-  './js/main.js',
-  './js/utils/app-config.js',
-  './js/utils/helpers.js',
-  './js/utils/app-state.js',
-  './js/utils/smart-debounce.js',
-  './js/utils/filter-cache.js',
-  './js/utils/fallback-processor.js',
-  './js/utils/keyboard-shortcuts.js',
-  './js/managers/security-manager.js',
-  './js/managers/worker-manager.js',
-  './js/managers/history-manager.js',
-  './js/managers/metadata-manager.js',
-  './js/managers/filter-loading-manager.js',
-  './js/managers/filter-manager.js',
-  './js/managers/ui-manager.js',
-  './js/managers/batch-manager.js',
-  './js/managers/text-layer-manager.js',
-  './js/managers/crop-manager.js',
-  './js/managers/preset-manager.js',
-  './js/managers/analysis-manager.js',
-  './js/managers/curves-manager.js',
-  './js/managers/bg-removal-manager.js',
-  './js/managers/export-manager.js',
+  './js/app.min.js',
+  './js/image-processor.js',
   './js/workers/analysis-worker.js',
   './images/favicon.svg',
   './images/favicon_io/favicon.ico',

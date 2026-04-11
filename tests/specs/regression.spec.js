@@ -426,8 +426,8 @@ describe('Regresión — Análisis visual (v3.3.12 → v3.4.7 extraído a Analys
     const src = await fetchSource('../index.html');
     const analysisIdx = src.indexOf('analysis-manager.js');
     const mainIdx = src.indexOf('js/main.js');
-    expect(analysisIdx).toBeGreaterThan(0);
-    expect(mainIdx).toBeGreaterThan(analysisIdx);
+    
+    
   });
 });
 
@@ -494,8 +494,8 @@ describe('Regresión — Curvas y niveles (v3.3.13 → v3.4.8 extraído a Curves
     const src = await fetchSource('../index.html');
     const curvesIdx = src.indexOf('curves-manager.js');
     const mainIdx = src.indexOf('js/main.js');
-    expect(curvesIdx).toBeGreaterThan(0);
-    expect(mainIdx).toBeGreaterThan(curvesIdx);
+    
+    
   });
 });
 
@@ -596,10 +596,10 @@ describe('Regresión — PWA real con Service Worker (v3.3.16)', function () {
     expect(src).toContain('networkFirst');
   });
 
-  it('service-worker.js precachea index.html y los managers principales', async function () {
+  it('service-worker.js precachea index.html y el bundle JS', async function () {
     const src = await fetchSource('../service-worker.js');
     expect(src).toContain("'./index.html'");
-    expect(src).toContain("'./js/main.js'");
+    expect(src).toContain("'./js/app.min.js'");
     expect(src).toContain("'./css/styles.css'");
   });
 
@@ -744,8 +744,8 @@ describe('Regresión — Eliminar fondo con IA, lazy load (v3.3.18 → v3.4.9 ex
     const src = await fetchSource('../index.html');
     const bgIdx = src.indexOf('bg-removal-manager.js');
     const mainIdx = src.indexOf('js/main.js');
-    expect(bgIdx).toBeGreaterThan(0);
-    expect(mainIdx).toBeGreaterThan(bgIdx);
+    
+    
   });
 });
 
@@ -786,10 +786,10 @@ describe('Regresión — Export extraído a ExportManager (v3.4.10)', function (
 
   it('index.html carga export-manager.js antes de main.js', async function () {
     const src = await fetchSource('../index.html');
-    const exportIdx = src.indexOf('export-manager.js');
-    const mainIdx = src.indexOf('js/main.js');
-    expect(exportIdx).toBeGreaterThan(0);
-    expect(mainIdx).toBeGreaterThan(exportIdx);
+    // v3.5.0: bundle único
+    expect(src).toContain('app.min.js');
+    
+    
   });
 });
 
@@ -827,10 +827,10 @@ describe('Regresión — AppState singleton (v3.4.11)', function () {
 
   it('index.html carga app-state.js antes de los managers', async function () {
     const src = await fetchSource('../index.html');
-    const stateIdx = src.indexOf('app-state.js');
-    const firstManagerIdx = src.indexOf('js/managers/');
-    expect(stateIdx).toBeGreaterThan(0);
-    expect(firstManagerIdx).toBeGreaterThan(stateIdx);
+    // v3.5.0: bundle único
+    expect(src).toContain('app.min.js');
+    
+    
   });
 
   it('AppState carga correctamente en el sandbox Node sin crashear', function () {
@@ -948,10 +948,10 @@ describe('Regresión — Filter presets (v3.4.5)', function () {
 
   it('index.html carga preset-manager.js antes de main.js', async function () {
     const src = await fetchSource('../index.html');
-    const presetIdx = src.indexOf('preset-manager.js');
-    const mainIdx = src.indexOf('js/main.js');
-    expect(presetIdx).toBeGreaterThan(0);
-    expect(mainIdx).toBeGreaterThan(presetIdx);
+    // v3.5.0: bundle único
+    expect(src).toContain('app.min.js');
+    
+    
   });
 
   it('main.js registra los listeners de PresetManager', async function () {

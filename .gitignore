@@ -40,6 +40,10 @@ coverage/
 # Dependency directories
 node_modules/
 
+# Build output (generados por Gulp — no editar a mano)
+js/app.min.js.map
+css/styles.css.map
+
 # Optional npm cache directory
 .npm
 
