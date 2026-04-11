@@ -9,9 +9,13 @@
 
 | Version | Fecha | Caracteristicas Principales | Estado |
 |---------|-------|----------------------------|--------|
-| **v3.5.2** | 11 Abr 2026 | Code audit: 14 problemas moderados (console guards, var->const/let, null guards, magic numbers) | **Actual** |
-| **v3.5.1** | 11 Abr 2026 | Code audit: 4 criticos (onclick->data-action, dark: muertos, .gitignore, debug flag) | Estable |
-| **v3.5.0** | 11 Abr 2026 | Build system: Gulp 5 + SCSS partials + JS bundle + browser-sync + zoom-pan-manager | Estable |
+| **v3.5.6** | 11 Abr 2026 | Fixes: SRI roto en dist, heic2any 404, originalWidth no declarado | **Actual** |
+| **v3.5.5** | 11 Abr 2026 | dist/index.html produccion autocontenido (minificado -36%, workers copiados) | Estable |
+| **v3.5.4** | 11 Abr 2026 | dist/images con conversion WebP + AVIF via sharp (PNG -98%) | Estable |
+| **v3.5.3** | 11 Abr 2026 | Carpeta dist/ + SCSS reorganizado en subcarpetas | Estable |
+| **v3.5.2** | 11 Abr 2026 | Code audit: 14 moderados (console guards, var->const/let, null guards) | Estable |
+| **v3.5.1** | 11 Abr 2026 | Code audit: 4 criticos (onclick->data-action, dark: muertos, debug flag) | Estable |
+| **v3.5.0** | 11 Abr 2026 | Build system: Gulp 5 + SCSS + JS bundle + browser-sync + zoom-pan-manager | Estable |
 | **v3.4.20** | 10 Abr 2026 | Fixes: batch modal + dark mode batch + botones herramientas + reinicios Live Server + SW localhost | Estable |
 | **v3.4.15** | 9 Abr 2026 | Phase 14: AVIF EXIF real (inyección ISOBMFF, ~600 líneas + 42 aserciones binarias) | ✅ Estable |
 | **v3.4.14** | 9 Abr 2026 | Fix CSP: `frame-ancestors` + `unsafe-eval` (errores consola reportados) | ✅ Estable |
@@ -69,7 +73,22 @@
 - 81 var → const/let
 - Magic numbers extraidos a AppConfig
 - Null guards en DOM queries
-- Debug code aislado
+
+### v3.5.3 — Carpeta dist/ + SCSS subcarpetas
+- Build output movido a `dist/css/` y `dist/js/`
+- SCSS reorganizado: `abstracts/`, `base/`, `layout/`, `components/`, `pages/`, `modules/`
+
+### v3.5.4 — dist/images WebP + AVIF
+- Task `images` con sharp: copia + convierte PNG/JPEG a WebP y AVIF
+- applicacion.png: 1.4 MB → AVIF 22 KB (-98%)
+
+### v3.5.5 — dist/index.html produccion
+- HTML minificado (-36%) con rutas relativas a dist/
+- Workers y service-worker copiados a dist/
+
+### v3.5.6 — Fixes
+- SRI roto en dist (replace demasiado agresivo en URLs CDN)
+- originalWidth/originalHeight no declarados tras var→const/let
 
 ---
 

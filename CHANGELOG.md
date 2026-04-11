@@ -4,6 +4,45 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.5.6] - 2026-04-11
+
+### Fixed
+- **SRI roto en `dist/index.html`**: la task `html` usaba `replace(/dist\//g, '')` que eliminaba `dist/` dentro de URLs CDN (Tailwind, heic2any). Ahora solo reemplaza atributos `href="dist/`, `src="dist/`, `srcset="dist/"`.
+- **`originalWidth is not defined`**: la migracion `var` → `const/let` elimino variables globales implicitas sin declararlas. Añadidas `let originalWidth` y `let originalHeight`.
+- **Imagenes no cargaban en desarrollo**: `index.html` raiz apuntaba a `dist/images/` en vez de `images/` (fuente). Revertido.
+
+---
+
+## [3.5.5] - 2026-04-11
+
+### Added — dist/index.html de produccion autocontenido
+- **Task `html`**: lee `index.html`, reescribe rutas locales `dist/X` → `X`, minifica con `html-minifier-terser` (100 KB → 64 KB, -36%).
+- **Task `copyAssets`**: copia workers (`image-processor.js`, `analysis-worker.js`) y `service-worker.js` a `dist/` con rutas ajustadas.
+- `dist/` es ahora un directorio desplegable completo a cualquier hosting estatico.
+
+---
+
+## [3.5.4] - 2026-04-11
+
+### Added — dist/images con conversion WebP + AVIF
+- **Task `images`**: copia todas las imagenes de `images/` a `dist/images/`, convierte cada PNG/JPEG a WebP (quality 80) y AVIF (quality 65) via `sharp`.
+- 26 archivos copiados, 12 convertidos (24 archivos WebP+AVIF nuevos).
+- `applicacion.png`: 1.4 MB → WebP 56 KB (-96%) → AVIF 22 KB (-98%).
+- Hero logo en `index.html` usa `<picture>` con source AVIF → WebP → PNG fallback.
+
+---
+
+## [3.5.3] - 2026-04-11
+
+### Changed — Carpeta dist/ + SCSS reorganizado
+- Build output movido de `css/` y `js/` a `dist/css/` y `dist/js/`.
+- Task `clean` elimina `dist/` antes de cada build.
+- `.gitignore`: una sola linea `dist/` reemplaza 4 entradas individuales.
+- **SCSS reorganizado en subcarpetas**: `abstracts/`, `base/`, `layout/`, `components/`, `pages/`, `modules/`.
+- `main.scss` usa `@use 'carpeta/partial'`.
+
+---
+
 ## [3.5.2] - 2026-04-11
 
 ### Fixed — 14 problemas moderados del code audit

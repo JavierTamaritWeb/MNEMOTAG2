@@ -31,11 +31,14 @@ The app is partway through a long-running modularization effort: logic is being 
 
 ### Build system (v3.5.0+)
 
-- **Gulp 5** compiles SCSS → `css/styles.css` and bundles 24 JS files → `js/app.min.js`.
-- **`src/scss/`** contains 7 partials: `_variables`, `_base`, `_layout`, `_components`, `_preview`, `_hero`, `_modals`. Edit these, NOT `css/styles.css` directly.
-- **`gulpfile.js`** has the exact concatenation order in `JS_FILES`. When adding a new module, add it there after its dependencies and before consumers.
+- **Gulp 5** compiles SCSS → `dist/css/styles.css` and bundles 24 JS files → `dist/js/app.min.js`.
+- **`src/scss/`** organized in subfolders: `abstracts/_variables`, `base/_base`, `layout/_layout`, `components/_components`, `pages/_preview`, `pages/_hero`, `modules/_modals`. Edit these, NOT `dist/css/styles.css`.
+- **`gulpfile.js`** tasks: `jsBundle`, `scssCompile`, `images` (copy + WebP/AVIF via sharp), `html` (minify for production), `copyAssets` (workers + service-worker), `clean`.
+- **`dist/`** is the self-contained production directory: `npm run build` generates it. Deploy `dist/` to any static host.
+- **`dist/index.html`** is a minified copy with `dist/` prefixes removed from local paths. CDN URLs are preserved.
+- **`dist/images/`** contains originals + WebP + AVIF variants of every PNG/JPEG.
+- Workers (`image-processor.js`, `analysis-worker.js`) are NOT bundled — copied to `dist/js/` separately.
 - **`js/app.min.js`** is generated with `mangle: false` (critical — globals must keep their names).
-- Workers (`image-processor.js`, `analysis-worker.js`) are NOT bundled — they run as separate files.
 
 ### Debug flag
 
@@ -83,7 +86,8 @@ These globals are referenced throughout `main.js` and read by some managers — 
 
 - `currentImage`, `currentFile`, `canvas`, `ctx`, `originalExtension`, `fileBaseName`
 - `currentRotation`, `isFlippedHorizontally`, `isFlippedVertically`
-- `currentZoom`, `panX`, `panY`, `isPanning` — zoom/pan system
+- `currentZoom`, `panX`, `panY`, `isPanning` — zoom/pan system (limits in `AppConfig`)
+- `originalWidth`, `originalHeight` — original image dimensions for resize
 - `customImagePosition`, `customTextPosition`, `isPositioningMode`, `isDragging`, `dragTarget` — watermark drag-and-drop
 - `isRulerMode`, `rulerElements` — metric ruler overlay
 - `cache` — local LRU cache for processed image data (separate from `filter-cache.js`)
@@ -148,10 +152,13 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 
 ## Versioning and commits
 
-**Current version: v3.5.2**. Build system migration (v3.5.0) + code audit fixes (v3.5.1–v3.5.2).
+**Current version: v3.5.6**.
 - **v3.5.0**: Gulp 5 build system (SCSS + JS bundle + minification + browser-sync), zoom-pan-manager extracted.
-- **v3.5.1**: 4 critical audit fixes (onclick→data-action, dead dark: classes, .gitignore, MNEMOTAG_DEBUG).
-- **v3.5.2**: 14 moderate audit fixes (console guards, var→const/let, magic numbers→AppConfig, null guards).
+- **v3.5.1–v3.5.2**: Code audit — 4 critical + 14 moderate fixes (onclick→data-action, console guards, var→const/let, null guards).
+- **v3.5.3**: Output movido a `dist/`, SCSS reorganizado en subcarpetas (`abstracts/`, `base/`, `layout/`, `components/`, `pages/`, `modules/`).
+- **v3.5.4**: `dist/images/` con conversion WebP + AVIF via sharp (PNG 1.4 MB → AVIF 22 KB).
+- **v3.5.5**: `dist/index.html` de produccion (minificado -36%, workers + SW copiados).
+- **v3.5.6**: Fixes — SRI roto en dist, heic2any 404, originalWidth no declarado.
 - **v3.4.x** (15 releases): CSP/SRI, ESLint/Stylelint CI, accessibility, curves live preview, filter presets, ImageBitmap undo/redo, 5 managers extracted, Web Worker for autoBalance, Playwright E2E, AVIF EXIF injection.
 
 **Tests**: 186/186 Node + 86/86 binarios + 5 Playwright E2E. `git log` remains the authoritative source for the actual commit version.

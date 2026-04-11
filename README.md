@@ -4,7 +4,7 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos. 100% cliente, sin backend.
 
-![Version](https://img.shields.io/badge/version-3.5.2-blue.svg)
+![Version](https://img.shields.io/badge/version-3.5.6-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 [![Tests](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml)
@@ -16,32 +16,27 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 
 ## NOVEDADES v3.5
 
-### Build system: Gulp 5 + SCSS + minificacion (v3.5.0)
+### Build system (v3.5.0)
+- **Gulp 5** con JS bundle (concat + terser), SCSS (sass + cleanCSS), imagenes (sharp → WebP + AVIF), HTML minificado.
+- **24 scripts** → 1 `<script src="dist/js/app.min.js">`.
+- **SCSS** en subcarpetas: `abstracts/`, `base/`, `layout/`, `components/`, `pages/`, `modules/`.
 
-- **Gulp 5** con `gulp-concat` + `gulp-terser` para JS y `sass` + `gulp-clean-css` para CSS.
-- **24 scripts** en `index.html` reemplazados por un solo `<script src="js/app.min.js"></script>`.
-- **SCSS partials** en `src/scss/`: CSS monolitico de 7,687 lineas dividido en 7 partials tematicos (`_variables`, `_base`, `_layout`, `_components`, `_preview`, `_hero`, `_modals`).
-- **`browser-sync`** en puerto 5507 sin live reload automatico (reemplaza Live Server).
-- **`zoom-pan-manager.js`** extraido de `main.js` (~210 lineas).
+### Carpeta dist/ de produccion (v3.5.3 – v3.5.5)
+- **`dist/`** es un directorio autocontenido y desplegable: HTML minificado (-36%), CSS, JS, workers, service-worker, imagenes con WebP + AVIF.
+- **Imagenes optimizadas**: cada PNG/JPEG tiene variante WebP y AVIF (applicacion.png: 1.4 MB → AVIF 22 KB, -98%).
+- **`<picture>`** con carga progresiva AVIF → WebP → PNG fallback.
 
-### Code audit: 4 criticos + 14 moderados (v3.5.1 + v3.5.2)
-
-- **23 `onclick` inline** reemplazados por delegacion de eventos con `data-action`.
-- **42 clases `dark:` de Tailwind** muertas eliminadas.
-- **83 `console.log/warn`** envueltos en `MNEMOTAG_DEBUG` (cero logging en produccion).
-- **81 `var`** reemplazados por `const`/`let`.
-- **Magic numbers** extraidos a `AppConfig` (zoom limits, debounce delays).
-- **Null guards** con optional chaining en DOM queries.
-- **Artefactos de build** en `.gitignore`.
+### Code audit (v3.5.1 – v3.5.2)
+- 23 `onclick` inline → delegacion de eventos con `data-action`.
+- 83 `console.log/warn` → `MNEMOTAG_DEBUG` guard.
+- 81 `var` → `const`/`let`. Magic numbers → `AppConfig`. Null guards.
 
 ### Verificacion
-
-- `npm run build` genera `js/app.min.js` + `css/styles.css`
-- `node tests/run-in-node.js` → **186/186 OK**
+- `npm run build` genera `dist/` completo
+- `node tests/run-in-node.js` → **209/209 OK**
 - `node tests/binary-validation.js` → **86/86 OK**
-- Playwright E2E en CI
 
-> Historial completo de versiones anteriores (v3.4.x, v3.3.x, v3.1.x): [CHANGELOG.md](CHANGELOG.md)
+> Versiones anteriores: [CHANGELOG.md](CHANGELOG.md)
 
 ---
 
