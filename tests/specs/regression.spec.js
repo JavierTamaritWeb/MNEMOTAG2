@@ -400,7 +400,7 @@ describe('Regresión — Análisis visual (v3.3.12 → v3.4.7 extraído a Analys
   });
 
   it('css/styles.css define las clases de los modales de análisis y la paleta', async function () {
-    const src = await fetchSource('../css/styles.css');
+    const src = await fetchSource('../dist/css/styles.css');
     expect(src).toContain('.analysis-modal');
     expect(src).toContain('.palette-grid');
     expect(src).toContain('.palette-swatch');
@@ -472,7 +472,7 @@ describe('Regresión — Curvas y niveles (v3.3.13 → v3.4.8 extraído a Curves
   });
 
   it('css/styles.css define las clases del editor de curvas', async function () {
-    const src = await fetchSource('../css/styles.css');
+    const src = await fetchSource('../dist/css/styles.css');
     expect(src).toContain('.curves-channel-tabs');
     expect(src).toContain('.curves-channel-btn');
     expect(src).toContain('#curves-canvas');
@@ -538,7 +538,7 @@ describe('Regresión — Histórico visual con thumbnails (v3.3.14)', function (
   });
 
   it('css/styles.css define las clases del panel de historial visual', async function () {
-    const src = await fetchSource('../css/styles.css');
+    const src = await fetchSource('../dist/css/styles.css');
     expect(src).toContain('.history-panel');
     expect(src).toContain('.history-thumb');
     expect(src).toContain('.history-thumb.is-current');
@@ -599,8 +599,8 @@ describe('Regresión — PWA real con Service Worker (v3.3.16)', function () {
   it('service-worker.js precachea index.html y el bundle JS', async function () {
     const src = await fetchSource('../service-worker.js');
     expect(src).toContain("'./index.html'");
-    expect(src).toContain("'./js/app.min.js'");
-    expect(src).toContain("'./css/styles.css'");
+    expect(src).toContain("'./dist/js/app.min.js'");
+    expect(src).toContain("'./dist/css/styles.css'");
   });
 
   it('main.js registra el Service Worker en window.load', async function () {
@@ -1012,7 +1012,7 @@ describe('Regresión — Undo/redo con ImageBitmap (v3.4.6)', function () {
 describe('Regresión — Build system Gulp 5 (v3.5.0)', function () {
   it('index.html carga el bundle app.min.js en vez de scripts individuales', async function () {
     const src = await fetchSource('../index.html');
-    expect(src).toContain('src="js/app.min.js"');
+    expect(src).toContain('src="dist/js/app.min.js"');
     // No debe haber scripts individuales de managers
     expect(src).not.toContain('src="js/managers/security-manager.js"');
     expect(src).not.toContain('src="js/managers/filter-manager.js"');
@@ -1039,15 +1039,22 @@ describe('Regresión — Build system Gulp 5 (v3.5.0)', function () {
     expect(typeof pkg.scripts.serve).toBe('string');
   });
 
-  it('SCSS entry point existe con los 7 partials', async function () {
+  it('SCSS entry point importa los 7 partials organizados en subcarpetas', async function () {
     const src = await fetchSource('../src/scss/main.scss');
-    expect(src).toContain("@use 'variables'");
-    expect(src).toContain("@use 'base'");
-    expect(src).toContain("@use 'layout'");
-    expect(src).toContain("@use 'components'");
-    expect(src).toContain("@use 'preview'");
-    expect(src).toContain("@use 'hero'");
-    expect(src).toContain("@use 'modals'");
+    expect(src).toContain("@use 'abstracts/variables'");
+    expect(src).toContain("@use 'base/base'");
+    expect(src).toContain("@use 'layout/layout'");
+    expect(src).toContain("@use 'components/components'");
+    expect(src).toContain("@use 'pages/preview'");
+    expect(src).toContain("@use 'pages/hero'");
+    expect(src).toContain("@use 'modules/modals'");
+  });
+
+  it('gulpfile.js usa dist/ como directorio de salida', async function () {
+    const src = await fetchSource('../gulpfile.js');
+    expect(src).toContain("const DIST = 'dist'");
+    expect(src).toContain('dest(DIST_CSS)');
+    expect(src).toContain('dest(DIST_JS)');
   });
 });
 

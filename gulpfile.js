@@ -5,6 +5,15 @@ const sourcemaps = require('gulp-sourcemaps');
 const sass = require('gulp-sass')(require('sass'));
 const cleanCSS = require('gulp-clean-css');
 const rename = require('gulp-rename');
+const { rm } = require('fs/promises');
+
+// ============================================================
+// Paths
+// ============================================================
+
+const DIST = 'dist';
+const DIST_CSS = DIST + '/css';
+const DIST_JS = DIST + '/js';
 
 // ============================================================
 // JS Bundle — Orden EXACTO de concatenación (dependencias)
@@ -41,6 +50,10 @@ const JS_FILES = [
 // Tasks
 // ============================================================
 
+async function clean() {
+  await rm(DIST, { recursive: true, force: true });
+}
+
 function jsBundle() {
   return src(JS_FILES)
     .pipe(sourcemaps.init())
@@ -51,7 +64,7 @@ function jsBundle() {
       format: { comments: false }
     }))
     .pipe(sourcemaps.write('.'))
-    .pipe(dest('js/'));
+    .pipe(dest(DIST_JS));
 }
 
 function scssCompile() {
@@ -61,19 +74,17 @@ function scssCompile() {
     .pipe(cleanCSS({ level: 2 }))
     .pipe(rename('styles.css'))
     .pipe(sourcemaps.write('.'))
-    .pipe(dest('css/'));
+    .pipe(dest(DIST_CSS));
 }
 
 function watchFiles() {
-  watch(['js/**/*.js', '!js/app.min.js', '!js/app.min.js.map'], jsBundle);
+  watch(['js/**/*.js', '!' + DIST_JS + '/**'], jsBundle);
   watch('src/scss/**/*.scss', scssCompile);
 }
 
 // ============================================================
 // Browser-Sync — reemplaza VS Code Live Server
 // ============================================================
-// SIN live reload automático (el usuario lo pidió explícitamente).
-// Solo sirve los archivos estáticos por HTTP.
 
 const browserSync = require('browser-sync').create();
 
@@ -81,18 +92,16 @@ function serve(cb) {
   browserSync.init({
     server: { baseDir: './' },
     port: 5507,
-    open: false,           // no abrir el browser automáticamente
-    notify: false,         // no mostrar notificaciones en el browser
-    ghostMode: false,      // no sincronizar scroll/clicks entre tabs
-    // NO live reload — el usuario recarga manualmente con Cmd+R
+    open: false,
+    notify: false,
+    ghostMode: false,
     injectChanges: false,
     reloadOnRestart: false,
-    watchEvents: []        // no observar nada
+    watchEvents: []
   });
   cb();
 }
 
-// Dev: build + watch + servidor local
 function dev(cb) {
   browserSync.init({
     server: { baseDir: './' },
@@ -104,14 +113,19 @@ function dev(cb) {
     reloadOnRestart: false,
     watchEvents: []
   });
-  watch(['js/**/*.js', '!js/app.min.js', '!js/app.min.js.map'], jsBundle);
+  watch(['js/**/*.js', '!' + DIST_JS + '/**'], jsBundle);
   watch('src/scss/**/*.scss', scssCompile);
   cb();
 }
 
+// ============================================================
+// Exports
+// ============================================================
+
+exports.clean = clean;
 exports.js = jsBundle;
 exports.scss = scssCompile;
-exports.build = parallel(jsBundle, scssCompile);
+exports.build = series(clean, parallel(jsBundle, scssCompile));
 exports.watch = series(exports.build, watchFiles);
 exports.serve = serve;
 exports.dev = series(exports.build, dev);

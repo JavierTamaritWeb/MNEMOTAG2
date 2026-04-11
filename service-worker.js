@@ -37,8 +37,8 @@ const CACHE_NAME_CDN = CACHE_VERSION + '-cdn';
 const PRECACHE_URLS = [
   './',
   './index.html',
-  './css/styles.css',
-  './js/app.min.js',
+  './dist/css/styles.css',
+  './dist/js/app.min.js',
   './js/image-processor.js',
   './js/workers/analysis-worker.js',
   './images/favicon.svg',

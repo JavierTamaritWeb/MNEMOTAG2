@@ -1,16 +1,16 @@
 // ============================================================
 // MnemoTag — SCSS entry point
 // ============================================================
-// Compilado por Gulp: npm run build → css/styles.css
-// NO editar css/styles.css directamente — editar estos archivos.
+// Compilado por Gulp: npm run build → dist/css/styles.css
+// NO editar dist/css/styles.css directamente.
 //
-// Orden de importación: variables primero, luego de general a específico.
+// Orden: abstracts → base → layout → components → pages → modules
 // ============================================================
 
-@use 'variables';       // :root CSS custom properties (light + dark)
-@use 'base';            // Global styles, body, scrollbar, selection, animations
-@use 'layout';          // Upload zone, watermark buttons, cards, forms
-@use 'components';      // Button system, filters, progress, validation
-@use 'preview';         // Canvas, zoom controls, ruler, comparison, mobile responsive
-@use 'hero';            // Hero section, features, clear-all button
-@use 'modals';          // Side panels, modals, text layers, batch, analysis, buttons specific
+@use 'abstracts/variables';
+@use 'base/base';
+@use 'layout/layout';
+@use 'components/components';
+@use 'pages/preview';
+@use 'pages/hero';
+@use 'modules/modals';

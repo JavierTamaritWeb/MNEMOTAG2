@@ -42,10 +42,7 @@ node_modules/
 
 # Build output (generados por Gulp — no editar a mano)
 # Ejecutar `npm run build` para regenerarlos tras clonar.
-js/app.min.js
-js/app.min.js.map
-css/styles.css
-css/styles.css.map
+dist/
 
 # Optional npm cache directory
 .npm
