@@ -190,17 +190,17 @@ class BatchManager {
   /**
    * Capturar configuración actual de la aplicación
    */
-  captureCurrentConfig(filters, watermarks, transformations, metadata) {
+  captureCurrentConfig(filterString, watermarks, textLayers, metadata) {
     this.currentConfig = {
-      filters: filters ? { ...filters } : null,
-      watermarks: watermarks ? { ...watermarks } : null,
-      transformations: transformations ? { ...transformations } : null,
+      filterString: filterString || '',
+      watermarks: watermarks || null,
+      textLayers: textLayers || null,
       metadata: metadata ? { ...metadata } : null,
       outputFormat: 'jpeg',
       outputQuality: 0.9,
       timestamp: Date.now()
     };
-    
+
     return this.currentConfig;
   }
 
@@ -272,41 +272,42 @@ class BatchManager {
   async processImage(imageItem) {
     return new Promise((resolve, reject) => {
       try {
-        // Crear canvas temporal
         const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d', {
-          alpha: true,
-          willReadFrequently: false
-        });
-        
-        // Configurar alta calidad
+        const ctx = canvas.getContext('2d');
+
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
-        
-        // Configurar tamaño canvas
+
         canvas.width = imageItem.imageData.width;
         canvas.height = imageItem.imageData.height;
-        
-        // Dibujar imagen
-        ctx.drawImage(imageItem.imageData.img, 0, 0);
-        
-        // Aplicar filtros si están configurados
-        if (this.currentConfig.filters) {
-          this.applyFilters(ctx, canvas, this.currentConfig.filters);
+
+        // 1. Aplicar filtros CSS via ctx.filter (idéntico a canvas.style.filter de la preview)
+        if (this.currentConfig.filterString) {
+          ctx.filter = this.currentConfig.filterString;
         }
-        
-        // Aplicar watermarks si están configurados
+
+        // 2. Dibujar imagen (los filtros CSS se aplican al drawImage)
+        ctx.drawImage(imageItem.imageData.img, 0, 0);
+
+        // Resetear filtro para que watermarks y text layers NO se filtren
+        ctx.filter = 'none';
+
+        // 3. Aplicar watermarks
         if (this.currentConfig.watermarks) {
           this.applyWatermarks(ctx, canvas, this.currentConfig.watermarks);
         }
-        
-        // Convertir a blob
+
+        // 4. Aplicar capas de texto
+        if (this.currentConfig.textLayers) {
+          this._renderTextLayers(ctx, canvas, this.currentConfig.textLayers);
+        }
+
+        // 5. Exportar a blob
         canvas.toBlob((blob) => {
           if (!blob) {
             reject(new Error('Error al generar blob'));
             return;
           }
-          
           resolve({
             success: true,
             name: imageItem.name,
@@ -315,8 +316,8 @@ class BatchManager {
             width: canvas.width,
             height: canvas.height
           });
-        }, `image/${this.currentConfig.outputFormat}`, this.currentConfig.outputQuality);
-        
+        }, 'image/' + this.currentConfig.outputFormat, this.currentConfig.outputQuality);
+
       } catch (error) {
         reject(error);
       }
@@ -324,25 +325,40 @@ class BatchManager {
   }
 
   /**
-   * Aplicar filtros CSS a canvas
+   * Renderizar capas de texto — replica textLayerManager.renderLayers
    */
-  applyFilters(ctx, canvas, filters) {
-    // Esta función se integrará con el FilterManager existente
-    // Por ahora aplicamos filtros básicos
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
-    
-    // Ejemplo básico - se extenderá con FilterManager
-    if (filters.brightness) {
-      const brightness = (filters.brightness - 100) * 2.55;
-      for (let i = 0; i < data.length; i += 4) {
-        data[i] += brightness;
-        data[i + 1] += brightness;
-        data[i + 2] += brightness;
+  _renderTextLayers(ctx, canvas, layers) {
+    for (let i = 0; i < layers.length; i++) {
+      const layer = layers[i];
+      if (!layer.text || layer.visible === false) continue;
+
+      const family = (layer.font && layer.font.family) || 'Roboto';
+      const size = (layer.font && layer.font.size) || 40;
+      const weight = (layer.font && layer.font.weight) || 'normal';
+      const color = layer.color || '#ffffff';
+      const px = (layer.position && layer.position.x) || 0;
+      const py = (layer.position && layer.position.y) || 0;
+
+      ctx.save();
+      ctx.font = weight + ' ' + size + 'px ' + family;
+      ctx.fillStyle = color;
+      ctx.globalAlpha = (layer.opacity != null) ? layer.opacity : 1;
+
+      if (layer.effects && layer.effects.shadow) {
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 2;
       }
+      if (layer.effects && layer.effects.stroke) {
+        ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+        ctx.lineWidth = 2;
+        ctx.strokeText(layer.text, px, py + size);
+      }
+
+      ctx.fillText(layer.text, px, py + size);
+      ctx.restore();
     }
-    
-    ctx.putImageData(imageData, 0, 0);
   }
 
   /**

@@ -6452,14 +6452,8 @@
     }
 
     function getCurrentFilters() {
-      const b = document.getElementById('brightness');
-      const c = document.getElementById('contrast');
-      const s = document.getElementById('saturation');
-      return {
-        brightness: b ? Number(b.value) + 100 : 100,
-        contrast: c ? Number(c.value) + 100 : 100,
-        saturation: s ? Number(s.value) + 100 : 100
-      };
+      // Capturar el filter string CSS exacto que se ve en la previsualización
+      return FilterManager.getFilterString() || '';
     }
 
     function getCurrentWatermarks() {
@@ -6546,11 +6540,11 @@
           });
         }
 
-        // Capturar configuración antes de procesar
-        // Leer filtros actuales del editor (si el checkbox está marcado)
-        const filters = config.applyFilters ? getCurrentFilters() : null;
+        // Capturar snapshot completo del estado del editor
+        const filterString = config.applyFilters ? getCurrentFilters() : '';
         const watermarks = config.applyWatermarks ? getCurrentWatermarks() : null;
-        batchManager.captureCurrentConfig(filters, watermarks, null, null);
+        const layers = config.applyTextLayers ? textLayerManager.getAllLayers() : null;
+        batchManager.captureCurrentConfig(filterString, watermarks, layers, null);
 
         // Procesar — processQueue recibe un callback con objeto {current, total, percentage}
         await batchManager.processQueue((progress) => {
