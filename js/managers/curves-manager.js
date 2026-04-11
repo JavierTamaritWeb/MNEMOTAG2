@@ -52,7 +52,7 @@ window.CurvesManager = (function () {
     try {
       _state.previewSnapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
     } catch (err) {
-      console.warn('CurvesManager.open: no se pudo capturar snapshot para live preview:', err);
+      MNEMOTAG_DEBUG && console.warn('CurvesManager.open: no se pudo capturar snapshot para live preview:', err);
       _state.previewSnapshot = null;
     }
 

@@ -44,7 +44,7 @@ const SmartDebounce = {
       // Verificar límite de operaciones concurrentes
       if (this.timers.size >= this.config.maxConcurrentOperations) {
         if (this.config.enableLogging) {
-          console.warn(`⚠️ SmartDebounce: Límite de operaciones concurrentes alcanzado (${this.config.maxConcurrentOperations})`);
+          MNEMOTAG_DEBUG && console.warn(`⚠️ SmartDebounce: Límite de operaciones concurrentes alcanzado (${this.config.maxConcurrentOperations})`);
         }
         return;
       }

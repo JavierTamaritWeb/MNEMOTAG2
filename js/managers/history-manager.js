@@ -74,12 +74,12 @@ const historyManager = {
         createImageBitmap(canvas).then(function (bitmap) {
           commitState(Object.assign({}, baseState, { bitmap: bitmap }));
         }).catch(function (err) {
-          console.warn('historyManager: createImageBitmap falló, fallback a dataURL:', err);
+          MNEMOTAG_DEBUG && console.warn('historyManager: createImageBitmap falló, fallback a dataURL:', err);
           commitState(Object.assign({}, baseState, { imageData: canvas.toDataURL() }));
         });
         return;
       } catch (err) {
-        console.warn('historyManager: createImageBitmap lanzó, fallback a dataURL:', err);
+        MNEMOTAG_DEBUG && console.warn('historyManager: createImageBitmap lanzó, fallback a dataURL:', err);
       }
     }
 
@@ -87,7 +87,7 @@ const historyManager = {
     const dataURL = canvas.toDataURL();
     const newSize = dataURL.length;
     if (newSize > HISTORY_MAX_TOTAL_SIZE) {
-      console.warn(
+      MNEMOTAG_DEBUG && console.warn(
         `historyManager: snapshot demasiado grande (${(newSize / 1024 / 1024).toFixed(1)} MB), ` +
         `excede el tope de ${(HISTORY_MAX_TOTAL_SIZE / 1024 / 1024)} MB. No se guarda al historial.`
       );
@@ -283,7 +283,7 @@ const historyManager = {
         applyFormState();
         return;
       } catch (err) {
-        console.warn('historyManager.restoreState: error dibujando bitmap, intentando dataURL:', err);
+        MNEMOTAG_DEBUG && console.warn('historyManager.restoreState: error dibujando bitmap, intentando dataURL:', err);
         // Cae al fallback de dataURL si existe.
       }
     }

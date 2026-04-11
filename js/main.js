@@ -1,15 +1,12 @@
-    // Flag de debug: activar con ?debug=1 en la URL o con localStorage.
-    // En producción NO se ejecuta ningún log de diagnóstico.
-    var MNEMOTAG_DEBUG = (typeof location !== 'undefined' && location.search.indexOf('debug=1') !== -1) ||
-                         (typeof localStorage !== 'undefined' && localStorage.getItem('mnemotag-debug') === '1');
-
+    // MNEMOTAG_DEBUG se define en app-config.js (carga primero).
+    // Bloque de arranque de diagnóstico.
     if (MNEMOTAG_DEBUG) {
       try {
-        var now = Date.now();
-        var prevBootRaw = sessionStorage.getItem('mnemotag-boot-info');
-        var prev = prevBootRaw ? JSON.parse(prevBootRaw) : null;
-        var bootCount = prev ? (prev.count + 1) : 1;
-        var deltaMs = prev ? (now - prev.ts) : null;
+        const now = Date.now();
+        const prevBootRaw = sessionStorage.getItem('mnemotag-boot-info');
+        const prev = prevBootRaw ? JSON.parse(prevBootRaw) : null;
+        const bootCount = prev ? (prev.count + 1) : 1;
+        const deltaMs = prev ? (now - prev.ts) : null;
         sessionStorage.setItem('mnemotag-boot-info', JSON.stringify({ ts: now, count: bootCount }));
         console.warn('[MnemoTag debug] Arranque #' + bootCount + (deltaMs !== null ? ' (hace ' + Math.round(deltaMs / 1000) + 's)' : ''));
       } catch (e) { /* sessionStorage puede fallar */ }
@@ -40,11 +37,11 @@
     let isFlippedHorizontally = false;
     let isFlippedVertically = false;
     
-    // Variables para zoom
-    let currentZoom = 1.0; // Factor de zoom (1.0 = 100%)
-    let minZoom = 0.1; // Zoom mínimo (10%)
-    let maxZoom = 5.0; // Zoom máximo (500%)
-    let zoomStep = 0.1; // Incremento del zoom (10%)
+    // Variables para zoom (límites en AppConfig)
+    let currentZoom = 1.0;
+    let minZoom = AppConfig.minZoom;
+    let maxZoom = AppConfig.maxZoom;
+    let zoomStep = AppConfig.zoomStep;
     let isZoomed = false;
     
     // Variables para pan (navegación con zoom)
@@ -351,7 +348,7 @@
     }
 
     function clearWatermarkState() {
-      try { localStorage.removeItem(WATERMARK_STORAGE_KEY); } catch (e) { /* ok */ }
+      try { localStorage.removeItem(WATERMARK_STORAGE_KEY); } catch (e) { MNEMOTAG_DEBUG && console.warn('localStorage op failed:', e); }
       const form = document.getElementById('watermark-form');
       if (form) form.reset();
       const syncPairs = [
@@ -389,7 +386,7 @@
       // 2. Limpiar formulario de metadatos + su localStorage
       const metaForm = document.getElementById('metadata-form');
       if (metaForm) metaForm.reset();
-      try { localStorage.removeItem('imageMetadata'); } catch (e) { /* ok */ }
+      try { localStorage.removeItem('imageMetadata'); } catch (e) { MNEMOTAG_DEBUG && console.warn('localStorage op failed:', e); }
 
       // 3. Limpiar formulario de watermark + su localStorage
       clearWatermarkState();
@@ -424,7 +421,7 @@
       }
 
       // 7. Limpiar sessionStorage de diagnóstico
-      try { sessionStorage.removeItem('mnemotag-boot-info'); } catch (e) { /* ok */ }
+      try { sessionStorage.removeItem('mnemotag-boot-info'); } catch (e) { MNEMOTAG_DEBUG && console.warn('localStorage op failed:', e); }
 
       // 8. Limpiar cualquier otra clave de localStorage que empiece por 'mnemotag-'
       try {
@@ -436,7 +433,7 @@
           }
         }
         keysToRemove.forEach(function (key) { localStorage.removeItem(key); });
-      } catch (e) { /* ok */ }
+      } catch (e) { MNEMOTAG_DEBUG && console.warn('localStorage op failed:', e); }
 
       // 9. Refrescar UI
       if (typeof updatePreview === 'function' && canvas && currentImage) {
@@ -458,8 +455,8 @@
     // Solo se activa en dev local. En producción no interfiere.
     (function () {
       try {
-        var hostname = location.hostname;
-        var isLocal = hostname === 'localhost' || hostname === '127.0.0.1' ||
+        const hostname = location.hostname;
+        const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' ||
                       hostname === '0.0.0.0' || hostname === '::1' ||
                       hostname.endsWith('.localhost');
         if (!isLocal) return;
@@ -467,13 +464,13 @@
         // 1) Monkey-patch WebSocket para bloquear conexiones de Live Reload.
         //    Live Server conecta a ws://host:port/ws. Browser-sync usa
         //    /browser-sync/socket.io. Detectamos ambos patrones.
-        var OrigWebSocket = window.WebSocket;
+        const OrigWebSocket = window.WebSocket;
         window.WebSocket = function (url, protocols) {
           if (typeof url === 'string') {
             // Patrón Live Server: ws://localhost:PORT/ws
-            var isLiveServer = /\/ws\/?$/.test(url);
+            const isLiveServer = /\/ws\/?$/.test(url);
             // Patrón browser-sync
-            var isBrowserSync = url.indexOf('browser-sync') !== -1;
+            const isBrowserSync = url.indexOf('browser-sync') !== -1;
 
             if (isLiveServer || isBrowserSync) {
               console.warn(
@@ -483,7 +480,7 @@
               // Devolver un objeto fake que no hace nada.
               // Live Server asignará onmessage/onopen pero nunca recibirá
               // el mensaje "reload" porque la conexión no existe.
-              var fake = {
+              const fake = {
                 send: function () {},
                 close: function () {},
                 addEventListener: function () {},
@@ -1183,9 +1180,9 @@
         // Delegación de eventos: todos los botones con data-action
         // (reemplaza los 23 onclick= inline que violaban buenas prácticas)
         document.addEventListener('click', function (e) {
-          var btn = e.target.closest('[data-action]');
+          const btn = e.target.closest('[data-action]');
           if (!btn) return;
-          var action = btn.getAttribute('data-action');
+          const action = btn.getAttribute('data-action');
           switch (action) {
             case 'hideMetadataPreview': hideMetadataPreview(); break;
             case 'closeBatchModal': closeBatchModal(); break;
@@ -2129,17 +2126,17 @@
 
     function handleDragOver(e) {
       e.preventDefault();
-      document.getElementById('drop-area').classList.add('upload__dropzone--active');
+      document.getElementById('drop-area')?.classList.add('upload__dropzone--active');
     }
 
     function handleDragLeave(e) {
       e.preventDefault();
-      document.getElementById('drop-area').classList.remove('upload__dropzone--active');
+      document.getElementById('drop-area')?.classList.remove('upload__dropzone--active');
     }
 
     function handleDrop(e) {
       e.preventDefault();
-      document.getElementById('drop-area').classList.remove('upload__dropzone--active');
+      document.getElementById('drop-area')?.classList.remove('upload__dropzone--active');
       
       const files = e.dataTransfer.files;
       if (files.length > 0) {
@@ -2843,12 +2840,12 @@
         // Desktop: hacer que el canvas ocupe todo el ancho del contenedor.
         // Calculamos el tamaño explícito en píxeles para que no quede
         // limitado por el max-width CSS ni por el tamaño intrínseco.
-        var container = canvas.parentElement;
+        const container = canvas.parentElement;
         if (container) {
-          var containerWidth = container.clientWidth - 8; // -8 por padding
-          var aspectRatio = height / width;
-          var displayW = Math.min(containerWidth, width * 2); // hasta 2x el tamaño real
-          var displayH = Math.round(displayW * aspectRatio);
+          const containerWidth = container.clientWidth - 8; // -8 por padding
+          const aspectRatio = height / width;
+          const displayW = Math.min(containerWidth, width * 2); // hasta 2x el tamaño real
+          const displayH = Math.round(displayW * aspectRatio);
           canvas.style.width = displayW + 'px';
           canvas.style.height = displayH + 'px';
         } else {
@@ -3014,8 +3011,8 @@
     }
 
     function applyWatermarkOptimized() {
-      const textEnabled = document.getElementById('watermark-text-enabled').checked;
-      const imageEnabled = document.getElementById('watermark-image-enabled').checked;
+      const textEnabled = document.getElementById('watermark-text-enabled')?.checked;
+      const imageEnabled = document.getElementById('watermark-image-enabled')?.checked;
       
       // Aplicar marca de agua de texto si está habilitada
       if (textEnabled) {
@@ -3051,17 +3048,17 @@
     }
 
     function applyTextWatermarkOptimized() {
-      const text = document.getElementById('watermark-text').value.trim();
+      const text = document.getElementById('watermark-text')?.value.trim();
       if (!text) {
         textWatermarkBounds = null; // No hay texto, limpiar bounds
         return;
       }
 
-      const font = document.getElementById('watermark-font').value;
-      const color = document.getElementById('watermark-color').value;
-      let size = parseInt(document.getElementById('watermark-size').value, 10);
-      const opacity = parseInt(document.getElementById('watermark-opacity').value) / 100;
-      const position = document.getElementById('watermark-position').value;
+      const font = document.getElementById('watermark-font')?.value;
+      const color = document.getElementById('watermark-color')?.value;
+      let size = parseInt(document.getElementById('watermark-size')?.value, 10);
+      const opacity = parseInt(document.getElementById('watermark-opacity')?.value) / 100;
+      const position = document.getElementById('watermark-position')?.value;
 
       // v3.3.5: Auto-escala del texto según el tamaño de la imagen.
       // Sin esto, size=24 se ve enorme en imágenes 800×600 y diminuto en 4K.
@@ -3139,11 +3136,11 @@
       // Use cached image if available and configuration hasn't changed
       const currentConfig = {
         file: watermarkImageInput.files[0],
-        opacity: document.getElementById('watermark-image-opacity').value,
-        size: document.getElementById('watermark-image-size').value,
-        position: document.getElementById('watermark-image-position').value,
-        width: document.getElementById('watermark-image-width').value,
-        height: document.getElementById('watermark-image-height').value,
+        opacity: document.getElementById('watermark-image-opacity')?.value,
+        size: document.getElementById('watermark-image-size')?.value,
+        position: document.getElementById('watermark-image-position')?.value,
+        width: document.getElementById('watermark-image-width')?.value,
+        height: document.getElementById('watermark-image-height')?.value,
         customPosition: customImagePosition ? JSON.stringify(customImagePosition) : null
       };
       
@@ -3264,8 +3261,8 @@
           height = (width / img.width) * img.height;
           break;
         case 'custom':
-          width = parseInt(document.getElementById('watermark-image-width').value) || 100;
-          height = parseInt(document.getElementById('watermark-image-height').value) || 100;
+          width = parseInt(document.getElementById('watermark-image-width')?.value) || 100;
+          height = parseInt(document.getElementById('watermark-image-height')?.value) || 100;
           break;
         default:
           width = img.width;
@@ -3330,8 +3327,8 @@
     function toggleWatermarkType() {
       const textOptions = document.getElementById('text-watermark-options');
       const imageOptions = document.getElementById('image-watermark-options');
-      const textEnabled = document.getElementById('watermark-text-enabled').checked;
-      const imageEnabled = document.getElementById('watermark-image-enabled').checked;
+      const textEnabled = document.getElementById('watermark-text-enabled')?.checked;
+      const imageEnabled = document.getElementById('watermark-image-enabled')?.checked;
       
       // Mostrar/ocultar opciones de texto
       if (textEnabled) {
@@ -3606,7 +3603,7 @@
 
       if (!isDragging) {
         // Hover cursor: capas de texto o watermarks
-        var cursorSet = false;
+        let cursorSet = false;
         if (isPointInTextLayer(x, y)) {
           canvas.style.cursor = 'grab';
           cursorSet = true;
@@ -3636,9 +3633,9 @@
       if (dragTarget && dragTarget.layerId) {
         // Arrastrando una capa de texto — render ligero (sin watermarks
         // ni filters) para evitar interferencias async y mantener 60 fps.
-        var newX = x - dragOffsetX;
-        var newY = y - dragOffsetY;
-        var layer = textLayerManager.getLayer(dragTarget.layerId);
+        const newX = x - dragOffsetX;
+        const newY = y - dragOffsetY;
+        const layer = textLayerManager.getLayer(dragTarget.layerId);
         if (layer) {
           layer.position.x = Math.round(newX);
           layer.position.y = Math.round(newY);
@@ -4302,8 +4299,8 @@
       }
 
       const form = e.target;
-      const textEnabled = document.getElementById('watermark-text-enabled').checked;
-      const imageEnabled = document.getElementById('watermark-image-enabled').checked;
+      const textEnabled = document.getElementById('watermark-text-enabled')?.checked;
+      const imageEnabled = document.getElementById('watermark-image-enabled')?.checked;
       
       // Verificar que al menos una opción esté habilitada
       if (!textEnabled && !imageEnabled) {
@@ -4318,9 +4315,9 @@
       try {
         // Validar marca de agua de texto si está habilitada
         if (textEnabled) {
-          const text = document.getElementById('watermark-text').value;
-          const size = document.getElementById('watermark-size').value;
-          const opacity = document.getElementById('watermark-opacity').value;
+          const text = document.getElementById('watermark-text')?.value;
+          const size = document.getElementById('watermark-size')?.value;
+          const opacity = document.getElementById('watermark-opacity')?.value;
           
           // Validar marca de agua de texto
           const validation = SecurityManager.validateWatermarkText(text, size, opacity);
@@ -4380,8 +4377,10 @@
       });
       
       // Resetear tipo de marca de agua
-      document.getElementById('watermark-text-enabled').checked = true;
-      document.getElementById('watermark-image-enabled').checked = false;
+      const wtEnabled = document.getElementById('watermark-text-enabled');
+      const wiEnabled = document.getElementById('watermark-image-enabled');
+      if (wtEnabled) wtEnabled.checked = true;
+      if (wiEnabled) wiEnabled.checked = false;
       toggleWatermarkType();
       
       // Restaurar botón de marca de agua a rojo y ocultar miniatura
@@ -5298,7 +5297,8 @@
       cache.lastWatermarkConfig = null;
       
       // Limpiar formularios
-      document.getElementById('file-input').value = '';
+      const fileInput = document.getElementById('file-input');
+      if (fileInput) fileInput.value = '';
       document.getElementById('metadata-form').reset();
       document.getElementById('watermark-form').reset();
       
@@ -5321,8 +5321,8 @@
       }
       
       // Ocultar elementos
-      document.getElementById('file-info').classList.add('file-info--hidden');
-      document.getElementById('editor-container').classList.add('editor-container--hidden');
+      document.getElementById('file-info')?.classList.add('file-info--hidden');
+      document.getElementById('editor-container')?.classList.add('editor-container--hidden');
       
       // Restaurar botón a rojo y ocultar miniatura
       const uploadButton = document.getElementById('file-selector');
@@ -5984,18 +5984,20 @@
       FilterLoadingManager.activeLoadings.clear();
     });
     
-    // Función para mostrar métricas de rendimiento (desarrollo)
-    window.getFilterPerformanceMetrics = function() {
-      const metrics = FilterManager.getPerformanceMetrics();
-      console.table({
-        'Cache Size': metrics.cacheSize,
-        'Cache Dirty': metrics.isDirty,
-        'Active Loadings': metrics.activeLoadings,
-        'Smart Debounce Timers': SmartDebounce.timers.size,
-        'Animation Frames': SmartDebounce.animationFrames.size
-      });
-      return metrics;
-    };
+    // Función para mostrar métricas de rendimiento (solo en modo debug)
+    if (MNEMOTAG_DEBUG) {
+      window.getFilterPerformanceMetrics = function() {
+        const metrics = FilterManager.getPerformanceMetrics();
+        console.table({
+          'Cache Size': metrics.cacheSize,
+          'Cache Dirty': metrics.isDirty,
+          'Active Loadings': metrics.activeLoadings,
+          'Smart Debounce Timers': SmartDebounce.timers.size,
+          'Animation Frames': SmartDebounce.animationFrames.size
+        });
+        return metrics;
+      };
+    }
 
     // ===== ADVANCED MANAGERS INITIALIZATION =====
     
@@ -6652,14 +6654,14 @@
       // Construir la lista con DOM API segura (evita XSS por layer.text)
       container.replaceChildren();
       layers.forEach(function (layer) {
-        var item = document.createElement('div');
+        const item = document.createElement('div');
         item.className = 'text-layer-item' + (layer.id === activeLayerId ? ' active' : '');
         item.addEventListener('click', function () { selectTextLayer(layer.id); });
 
-        var preview = document.createElement('div');
+        const preview = document.createElement('div');
         preview.className = 'text-layer-preview';
 
-        var textDiv = document.createElement('div');
+        const textDiv = document.createElement('div');
         textDiv.className = 'text-layer-text';
         textDiv.textContent = layer.text || '';
         // Doble-click para edición inline directa
@@ -6669,26 +6671,26 @@
             divRef.contentEditable = 'true';
             divRef.focus();
             // Seleccionar todo el texto
-            var range = document.createRange();
+            const range = document.createRange();
             range.selectNodeContents(divRef);
-            var sel = window.getSelection();
+            const sel = window.getSelection();
             sel.removeAllRanges();
             sel.addRange(range);
             // Al perder foco o pulsar Enter, guardar
-            var save = function () {
+            const save = function () {
               divRef.contentEditable = 'false';
-              var newText = divRef.textContent.trim();
+              const newText = divRef.textContent.trim();
               if (newText && newText !== layerRef.text) {
                 layerRef.text = newText;
                 renderCanvasWithLayers();
                 // Actualizar el editor si esta capa está seleccionada
-                var el = document.getElementById('text-layer-text');
+                const el = document.getElementById('text-layer-text');
                 if (el && activeLayerId === layerRef.id) el.value = newText;
               }
               divRef.removeEventListener('blur', save);
               divRef.removeEventListener('keydown', onKey);
             };
-            var onKey = function (ke) {
+            const onKey = function (ke) {
               if (ke.key === 'Enter') {
                 ke.preventDefault();
                 divRef.blur();
@@ -6703,22 +6705,22 @@
         })(layer, textDiv));
         preview.appendChild(textDiv);
 
-        var fontDiv = document.createElement('div');
+        const fontDiv = document.createElement('div');
         fontDiv.className = 'text-layer-font';
-        var family = (layer.font && layer.font.family) || '?';
-        var size = (layer.font && layer.font.size) || '?';
+        const family = (layer.font && layer.font.family) || '?';
+        const size = (layer.font && layer.font.size) || '?';
         fontDiv.textContent = family + ' - ' + size + 'px';
         preview.appendChild(fontDiv);
 
         item.appendChild(preview);
 
-        var visBtn = document.createElement('button');
+        const visBtn = document.createElement('button');
         visBtn.className = 'text-layer-visibility';
         visBtn.addEventListener('click', function (ev) {
           ev.stopPropagation();
           toggleLayerVisibility(layer.id);
         });
-        var icon = document.createElement('i');
+        const icon = document.createElement('i');
         icon.className = 'fas fa-' + (layer.visible ? 'eye' : 'eye-slash');
         visBtn.appendChild(icon);
         item.appendChild(visBtn);
@@ -6744,7 +6746,7 @@
 
       // Cargar valores en el editor. La estructura del layer es anidada:
       // layer.font.family, layer.font.size, layer.position.x, layer.effects.shadow, etc.
-      var el;
+      let el;
       el = document.getElementById('text-layer-text');     if (el) el.value = layer.text || '';
       el = document.getElementById('text-layer-font');     if (el) el.value = (layer.font && layer.font.family) || 'Roboto';
       el = document.getElementById('text-layer-size');     if (el) el.value = (layer.font && layer.font.size) || 40;
@@ -6764,26 +6766,26 @@
       // Construir el objeto updates con la estructura anidada que espera
       // textLayerManager.updateLayer(): font.{family,size}, position.{x,y},
       // effects.{shadow,stroke,gradient}.
-      var e;
-      var fontFamily = (e = document.getElementById('text-layer-font')) ? e.value : 'Roboto';
-      var fontSize = (e = document.getElementById('text-layer-size')) ? parseInt(e.value) || 40 : 40;
-      var posX = (e = document.getElementById('text-layer-x')) ? parseInt(e.value) || 0 : 0;
-      var posY = (e = document.getElementById('text-layer-y')) ? parseInt(e.value) || 0 : 0;
-      var hasShadow = (e = document.getElementById('text-layer-shadow')) ? e.checked : false;
-      var hasStroke = (e = document.getElementById('text-layer-stroke')) ? e.checked : false;
-      var hasGradient = (e = document.getElementById('text-layer-gradient')) ? e.checked : false;
+      let e;
+      const fontFamily = (e = document.getElementById('text-layer-font')) ? e.value : 'Roboto';
+      const fontSize = (e = document.getElementById('text-layer-size')) ? parseInt(e.value) || 40 : 40;
+      const posX = (e = document.getElementById('text-layer-x')) ? parseInt(e.value) || 0 : 0;
+      const posY = (e = document.getElementById('text-layer-y')) ? parseInt(e.value) || 0 : 0;
+      const hasShadow = (e = document.getElementById('text-layer-shadow')) ? e.checked : false;
+      const hasStroke = (e = document.getElementById('text-layer-stroke')) ? e.checked : false;
+      const hasGradient = (e = document.getElementById('text-layer-gradient')) ? e.checked : false;
 
       // Para shadow/stroke/gradient: si el checkbox está activo pero el
       // layer ya tenía un objeto previo, lo reutilizamos. Si no tenía,
       // creamos uno con defaults razonables.
-      var currentLayer = textLayerManager.getLayer(activeLayerId);
-      var shadowVal = hasShadow
+      const currentLayer = textLayerManager.getLayer(activeLayerId);
+      const shadowVal = hasShadow
         ? (currentLayer && currentLayer.effects && currentLayer.effects.shadow) || { offsetX: 2, offsetY: 2, blur: 4, color: 'rgba(0,0,0,0.3)' }
         : null;
-      var strokeVal = hasStroke
+      const strokeVal = hasStroke
         ? (currentLayer && currentLayer.effects && currentLayer.effects.stroke) || { width: 2, color: '#000000' }
         : null;
-      var gradientVal = hasGradient
+      const gradientVal = hasGradient
         ? (currentLayer && currentLayer.effects && currentLayer.effects.gradient) || { type: 'linear', colors: ['#ff0000', '#0000ff'], angle: 0 }
         : null;
 
@@ -6844,20 +6846,20 @@
       // en el render completo al soltar el drag.
       try {
         if (textLayerManager) {
-          var layers = textLayerManager.getAllLayers();
+          const layers = textLayerManager.getAllLayers();
           for (var i = 0; i < layers.length; i++) {
-            var layer = layers[i];
+            const layer = layers[i];
             if (!layer || !layer.visible) continue;
             ctx.save();
             ctx.globalAlpha = (typeof layer.opacity === 'number') ? layer.opacity : 1;
-            var family = (layer.font && layer.font.family) || 'Roboto';
-            var size = (layer.font && layer.font.size) || 40;
-            var weight = (layer.font && layer.font.weight) || 'normal';
+            const family = (layer.font && layer.font.family) || 'Roboto';
+            const size = (layer.font && layer.font.size) || 40;
+            const weight = (layer.font && layer.font.weight) || 'normal';
             ctx.font = weight + ' ' + size + 'px "' + family + '", sans-serif';
             ctx.textBaseline = 'top';
             ctx.fillStyle = layer.color || '#ffffff';
-            var px = (layer.position && layer.position.x) || 0;
-            var py = (layer.position && layer.position.y) || 0;
+            const px = (layer.position && layer.position.x) || 0;
+            const py = (layer.position && layer.position.y) || 0;
             ctx.fillText(layer.text || '', px, py);
             ctx.restore();
           }
@@ -6871,17 +6873,17 @@
 
     function _updateTextLayerBounds() {
       textLayerBounds = [];
-      var layers = textLayerManager.getAllLayers();
+      const layers = textLayerManager.getAllLayers();
       for (var i = 0; i < layers.length; i++) {
-        var layer = layers[i];
+        const layer = layers[i];
         if (!layer.visible) continue;
-        var family = (layer.font && layer.font.family) || 'Roboto';
-        var size = (layer.font && layer.font.size) || 40;
-        var weight = (layer.font && layer.font.weight) || 'normal';
+        const family = (layer.font && layer.font.family) || 'Roboto';
+        const size = (layer.font && layer.font.size) || 40;
+        const weight = (layer.font && layer.font.weight) || 'normal';
         ctx.font = weight + ' ' + size + 'px "' + family + '", sans-serif';
-        var metrics = ctx.measureText(layer.text || '');
-        var posX = (layer.position && layer.position.x) || 0;
-        var posY = (layer.position && layer.position.y) || 0;
+        const metrics = ctx.measureText(layer.text || '');
+        const posX = (layer.position && layer.position.x) || 0;
+        const posY = (layer.position && layer.position.y) || 0;
         textLayerBounds.push({
           layerId: layer.id,
           x: posX, y: posY,

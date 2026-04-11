@@ -186,7 +186,7 @@ async function canvasToBlob(canvas, mimeType, quality = 0.9) {
       }, mimeType, quality);
     });
   } catch (error) {
-    console.warn(`canvasToBlob falló para ${mimeType}, cayendo a JPEG:`, error.message || error);
+    MNEMOTAG_DEBUG && console.warn(`canvasToBlob falló para ${mimeType}, cayendo a JPEG:`, error.message || error);
     return canvasToBlob_fallback(canvas, 'image/jpeg', quality);
   }
 }
@@ -329,21 +329,21 @@ async function determineFallbackFormat(hasAlpha, preferredFormat = 'image/jpeg')
 
   // Si el formato preferido NO se puede exportar, buscar alternativas
   if (!supportsExport) {
-    console.info(`Formato ${preferredFormat} no soporta exportación, buscando alternativa...`);
+    MNEMOTAG_DEBUG && console.info(`Formato ${preferredFormat} no soporta exportación, buscando alternativa...`);
 
     // Cadena de fallback para exportación
     if (preferredFormat === 'image/avif') {
       // AVIF → WebP → PNG/JPEG
       if (await supportsEncode('image/webp')) {
-        console.info('AVIF no soportado, usando WebP como fallback');
+        MNEMOTAG_DEBUG && console.info('AVIF no soportado, usando WebP como fallback');
         return 'image/webp';
       } else {
-        console.info('AVIF y WebP no soportados, usando PNG/JPEG según transparencia');
+        MNEMOTAG_DEBUG && console.info('AVIF y WebP no soportados, usando PNG/JPEG según transparencia');
         return hasAlpha ? 'image/png' : 'image/jpeg';
       }
     } else if (preferredFormat === 'image/webp') {
       // WebP → PNG/JPEG
-      console.info('WebP no soportado, usando PNG/JPEG según transparencia');
+      MNEMOTAG_DEBUG && console.info('WebP no soportado, usando PNG/JPEG según transparencia');
       return hasAlpha ? 'image/png' : 'image/jpeg';
     }
   }

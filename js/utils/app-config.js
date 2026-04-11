@@ -35,14 +35,28 @@ const AppConfig = {
   // Performance settings
   debounceDelay: 300,
   throttleDelay: 100,
-  
+  previewDebounceDelay: 150,
+
+  // Zoom settings
+  minZoom: 0.1,
+  maxZoom: 5.0,
+  zoomStep: 0.1,
+  wheelZoomStep: 0.05,
+
   // UI settings
   animationDuration: 300,
   toastDuration: 3000,
-  errorDuration: 5000
+  errorDuration: 5000,
+  modalZIndex: 10000,
+  overlayZIndex: 9999
 };
+
+// Flag de debug global: activar con ?debug=1 en la URL o localStorage.
+// Definida aquí (app-config carga primero) para que TODOS los módulos la usen.
+const MNEMOTAG_DEBUG = (typeof location !== 'undefined' && location.search.indexOf('debug=1') !== -1) ||
+                       (typeof localStorage !== 'undefined' && localStorage.getItem('mnemotag-debug') === '1');
 
 // Export para uso modular
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = AppConfig;
+  module.exports = { AppConfig, MNEMOTAG_DEBUG };
 }

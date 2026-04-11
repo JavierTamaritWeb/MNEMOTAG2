@@ -157,7 +157,7 @@ const FallbackProcessor = {
           this.applyHueRotateFallback(ctx, operation.config || { value: operation.value });
           break;
         default:
-          console.warn(`⚠️ FallbackProcessor: Operación no soportada: ${operation.type}`);
+          MNEMOTAG_DEBUG && console.warn(`⚠️ FallbackProcessor: Operación no soportada: ${operation.type}`);
       }
     } catch (error) {
       console.error(`❌ FallbackProcessor: Error aplicando operación ${operation.type}:`, error);
@@ -210,7 +210,7 @@ const FallbackProcessor = {
   // Aplicar marca de agua de imagen (fallback)
   applyImageWatermarkFallback: function(ctx, config) {
     if (!config.imageElement && !config.imageData) {
-      console.warn('⚠️ FallbackProcessor: No hay imagen para marca de agua');
+      MNEMOTAG_DEBUG && console.warn('⚠️ FallbackProcessor: No hay imagen para marca de agua');
       return;
     }
     
@@ -278,7 +278,7 @@ const FallbackProcessor = {
         this.adjustGrayscaleFallback(data);
         break;
       default:
-        console.warn(`⚠️ FallbackProcessor: Filtro no soportado: ${config.type}`);
+        MNEMOTAG_DEBUG && console.warn(`⚠️ FallbackProcessor: Filtro no soportado: ${config.type}`);
         return;
     }
     

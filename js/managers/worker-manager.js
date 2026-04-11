@@ -63,7 +63,7 @@ const WorkerManager = {
   // Crear worker pool
   initializeWorkerPool: function(poolSize = null) {
     if (!this.supportsWorkers()) {
-      console.warn('⚠️ Workers no soportados, usando fallback');
+      MNEMOTAG_DEBUG && console.warn('⚠️ Workers no soportados, usando fallback');
       return false;
     }
     
@@ -116,7 +116,7 @@ const WorkerManager = {
     }
     
     if (leastUsedWorker && this.config.enableLogging) {
-      console.warn('⚠️ Todos los workers ocupados, usando el menos reciente');
+      MNEMOTAG_DEBUG && console.warn('⚠️ Todos los workers ocupados, usando el menos reciente');
     }
     
     return leastUsedWorker;
@@ -138,7 +138,7 @@ const WorkerManager = {
     const job = this.activeJobs.get(id);
     
     if (!job) {
-      console.warn(`⚠️ Job ${id} no encontrado`);
+      MNEMOTAG_DEBUG && console.warn(`⚠️ Job ${id} no encontrado`);
       return;
     }
     
@@ -273,7 +273,7 @@ const WorkerManager = {
         };
         transferables.push(buffer);
       } catch (error) {
-        console.warn('⚠️ Error preparando transferable ImageData:', error);
+        MNEMOTAG_DEBUG && console.warn('⚠️ Error preparando transferable ImageData:', error);
         // Fallback a copia normal
         processedImageData = {
           data: new Uint8ClampedArray(imageData.data),
@@ -302,7 +302,7 @@ const WorkerManager = {
             }
           };
         } catch (error) {
-          console.warn('⚠️ Error preparando transferable watermark:', error);
+          MNEMOTAG_DEBUG && console.warn('⚠️ Error preparando transferable watermark:', error);
           return op;
         }
       }
@@ -473,7 +473,7 @@ const WorkerManager = {
     }
     
     if (unhealthyWorkers.length > 0 && this.config.enableLogging) {
-      console.warn('⚠️ Workers con problemas encontrados:', unhealthyWorkers);
+      MNEMOTAG_DEBUG && console.warn('⚠️ Workers con problemas encontrados:', unhealthyWorkers);
     }
     
     return {

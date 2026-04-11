@@ -290,7 +290,7 @@ const FilterLoadingManager = {
   setLoadingTimeout: function(key) {
     const timeout = setTimeout(() => {
       if (this.activeLoadings.has(key)) {
-        console.warn(`⚠️ Loading timeout para ${key}, forzando finalización`);
+        MNEMOTAG_DEBUG && console.warn(`⚠️ Loading timeout para ${key}, forzando finalización`);
         this.hideFilterLoading(key.replace('global', null));
         
         // Mostrar mensaje de error si está disponible UIManager

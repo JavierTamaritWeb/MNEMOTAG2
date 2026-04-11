@@ -267,7 +267,7 @@ const MetadataManager = {
     try {
       localStorage.setItem('imageMetadata', JSON.stringify(metadata));
     } catch (error) {
-      console.warn('No se pudieron guardar metadatos:', error);
+      MNEMOTAG_DEBUG && console.warn('No se pudieron guardar metadatos:', error);
     }
     
     return exifData;
@@ -313,7 +313,7 @@ const MetadataManager = {
       // NO restaurar license: el usuario debe elegirla intencionalmente cada vez.
       // NO restaurar creationDate: debe coincidir con la fecha real de la foto.
     } catch (error) {
-      console.warn('No se pudieron cargar metadatos guardados:', error);
+      MNEMOTAG_DEBUG && console.warn('No se pudieron cargar metadatos guardados:', error);
     }
   },
 
@@ -348,7 +348,7 @@ const MetadataManager = {
 
       localStorage.setItem('imageMetadata', JSON.stringify(existing));
     } catch (error) {
-      console.warn('No se pudo guardar el formulario en localStorage:', error);
+      MNEMOTAG_DEBUG && console.warn('No se pudo guardar el formulario en localStorage:', error);
     }
   },
 
@@ -385,7 +385,7 @@ const MetadataManager = {
     try {
       localStorage.removeItem('imageMetadata');
     } catch (error) {
-      console.warn('No se pudieron limpiar metadatos:', error);
+      MNEMOTAG_DEBUG && console.warn('No se pudieron limpiar metadatos:', error);
     }
   },
   
@@ -532,7 +532,7 @@ const MetadataManager = {
       const exifBytes = piexif.dump(exifObj);
       return piexif.insert(exifBytes, dataUrl);
     } catch (err) {
-      console.warn('No se pudo insertar EXIF en JPEG (dataURL):', err);
+      MNEMOTAG_DEBUG && console.warn('No se pudo insertar EXIF en JPEG (dataURL):', err);
       return dataUrl;
     }
   },
@@ -572,7 +572,7 @@ const MetadataManager = {
       }
       return new Blob([bytes], { type: 'image/jpeg' });
     } catch (err) {
-      console.warn('No se pudo insertar EXIF en JPEG (blob):', err);
+      MNEMOTAG_DEBUG && console.warn('No se pudo insertar EXIF en JPEG (blob):', err);
       return blob;
     }
   },
@@ -737,13 +737,13 @@ const MetadataManager = {
 
       // Validar que el resultado sigue empezando por la signature PNG
       if (newPng[0] !== 0x89 || newPng[1] !== 0x50) {
-        console.warn('embedExifInPngBlob: resultado no parece PNG válido, devolviendo original');
+        MNEMOTAG_DEBUG && console.warn('embedExifInPngBlob: resultado no parece PNG válido, devolviendo original');
         return blob;
       }
 
       return new Blob([newPng], { type: 'image/png' });
     } catch (err) {
-      console.warn('No se pudo insertar EXIF en PNG (blob):', err);
+      MNEMOTAG_DEBUG && console.warn('No se pudo insertar EXIF en PNG (blob):', err);
       return blob;
     }
   },
@@ -778,7 +778,7 @@ const MetadataManager = {
         reader.readAsDataURL(newBlob);
       });
     } catch (err) {
-      console.warn('No se pudo insertar EXIF en PNG (dataURL):', err);
+      MNEMOTAG_DEBUG && console.warn('No se pudo insertar EXIF en PNG (dataURL):', err);
       return dataUrl;
     }
   },
@@ -967,7 +967,7 @@ const MetadataManager = {
       // Parsear el WebP existente
       const dim = this._parseWebpDimensions(webpBytes);
       if (!dim) {
-        console.warn('embedExifInWebpBlob: no se pudo parsear el WebP, devolviendo original');
+        MNEMOTAG_DEBUG && console.warn('embedExifInWebpBlob: no se pudo parsear el WebP, devolviendo original');
         return blob;
       }
 
@@ -986,13 +986,13 @@ const MetadataManager = {
       // Validación post: el resultado DEBE seguir siendo un WebP válido
       if (newBytes[0] !== 0x52 || newBytes[1] !== 0x49 || newBytes[2] !== 0x46 || newBytes[3] !== 0x46 ||
           newBytes[8] !== 0x57 || newBytes[9] !== 0x45 || newBytes[10] !== 0x42 || newBytes[11] !== 0x50) {
-        console.warn('embedExifInWebpBlob: resultado no parece WebP válido, devolviendo original');
+        MNEMOTAG_DEBUG && console.warn('embedExifInWebpBlob: resultado no parece WebP válido, devolviendo original');
         return blob;
       }
 
       return new Blob([newBytes], { type: 'image/webp' });
     } catch (err) {
-      console.warn('No se pudo insertar EXIF en WebP (blob):', err);
+      MNEMOTAG_DEBUG && console.warn('No se pudo insertar EXIF en WebP (blob):', err);
       return blob;
     }
   },
@@ -1022,7 +1022,7 @@ const MetadataManager = {
         reader.readAsDataURL(newBlob);
       });
     } catch (err) {
-      console.warn('No se pudo insertar EXIF en WebP (dataURL):', err);
+      MNEMOTAG_DEBUG && console.warn('No se pudo insertar EXIF en WebP (dataURL):', err);
       return dataUrl;
     }
   },
@@ -1911,14 +1911,14 @@ const MetadataManager = {
     try {
       newIlocBytes = this._buildIlocWithExtra(bytes, metaContents.iloc, ilocData, newItemEntry, metaGrowth);
     } catch (err) {
-      console.warn('_injectExifInAvifBytes: error construyendo iloc:', err);
+      MNEMOTAG_DEBUG && console.warn('_injectExifInAvifBytes: error construyendo iloc:', err);
       return null;
     }
 
     // Sanity check: el tamaño real del nuevo iloc debe coincidir con extraIlocBytes
     const realIlocGrowth = newIlocBytes.length - oldIlocSize;
     if (realIlocGrowth !== extraIlocBytes) {
-      console.warn('_injectExifInAvifBytes: iloc growth mismatch, predicted=' + extraIlocBytes + ' real=' + realIlocGrowth);
+      MNEMOTAG_DEBUG && console.warn('_injectExifInAvifBytes: iloc growth mismatch, predicted=' + extraIlocBytes + ' real=' + realIlocGrowth);
       return null;
     }
 
@@ -1927,7 +1927,7 @@ const MetadataManager = {
 
     // Sanity check adicional: el tamaño del nuevo meta debe ser oldMetaSize + metaGrowth
     if (newMetaBytes.length !== oldMetaSize + metaGrowth) {
-      console.warn('_injectExifInAvifBytes: meta size mismatch, expected=' + (oldMetaSize + metaGrowth) + ' real=' + newMetaBytes.length);
+      MNEMOTAG_DEBUG && console.warn('_injectExifInAvifBytes: meta size mismatch, expected=' + (oldMetaSize + metaGrowth) + ' real=' + newMetaBytes.length);
       return null;
     }
 
@@ -2028,20 +2028,20 @@ const MetadataManager = {
 
       const result = this._injectExifInAvifBytes(bytes, tiffBytes);
       if (!result) {
-        console.warn('embedExifInAvifBlob: _injectExifInAvifBytes devolvió null — estructura no soportada. Devolviendo original.');
+        MNEMOTAG_DEBUG && console.warn('embedExifInAvifBlob: _injectExifInAvifBytes devolvió null — estructura no soportada. Devolviendo original.');
         return blob;
       }
 
       // Validación post-construcción: primeros bytes ftyp
       if (result.length < 12 || result[4] !== 0x66 || result[5] !== 0x74 || result[6] !== 0x79 || result[7] !== 0x70) {
-        console.warn('embedExifInAvifBlob: resultado no empieza por ftyp, devolviendo original');
+        MNEMOTAG_DEBUG && console.warn('embedExifInAvifBlob: resultado no empieza por ftyp, devolviendo original');
         return blob;
       }
 
       return new Blob([result], { type: 'image/avif' });
 
     } catch (err) {
-      console.warn('embedExifInAvifBlob: error inyectando EXIF en AVIF, devolviendo original:', err);
+      MNEMOTAG_DEBUG && console.warn('embedExifInAvifBlob: error inyectando EXIF en AVIF, devolviendo original:', err);
       return blob;
     }
   },
@@ -2073,7 +2073,7 @@ const MetadataManager = {
         reader.readAsDataURL(newBlob);
       });
     } catch (err) {
-      console.warn('No se pudo insertar EXIF en AVIF (dataURL):', err);
+      MNEMOTAG_DEBUG && console.warn('No se pudo insertar EXIF en AVIF (dataURL):', err);
       return dataUrl;
     }
   }

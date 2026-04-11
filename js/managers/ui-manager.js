@@ -124,7 +124,7 @@ const UIManager = {
       if (typeof config.action.handler === 'function') {
         actionBtn.addEventListener('click', config.action.handler);
       } else if (config.action.handler != null) {
-        console.warn('UIManager.showError: action.handler como string ya no se soporta (XSS). Pasa una función.');
+        MNEMOTAG_DEBUG && console.warn('UIManager.showError: action.handler como string ya no se soporta (XSS). Pasa una función.');
       }
       const content = errorContainer.querySelector('.error-content');
       const closeBtn = errorContainer.querySelector('.error-close');
@@ -200,7 +200,7 @@ const UIManager = {
       if (typeof config.action.handler === 'function') {
         actionBtn.addEventListener('click', config.action.handler);
       } else if (config.action.handler != null) {
-        console.warn('UIManager.showWarning: action.handler como string ya no se soporta (XSS). Pasa una función.');
+        MNEMOTAG_DEBUG && console.warn('UIManager.showWarning: action.handler como string ya no se soporta (XSS). Pasa una función.');
       }
       const content = warningContainer.querySelector('.warning-content');
       const closeBtn = warningContainer.querySelector('.warning-close');
@@ -229,7 +229,7 @@ const UIManager = {
     }
     
     if (this.config.enableLogging) {
-      console.warn(`⚠️ Warning mostrado [${config.category}]:`, message);
+      MNEMOTAG_DEBUG && console.warn(`⚠️ Warning mostrado [${config.category}]:`, message);
     }
     
     this.limitActiveToasts();
@@ -276,7 +276,7 @@ const UIManager = {
       if (typeof config.action.handler === 'function') {
         actionBtn.addEventListener('click', config.action.handler);
       } else if (config.action.handler != null) {
-        console.warn('UIManager.showSuccess: action.handler como string ya no se soporta (XSS). Pasa una función.');
+        MNEMOTAG_DEBUG && console.warn('UIManager.showSuccess: action.handler como string ya no se soporta (XSS). Pasa una función.');
       }
       const content = successContainer.querySelector('.success-content');
       const closeBtn = successContainer.querySelector('.success-close');
@@ -387,7 +387,7 @@ const UIManager = {
       : [formSelector];
     
     if (!forms.length) {
-      console.warn(`UIManager: No se encontraron formularios con selector: ${formSelector}`);
+      MNEMOTAG_DEBUG && console.warn(`UIManager: No se encontraron formularios con selector: ${formSelector}`);
       return;
     }
     

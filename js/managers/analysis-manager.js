@@ -40,7 +40,7 @@ window.AnalysisManager = (function () {
         else pending.reject(new Error(msg.error || 'Worker error'));
       });
       _worker.addEventListener('error', function (e) {
-        console.warn('AnalysisManager worker error:', e.message || e);
+        MNEMOTAG_DEBUG && console.warn('AnalysisManager worker error:', e.message || e);
         _workerAvailable = false;
         _worker = null;
         // Rechazar todos los pendientes
@@ -49,7 +49,7 @@ window.AnalysisManager = (function () {
       });
       return _worker;
     } catch (err) {
-      console.warn('AnalysisManager: no se pudo crear worker, usando main-thread:', err);
+      MNEMOTAG_DEBUG && console.warn('AnalysisManager: no se pudo crear worker, usando main-thread:', err);
       _workerAvailable = false;
       return null;
     }
@@ -316,7 +316,7 @@ window.AnalysisManager = (function () {
       try {
         result = await _runInWorker('autoBalance', imageData);
       } catch (err) {
-        console.warn('AnalysisManager: worker autoBalance falló, fallback main-thread:', err);
+        MNEMOTAG_DEBUG && console.warn('AnalysisManager: worker autoBalance falló, fallback main-thread:', err);
         // Nota: si postMessage transfirió el buffer, el imageData
         // original en main-thread queda detached. Hacemos una nueva
         // lectura del canvas para el fallback.

@@ -148,7 +148,7 @@ window.ExportManager = (function () {
       if (finalMimeType !== requestedMimeType) {
         const requestedFormat = outputFormat.toUpperCase();
         const actualFormat = finalFormat.toUpperCase();
-        console.info('Usando fallback: ' + requestedFormat + ' → ' + actualFormat + ' (mejor compatibilidad)');
+        MNEMOTAG_DEBUG && console.info('Usando fallback: ' + requestedFormat + ' → ' + actualFormat + ' (mejor compatibilidad)');
         UIManager.showInfo('📄 Exportando en ' + actualFormat + ' para máxima compatibilidad (solicitado: ' + requestedFormat + ')');
       }
 
@@ -167,7 +167,7 @@ window.ExportManager = (function () {
       }
 
       if (!SecurityManager.isValidFileBaseName(filename)) {
-        console.warn('⚠️ Nombre inválido, usando fallback:', filename);
+        MNEMOTAG_DEBUG && console.warn('⚠️ Nombre inválido, usando fallback:', filename);
         filename = 'imagen';
       }
 
@@ -213,7 +213,7 @@ window.ExportManager = (function () {
           if (saveError.name === 'AbortError') {
             return;
           }
-          console.warn('Error con File System Access API, usando fallback:', saveError);
+          MNEMOTAG_DEBUG && console.warn('Error con File System Access API, usando fallback:', saveError);
         }
       }
 
@@ -292,7 +292,7 @@ window.ExportManager = (function () {
       if (finalMimeType !== requestedMimeType) {
         const requestedFormat = outputFormat.toUpperCase();
         const actualFormat = finalFormat.toUpperCase();
-        console.info('Usando fallback: ' + requestedFormat + ' → ' + actualFormat + ' (mejor compatibilidad)');
+        MNEMOTAG_DEBUG && console.info('Usando fallback: ' + requestedFormat + ' → ' + actualFormat + ' (mejor compatibilidad)');
         UIManager.showInfo('📄 Exportando en ' + actualFormat + ' para máxima compatibilidad (solicitado: ' + requestedFormat + ')');
       }
 
@@ -326,7 +326,7 @@ window.ExportManager = (function () {
       }
 
       if (!SecurityManager.isValidFileBaseName(filename)) {
-        console.warn('⚠️ Nombre inválido en descarga con progreso, usando fallback');
+        MNEMOTAG_DEBUG && console.warn('⚠️ Nombre inválido en descarga con progreso, usando fallback');
         filename = 'imagen-editada';
       }
 
@@ -376,7 +376,7 @@ window.ExportManager = (function () {
             hideProgressBar();
             return;
           }
-          console.warn('Error con File System Access API, usando fallback:', saveError);
+          MNEMOTAG_DEBUG && console.warn('Error con File System Access API, usando fallback:', saveError);
         }
       }
 

@@ -29,7 +29,7 @@ window.ZoomPanManager = (function () {
 
   function zoomInWheel() {
     if (currentZoom < maxZoom) {
-      var wheelStep = 0.05;
+      const wheelStep = AppConfig.wheelZoomStep;
       currentZoom = Math.min(currentZoom + wheelStep, maxZoom);
       applyZoom();
       updateZoomLevel();
@@ -38,7 +38,7 @@ window.ZoomPanManager = (function () {
 
   function zoomOutWheel() {
     if (currentZoom > minZoom) {
-      var wheelStep = 0.05;
+      const wheelStep = AppConfig.wheelZoomStep;
       currentZoom = Math.max(currentZoom - wheelStep, minZoom);
       applyZoom();
       updateZoomLevel();
@@ -70,19 +70,19 @@ window.ZoomPanManager = (function () {
       panX = 0;
       panY = 0;
     }
-    var previewContainer = document.querySelector('.preview__container');
+    const previewContainer = document.querySelector('.preview__container');
     if (previewContainer) {
       previewContainer.style.overflow = 'hidden';
     }
   }
 
   function updateZoomLevel() {
-    var zoomLevelElement = document.getElementById('zoom-level');
+    const zoomLevelElement = document.getElementById('zoom-level');
     if (zoomLevelElement) {
       zoomLevelElement.textContent = Math.round(currentZoom * 100) + '%';
     }
-    var zoomInBtn = document.getElementById('zoom-in-btn');
-    var zoomOutBtn = document.getElementById('zoom-out-btn');
+    const zoomInBtn = document.getElementById('zoom-in-btn');
+    const zoomOutBtn = document.getElementById('zoom-out-btn');
     if (zoomInBtn) {
       zoomInBtn.disabled = currentZoom >= maxZoom;
       zoomInBtn.style.opacity = currentZoom >= maxZoom ? '0.5' : '1';
@@ -109,11 +109,11 @@ window.ZoomPanManager = (function () {
   }
 
   function initMouseWheelZoom() {
-    var previewContainer = document.querySelector('.preview__container');
-    var cv = document.getElementById('preview-canvas');
+    const previewContainer = document.querySelector('.preview__container');
+    const cv = document.getElementById('preview-canvas');
     if (!previewContainer) return;
 
-    var handleWheelZoom = function (e) {
+    const handleWheelZoom = function (e) {
       if (!currentImage || !cv) return;
       if (window.innerWidth >= 768) return; // Solo móvil
       e.preventDefault();
@@ -126,7 +126,7 @@ window.ZoomPanManager = (function () {
   }
 
   function initPanNavigation() {
-    var cv = document.getElementById('preview-canvas');
+    const cv = document.getElementById('preview-canvas');
     if (!cv) return;
 
     cv.addEventListener('mousedown', function (e) {
@@ -142,8 +142,8 @@ window.ZoomPanManager = (function () {
 
     document.addEventListener('mousemove', function (e) {
       if (!isPanning || !isZoomed) return;
-      var maxPX = (cv.offsetWidth * (currentZoom - 1)) / 2;
-      var maxPY = (cv.offsetHeight * (currentZoom - 1)) / 2;
+      const maxPX = (cv.offsetWidth * (currentZoom - 1)) / 2;
+      const maxPY = (cv.offsetHeight * (currentZoom - 1)) / 2;
       panX = Math.max(-maxPX, Math.min(maxPX, startOffsetX + (e.clientX - startPanX) / currentZoom));
       panY = Math.max(-maxPY, Math.min(maxPY, startOffsetY + (e.clientY - startPanY) / currentZoom));
       applyZoom();
@@ -167,7 +167,7 @@ window.ZoomPanManager = (function () {
     // Touch
     cv.addEventListener('touchstart', function (e) {
       if (!isZoomed || !currentImage) return;
-      var touch = e.touches[0];
+      const touch = e.touches[0];
       isPanning = true;
       startPanX = touch.clientX;
       startPanY = touch.clientY;
@@ -178,9 +178,9 @@ window.ZoomPanManager = (function () {
 
     document.addEventListener('touchmove', function (e) {
       if (!isPanning || !isZoomed) return;
-      var touch = e.touches[0];
-      var maxPX = (cv.offsetWidth * (currentZoom - 1)) / 2;
-      var maxPY = (cv.offsetHeight * (currentZoom - 1)) / 2;
+      const touch = e.touches[0];
+      const maxPX = (cv.offsetWidth * (currentZoom - 1)) / 2;
+      const maxPY = (cv.offsetHeight * (currentZoom - 1)) / 2;
       panX = Math.max(-maxPX, Math.min(maxPX, startOffsetX + (touch.clientX - startPanX) / currentZoom));
       panY = Math.max(-maxPY, Math.min(maxPY, startOffsetY + (touch.clientY - startPanY) / currentZoom));
       applyZoom();

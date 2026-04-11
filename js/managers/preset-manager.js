@@ -31,7 +31,7 @@ const PresetManager = {
       const parsed = JSON.parse(raw);
       return Array.isArray(parsed) ? parsed : [];
     } catch (err) {
-      console.warn('PresetManager.listPresets: error leyendo índice', err);
+      MNEMOTAG_DEBUG && console.warn('PresetManager.listPresets: error leyendo índice', err);
       return [];
     }
   },

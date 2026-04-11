@@ -109,7 +109,7 @@ const FilterManager = {
   applyPreset: function(presetName) {
     const preset = this.presets[presetName];
     if (!preset) {
-      console.warn(`❌ Preset "${presetName}" no encontrado`);
+      MNEMOTAG_DEBUG && console.warn(`❌ Preset "${presetName}" no encontrado`);
       return;
     }
     
@@ -220,7 +220,7 @@ const FilterManager = {
       
       
     } catch (error) {
-      console.warn('⚠️ Error en worker, usando fallback:', error);
+      MNEMOTAG_DEBUG && console.warn('⚠️ Error en worker, usando fallback:', error);
       // Fallback al procesamiento normal
       this.applyFiltersImmediate();
     } finally {
@@ -352,7 +352,7 @@ const FilterManager = {
         return result;
       }
     } catch (error) {
-      console.warn('Worker falló, usando fallback:', error);
+      MNEMOTAG_DEBUG && console.warn('Worker falló, usando fallback:', error);
       if (typeof FilterLoadingManager !== 'undefined') {
         FilterLoadingManager.hideFilterLoading();
       }
