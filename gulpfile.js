@@ -5,9 +5,10 @@ const sourcemaps = require('gulp-sourcemaps');
 const sass = require('gulp-sass')(require('sass'));
 const cleanCSS = require('gulp-clean-css');
 const rename = require('gulp-rename');
-const { rm, mkdir, readdir, copyFile, stat } = require('fs/promises');
+const { rm, mkdir, readdir, readFile, writeFile, copyFile } = require('fs/promises');
 const path = require('path');
 const sharp = require('sharp');
+const { minify } = require('html-minifier-terser');
 
 // ============================================================
 // Paths
@@ -112,11 +113,9 @@ async function images() {
     const destDir = path.dirname(destPath);
     await mkdir(destDir, { recursive: true });
 
-    // Copiar original
     await copyFile(file, destPath);
     copied++;
 
-    // Convertir PNG/JPEG a WebP y AVIF
     const ext = path.extname(file).toLowerCase();
     if (CONVERTIBLE_EXT.has(ext)) {
       const baseName = destPath.replace(/\.[^.]+$/, '');
@@ -133,14 +132,67 @@ async function images() {
   console.log('  ' + copied + ' copied, ' + converted + ' converted to WebP+AVIF');
 }
 
+// ============================================================
+// HTML — index.html de producción (minificado, rutas relativas)
+// ============================================================
+
+async function html() {
+  let content = await readFile('index.html', 'utf8');
+
+  // Reescribir rutas: dist/X → X (dist/index.html ya está dentro de dist/)
+  content = content.replace(/dist\//g, '');
+
+  // Eliminar comentarios HTML de desarrollo (excepto condicionales IE)
+  // y el bloque CSP comment que es largo
+  const minified = await minify(content, {
+    collapseWhitespace: true,
+    removeComments: true,
+    removeRedundantAttributes: true,
+    removeEmptyAttributes: true,
+    minifyCSS: true,
+    minifyJS: true,
+    sortAttributes: true,
+    sortClassName: true
+  });
+
+  await mkdir(DIST, { recursive: true });
+  await writeFile(path.join(DIST, 'index.html'), minified, 'utf8');
+
+  const saved = Math.round((1 - minified.length / content.length) * 100);
+  console.log('  index.html: ' + content.length + ' → ' + minified.length + ' bytes (-' + saved + '%)');
+}
+
+// ============================================================
+// Assets — Workers + Service Worker para dist/ autocontenido
+// ============================================================
+
+async function copyAssets() {
+  // Workers (no se bundlean — los carga new Worker())
+  await mkdir(path.join(DIST, 'js/workers'), { recursive: true });
+  await copyFile('js/image-processor.js', path.join(DIST, 'js/image-processor.js'));
+  await copyFile('js/workers/analysis-worker.js', path.join(DIST, 'js/workers/analysis-worker.js'));
+
+  // Service Worker — reescribir rutas dist/ → rutas relativas
+  let sw = await readFile('service-worker.js', 'utf8');
+  sw = sw.replace(/\.\/dist\//g, './');
+  await writeFile(path.join(DIST, 'service-worker.js'), sw, 'utf8');
+
+  console.log('  workers + service-worker copied to dist/');
+}
+
+// ============================================================
+// Watch
+// ============================================================
+
 function watchFiles() {
   watch(['js/**/*.js', '!' + DIST_JS + '/**'], jsBundle);
   watch('src/scss/**/*.scss', scssCompile);
   watch(SRC_IMAGES + '/**/*', images);
+  watch('index.html', html);
 }
 
 // ============================================================
-// Browser-Sync — reemplaza VS Code Live Server
+// Browser-Sync
 // ============================================================
 
 const browserSync = require('browser-sync').create();
@@ -172,6 +224,7 @@ function dev(cb) {
   });
   watch(['js/**/*.js', '!' + DIST_JS + '/**'], jsBundle);
   watch('src/scss/**/*.scss', scssCompile);
+  watch('index.html', html);
   cb();
 }
 
@@ -183,7 +236,8 @@ exports.clean = clean;
 exports.js = jsBundle;
 exports.scss = scssCompile;
 exports.images = images;
-exports.build = series(clean, parallel(jsBundle, scssCompile, images));
+exports.html = html;
+exports.build = series(clean, parallel(jsBundle, scssCompile, images, html, copyAssets));
 exports.watch = series(exports.build, watchFiles);
 exports.serve = serve;
 exports.dev = series(exports.build, dev);
