@@ -33,6 +33,7 @@ const JS_FILES = [
   'js/managers/curves-manager.js',
   'js/managers/bg-removal-manager.js',
   'js/managers/export-manager.js',
+  'js/managers/zoom-pan-manager.js',
   'js/main.js'
 ];
 
