@@ -41,9 +41,9 @@ const PRECACHE_URLS = [
   './dist/js/app.min.js',
   './js/image-processor.js',
   './js/workers/analysis-worker.js',
-  './dist/images/favicon.svg',
-  './dist/images/favicon_io/favicon.ico',
-  './dist/images/favicon_io/site.webmanifest'
+  './images/favicon.svg',
+  './images/favicon_io/favicon.ico',
+  './images/favicon_io/site.webmanifest'
 ];
 
 // Hosts considerados "CDN externa" — se aplica network-first.
