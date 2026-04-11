@@ -1004,3 +1004,153 @@ describe('Regresión — Undo/redo con ImageBitmap (v3.4.6)', function () {
     expect(src).toContain('historyManager.clear()');
   });
 });
+
+// ========================================================================
+// v3.5.0 — Build system: Gulp + SCSS + JS bundle
+// ========================================================================
+
+describe('Regresión — Build system Gulp 5 (v3.5.0)', function () {
+  it('index.html carga el bundle app.min.js en vez de scripts individuales', async function () {
+    const src = await fetchSource('../index.html');
+    expect(src).toContain('src="js/app.min.js"');
+    // No debe haber scripts individuales de managers
+    expect(src).not.toContain('src="js/managers/security-manager.js"');
+    expect(src).not.toContain('src="js/managers/filter-manager.js"');
+    expect(src).not.toContain('src="js/utils/helpers.js"');
+  });
+
+  it('gulpfile.js define las tasks jsBundle y scssCompile', async function () {
+    const src = await fetchSource('../gulpfile.js');
+    expect(src).toContain('function jsBundle');
+    expect(src).toContain('function scssCompile');
+    expect(src).toContain("mangle: false");
+  });
+
+  it('gulpfile.js incluye zoom-pan-manager.js en JS_FILES', async function () {
+    const src = await fetchSource('../gulpfile.js');
+    expect(src).toContain('zoom-pan-manager.js');
+  });
+
+  it('package.json tiene los scripts de build', async function () {
+    const src = await fetchSource('../package.json');
+    const pkg = JSON.parse(src);
+    expect(typeof pkg.scripts.build).toBe('string');
+    expect(typeof pkg.scripts.dev).toBe('string');
+    expect(typeof pkg.scripts.serve).toBe('string');
+  });
+
+  it('SCSS entry point existe con los 7 partials', async function () {
+    const src = await fetchSource('../src/scss/main.scss');
+    expect(src).toContain("@use 'variables'");
+    expect(src).toContain("@use 'base'");
+    expect(src).toContain("@use 'layout'");
+    expect(src).toContain("@use 'components'");
+    expect(src).toContain("@use 'preview'");
+    expect(src).toContain("@use 'hero'");
+    expect(src).toContain("@use 'modals'");
+  });
+});
+
+describe('Regresión — ZoomPanManager extraído (v3.5.0)', function () {
+  it('zoom-pan-manager.js expone window.ZoomPanManager con IIFE', async function () {
+    const src = await fetchSource('../js/managers/zoom-pan-manager.js');
+    expect(src).toContain('window.ZoomPanManager');
+    expect(src).toContain('function zoomIn');
+    expect(src).toContain('function zoomOut');
+    expect(src).toContain('function resetZoom');
+    expect(src).toContain('function applyZoom');
+    expect(src).toContain('function initPanNavigation');
+  });
+
+  it('zoom-pan-manager.js usa AppConfig.wheelZoomStep', async function () {
+    const src = await fetchSource('../js/managers/zoom-pan-manager.js');
+    expect(src).toContain('AppConfig.wheelZoomStep');
+    expect(src).not.toContain('wheelStep = 0.05');
+  });
+
+  it('zoom-pan-manager.js usa const/let (no var)', async function () {
+    const src = await fetchSource('../js/managers/zoom-pan-manager.js');
+    expect(src).not.toMatch(/^\s+var\s/m);
+  });
+
+  it('ZoomPanManager está definido como objeto global', function () {
+    expect(typeof ZoomPanManager).toBe('object');
+    expect(typeof ZoomPanManager.zoomIn).toBe('function');
+    expect(typeof ZoomPanManager.zoomOut).toBe('function');
+    expect(typeof ZoomPanManager.resetZoom).toBe('function');
+  });
+});
+
+// ========================================================================
+// v3.5.1 — 4 critical fixes del code audit
+// ========================================================================
+
+describe('Regresión — Code audit crítico (v3.5.1)', function () {
+  it('index.html no tiene onclick inline', async function () {
+    const src = await fetchSource('../index.html');
+    expect(src).not.toMatch(/onclick="/);
+  });
+
+  it('index.html no tiene clases dark: de Tailwind', async function () {
+    const src = await fetchSource('../index.html');
+    expect(src).not.toMatch(/class="[^"]*dark:/);
+  });
+
+  it('main.js usa delegación de eventos con data-action', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain("closest('[data-action]')");
+    expect(src).toContain("getAttribute('data-action')");
+  });
+
+  it('index.html usa atributos data-action en los botones', async function () {
+    const src = await fetchSource('../index.html');
+    expect(src).toContain('data-action="closeBatchModal"');
+    expect(src).toContain('data-action="clearBatchQueue"');
+    expect(src).toContain('data-action="hideMetadataPreview"');
+  });
+});
+
+// ========================================================================
+// v3.5.2 — 14 moderate fixes del code audit
+// ========================================================================
+
+describe('Regresión — Code audit moderado (v3.5.2)', function () {
+  it('MNEMOTAG_DEBUG se define en app-config.js (no en main.js)', async function () {
+    const config = await fetchSource('../js/utils/app-config.js');
+    expect(config).toContain('const MNEMOTAG_DEBUG');
+    const main = await fetchSource('../js/main.js');
+    expect(main).not.toMatch(/^\s*var MNEMOTAG_DEBUG/m);
+  });
+
+  it('console.log/warn están detrás de MNEMOTAG_DEBUG en managers', async function () {
+    const files = [
+      '../js/managers/worker-manager.js',
+      '../js/managers/export-manager.js',
+      '../js/managers/metadata-manager.js',
+      '../js/managers/ui-manager.js',
+    ];
+    for (const file of files) {
+      const src = await fetchSource(file);
+      // No debe haber console.warn/log sin guard
+      const lines = src.split('\n');
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('console.log(') || trimmed.startsWith('console.warn(') || trimmed.startsWith('console.info(')) {
+          throw new Error(file + ' tiene console sin MNEMOTAG_DEBUG guard: ' + trimmed.substring(0, 80));
+        }
+      }
+    }
+  });
+
+  it('main.js no tiene declaraciones var (usa const/let)', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).not.toMatch(/^\s+var\s+\w+\s*=/m);
+  });
+
+  it('main.js usa AppConfig para zoom limits', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('AppConfig.minZoom');
+    expect(src).toContain('AppConfig.maxZoom');
+    expect(src).toContain('AppConfig.zoomStep');
+  });
+});
