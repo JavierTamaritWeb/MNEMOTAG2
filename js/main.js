@@ -1,100 +1,25 @@
- // v3.4.17: DIAGNÓSTICO de reinicios reportados por el usuario.
-    // Cada vez que main.js se ejecuta, incrementamos un contador en
-    // sessionStorage y loggeamos un banner muy visible con:
-    //   - timestamp del arranque actual
-    //   - cuántas veces se ha "reiniciado" la página en esta sesión
-    //   - delta con el arranque anterior (si existe)
-    // Si el usuario ve este banner aparecer repetidamente, sabemos que
-    // la página se está recargando (y no es un reset lógico dentro del
-    // script). Con el delta sabemos exactamente cada cuánto ocurre.
-    try {
-      const now = Date.now();
-      const prevBootRaw = sessionStorage.getItem('mnemotag-boot-info');
-      const prev = prevBootRaw ? JSON.parse(prevBootRaw) : null;
-      const bootCount = prev ? (prev.count + 1) : 1;
-      const deltaMs = prev ? (now - prev.ts) : null;
-      sessionStorage.setItem('mnemotag-boot-info', JSON.stringify({ ts: now, count: bootCount }));
-      const label = '%c[MnemoTag diag] Arranque #' + bootCount + ' @ ' + new Date(now).toLocaleTimeString() +
-                    (deltaMs !== null ? (' (hace ' + Math.round(deltaMs / 1000) + ' s del anterior)') : '');
-      console.warn(label, 'background:#fbbf24;color:#000;font-weight:bold;padding:4px 8px;border-radius:4px;');
-      if (deltaMs !== null && deltaMs < 5 * 60 * 1000) {
-        console.warn('[MnemoTag diag] Reinicio detectado. Si no lo has provocado tú (reload manual, edición de archivo), revisa los listeners de error abajo ↓');
-      }
-    } catch (e) { /* sessionStorage puede fallar en modo privado */ }
+    // Flag de debug: activar con ?debug=1 en la URL o con localStorage.
+    // En producción NO se ejecuta ningún log de diagnóstico.
+    var MNEMOTAG_DEBUG = (typeof location !== 'undefined' && location.search.indexOf('debug=1') !== -1) ||
+                         (typeof localStorage !== 'undefined' && localStorage.getItem('mnemotag-debug') === '1');
 
-    // v3.4.17: Handler global de errores JavaScript no capturados.
-    // Loggea con un banner rojo y retiene la pila completa para facilitar
-    // el diagnóstico del usuario.
-    if (typeof window !== 'undefined' && !window._mnemotagDiagErrorInstalled) {
-      window._mnemotagDiagErrorInstalled = true;
+    if (MNEMOTAG_DEBUG) {
+      try {
+        var now = Date.now();
+        var prevBootRaw = sessionStorage.getItem('mnemotag-boot-info');
+        var prev = prevBootRaw ? JSON.parse(prevBootRaw) : null;
+        var bootCount = prev ? (prev.count + 1) : 1;
+        var deltaMs = prev ? (now - prev.ts) : null;
+        sessionStorage.setItem('mnemotag-boot-info', JSON.stringify({ ts: now, count: bootCount }));
+        console.warn('[MnemoTag debug] Arranque #' + bootCount + (deltaMs !== null ? ' (hace ' + Math.round(deltaMs / 1000) + 's)' : ''));
+      } catch (e) { /* sessionStorage puede fallar */ }
+
       window.addEventListener('error', function (e) {
-        console.error(
-          '%c[MnemoTag diag] ERROR NO CAPTURADO: ' + (e && e.message) + ' en ' + (e && e.filename) + ':' + (e && e.lineno),
-          'background:#dc2626;color:#fff;font-weight:bold;padding:4px 8px;border-radius:4px;',
-          e && e.error
-        );
+        console.error('[MnemoTag debug] ERROR:', (e && e.message), (e && e.filename) + ':' + (e && e.lineno));
       });
       window.addEventListener('unhandledrejection', function (e) {
-        console.error(
-          '%c[MnemoTag diag] PROMISE RECHAZADA SIN HANDLER: ' + (e && e.reason && (e.reason.message || e.reason)),
-          'background:#dc2626;color:#fff;font-weight:bold;padding:4px 8px;border-radius:4px;',
-          e && e.reason
-        );
+        console.error('[MnemoTag debug] PROMISE REJECTED:', (e && e.reason));
       });
-      // Loggear cualquier beforeunload (usuario cerrando, reload, etc.)
-      window.addEventListener('beforeunload', function (e) {
-        console.warn(
-          '%c[MnemoTag diag] beforeunload disparado — la página se va a recargar/cerrar ahora (persistido=' + (e.persisted === true) + ')',
-          'background:#3b82f6;color:#fff;font-weight:bold;padding:4px 8px;border-radius:4px;'
-        );
-        // Dump de la pila si es posible — a veces ayuda a ver quién lo disparó
-        try { console.trace('[MnemoTag diag] Stack trace del beforeunload:'); } catch (_) {}
-      });
-
-      // Loggear visibilitychange y pagehide (complementa beforeunload)
-      document.addEventListener('visibilitychange', function () {
-        console.warn(
-          '%c[MnemoTag diag] visibilitychange → ' + document.visibilityState,
-          'background:#8b5cf6;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;'
-        );
-      });
-      window.addEventListener('pagehide', function (e) {
-        console.warn(
-          '%c[MnemoTag diag] pagehide (persisted=' + e.persisted + ') — bfcache eviction?',
-          'background:#3b82f6;color:#fff;font-weight:bold;padding:2px 6px;border-radius:4px;'
-        );
-      });
-
-      // Monitor de memoria cada 10 s (si la API está disponible — Chrome/Edge).
-      // Si el uso crece indefinidamente sabemos que hay un leak.
-      if (performance && performance.memory) {
-        setInterval(function () {
-          const used = (performance.memory.usedJSHeapSize / 1048576).toFixed(1);
-          const total = (performance.memory.totalJSHeapSize / 1048576).toFixed(1);
-          const limit = (performance.memory.jsHeapSizeLimit / 1048576).toFixed(0);
-          console.info('[MnemoTag diag] memoria JS heap: ' + used + ' / ' + total + ' MB (límite ' + limit + ' MB)');
-        }, 10000);
-      }
-
-      // Detector de "cambios de archivo en caliente" (Live Reload de VS Code
-      // Live Server o similares). Live Server inyecta un <script> en runtime
-      // que abre un WebSocket y llama a location.reload() cuando cambia un
-      // archivo. Detectamos si existe ese WebSocket escaneando el DOM.
-      try {
-        const allScripts = Array.from(document.scripts || []);
-        const liveReload = allScripts.find(function (s) {
-          return (s.src || '').includes('livereload') ||
-                 (s.src || '').includes('browser-sync') ||
-                 (s.textContent || '').includes('WebSocket') && (s.textContent || '').includes('reload');
-        });
-        if (liveReload) {
-          console.warn(
-            '%c[MnemoTag diag] DETECTADO script de Live Reload en la página: ' + (liveReload.src || '(inline)'),
-            'background:#f59e0b;color:#000;font-weight:bold;padding:4px 8px;border-radius:4px;'
-          );
-          console.warn('[MnemoTag diag] Este script puede ser la causa de los reinicios si está recargando ante cambios de archivos del proyecto.');
-        }
-      } catch (_) { /* defensivo */ }
     }
 
     // Variables globales optimizadas
@@ -1253,6 +1178,35 @@
             const modal = document.getElementById(which + '-modal');
             _closeAccessibleModal(modal);
           });
+        });
+
+        // Delegación de eventos: todos los botones con data-action
+        // (reemplaza los 23 onclick= inline que violaban buenas prácticas)
+        document.addEventListener('click', function (e) {
+          var btn = e.target.closest('[data-action]');
+          if (!btn) return;
+          var action = btn.getAttribute('data-action');
+          switch (action) {
+            case 'hideMetadataPreview': hideMetadataPreview(); break;
+            case 'closeBatchModal': closeBatchModal(); break;
+            case 'clearBatchQueue': clearBatchQueue(); break;
+            case 'processBatch': processBatch(); break;
+            case 'downloadBatchZip': downloadBatchZip(); break;
+            case 'closeTextLayersPanel': closeTextLayersPanel(); break;
+            case 'addNewTextLayer': addNewTextLayer(); break;
+            case 'updateActiveTextLayer': updateActiveTextLayer(); break;
+            case 'deleteActiveTextLayer': deleteActiveTextLayer(); break;
+            case 'closeCropPanel': closeCropPanel(); break;
+            case 'applyCrop': applyCrop(); break;
+            case 'cancelCrop': cancelCrop(); break;
+            case 'closeShortcutsModal': closeShortcutsModal(); break;
+            case 'applyTextTemplate':
+              applyTextTemplate(btn.getAttribute('data-template'));
+              break;
+            case 'applyCropSuggestion':
+              applyCropSuggestion(parseInt(btn.getAttribute('data-index')));
+              break;
+          }
         });
 
         // Form submissions with loading states
