@@ -6472,6 +6472,7 @@
       if (textEnabled) {
         const textVal = document.getElementById('watermark-text')?.value;
         if (textVal) {
+          const autoScaleEl = document.getElementById('watermark-auto-scale');
           result.text = {
             enabled: true,
             value: textVal,
@@ -6479,7 +6480,8 @@
             size: Number(document.getElementById('watermark-size')?.value || 30),
             color: document.getElementById('watermark-color')?.value || '#000000',
             opacity: Number(document.getElementById('watermark-opacity')?.value || 50) / 100,
-            position: document.getElementById('watermark-position')?.value || 'center'
+            position: document.getElementById('watermark-position')?.value || 'center',
+            autoScale: autoScaleEl ? autoScaleEl.checked : false
           };
         }
       }
@@ -6488,8 +6490,11 @@
         result.image = {
           enabled: true,
           img: watermarkImagePreview,
-          opacity: Number(document.getElementById('watermark-opacity')?.value || 50) / 100,
-          position: document.getElementById('watermark-position')?.value || 'center'
+          opacity: Number(document.getElementById('watermark-image-opacity')?.value || 50) / 100,
+          sizeOption: document.getElementById('watermark-image-size')?.value || 'medium',
+          position: document.getElementById('watermark-image-position')?.value || 'center',
+          customWidth: parseInt(document.getElementById('watermark-image-width')?.value) || 100,
+          customHeight: parseInt(document.getElementById('watermark-image-height')?.value) || 100
         };
       }
 

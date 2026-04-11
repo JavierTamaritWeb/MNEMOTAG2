@@ -346,26 +346,39 @@ class BatchManager {
   }
 
   /**
-   * Aplicar watermarks a canvas (texto e imagen)
+   * Aplicar watermarks a canvas — replica la logica de applyTextWatermarkOptimized
+   * y drawCachedWatermark de main.js para que el resultado sea identico a la previsualizacion.
    */
   applyWatermarks(ctx, canvas, watermarks) {
     if (watermarks.text && watermarks.text.enabled) {
       const text = watermarks.text.value;
       const font = watermarks.text.font || 'Arial';
-      const size = watermarks.text.size || 30;
+      let size = watermarks.text.size || 30;
       const color = watermarks.text.color || '#000000';
       const opacity = watermarks.text.opacity || 0.5;
       const position = watermarks.text.position || 'center';
+
+      // Auto-escala: misma logica que main.js (referencia 1000px)
+      if (watermarks.text.autoScale && canvas.width > 0) {
+        const factor = canvas.width / 1000;
+        size = Math.max(8, Math.round(size * factor));
+      }
 
       ctx.save();
       ctx.font = size + 'px ' + font;
       ctx.fillStyle = color;
       ctx.globalAlpha = opacity;
 
+      // Sombra — misma que main.js applyTextWatermarkOptimized
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+      ctx.shadowBlur = 2;
+      ctx.shadowOffsetX = 1;
+      ctx.shadowOffsetY = 1;
+
       const metrics = ctx.measureText(text);
       const textWidth = metrics.width;
       const textHeight = size;
-      const pos = this._getWatermarkPosition(position, textWidth, textHeight, canvas.width, canvas.height);
+      const pos = this._getTextPosition(position, textWidth, textHeight, canvas.width, canvas.height);
       ctx.fillText(text, pos.x, pos.y);
       ctx.restore();
     }
@@ -374,46 +387,82 @@ class BatchManager {
       const img = watermarks.image.img;
       const opacity = watermarks.image.opacity || 0.5;
       const position = watermarks.image.position || 'center';
+      const sizeOption = watermarks.image.sizeOption || 'medium';
+
+      // Calcular tamaño — misma logica que calculateWatermarkImageSize de main.js
+      let w, h;
+      switch (sizeOption) {
+        case 'small':
+          w = Math.min(img.width, canvas.width * 0.15);
+          h = (w / img.width) * img.height;
+          break;
+        case 'medium':
+          w = Math.min(img.width, canvas.width * 0.25);
+          h = (w / img.width) * img.height;
+          break;
+        case 'large':
+          w = Math.min(img.width, canvas.width * 0.4);
+          h = (w / img.width) * img.height;
+          break;
+        case 'custom':
+          w = watermarks.image.customWidth || 100;
+          h = watermarks.image.customHeight || 100;
+          break;
+        default:
+          w = img.width;
+          h = img.height;
+      }
+
+      // Posicion — misma logica que getImageWatermarkPosition de main.js
+      const pos = this._getImagePosition(position, w, h, canvas.width, canvas.height);
 
       ctx.save();
       ctx.globalAlpha = opacity;
-      const pos = this._getWatermarkPosition(position, img.width, img.height, canvas.width, canvas.height);
-      ctx.drawImage(img, pos.x, pos.y - img.height);
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetX = 2;
+      ctx.shadowOffsetY = 2;
+      ctx.drawImage(img, pos.x, pos.y, w, h);
       ctx.restore();
     }
   }
 
   /**
-   * Calcular posicion del watermark segun la configuracion
+   * Posicion del watermark de texto (baseline = pos.y)
    */
-  _getWatermarkPosition(position, width, height, canvasWidth, canvasHeight) {
-    const margin = 20;
-    let x, y;
-
+  _getTextPosition(position, width, height, cw, ch) {
+    const m = 20;
     switch (position) {
-      case 'top-left':
-        x = margin; y = margin + height; break;
-      case 'top-center':
-        x = (canvasWidth - width) / 2; y = margin + height; break;
-      case 'top-right':
-        x = canvasWidth - width - margin; y = margin + height; break;
-      case 'center-left':
-        x = margin; y = (canvasHeight + height) / 2; break;
-      case 'center':
-        x = (canvasWidth - width) / 2; y = (canvasHeight + height) / 2; break;
-      case 'center-right':
-        x = canvasWidth - width - margin; y = (canvasHeight + height) / 2; break;
-      case 'bottom-left':
-        x = margin; y = canvasHeight - margin; break;
-      case 'bottom-center':
-        x = (canvasWidth - width) / 2; y = canvasHeight - margin; break;
-      case 'bottom-right':
-        x = canvasWidth - width - margin; y = canvasHeight - margin; break;
-      default:
-        x = (canvasWidth - width) / 2; y = (canvasHeight + height) / 2;
+      case 'top-left':      return { x: m, y: m + height };
+      case 'top-center':    return { x: (cw - width) / 2, y: m + height };
+      case 'top-right':     return { x: cw - width - m, y: m + height };
+      case 'center-left':   return { x: m, y: (ch + height) / 2 };
+      case 'center':        return { x: (cw - width) / 2, y: (ch + height) / 2 };
+      case 'center-right':  return { x: cw - width - m, y: (ch + height) / 2 };
+      case 'bottom-left':   return { x: m, y: ch - m };
+      case 'bottom-center': return { x: (cw - width) / 2, y: ch - m };
+      case 'bottom-right':  return { x: cw - width - m, y: ch - m };
+      default:              return { x: (cw - width) / 2, y: (ch + height) / 2 };
     }
+  }
 
-    return { x, y };
+  /**
+   * Posicion del watermark de imagen (top-left corner = pos.x, pos.y)
+   */
+  _getImagePosition(position, width, height, cw, ch) {
+    const m = 20;
+    switch (position) {
+      case 'top-left':      return { x: m, y: m };
+      case 'top-center':    return { x: (cw - width) / 2, y: m };
+      case 'top-right':     return { x: cw - width - m, y: m };
+      case 'center-left':   return { x: m, y: (ch - height) / 2 };
+      case 'center':        return { x: (cw - width) / 2, y: (ch - height) / 2 };
+      case 'center-right':  return { x: cw - width - m, y: (ch - height) / 2 };
+      case 'bottom-left':   return { x: m, y: ch - height - m };
+      case 'bottom-center': return { x: (cw - width) / 2, y: ch - height - m };
+      case 'bottom-right':  return { x: cw - width - m, y: ch - height - m };
+      default:              return { x: (cw - width) / 2, y: (ch - height) / 2 };
+    }
   }
 
   /**
