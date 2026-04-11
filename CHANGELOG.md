@@ -1,6 +1,59 @@
-# 📝 CHANGELOG - MNEMOTAG v3.4
+# 📝 CHANGELOG - MNEMOTAG
 
 Todos los cambios notables en este proyecto serán documentados en este archivo.
+
+---
+
+## [3.5.2] - 2026-04-11
+
+### Fixed — 14 problemas moderados del code audit
+- **Console pollution**: 83 `console.log/warn/info` envueltos en `MNEMOTAG_DEBUG &&` en 14 archivos JS. Cero logging en producción excepto `console.error` para errores reales.
+- **`MNEMOTAG_DEBUG` centralizado**: movido de `main.js` a `app-config.js` (carga primero) para que todos los managers lo usen. Activable con `?debug=1` en URL o `localStorage`.
+- **`var` eliminados**: 81 declaraciones `var` reemplazadas por `const`/`let` en `main.js` y `zoom-pan-manager.js`.
+- **Magic numbers extraídos**: zoom limits (`minZoom`, `maxZoom`, `zoomStep`, `wheelZoomStep`) movidos a `AppConfig`.
+- **Null guards en DOM queries**: optional chaining `?.` en `getElementById().property` y guards explícitos en asignaciones.
+- **Debug-only code**: `getFilterPerformanceMetrics` envuelto en `if (MNEMOTAG_DEBUG)`.
+- **Catch blocks silenciosos**: añadido logging condicional en bloques vacíos `/* ok */`.
+
+### Verificación
+- `node tests/run-in-node.js` → **186/186 OK**
+- `node tests/binary-validation.js` → **86/86 OK**
+
+---
+
+## [3.5.1] - 2026-04-11
+
+### Fixed — 4 problemas críticos del code audit
+- **23 `onclick` inline** en `index.html` reemplazados por delegación de eventos con atributos `data-action` y un handler centralizado en `main.js`.
+- **42 clases `dark:` de Tailwind** eliminadas (nunca funcionaron — el tema usa `[data-theme="dark"]` en CSS, no `dark:` de Tailwind 2.2.19 CDN).
+- **Artefactos de build** (`app.min.js`, `styles.css`, sourcemaps) añadidos a `.gitignore`.
+- **~98 líneas de logging diagnóstico** consolidadas bajo flag `MNEMOTAG_DEBUG` (activable con `?debug=1`).
+
+### Verificación
+- `node tests/run-in-node.js` → **186/186 OK**
+- `node tests/binary-validation.js` → **86/86 OK**
+
+---
+
+## [3.5.0] - 2026-04-11
+
+### Added — Build system: Gulp 5 + SCSS + minificación
+- **`package.json`** con devDependencies: `gulp@5`, `gulp-concat`, `gulp-terser`, `gulp-sourcemaps`, `sass`, `gulp-sass@6`, `gulp-clean-css`, `gulp-rename`, `browser-sync@3`.
+- **`gulpfile.js`** con tasks: `jsBundle` (concat 24 archivos + terser con `mangle:false`), `scssCompile` (sass + cleanCSS), `watchFiles`, `serve` (browser-sync puerto 5507 sin live reload), `dev` (build + watch + serve).
+- **SCSS partials** en `src/scss/`: `main.scss` + 7 partials (`_variables`, `_base`, `_layout`, `_components`, `_preview`, `_hero`, `_modals`). CSS monolítico de 7,687 líneas dividido temáticamente.
+- **JS bundle**: 24 scripts individuales en `index.html` reemplazados por un solo `<script src="js/app.min.js"></script>`. Workers (`image-processor.js`, `analysis-worker.js`) NO se bundlean.
+- **`zoom-pan-manager.js`** extraído de `main.js` (~210 líneas): zoom con botones/teclado/rueda + pan con mouse/touch.
+- **Service Worker actualizado**: `PRECACHE_URLS` simplificado a `app.min.js` en lugar de 24 scripts individuales.
+
+### Changed
+- `index.html`: de 24 `<script>` tags a 1.
+- `.gitignore`: `js/app.min.js`, `js/app.min.js.map`, `css/styles.css`, `css/styles.css.map` (artefactos generados).
+- `css/styles.css` ahora es generado por Gulp desde SCSS — NO editar a mano.
+
+### Verificación
+- `npm run build` genera `js/app.min.js` (~126 KB min) y `css/styles.css`.
+- `node tests/run-in-node.js` → **186/186 OK**
+- `node tests/binary-validation.js` → **86/86 OK**
 
 ---
 

@@ -1,15 +1,18 @@
 # 🚀 Resumen Ejecutivo de Versiones - MNEMOTAG
 
-**Documento**: Resumen de evolución del proyecto  
-**Última actualización**: 9 de abril de 2026
+**Documento**: Resumen de evolucion del proyecto
+**Ultima actualizacion**: 11 de abril de 2026
 
 ---
 
-## 📊 Vista General de Versiones
+## Vista General de Versiones
 
-| Versión | Fecha | Características Principales | Estado |
+| Version | Fecha | Caracteristicas Principales | Estado |
 |---------|-------|----------------------------|--------|
-| **v3.4.20** | 10 Abr 2026 | Fixes: batch modal + dark mode batch + botones herramientas + reinicios Live Server + SW localhost | 🟢 **Actual** |
+| **v3.5.2** | 11 Abr 2026 | Code audit: 14 problemas moderados (console guards, var->const/let, null guards, magic numbers) | **Actual** |
+| **v3.5.1** | 11 Abr 2026 | Code audit: 4 criticos (onclick->data-action, dark: muertos, .gitignore, debug flag) | Estable |
+| **v3.5.0** | 11 Abr 2026 | Build system: Gulp 5 + SCSS partials + JS bundle + browser-sync + zoom-pan-manager | Estable |
+| **v3.4.20** | 10 Abr 2026 | Fixes: batch modal + dark mode batch + botones herramientas + reinicios Live Server + SW localhost | Estable |
 | **v3.4.15** | 9 Abr 2026 | Phase 14: AVIF EXIF real (inyección ISOBMFF, ~600 líneas + 42 aserciones binarias) | ✅ Estable |
 | **v3.4.14** | 9 Abr 2026 | Fix CSP: `frame-ancestors` + `unsafe-eval` (errores consola reportados) | ✅ Estable |
 | **v3.4.13** | 9 Abr 2026 | Phase 13: Playwright E2E smoke test + workflow CI | ✅ Estable |
@@ -47,7 +50,30 @@
 
 ---
 
-## 🔧 v3.4.20 - PATCH FIXES (Actual)
+## v3.5.x - BUILD SYSTEM + CODE AUDIT (Actual)
+
+### v3.5.0 — Gulp 5 + SCSS + JS bundle
+- `package.json` con Gulp 5, sass, gulp-terser, browser-sync
+- 24 scripts individuales → 1 `app.min.js` bundle
+- CSS monolitico → 7 SCSS partials en `src/scss/`
+- `zoom-pan-manager.js` extraido de main.js
+
+### v3.5.1 — 4 problemas criticos
+- 23 onclick inline → delegacion de eventos con data-action
+- 42 clases dark: de Tailwind muertas eliminadas
+- Artefactos de build en .gitignore
+- Logging diagnostico bajo flag MNEMOTAG_DEBUG
+
+### v3.5.2 — 14 problemas moderados
+- 83 console.log/warn envueltos en MNEMOTAG_DEBUG
+- 81 var → const/let
+- Magic numbers extraidos a AppConfig
+- Null guards en DOM queries
+- Debug code aislado
+
+---
+
+## v3.4.20 - PATCH FIXES
 
 ### 📅 Fecha de lanzamiento: 10 de abril de 2026
 

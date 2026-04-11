@@ -4,57 +4,77 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-MnemoTag is a **client-side, single-page** image editor (vanilla JS, no framework, no build step). It applies filters, adds text/image watermarks, crops, and exports JPEG/PNG/WebP/AVIF — all in the browser. **EXIF metadata writing works for JPEG only** (via piexifjs CDN) — PNG/WebP/AVIF still come out without metadata. See "EXIF/metadata writing — JPEG only" below for details. Documentation is in Spanish; UI strings, comments, and commit messages are in Spanish too.
+MnemoTag is a **client-side, single-page** image editor (vanilla JS, no framework). It applies filters, adds text/image watermarks, crops, and exports JPEG/PNG/WebP/AVIF — all in the browser. **EXIF metadata writing works for JPEG, PNG, WebP and AVIF** (JPEG via piexifjs CDN; PNG/WebP/AVIF via custom binary manipulation). See "EXIF/metadata writing" below for details. Documentation is in Spanish; UI strings, comments, and commit messages are in Spanish too. Since v3.5.0, the project uses **Gulp 5** as build tool (SCSS compilation + JS bundling + minification).
 
 ## Running and developing
 
-There is no `package.json`, no bundler, no test framework. The app is a static site:
+The app is a static site with a Gulp-based build system:
 
-- **Run locally:** open `index.html` directly in a browser, or use the VS Code Live Server extension (configured to port 5505 in `.vscode/settings.json`).
-- **No build, no lint.** Tests live in `tests/` and have **two runners** that share the same specs:
+- **Setup:** `npm install` (one-time, installs Gulp + SCSS compiler + browser-sync).
+- **Build:** `npm run build` compiles SCSS → `css/styles.css` and bundles 24 JS files → `js/app.min.js`.
+- **Dev:** `npm run dev` runs build + watch + browser-sync on port 5507 (no auto-reload).
+- **Run locally:** open `index.html` in a browser, or use `npm run serve` (browser-sync on port 5507).
+- Tests live in `tests/` and have **two runners** that share the same specs:
   - **Browser runner (authoritative).** `tests/index.html` + `tests/test-runner.js` (~250-line custom mini-framework, zero dependencies). Serve the project root with Live Server and open `http://localhost:5505/tests/index.html`. This is the source of truth — it executes against a real DOM, real Canvas, real `fetch()`. Use it before any release.
   - **Node runner (fast / CI / agent-friendly).** `tests/run-in-node.js` runs the same `tests/specs/*.spec.js` files inside a `vm.createContext` with minimal polyfills (`document`, `localStorage`, `performance`, and `fetch` aliased to `fs.readFileSync`). Command: `node tests/run-in-node.js`. Finishes in ~80 ms. No npm, no `package.json`, no `node_modules` — uses only Node's built-in `fs`/`path`/`vm`. Use it as a smoke check before committing, or from any agent that doesn't have a browser. **Caveat:** because the DOM is stubbed, any future test that touches a real `Canvas` 2D context, real layout, or live event dispatch will pass in Node but only the browser runner can truly verify it.
-  - **Binary validation runner (low-level).** `tests/binary-validation.js` (added in v3.3.8) carga `helpers.js` y `metadata-manager.js` en un VM context con polyfills mínimos, sintetiza un PNG mínimo (1×1 rojo) y tres WebP (VP8 lossy, VP8L lossless, VP8X extended) **a mano byte por byte**, y verifica que `_buildPngExifChunk`, `_insertExifChunkInPng`, `_parseWebpDimensions`, `_buildVp8xChunk`, `_buildRiffExifChunk` y `_convertSimpleWebpToVp8xWithExif` producen output con la estructura binaria correcta — incluyendo el CRC32 del chunk eXIf comparado contra una computación independiente. Comando: `node tests/binary-validation.js`. 36 aserciones, ~100 ms. **No sustituye a la validación browser** (no decodifica imágenes reales), pero captura regresiones en bytes calculados, offsets, padding o magic bytes. Importante: el orden de carga importa — `helpers.js` debe ir antes que `metadata-manager.js` porque `_buildPngExifChunk` usa `crc32`, y si el orden se invierte el chunk se construye con CRC=0 (la función tiene un fallback defensivo).
-- **CI/CD con GitHub Actions** (desde v3.3.9): hay dos workflows en `.github/workflows/`:
-  - `test.yml`: corre los dos runners Node en cada `push` y `pull_request` a `main`. Sirve como "test gate" del proyecto. Si alguno de los 136 tests falla, el job queda rojo. Se puede usar como required check en branch protection.
-  - `deploy.yml`: tras cada push a `main`, re-corre los tests como defensa en profundidad y despliega el repo entero a **GitHub Pages** (`https://javiertamaritweb.github.io/MNEMOTAG2/`). Sin build step. La primera ejecución **falla** hasta que se active Pages a mano en `Settings → Pages → Source = GitHub Actions`. Documentado en `.github/workflows/README.md`.
-  - **NO se introdujo npm en el código de la app**. Los workflows usan Node solo para ejecutar los tests existentes, que son JavaScript puro sin dependencias.
-  - Specs cover `AppConfig`, `helpers`, `SecurityManager`, `MetadataManager` (including the JPEG EXIF embedding methods), `historyManager`, plus regression tests for the XSS-in-batch / worker-path / falsy-metadata-toast bugs and for the EXIF integration. Current count: **67 tests**, all green.
-- **External deps are CDN-loaded** in `index.html` (Tailwind 2.2.19, Font Awesome 6.4.0, JSZip 3.10.1, piexifjs 1.0.6, Google Fonts). There is nothing to `npm install`.
-- **Cache busting:** only one `<script>` currently uses a cache-busting query string — `metadata-manager.js?v=1760378841` in `index.html:1488`. Bump it (or add the same trick to other files) when a hard refresh isn't picking up changes during development.
+  - **Binary validation runner (low-level).** `tests/binary-validation.js` carga `helpers.js` y `metadata-manager.js` en un VM context con polyfills mínimos, sintetiza un PNG mínimo (1×1 rojo), tres WebP (VP8 lossy, VP8L lossless, VP8X extended) y un AVIF sintético (164 bytes con meta+mdat) **a mano byte por byte**, y verifica que las funciones de manipulación binaria producen output correcto. Comando: `node tests/binary-validation.js`. **86 aserciones**, ~100 ms. Importante: el orden de carga importa — `helpers.js` debe ir antes que `metadata-manager.js` porque `_buildPngExifChunk` usa `crc32`.
+- **CI/CD con GitHub Actions**: workflows en `.github/workflows/`:
+  - `test.yml`: corre los dos runners Node en cada `push` y `pull_request` a `main`. **186 + 86 = 272 aserciones**.
+  - `deploy.yml`: tras cada push a `main`, re-corre los tests y despliega a **GitHub Pages**.
+  - `lint.yml`: ESLint 9 + Stylelint 16 via `npx --yes`.
+  - `e2e.yml`: Playwright smoke tests con Chromium.
+- **External deps are CDN-loaded** in `index.html` (Tailwind 2.2.19, Font Awesome 6.4.0, JSZip 3.10.1, piexifjs 1.0.6, Google Fonts). `npm install` solo instala devDependencies del build (Gulp, sass, etc.).
 
 ## Architecture
 
-The app is partway through a long-running modularization effort: logic is being extracted from a single monolithic `js/main.js` (~7k lines) into focused manager modules. **`main.js` is still the orchestrator** — it owns the global mutable state (current image, canvas, zoom/pan, rotation, drag state, ruler state, etc.) and wires everything together. New managers are added by sourcing them in `index.html` *before* `main.js`.
+The app is partway through a long-running modularization effort: logic is being extracted from a single monolithic `js/main.js` (~7k lines) into focused manager modules. **`main.js` is still the orchestrator** — it owns the global mutable state (current image, canvas, rotation, drag state, ruler state, etc.) and wires everything together. New managers are added to the `JS_FILES` array in `gulpfile.js` in dependency order.
 
-### Load order matters
+### Build system (v3.5.0+)
 
-Scripts are loaded as plain `<script>` tags (no ES modules, no `import`/`export`). Each file attaches a global object (e.g. `AppConfig`, `SecurityManager`, `WorkerManager`). The order in `index.html` is the dependency order — utils first, then managers, then `main.js` last. When adding a new module, place it after its dependencies and before any consumer.
+- **Gulp 5** compiles SCSS → `css/styles.css` and bundles 24 JS files → `js/app.min.js`.
+- **`src/scss/`** contains 7 partials: `_variables`, `_base`, `_layout`, `_components`, `_preview`, `_hero`, `_modals`. Edit these, NOT `css/styles.css` directly.
+- **`gulpfile.js`** has the exact concatenation order in `JS_FILES`. When adding a new module, add it there after its dependencies and before consumers.
+- **`js/app.min.js`** is generated with `mangle: false` (critical — globals must keep their names).
+- Workers (`image-processor.js`, `analysis-worker.js`) are NOT bundled — they run as separate files.
+
+### Debug flag
+
+`MNEMOTAG_DEBUG` is defined in `app-config.js` (loads first). Activate with `?debug=1` in URL or `localStorage.setItem('mnemotag-debug', '1')`. All `console.log/warn` calls are behind this flag — zero logging in production.
 
 ### Module layout
 
 ```
 js/
+├── app.min.js              # GENERATED: bundle of all files below (do not edit)
 ├── main.js                 # Orchestrator + global state + most event wiring
 ├── image-processor.js      # Web Worker script (OffscreenCanvas-based filters)
 ├── utils/
-│   ├── app-config.js       # AppConfig: file size limits, canvas dims, debounce delays
-│   ├── helpers.js          # debounce/throttle, formatFileSize, canvasToBlob
+│   ├── app-config.js       # AppConfig + MNEMOTAG_DEBUG flag
+│   ├── helpers.js          # debounce/throttle, formatFileSize, canvasToBlob, crc32
+│   ├── app-state.js        # AppState singleton (getters/setters to main.js vars)
 │   ├── smart-debounce.js   # Adaptive debouncing for filter previews
 │   ├── filter-cache.js     # LRU cache for processed filter results
 │   ├── fallback-processor.js  # Main-thread fallback when workers unavailable
 │   └── keyboard-shortcuts.js  # ⌘-key bindings (Mac-optimized)
+├── workers/
+│   └── analysis-worker.js  # Web Worker for histogram/palette/autoBalance
 └── managers/
     ├── security-manager.js     # XSS sanitization, file/dimension validation
-    ├── worker-manager.js       # Web Worker pool (transferable objects, job queue) — script path lives at js/image-processor.js
-    ├── history-manager.js      # Undo/redo stack
-    ├── metadata-manager.js     # Form values + localStorage + JPEG EXIF writing via piexifjs
+    ├── worker-manager.js       # Web Worker pool (transferable objects, job queue)
+    ├── history-manager.js      # Undo/redo stack with ImageBitmap
+    ├── metadata-manager.js     # Form values + localStorage + EXIF writing (JPEG/PNG/WebP/AVIF)
     ├── filter-loading-manager.js  # Lazy filter module loading
     ├── filter-manager.js       # Filter pipeline + presets
     ├── ui-manager.js           # Toasts, modals, collapsible sections, hero
     ├── batch-manager.js        # Multi-image processing → ZIP export (JSZip)
     ├── text-layer-manager.js   # Multi-layer text rendering with Google Fonts
-    └── crop-manager.js         # Aspect-ratio cropping with presets
+    ├── crop-manager.js         # Aspect-ratio cropping with presets
+    ├── preset-manager.js       # Filter presets in localStorage
+    ├── analysis-manager.js     # Histogram, palette, auto-balance (delegates to Worker)
+    ├── curves-manager.js       # Curves/levels editor with live preview
+    ├── bg-removal-manager.js   # AI background removal (lazy model load)
+    ├── export-manager.js       # Download with EXIF embed chain
+    └── zoom-pan-manager.js     # Zoom buttons/keyboard/wheel + pan navigation
 ```
 
 ### Key cross-cutting state (in `main.js`)
@@ -85,7 +105,7 @@ Watermarks (text and image) can be free-positioned by dragging. `main.js` mainta
 
 When `isRulerMode` is true, `main.js` injects DOM-level ruler/guide elements (tracked in `rulerElements`) on top of the canvas. They're plain DOM (not drawn to canvas), so they never end up in exports. Guide-line color is chosen by sampling background brightness via `getImageData()` — keep that in mind if you change canvas pixel formats.
 
-### EXIF/metadata writing — JPEG, PNG and WebP
+### EXIF/metadata writing — JPEG, PNG, WebP and AVIF
 
 EXIF writing is implemented para **JPEG** (via `piexifjs@1.0.6` cargado por CDN), **PNG** (manipulación binaria del chunk `eXIf`) y **WebP** (manipulación RIFF + conversión a VP8X). Sin librerías externas más allá de piexifjs. **AVIF** sigue sin metadatos: necesitaría ISOBMFF boxes, mucho más complejo.
 
@@ -128,20 +148,12 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 
 ## Versioning and commits
 
-**Current version: v3.4.20** (patch release: fixes de batch modal, dark mode del batch, botones de herramientas avanzadas, reinicios por Live Server y SW en localhost). Bloque anterior v3.4.1–v3.4.15 cubrió las 14 fases del plan de mejoras. Contenido acumulado:
-- **Seguridad (v3.4.1, v3.4.14)**: CSP + SRI hashes en los 5 CDNs + fix de watermark-text-enabled default + fix de `frame-ancestors` y `'unsafe-eval'` reportados en consola.
-- **CI (v3.4.2)**: ESLint 9 flat config + Stylelint 16 en workflow `.github/workflows/lint.yml` vía `npx --yes` sin package.json. 0 errors.
-- **Accesibilidad (v3.4.3)**: focus trap + Escape + aria-live en modales. Helpers `_openAccessibleModal(modal, onClose)` / `_closeAccessibleModal(modal)` con `WeakMap` para tracking.
-- **Features nuevas (v3.4.4–v3.4.6)**: live preview en curvas (rAF-throttled), filter presets en localStorage (`preset-manager.js`), undo/redo con `ImageBitmap` (memoria GPU nativa, ~10x menos que dataURL, con `.close()` explícito al descartar).
-- **Modularización (v3.4.7–v3.4.11)**: **~1162 líneas extraídas de `main.js`** a 4 managers nuevos (IIFE con estado privado): `analysis-manager.js`, `curves-manager.js`, `bg-removal-manager.js`, `export-manager.js`. Más `js/utils/app-state.js` con `AppState` singleton no invasivo (getters/setters a las let de main.js).
-- **Performance (v3.4.12)**: `js/workers/analysis-worker.js` con handlers para `autoBalance` (delegado), `buildHistogram` y `extractPalette` (disponibles). Transferable objects + fallback main-thread si el Worker no está disponible.
-- **Testing E2E (v3.4.13)**: Playwright en `tests/e2e/smoke.spec.js` + `.github/workflows/e2e.yml` con webServer python3. 5 smoke tests que validan carga, managers globales, botones, subida de imagen, AppState.snapshot().
-- **AVIF EXIF real (v3.4.15)**: Phase 14 del plan retomada y cerrada. ~600 líneas nuevas en `metadata-manager.js` con parser ISOBMFF recursivo, lectores `_readPitm`/`_readIinf`/`_readIloc`, builders `_buildInfeBoxForExif`/`_buildIinfWithExtra`/`_buildIrefWithCdsc`/`_buildIlocWithExtra`/`_buildNewMetaBox`, y orquestador `_injectExifInAvifBytes`. Estrategia append-only: añade un item `Exif` al iinf, crea un `cdsc` ref en iref, añade entry en iloc con offset al final del mdat, extiende el mdat con `[exif_tiff_header_offset=0][TIFF bytes]`, reconstruye el archivo con los offsets de items existentes desplazados en `metaGrowth`. 42 aserciones binarias nuevas con un AVIF sintético realista de 164 bytes validan end-to-end (primary image data intacto en nuevo offset, payload EXIF correcto, cdsc from/to IDs correctos, re-injection rechazada).
+**Current version: v3.5.2**. Build system migration (v3.5.0) + code audit fixes (v3.5.1–v3.5.2).
+- **v3.5.0**: Gulp 5 build system (SCSS + JS bundle + minification + browser-sync), zoom-pan-manager extracted.
+- **v3.5.1**: 4 critical audit fixes (onclick→data-action, dead dark: classes, .gitignore, MNEMOTAG_DEBUG).
+- **v3.5.2**: 14 moderate audit fixes (console guards, var→const/let, magic numbers→AppConfig, null guards).
+- **v3.4.x** (15 releases): CSP/SRI, ESLint/Stylelint CI, accessibility, curves live preview, filter presets, ImageBitmap undo/redo, 5 managers extracted, Web Worker for autoBalance, Playwright E2E, AVIF EXIF injection.
 
-Sources kept in sync: `index.html` `<title>`, `README.md` badge + NOVEDADES reescrita como resumen v3.4.1→v3.4.15, `CHANGELOG.md` con entradas individuales [3.4.1]–[3.4.15] + footer, `docs/INDICE_DOCUMENTACION.md`, `docs/RESUMEN_VERSIONES.md`, `docs/README.md`. Service Worker `CACHE_VERSION = 'mnemotag-v3.4.15'`.
-
-- **Fixes post-v3.4.15 (v3.4.16–v3.4.20)**: SW deshabilitado en localhost (fix reinicios por Live Server), diagnóstico de reinicios con banners en consola + monitor de memoria, `.vscode/settings.json` con `NoReload: true`, botones herramientas avanzadas con llamada directa (timing fix), batch modal corregido (items al grid correcto + display toggle), dark mode del batch modal con `[data-theme="dark"]`.
-
-**Tests**: 186/186 Node (fetch+grep de regresión) + 86/86 binarios (44 antiguas + 42 AVIF EXIF) + Playwright E2E (5 tests smoke). **`main.js` reducido de ~8000 a ~7080 líneas** (-1162 extraídas a managers + pequeños fixes de dead code). `git log` remains the authoritative source for the actual commit version.
+**Tests**: 186/186 Node + 86/86 binarios + 5 Playwright E2E. `git log` remains the authoritative source for the actual commit version.
 
 Commit messages follow `Versión X.Y.Z - <descripción>` in Spanish — match this style. `CHANGELOG.md` and the docs under `docs/` are kept hand-updated per release.
