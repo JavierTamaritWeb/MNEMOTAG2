@@ -273,4 +273,4 @@ exports.build = series(clean, parallel(jsBundle, scssCompile, images, html, copy
 exports.watch = series(exports.build, watchOnly);
 exports.serve = serve;
 exports.dev = series(exports.build, dev);
-exports.default = exports.build;
+exports.default = exports.dev;
