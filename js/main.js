@@ -6553,17 +6553,52 @@
         const wmImgCustomH = parseInt(document.getElementById('watermark-image-height')?.value) || 100;
         const allLayers = textLayerManager ? textLayerManager.getAllLayers() : [];
 
+        // Calcular posición de watermark relativa a un canvas dado
+        function batchWmPos(position, width, height, cw, ch) {
+          const m = 20;
+          switch (position) {
+            case 'top-left':      return { x: m, y: m + height };
+            case 'top-center':    return { x: (cw - width) / 2, y: m + height };
+            case 'top-right':     return { x: cw - width - m, y: m + height };
+            case 'center-left':   return { x: m, y: (ch + height) / 2 };
+            case 'center':        return { x: (cw - width) / 2, y: (ch + height) / 2 };
+            case 'center-right':  return { x: cw - width - m, y: (ch + height) / 2 };
+            case 'bottom-left':   return { x: m, y: ch - m };
+            case 'bottom-center': return { x: (cw - width) / 2, y: ch - m };
+            case 'bottom-right':  return { x: cw - width - m, y: ch - m };
+            default:              return { x: (cw - width) / 2, y: (ch + height) / 2 };
+          }
+        }
+        function batchImgPos(position, width, height, cw, ch) {
+          const m = 20;
+          switch (position) {
+            case 'top-left':      return { x: m, y: m };
+            case 'top-center':    return { x: (cw - width) / 2, y: m };
+            case 'top-right':     return { x: cw - width - m, y: m };
+            case 'center-left':   return { x: m, y: (ch - height) / 2 };
+            case 'center':        return { x: (cw - width) / 2, y: (ch - height) / 2 };
+            case 'center-right':  return { x: cw - width - m, y: (ch - height) / 2 };
+            case 'bottom-left':   return { x: m, y: ch - height - m };
+            case 'bottom-center': return { x: (cw - width) / 2, y: ch - height - m };
+            case 'bottom-right':  return { x: cw - width - m, y: ch - height - m };
+            default:              return { x: (cw - width) / 2, y: (ch - height) / 2 };
+          }
+        }
+
         function renderImageForBatch(ctx, cvs, img) {
+          const cw = cvs.width;
+          const ch = cvs.height;
+
           // 1. Filtros CSS
           if (filterString) ctx.filter = filterString;
-          ctx.drawImage(img, 0, 0, cvs.width, cvs.height);
+          ctx.drawImage(img, 0, 0, cw, ch);
           ctx.filter = 'none';
 
           // 2. Watermark de texto
           if (wmTextEnabled && wmText) {
             let sz = wmSize;
-            if (wmAutoScale && cvs.width > 0) {
-              sz = Math.max(8, Math.round(sz * (cvs.width / 1000)));
+            if (wmAutoScale && cw > 0) {
+              sz = Math.max(8, Math.round(sz * (cw / 1000)));
             }
             ctx.save();
             ctx.font = sz + 'px ' + wmFont;
@@ -6574,7 +6609,7 @@
             ctx.shadowOffsetX = 1;
             ctx.shadowOffsetY = 1;
             const tw = ctx.measureText(wmText).width;
-            const pos = getTextWatermarkPosition(wmPosition, tw, sz);
+            const pos = batchWmPos(wmPosition, tw, sz, cw, ch);
             ctx.fillText(wmText, pos.x, pos.y);
             ctx.restore();
           }
@@ -6583,13 +6618,13 @@
           if (wmImageEnabled && wmImgRef) {
             let w, h;
             switch (wmImgSizeOpt) {
-              case 'small':  w = Math.min(wmImgRef.width, cvs.width * 0.15); h = (w / wmImgRef.width) * wmImgRef.height; break;
-              case 'medium': w = Math.min(wmImgRef.width, cvs.width * 0.25); h = (w / wmImgRef.width) * wmImgRef.height; break;
-              case 'large':  w = Math.min(wmImgRef.width, cvs.width * 0.4);  h = (w / wmImgRef.width) * wmImgRef.height; break;
+              case 'small':  w = Math.min(wmImgRef.width, cw * 0.15); h = (w / wmImgRef.width) * wmImgRef.height; break;
+              case 'medium': w = Math.min(wmImgRef.width, cw * 0.25); h = (w / wmImgRef.width) * wmImgRef.height; break;
+              case 'large':  w = Math.min(wmImgRef.width, cw * 0.4);  h = (w / wmImgRef.width) * wmImgRef.height; break;
               case 'custom': w = wmImgCustomW; h = wmImgCustomH; break;
               default:       w = wmImgRef.width; h = wmImgRef.height;
             }
-            const ipos = getImageWatermarkPosition(wmImgPosition, w, h);
+            const ipos = batchImgPos(wmImgPosition, w, h, cw, ch);
             ctx.save();
             ctx.globalAlpha = wmImgOpacity;
             ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
