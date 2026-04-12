@@ -1161,3 +1161,103 @@ describe('Regresión — Code audit moderado (v3.5.2)', function () {
     expect(src).toContain('AppConfig.zoomStep');
   });
 });
+
+// ========================================================================
+// v3.5.6+ — Batch processing: watermarks idénticas a previsualización
+// ========================================================================
+
+describe('Regresión — Batch ZIP download (v3.5.6)', function () {
+  it('downloadBatchZip NO usa createObjectURL (exportToZip descarga internamente)', async function () {
+    const src = await fetchSource('../js/main.js');
+    // Extraer solo la función downloadBatchZip
+    const fnStart = src.indexOf('function downloadBatchZip');
+    const fnBlock = src.substring(fnStart, fnStart + 500);
+    expect(fnBlock).not.toContain('createObjectURL');
+    expect(fnBlock).toContain('exportToZip()');
+  });
+});
+
+describe('Regresión — Batch renderFn desde previsualización (v3.5.6)', function () {
+  it('processBatch crea renderImageForBatch y la pasa al batch manager', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('function renderImageForBatch(ctx, cvs, img)');
+    expect(src).toContain('captureCurrentConfig(filterString, null, null, null, renderImageForBatch)');
+  });
+
+  it('renderImageForBatch usa funciones locales batchWmPos/batchImgPos (no globales)', async function () {
+    const src = await fetchSource('../js/main.js');
+    // Debe tener funciones locales que reciben cw, ch
+    expect(src).toContain('function batchWmPos(position, width, height, cw, ch)');
+    expect(src).toContain('function batchImgPos(position, width, height, cw, ch)');
+
+    // Dentro de renderImageForBatch NO debe llamar a las funciones globales
+    const fnStart = src.indexOf('function renderImageForBatch');
+    const fnBlock = src.substring(fnStart, fnStart + 2000);
+    expect(fnBlock).not.toContain('getTextWatermarkPosition(');
+    expect(fnBlock).not.toContain('getImageWatermarkPosition(');
+    // Debe usar las locales con las dimensiones del canvas batch
+    expect(fnBlock).toContain('batchWmPos(wmPosition, tw, sz, cw, ch)');
+    expect(fnBlock).toContain('batchImgPos(wmImgPosition, w, h, cw, ch)');
+  });
+
+  it('renderImageForBatch aplica filtros CSS vía ctx.filter y los resetea', async function () {
+    const src = await fetchSource('../js/main.js');
+    const fnStart = src.indexOf('function renderImageForBatch');
+    const fnBlock = src.substring(fnStart, fnStart + 2000);
+    expect(fnBlock).toContain('ctx.filter = filterString');
+    expect(fnBlock).toContain("ctx.filter = 'none'");
+  });
+
+  it('getCurrentFilters devuelve FilterManager.getFilterString() (no reimplementación)', async function () {
+    const src = await fetchSource('../js/main.js');
+    const fnStart = src.indexOf('function getCurrentFilters');
+    const fnBlock = src.substring(fnStart, fnStart + 300);
+    expect(fnBlock).toContain('FilterManager.getFilterString()');
+    // No debe tener la implementación antigua con Number(b.value) + 100
+    expect(fnBlock).not.toContain('Number(b.value)');
+    expect(fnBlock).not.toContain('+ 100');
+  });
+});
+
+describe('Regresión — Batch IDs de watermark correctos (v3.5.6)', function () {
+  it('processBatch lee watermark-text (no watermarkText)', async function () {
+    const src = await fetchSource('../js/main.js');
+    // Dentro del bloque de processBatch, los IDs deben ser con guión
+    const fnStart = src.indexOf('async function processBatch');
+    const fnBlock = src.substring(fnStart, fnStart + 4000);
+    expect(fnBlock).toContain("getElementById('watermark-text')");
+    expect(fnBlock).toContain("getElementById('watermark-size')");
+    expect(fnBlock).toContain("getElementById('watermark-font')");
+    expect(fnBlock).toContain("getElementById('watermark-color')");
+    expect(fnBlock).toContain("getElementById('watermark-opacity')");
+    // IDs sin guión NO deben existir (eran los bugs)
+    expect(fnBlock).not.toContain("getElementById('watermarkText')");
+    expect(fnBlock).not.toContain("getElementById('watermarkSize')");
+  });
+
+  it('processBatch lee controles separados para watermark de imagen', async function () {
+    const src = await fetchSource('../js/main.js');
+    const fnStart = src.indexOf('async function processBatch');
+    const fnBlock = src.substring(fnStart, fnStart + 4000);
+    expect(fnBlock).toContain("getElementById('watermark-image-opacity')");
+    expect(fnBlock).toContain("getElementById('watermark-image-size')");
+    expect(fnBlock).toContain("getElementById('watermark-image-position')");
+  });
+});
+
+describe('Regresión — batch-manager.js usa renderFn (v3.5.6)', function () {
+  it('processImage delega en renderFn en vez de reimplementar filtros', async function () {
+    const src = await fetchSource('../js/managers/batch-manager.js');
+    // Debe usar renderFn
+    expect(src).toContain('this.currentConfig.renderFn');
+    // NO debe tener implementación propia de filtros por píxeles
+    expect(src).not.toContain('this.applyFilters(');
+    expect(src).not.toContain('getImageData(0, 0');
+    expect(src).not.toContain('(filters.brightness');
+  });
+
+  it('captureCurrentConfig acepta renderFn como parámetro', async function () {
+    const src = await fetchSource('../js/managers/batch-manager.js');
+    expect(src).toContain('renderFn: renderFn || null');
+  });
+});
