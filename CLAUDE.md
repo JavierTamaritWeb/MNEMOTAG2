@@ -18,11 +18,12 @@ The app is a static site with a Gulp-based build system:
   - **Browser runner (authoritative).** `tests/index.html` + `tests/test-runner.js` (~250-line custom mini-framework, zero dependencies). Serve the project root with Live Server and open `http://localhost:5505/tests/index.html`. This is the source of truth — it executes against a real DOM, real Canvas, real `fetch()`. Use it before any release.
   - **Node runner (fast / CI / agent-friendly).** `tests/run-in-node.js` runs the same `tests/specs/*.spec.js` files inside a `vm.createContext` with minimal polyfills (`document`, `localStorage`, `performance`, and `fetch` aliased to `fs.readFileSync`). Command: `node tests/run-in-node.js`. Finishes in ~80 ms. No npm, no `package.json`, no `node_modules` — uses only Node's built-in `fs`/`path`/`vm`. Use it as a smoke check before committing, or from any agent that doesn't have a browser. **Caveat:** because the DOM is stubbed, any future test that touches a real `Canvas` 2D context, real layout, or live event dispatch will pass in Node but only the browser runner can truly verify it.
   - **Binary validation runner (low-level).** `tests/binary-validation.js` carga `helpers.js` y `metadata-manager.js` en un VM context con polyfills mínimos, sintetiza un PNG mínimo (1×1 rojo), tres WebP (VP8 lossy, VP8L lossless, VP8X extended) y un AVIF sintético (164 bytes con meta+mdat) **a mano byte por byte**, y verifica que las funciones de manipulación binaria producen output correcto. Comando: `node tests/binary-validation.js`. **86 aserciones**, ~100 ms. Importante: el orden de carga importa — `helpers.js` debe ir antes que `metadata-manager.js` porque `_buildPngExifChunk` usa `crc32`.
+- **Linting:** `npx --yes eslint@9 --no-config-lookup -c eslint.config.js js/` and `npx --yes stylelint "src/scss/**/*.scss" "css/**/*.css"`. Config files: `eslint.config.js` (ESLint 9 flat config) and `.stylelintrc.json` (Stylelint 16, 18 rules).
 - **CI/CD con GitHub Actions**: workflows en `.github/workflows/`:
-  - `test.yml`: corre los dos runners Node en cada `push` y `pull_request` a `main`. **186 + 86 = 272 aserciones**.
-  - `deploy.yml`: tras cada push a `main`, re-corre los tests y despliega a **GitHub Pages**.
+  - `test.yml`: corre los dos runners Node en cada `push` y `pull_request` a `main`. **218 + 86 = 304 aserciones**.
   - `lint.yml`: ESLint 9 + Stylelint 16 via `npx --yes`.
   - `e2e.yml`: Playwright smoke tests con Chromium.
+- **Docs**: `docs/` contiene guías de funcionalidades (drag-and-drop, reglas métricas, zoom, versiones). Índice en `docs/INDICE_DOCUMENTACION.md`.
 - **External deps are CDN-loaded** in `index.html` (Tailwind 2.2.19, Font Awesome 6.4.0, JSZip 3.10.1, piexifjs 1.0.6, Google Fonts). `npm install` solo instala devDependencies del build (Gulp, sass, etc.).
 
 ## Architecture
@@ -161,6 +162,6 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 - **v3.5.6**: Fixes — SRI roto en dist, heic2any 404, originalWidth no declarado.
 - **v3.4.x** (15 releases): CSP/SRI, ESLint/Stylelint CI, accessibility, curves live preview, filter presets, ImageBitmap undo/redo, 5 managers extracted, Web Worker for autoBalance, Playwright E2E, AVIF EXIF injection.
 
-**Tests**: 186/186 Node + 86/86 binarios + 5 Playwright E2E. `git log` remains the authoritative source for the actual commit version.
+**Tests**: 218/218 Node + 86/86 binarios + 5 Playwright E2E. Quick smoke check: `npm test` (runs both Node runners). `git log` remains the authoritative source for the actual commit version.
 
 Commit messages follow `Versión X.Y.Z - <descripción>` in Spanish — match this style. `CHANGELOG.md` and the docs under `docs/` are kept hand-updated per release.

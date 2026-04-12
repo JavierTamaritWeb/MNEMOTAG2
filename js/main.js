@@ -2994,9 +2994,25 @@
           y: customImagePosition.y - height / 2
         };
       }
-      
-      // Si no, usar la función estándar
-      return getWatermarkPosition(position, width, height);
+
+      // Posicionamiento propio para imágenes (top-left origin, no baseline).
+      // getWatermarkPosition usa fórmulas de baseline de texto (y = margin + height)
+      // que hacen que las imágenes se desborden del canvas en posiciones bottom-*.
+      const cw = canvas.width;
+      const ch = canvas.height;
+      const m = 20;
+      switch (position) {
+        case 'top-left':      return { x: m, y: m };
+        case 'top-center':    return { x: (cw - width) / 2, y: m };
+        case 'top-right':     return { x: cw - width - m, y: m };
+        case 'center-left':   return { x: m, y: (ch - height) / 2 };
+        case 'center':        return { x: (cw - width) / 2, y: (ch - height) / 2 };
+        case 'center-right':  return { x: cw - width - m, y: (ch - height) / 2 };
+        case 'bottom-left':   return { x: m, y: ch - height - m };
+        case 'bottom-center': return { x: (cw - width) / 2, y: ch - height - m };
+        case 'bottom-right':  return { x: cw - width - m, y: ch - height - m };
+        default:              return { x: (cw - width) / 2, y: (ch - height) / 2 };
+      }
     }
 
     function getTextWatermarkPosition(position, width, height) {
@@ -6554,6 +6570,10 @@
         const allLayers = textLayerManager ? textLayerManager.getAllLayers() : [];
 
         // Calcular posición de watermark relativa a un canvas dado
+        // Escala proporcional de preview → batch
+        const previewW = canvas.width;
+        const previewH = canvas.height;
+
         function batchWmPos(position, width, height, cw, ch) {
           const m = 20;
           switch (position) {
@@ -6566,6 +6586,13 @@
             case 'bottom-left':   return { x: m, y: ch - m };
             case 'bottom-center': return { x: (cw - width) / 2, y: ch - m };
             case 'bottom-right':  return { x: cw - width - m, y: ch - m };
+            case 'custom':
+              if (customTextPosition && previewW > 0) {
+                const sx = cw / previewW;
+                const sy = ch / previewH;
+                return { x: customTextPosition.x * sx - width / 2, y: customTextPosition.y * sy };
+              }
+              return { x: (cw - width) / 2, y: (ch + height) / 2 };
             default:              return { x: (cw - width) / 2, y: (ch + height) / 2 };
           }
         }
@@ -6581,6 +6608,13 @@
             case 'bottom-left':   return { x: m, y: ch - height - m };
             case 'bottom-center': return { x: (cw - width) / 2, y: ch - height - m };
             case 'bottom-right':  return { x: cw - width - m, y: ch - height - m };
+            case 'custom':
+              if (customImagePosition && previewW > 0) {
+                const sx = cw / previewW;
+                const sy = ch / previewH;
+                return { x: customImagePosition.x * sx - width / 2, y: customImagePosition.y * sy - height / 2 };
+              }
+              return { x: (cw - width) / 2, y: (ch - height) / 2 };
             default:              return { x: (cw - width) / 2, y: (ch - height) / 2 };
           }
         }
@@ -6635,32 +6669,20 @@
             ctx.restore();
           }
 
-          // 4. Capas de texto
-          for (let i = 0; i < allLayers.length; i++) {
-            const layer = allLayers[i];
-            if (!layer.text || layer.visible === false) continue;
-            const family = (layer.font && layer.font.family) || 'Roboto';
-            const fsize = (layer.font && layer.font.size) || 40;
-            const weight = (layer.font && layer.font.weight) || 'normal';
-            const px = (layer.position && layer.position.x) || 0;
-            const py = (layer.position && layer.position.y) || 0;
-            ctx.save();
-            ctx.font = weight + ' ' + fsize + 'px ' + family;
-            ctx.fillStyle = layer.color || '#ffffff';
-            ctx.globalAlpha = (layer.opacity != null) ? layer.opacity : 1;
-            if (layer.effects && layer.effects.shadow) {
-              ctx.shadowColor = 'rgba(0,0,0,0.5)';
-              ctx.shadowBlur = 4;
-              ctx.shadowOffsetX = 2;
-              ctx.shadowOffsetY = 2;
+          // 4. Capas de texto — delegar a textLayerManager (z-index, baseline,
+          //    sombras reales, stroke, gradientes) con escalado proporcional
+          //    para que las coordenadas del preview se mapeen al tamaño del lote.
+          if (textLayerManager && allLayers.length > 0) {
+            const previewW = canvas.width;
+            const previewH = canvas.height;
+            if (previewW > 0 && previewH > 0) {
+              const sx = cw / previewW;
+              const sy = ch / previewH;
+              ctx.save();
+              ctx.scale(sx, sy);
+              textLayerManager.renderLayers(ctx, canvas);
+              ctx.restore();
             }
-            if (layer.effects && layer.effects.stroke) {
-              ctx.strokeStyle = 'rgba(0,0,0,0.7)';
-              ctx.lineWidth = 2;
-              ctx.strokeText(layer.text, px, py + fsize);
-            }
-            ctx.fillText(layer.text, px, py + fsize);
-            ctx.restore();
           }
         }
 
