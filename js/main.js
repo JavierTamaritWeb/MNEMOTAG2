@@ -6509,14 +6509,6 @@
 
       if (!progressBar || !progressText || !processBtn) return;
 
-      // Obtener configuración (IDs deben coincidir con index.html)
-      const config = {
-        applyFilters: document.getElementById('batch-apply-filters')?.checked ?? false,
-        applyWatermarks: document.getElementById('batch-apply-watermarks')?.checked ?? false,
-        applyTextLayers: document.getElementById('batch-apply-text-layers')?.checked ?? false,
-        applyMetadata: document.getElementById('batch-apply-metadata')?.checked ?? false
-      };
-
       // UI feedback
       processBtn.disabled = true;
       if (progressSection) progressSection.style.display = 'block';
@@ -6540,11 +6532,104 @@
           });
         }
 
-        // Capturar snapshot completo del estado del editor
-        const filterString = config.applyFilters ? getCurrentFilters() : '';
-        const watermarks = config.applyWatermarks ? getCurrentWatermarks() : null;
-        const layers = config.applyTextLayers ? textLayerManager.getAllLayers() : null;
-        batchManager.captureCurrentConfig(filterString, watermarks, layers, null);
+        // La previsualización manda: pasar una función de render que aplica
+        // EXACTAMENTE lo mismo que se ve en la preview a cada imagen del lote.
+        // Capturamos las referencias actuales una sola vez (closure).
+        const filterString = getCurrentFilters();
+        const wmTextEnabled = document.getElementById('watermark-text-enabled')?.checked;
+        const wmImageEnabled = document.getElementById('watermark-image-enabled')?.checked;
+        const wmText = document.getElementById('watermark-text')?.value || '';
+        const wmFont = document.getElementById('watermark-font')?.value || 'Arial';
+        const wmSize = Number(document.getElementById('watermark-size')?.value || 30);
+        const wmColor = document.getElementById('watermark-color')?.value || '#000000';
+        const wmOpacity = Number(document.getElementById('watermark-opacity')?.value || 50) / 100;
+        const wmPosition = document.getElementById('watermark-position')?.value || 'center';
+        const wmAutoScale = document.getElementById('watermark-auto-scale')?.checked || false;
+        const wmImgRef = watermarkImagePreview; // Image element o null
+        const wmImgOpacity = Number(document.getElementById('watermark-image-opacity')?.value || 50) / 100;
+        const wmImgSizeOpt = document.getElementById('watermark-image-size')?.value || 'medium';
+        const wmImgPosition = document.getElementById('watermark-image-position')?.value || 'center';
+        const wmImgCustomW = parseInt(document.getElementById('watermark-image-width')?.value) || 100;
+        const wmImgCustomH = parseInt(document.getElementById('watermark-image-height')?.value) || 100;
+        const allLayers = textLayerManager ? textLayerManager.getAllLayers() : [];
+
+        function renderImageForBatch(ctx, cvs, img) {
+          // 1. Filtros CSS
+          if (filterString) ctx.filter = filterString;
+          ctx.drawImage(img, 0, 0, cvs.width, cvs.height);
+          ctx.filter = 'none';
+
+          // 2. Watermark de texto
+          if (wmTextEnabled && wmText) {
+            let sz = wmSize;
+            if (wmAutoScale && cvs.width > 0) {
+              sz = Math.max(8, Math.round(sz * (cvs.width / 1000)));
+            }
+            ctx.save();
+            ctx.font = sz + 'px ' + wmFont;
+            ctx.fillStyle = wmColor;
+            ctx.globalAlpha = wmOpacity;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+            ctx.shadowBlur = 2;
+            ctx.shadowOffsetX = 1;
+            ctx.shadowOffsetY = 1;
+            const tw = ctx.measureText(wmText).width;
+            const pos = getTextWatermarkPosition(wmPosition, tw, sz);
+            ctx.fillText(wmText, pos.x, pos.y);
+            ctx.restore();
+          }
+
+          // 3. Watermark de imagen
+          if (wmImageEnabled && wmImgRef) {
+            let w, h;
+            switch (wmImgSizeOpt) {
+              case 'small':  w = Math.min(wmImgRef.width, cvs.width * 0.15); h = (w / wmImgRef.width) * wmImgRef.height; break;
+              case 'medium': w = Math.min(wmImgRef.width, cvs.width * 0.25); h = (w / wmImgRef.width) * wmImgRef.height; break;
+              case 'large':  w = Math.min(wmImgRef.width, cvs.width * 0.4);  h = (w / wmImgRef.width) * wmImgRef.height; break;
+              case 'custom': w = wmImgCustomW; h = wmImgCustomH; break;
+              default:       w = wmImgRef.width; h = wmImgRef.height;
+            }
+            const ipos = getImageWatermarkPosition(wmImgPosition, w, h);
+            ctx.save();
+            ctx.globalAlpha = wmImgOpacity;
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            ctx.shadowBlur = 4;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+            ctx.drawImage(wmImgRef, ipos.x, ipos.y, w, h);
+            ctx.restore();
+          }
+
+          // 4. Capas de texto
+          for (let i = 0; i < allLayers.length; i++) {
+            const layer = allLayers[i];
+            if (!layer.text || layer.visible === false) continue;
+            const family = (layer.font && layer.font.family) || 'Roboto';
+            const fsize = (layer.font && layer.font.size) || 40;
+            const weight = (layer.font && layer.font.weight) || 'normal';
+            const px = (layer.position && layer.position.x) || 0;
+            const py = (layer.position && layer.position.y) || 0;
+            ctx.save();
+            ctx.font = weight + ' ' + fsize + 'px ' + family;
+            ctx.fillStyle = layer.color || '#ffffff';
+            ctx.globalAlpha = (layer.opacity != null) ? layer.opacity : 1;
+            if (layer.effects && layer.effects.shadow) {
+              ctx.shadowColor = 'rgba(0,0,0,0.5)';
+              ctx.shadowBlur = 4;
+              ctx.shadowOffsetX = 2;
+              ctx.shadowOffsetY = 2;
+            }
+            if (layer.effects && layer.effects.stroke) {
+              ctx.strokeStyle = 'rgba(0,0,0,0.7)';
+              ctx.lineWidth = 2;
+              ctx.strokeText(layer.text, px, py + fsize);
+            }
+            ctx.fillText(layer.text, px, py + fsize);
+            ctx.restore();
+          }
+        }
+
+        batchManager.captureCurrentConfig(filterString, null, null, null, renderImageForBatch);
 
         // Procesar — processQueue recibe un callback con objeto {current, total, percentage}
         await batchManager.processQueue((progress) => {

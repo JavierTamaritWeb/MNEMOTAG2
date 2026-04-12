@@ -190,12 +190,22 @@ class BatchManager {
   /**
    * Capturar configuración actual de la aplicación
    */
-  captureCurrentConfig(filterString, watermarks, textLayers, metadata) {
+  /**
+   * Capturar el estado completo del editor para aplicar al lote.
+   * @param {string} filterString - CSS filter string del FilterManager
+   * @param {Object} watermarks - Config de watermarks (text + image)
+   * @param {Array} textLayers - Capas de texto
+   * @param {Object} metadata - Metadatos
+   * @param {Function} renderFn - Función que renderiza una imagen en un canvas
+   *   con todas las capas (watermarks, filtros, text layers). Recibe (ctx, canvas, img).
+   */
+  captureCurrentConfig(filterString, watermarks, textLayers, metadata, renderFn) {
     this.currentConfig = {
       filterString: filterString || '',
       watermarks: watermarks || null,
       textLayers: textLayers || null,
       metadata: metadata ? { ...metadata } : null,
+      renderFn: renderFn || null,
       outputFormat: 'jpeg',
       outputQuality: 0.9,
       timestamp: Date.now()
@@ -281,28 +291,15 @@ class BatchManager {
         canvas.width = imageItem.imageData.width;
         canvas.height = imageItem.imageData.height;
 
-        // 1. Aplicar filtros CSS via ctx.filter (idéntico a canvas.style.filter de la preview)
-        if (this.currentConfig.filterString) {
-          ctx.filter = this.currentConfig.filterString;
+        // Usar la función de render de main.js que aplica EXACTAMENTE
+        // lo mismo que la previsualización: filtros, watermarks, text layers.
+        if (this.currentConfig.renderFn) {
+          this.currentConfig.renderFn(ctx, canvas, imageItem.imageData.img);
+        } else {
+          // Fallback: render básico sin efectos
+          ctx.drawImage(imageItem.imageData.img, 0, 0);
         }
 
-        // 2. Dibujar imagen (los filtros CSS se aplican al drawImage)
-        ctx.drawImage(imageItem.imageData.img, 0, 0);
-
-        // Resetear filtro para que watermarks y text layers NO se filtren
-        ctx.filter = 'none';
-
-        // 3. Aplicar watermarks
-        if (this.currentConfig.watermarks) {
-          this.applyWatermarks(ctx, canvas, this.currentConfig.watermarks);
-        }
-
-        // 4. Aplicar capas de texto
-        if (this.currentConfig.textLayers) {
-          this._renderTextLayers(ctx, canvas, this.currentConfig.textLayers);
-        }
-
-        // 5. Exportar a blob
         canvas.toBlob((blob) => {
           if (!blob) {
             reject(new Error('Error al generar blob'));
