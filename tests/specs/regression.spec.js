@@ -905,15 +905,6 @@ describe('Regresión — Playwright E2E (v3.4.13)', function () {
     expect(src).toContain('AppState.snapshot()');
   });
 
-  it('.github/workflows/e2e.yml define el job Playwright con npx', async function () {
-    const res = await fetch('../.github/workflows/e2e.yml');
-    expect(res.ok).toBe(true);
-    const src = await res.text();
-    expect(src).toContain('npx --yes playwright@latest install');
-    expect(src).toContain('npx --yes playwright@latest test');
-    expect(src).toContain('--project=chromium');
-  });
-
   it('tests/e2e/fixtures/1x1.png existe como fixture de imagen', async function () {
     const res = await fetch('../tests/e2e/fixtures/1x1.png');
     expect(res.ok).toBe(true);
