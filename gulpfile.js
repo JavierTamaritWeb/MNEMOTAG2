@@ -184,22 +184,52 @@ async function copyAssets() {
 }
 
 // ============================================================
-// Watch
-// ============================================================
-
-function watchFiles() {
-  watch(['js/**/*.js', '!' + DIST_JS + '/**'], jsBundle);
-  watch('src/scss/**/*.scss', scssCompile);
-  watch(SRC_IMAGES + '/**/*', images);
-  watch('index.html', html);
-}
-
-// ============================================================
-// Browser-Sync
+// Watch — espera cambios y recompila automáticamente
 // ============================================================
 
 const browserSync = require('browser-sync').create();
 
+function setupWatchers() {
+  // JS: cualquier .js en js/ (excepto dist/) → rebundle
+  watch(
+    ['js/**/*.js', '!' + DIST + '/**'],
+    series(jsBundle, copyAssets)
+  ).on('change', (file) => console.log('  JS changed: ' + file));
+
+  // SCSS: cualquier .scss en src/scss/ → recompilar CSS
+  watch(
+    'src/scss/**/*.scss',
+    scssCompile
+  ).on('change', (file) => console.log('  SCSS changed: ' + file));
+
+  // Imágenes: cualquier archivo en images/ → copiar + convertir
+  watch(
+    SRC_IMAGES + '/**/*',
+    images
+  ).on('change', (file) => console.log('  Image changed: ' + file));
+
+  // HTML: index.html → regenerar dist/index.html minificado
+  watch(
+    'index.html',
+    html
+  ).on('change', () => console.log('  index.html changed'));
+
+  // Service Worker: regenerar copia en dist/
+  watch(
+    'service-worker.js',
+    copyAssets
+  ).on('change', () => console.log('  service-worker.js changed'));
+
+  console.log('\n  Watching for changes...\n');
+}
+
+// Solo watch (sin servidor)
+function watchOnly(cb) {
+  setupWatchers();
+  cb();
+}
+
+// Servidor estático (sin watch)
 function serve(cb) {
   browserSync.init({
     server: { baseDir: './' },
@@ -214,6 +244,7 @@ function serve(cb) {
   cb();
 }
 
+// Dev: build + watch + servidor
 function dev(cb) {
   browserSync.init({
     server: { baseDir: './' },
@@ -225,9 +256,7 @@ function dev(cb) {
     reloadOnRestart: false,
     watchEvents: []
   });
-  watch(['js/**/*.js', '!' + DIST_JS + '/**'], jsBundle);
-  watch('src/scss/**/*.scss', scssCompile);
-  watch('index.html', html);
+  setupWatchers();
   cb();
 }
 
@@ -241,7 +270,7 @@ exports.scss = scssCompile;
 exports.images = images;
 exports.html = html;
 exports.build = series(clean, parallel(jsBundle, scssCompile, images, html, copyAssets));
-exports.watch = series(exports.build, watchFiles);
+exports.watch = series(exports.build, watchOnly);
 exports.serve = serve;
 exports.dev = series(exports.build, dev);
 exports.default = exports.build;
