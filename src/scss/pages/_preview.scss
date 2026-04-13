@@ -1087,25 +1087,20 @@
       .grid--large > section {
         display: flex;
         flex-direction: column;
-        height: 100%;
       }
       .grid--large > section > div {
-        min-height: 650px;
         display: flex;
         flex-direction: column;
         flex: 1;
-        height: 100%;
       }
       .grid--large .section__content {
         flex: 1;
         display: flex;
         flex-direction: column;
-        justify-content: space-between;
       }
       .grid--large .section__content form {
         display: flex;
         flex-direction: column;
-        height: 100%;
         flex: 1;
       }
       .grid--large .section__content form > div:last-child {

@@ -23,6 +23,7 @@ const historyManager = {
   states: [],
   currentIndex: -1,
   maxStates: 20,
+  isRestoring: false,
 
   /**
    * Guardar el estado actual del canvas y configuración.
@@ -39,7 +40,14 @@ const historyManager = {
    * (navegadores muy viejos) o si falla por canvas tainted.
    */
   saveState: async function() {
-    if (!canvas || !currentImage) return;
+    if (this.isRestoring) {
+      if (MNEMOTAG_DEBUG) console.warn('historyManager: saveState bloqueado por isRestoring (evitando bucles)');
+      return;
+    }
+    if (!canvas || !currentImage) {
+      if (MNEMOTAG_DEBUG) console.warn('historyManager: No se guarda estado (canvas o imagen no cargada)');
+      return;
+    }
 
     // Remover estados futuros si estamos en medio del historial.
     // Liberar ImageBitmaps descartados para no fugar memoria GPU.
@@ -54,6 +62,9 @@ const historyManager = {
       filterState: this.getCurrentFilterState(),
       canvasFilter: canvas.style.filter || '',
       fileBaseName: fileBaseName || 'imagen',
+      rotation: typeof currentRotation !== 'undefined' ? currentRotation : 0,
+      isFlippedHorizontally: typeof isFlippedHorizontally !== 'undefined' ? isFlippedHorizontally : false,
+      isFlippedVertically: typeof isFlippedVertically !== 'undefined' ? isFlippedVertically : false,
       timestamp: Date.now()
     };
 
@@ -67,6 +78,7 @@ const historyManager = {
         self.currentIndex--;
       }
       self.updateUndoRedoButtons();
+      if (MNEMOTAG_DEBUG) console.log(`historyManager: Estado guardado. Historial: ${self.currentIndex + 1}/${self.states.length}`);
     };
 
     // Estrategia 1: ImageBitmap (preferida). Ahora con await.
@@ -104,11 +116,14 @@ const historyManager = {
   undo: function() {
     if (this.currentIndex > 0) {
       this.currentIndex--;
-      this.restoreState(this.states[this.currentIndex]);
+      historyManager.restoreState(this.states[this.currentIndex]);
       this.updateUndoRedoButtons();
       if (typeof UIManager !== 'undefined') {
         UIManager.showSuccess('Acción deshecha');
       }
+      if (MNEMOTAG_DEBUG) console.log('historyManager: Undo ejecutado. Índice:', this.currentIndex);
+    } else {
+      if (MNEMOTAG_DEBUG) console.warn('historyManager: No hay más estados para deshacer');
     }
   },
   
@@ -118,11 +133,14 @@ const historyManager = {
   redo: function() {
     if (this.currentIndex < this.states.length - 1) {
       this.currentIndex++;
-      this.restoreState(this.states[this.currentIndex]);
+      historyManager.restoreState(this.states[this.currentIndex]);
       this.updateUndoRedoButtons();
       if (typeof UIManager !== 'undefined') {
         UIManager.showSuccess('Acción rehecha');
       }
+      if (MNEMOTAG_DEBUG) console.log('historyManager: Redo ejecutado. Índice:', this.currentIndex);
+    } else {
+      if (MNEMOTAG_DEBUG) console.warn('historyManager: No hay más estados para rehacer');
     }
   },
   
@@ -214,109 +232,135 @@ const historyManager = {
   restoreState: function(state) {
     if (!state || !canvas) return;
 
-    // v3.4.6: función auxiliar que restaura los campos del formulario
-    // después de que el canvas ya ha sido repintado.
-    const applyFormState = function () {
-      // Restaurar metadatos
-      if (state.metadata) {
-        const form = document.getElementById('metadata-form');
-        if (form) {
-          Object.entries(state.metadata).forEach(([key, value]) => {
-            const field = form.querySelector(`[name="${key}"]`);
-            if (field) field.value = value;
-          });
-        }
-      }
+    this.isRestoring = true;
+    if (MNEMOTAG_DEBUG) console.log('historyManager: Iniciando restauración del estado...');
 
-      // Restaurar configuración de marca de agua
-      if (state.watermarkConfig) {
-        const config = state.watermarkConfig;
-        Object.entries(config).forEach(([key, value]) => {
-          const element = document.getElementById(`watermark-${key.replace(/([A-Z])/g, '-$1').toLowerCase()}`);
-          if (element) {
-            if (element.type === 'checkbox') {
-              element.checked = value;
-            } else {
-              element.value = value;
+    try {
+      // v3.4.6: función auxiliar que restaura los campos del formulario
+      const applyFormState = () => {
+        // 1. Restaurar metadatos
+        if (state.metadata) {
+          const form = document.getElementById('metadata-form');
+          if (form) {
+            Object.entries(state.metadata).forEach(([key, value]) => {
+              const field = form.querySelector(`[name="${key}"]`);
+              if (field) field.value = value;
+            });
+          }
+        }
+
+        // 2. Restaurar configuración de marca de agua
+        if (state.watermarkConfig) {
+          const config = state.watermarkConfig;
+          Object.entries(config).forEach(([key, value]) => {
+            const element = document.getElementById(`watermark-${key.replace(/([A-Z])/g, '-$1').toLowerCase()}`);
+            if (element) {
+              if (element.type === 'checkbox') {
+                element.checked = value;
+              } else {
+                element.value = value;
+              }
             }
+          });
+
+          const sliderConfigs = [
+            { sliderId: 'watermark-size', numberId: 'watermark-size-num' },
+            { sliderId: 'watermark-opacity', numberId: 'watermark-opacity-num' },
+            { sliderId: 'watermark-image-opacity', numberId: 'watermark-image-opacity-num' }
+          ];
+          sliderConfigs.forEach(({ sliderId, numberId }) => {
+            const slider = document.getElementById(sliderId);
+            const numberInput = document.getElementById(numberId);
+            if (slider && numberInput) {
+              numberInput.value = slider.value;
+            }
+          });
+
+          if (config.customPosition && typeof customImagePosition !== 'undefined') {
+            customImagePosition = config.customPosition;
           }
-        });
+        }
 
-        const sliderConfigs = [
-          { sliderId: 'watermark-size', numberId: 'watermark-size-num' },
-          { sliderId: 'watermark-opacity', numberId: 'watermark-opacity-num' },
-          { sliderId: 'watermark-image-opacity', numberId: 'watermark-image-opacity-num' }
-        ];
-        sliderConfigs.forEach(({ sliderId, numberId }) => {
-          const slider = document.getElementById(sliderId);
-          const numberInput = document.getElementById(numberId);
-          if (slider && numberInput) {
-            numberInput.value = slider.value;
+        // 3. Restaurar nombre de archivo
+        if (state.fileBaseName) {
+          if (typeof fileBaseName !== 'undefined') {
+            fileBaseName = state.fileBaseName;
           }
-        });
-
-        if (config.customPosition && typeof customImagePosition !== 'undefined') {
-          customImagePosition = config.customPosition;
+          const basenameInput = document.getElementById('file-basename');
+          if (basenameInput) {
+            basenameInput.value = state.fileBaseName;
+          }
+          if (typeof updateFilenamePreview === 'function') {
+            updateFilenamePreview();
+          }
         }
-      }
 
-      if (state.fileBaseName) {
-        if (typeof fileBaseName !== 'undefined') {
-          fileBaseName = state.fileBaseName;
+        // 4. Restaurar filtros (v3.5.9)
+        if (state.filterState && typeof FilterManager !== 'undefined') {
+          Object.entries(state.filterState).forEach(([key, value]) => {
+            FilterManager.filters[key] = value;
+            FilterManager.updateFilterDisplay(key, value);
+            const slider = document.getElementById(key);
+            if (slider) slider.value = value;
+          });
+          
+          if (typeof FilterManager.highlightActivePreset === 'function') {
+            FilterManager.highlightActivePreset('none');
+          }
+          
+          if (typeof FilterCache !== 'undefined') {
+            FilterCache.markDirty();
+          }
         }
-        const basenameInput = document.getElementById('file-basename');
-        if (basenameInput) {
-          basenameInput.value = state.fileBaseName;
+
+        // 5. Restaurar rotación (v3.5.9)
+        if (typeof state.rotation !== 'undefined') {
+          if (typeof currentRotation !== 'undefined') currentRotation = state.rotation;
+          if (typeof isFlippedHorizontally !== 'undefined') isFlippedHorizontally = state.isFlippedHorizontally || false;
+          if (typeof isFlippedVertically !== 'undefined') isFlippedVertically = state.isFlippedVertically || false;
+          
+          if (typeof updateRotationDisplay === 'function') {
+            updateRotationDisplay();
+          }
         }
-        if (typeof updateFilenamePreview === 'function') {
-          updateFilenamePreview();
+
+        // 6. Restaurar el CSS filter del canvas
+        if (state.canvasFilter !== undefined && canvas) {
+          canvas.style.filter = state.canvasFilter;
         }
-      }
 
-      // Restaurar filtros CSS (brillo, contraste, etc.)
-      if (state.filterState && typeof FilterManager !== 'undefined') {
-        Object.entries(state.filterState).forEach(([key, value]) => {
-          FilterManager.filters[key] = value;
-          FilterManager.updateFilterDisplay(key, value);
-          const slider = document.getElementById(key);
-          if (slider) slider.value = value;
-        });
-        if (typeof FilterCache !== 'undefined') {
-          FilterCache.markDirty();
+        if (typeof toggleWatermarkType === 'function') {
+          toggleWatermarkType();
         }
-      }
-      // Restaurar el CSS filter del canvas
-      if (state.canvasFilter !== undefined && canvas) {
-        canvas.style.filter = state.canvasFilter;
-      }
-
-      if (typeof toggleWatermarkType === 'function') {
-        toggleWatermarkType();
-      }
-    };
-
-    // v3.4.6: dos estrategias — ImageBitmap (sync, rápido) o dataURL
-    // (async, legacy fallback). Detectamos por la presencia del campo.
-    if (state.bitmap) {
-      try {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(state.bitmap, 0, 0);
-        applyFormState();
-        return;
-      } catch (err) {
-        MNEMOTAG_DEBUG && console.warn('historyManager.restoreState: error dibujando bitmap, intentando dataURL:', err);
-        // Cae al fallback de dataURL si existe.
-      }
-    }
-
-    if (state.imageData) {
-      const img = new Image();
-      img.onload = function() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0);
-        applyFormState();
+        
+        if (MNEMOTAG_DEBUG) console.log('historyManager: UI Restaurada.');
       };
-      img.src = state.imageData;
+
+      // Restaurar canvas (ImageBitmap preferido, dataURL fallback)
+      if (state.bitmap) {
+        try {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(state.bitmap, 0, 0);
+          applyFormState();
+        } catch (err) {
+          MNEMOTAG_DEBUG && console.warn('historyManager.restoreState: error dibujando bitmap, intentando dataURL:', err);
+        }
+      } else if (state.imageData) {
+        const img = new Image();
+        img.onload = function() {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0);
+          applyFormState();
+        };
+        img.src = state.imageData;
+      }
+    } finally {
+      // v3.5.9: Desbloquear saveState tras breve delay para asegurar que 
+      // todos los eventos disparados por la restauración hayan terminado.
+      setTimeout(() => {
+        historyManager.isRestoring = false;
+        if (MNEMOTAG_DEBUG) console.log('historyManager: isRestoring desactivado (restauración finalizada).');
+      }, 150);
     }
   },
   
@@ -424,7 +468,7 @@ const historyManager = {
   jumpToState: function(index) {
     if (index < 0 || index >= this.states.length) return;
     this.currentIndex = index;
-    this.restoreState(this.states[index]);
+    historyManager.restoreState(this.states[index]);
     this.updateUndoRedoButtons();
     if (typeof UIManager !== 'undefined') {
       UIManager.showSuccess('Saltado al estado ' + (index + 1));

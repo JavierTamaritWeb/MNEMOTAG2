@@ -1,7 +1,7 @@
 # 🚀 Resumen Ejecutivo de Versiones - MNEMOTAG
 
 **Documento**: Resumen de evolucion del proyecto
-**Ultima actualizacion**: 13 de abril de 2026
+**Ultima actualizacion**: 13 de abril de 2026 (v3.5.9)
 
 ---
 
@@ -9,7 +9,8 @@
 
 | Version | Fecha | Caracteristicas Principales | Estado |
 |---------|-------|----------------------------|--------|
-| **v3.5.8** | 13 Abr 2026 | Custom Position / Favicon visibility fix | **Actual** |
+| **v3.5.9** | 13 Abr 2026 | Undo/Redo Restoration + UI Spacing Fix | **Actual** |
+| **v3.5.8** | 13 Abr 2026 | Custom Position / Favicon visibility fix | Estable |
 | **v3.5.7** | 13 Abr 2026 | Batch processing arreglado (5 bugs), 9 tests regresion, gulp watch, defaults watermark | Estable |
 | **v3.5.6** | 11 Abr 2026 | Fixes: SRI roto en dist, heic2any 404, originalWidth no declarado | Estable |
 | **v3.5.5** | 11 Abr 2026 | dist/index.html produccion autocontenido (minificado -36%, workers copiados) | Estable |
@@ -91,6 +92,12 @@
 ### v3.5.6 — Fixes
 - SRI roto en dist (replace demasiado agresivo en URLs CDN)
 - originalWidth/originalHeight no declarados tras var→const/let
+
+### v3.5.9 — Restauración de historial y consistencia UI
+- **Deshacer/Rehacer funcional**: arreglado el bucle infinito que impedía a "Deshacer" funcionar por más de un paso.
+- **Sincronización de UI**: restaurar un estado ahora actualiza sliders de brillo/contraste, etiquetas de rotación y formularios.
+- **UI Spacing**: eliminación del hueco de ~300px bajo el botón de marca de agua agrupando las secciones correctamente.
+- **Filtro Cálido**: optimización de valores para mayor impacto visual.
 
 ### v3.5.8 — Fixes de UI y Cache
 - **Marcador de posición personalizada invisible** arreglado con auto-scroll y cálculo inmediato de coordenadas al activarse.

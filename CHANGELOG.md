@@ -4,6 +4,13 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.5.9] - 2026-04-13
+
+### Fixed
+- **Deshacer/Rehacer (Undo/Redo)**: Restaurada la funcionalidad completa del sistema tras arreglar un bucle de guardado infinito. Ahora la restauración de estados sincroniza correctamente todos los elementos de la interfaz (sliders de filtros, etiquetas de rotación, formas de metadatos).
+- **Consistencia de UI**: Eliminado el espacio excesivo debajo del botón "Aplicar marca de agua", estandarizando los márgenes de todas las secciones para un diseño más compacto y profesional.
+- **Filtro Cálido**: Ajustados los valores del preset para una previsualización más distintiva y asegurada su persistencia en el historial.
+
 ## [3.5.8] - 2026-04-13
 
 ### Fixed

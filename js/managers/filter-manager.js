@@ -31,7 +31,7 @@ const FilterManager = {
     grayscale: { brightness: 0, contrast: 0, saturation: -100, blur: 0, sepia: 0, hueRotate: 0 },
     vintage: { brightness: -10, contrast: 25, saturation: -30, blur: 0.5, sepia: 30, hueRotate: 0 },
     cold: { brightness: -15, contrast: 30, saturation: -25, blur: 0, sepia: 0, hueRotate: 200 },
-    warm: { brightness: 15, contrast: 10, saturation: 20, blur: 0, sepia: 10, hueRotate: -10 }
+    warm: { brightness: 10, contrast: 5, saturation: 30, blur: 0, sepia: 25, hueRotate: -15 }
   },
   
   // Configuración para workers

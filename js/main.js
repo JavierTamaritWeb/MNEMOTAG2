@@ -944,6 +944,12 @@
             slider.addEventListener('input', (e) => {
               FilterManager.applyFilter(filter, parseInt(e.target.value));
             });
+            // v3.5.9: Guardar estado al soltar el slider para el historial
+            slider.addEventListener('change', () => {
+              if (typeof historyManager !== 'undefined') {
+                historyManager.saveState();
+              }
+            });
           }
         });
         
@@ -952,13 +958,23 @@
         presetButtons.forEach(btn => {
           btn.addEventListener('click', () => {
             FilterManager.applyPreset(btn.dataset.filter);
+            // v3.5.9: Guardar estado tras aplicar preset
+            if (typeof historyManager !== 'undefined') {
+              historyManager.saveState();
+            }
           });
         });
         
         // Listener para reset de filtros
         const resetFiltersBtn = document.getElementById('resetFilters');
         if (resetFiltersBtn) {
-          resetFiltersBtn.addEventListener('click', resetFilters);
+          resetFiltersBtn.addEventListener('click', () => {
+            resetFilters();
+            // v3.5.9: Guardar estado tras reset
+            if (typeof historyManager !== 'undefined') {
+              historyManager.saveState();
+            }
+          });
         }
         
         // Listeners para metadatos y geolocalización
@@ -4284,6 +4300,11 @@
         setTimeout(() => {
           form.classList.remove('form-loading');
           UIManager.showSuccess('Metadatos guardados correctamente.');
+          
+          // v3.5.9: Guardar estado en el historial tras actualizar metadatos
+          if (typeof historyManager !== 'undefined') {
+            historyManager.saveState();
+          }
         }, 500);
         
       } catch (error) {
@@ -4403,8 +4424,12 @@
         setTimeout(() => {
           form.classList.remove('form-loading');
           UIManager.showSuccess('Marca de agua aplicada correctamente.');
+          
+          // v3.5.9: Guardar estado en el historial tras aplicar marca de agua
+          if (typeof historyManager !== 'undefined') {
+            historyManager.saveState();
+          }
         }, 300);
-        
       } catch (error) {
         form.classList.remove('form-loading');
         console.error('Error al aplicar marca de agua:', error);
@@ -5071,6 +5096,10 @@
         // Show success message
         showSuccessMessage(`Imagen rotada ${degrees}° (Total: ${currentRotation}°)`);
         
+        // v3.5.9: Guardar estado en el historial tras rotar
+        if (typeof historyManager !== 'undefined') {
+          historyManager.saveState();
+        }
         
       } catch (error) {
         console.error('Error rotating image:', error);
@@ -5101,6 +5130,10 @@
         const flipText = direction === 'horizontal' ? 'horizontalmente' : 'verticalmente';
         showSuccessMessage(`Imagen volteada ${flipText}`);
         
+        // v3.5.9: Guardar estado en el historial tras voltear
+        if (typeof historyManager !== 'undefined') {
+          historyManager.saveState();
+        }
         
       } catch (error) {
         console.error('Error flipping image:', error);
@@ -5232,6 +5265,10 @@
         
         showSuccessMessage('Rotación restablecida al original');
         
+        // v3.5.9: Guardar estado en el historial tras resetear rotación
+        if (typeof historyManager !== 'undefined') {
+          historyManager.saveState();
+        }
       } catch (error) {
         console.error('Error resetting rotation:', error);
         showSuccessMessage('Error al restablecer la rotación');
@@ -7234,6 +7271,11 @@
             currentImage = croppedImage;
             closeCropPanel();
             UIManager.showSuccess('✅ Imagen recortada correctamente');
+            
+            // v3.5.9: Guardar estado tras recorte
+            if (typeof historyManager !== 'undefined') {
+              historyManager.saveState();
+            }
           };
           croppedImage.src = croppedCanvas.toDataURL();
         }

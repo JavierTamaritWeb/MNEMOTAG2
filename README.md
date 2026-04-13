@@ -4,7 +4,7 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos. 100% cliente, sin backend.
 
-![Version](https://img.shields.io/badge/version-3.5.8-blue.svg)
+![Version](https://img.shields.io/badge/version-3.5.9-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 [![Tests](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml)
@@ -15,6 +15,11 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 ---
 
 ## NOVEDADES v3.5
+
+### Estabilidad y Deshacer/Rehacer (v3.5.9)
+- **Restauración de Undo/Redo**: Corrección de bucles infinitos y sincronización total de UI (filtros, rotación, metadatos) tras restaurar estados.
+- **UI Spacing Fix**: Eliminación de huecos excesivos entre secciones para una interfaz más compacta.
+- **Filtro Cálido mejorado**: Boost en previsualización y persistencia en historial.
 
 ### Build system (v3.5.0)
 - **Gulp 5** con JS bundle (concat + terser), SCSS (sass + cleanCSS), imagenes (sharp → WebP + AVIF), HTML minificado.
