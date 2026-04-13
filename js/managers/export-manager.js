@@ -273,16 +273,16 @@ window.ExportManager = (function () {
       showProgressBar('Iniciando descarga...');
 
       const downloadSteps = [
-        { message: 'Obteniendo metadatos...', duration: 300 },
-        { message: 'Aplicando metadatos...', duration: 400 },
-        { message: 'Generando nombre de archivo...', duration: 200 },
-        { message: 'Configurando formato de salida...', duration: 300 },
-        { message: 'Procesando imagen...', duration: 600 },
-        { message: 'Generando archivo...', duration: 500 },
-        { message: 'Iniciando descarga...', duration: 400 }
+        { message: 'Obteniendo metadatos...', duration: 400 },
+        { message: 'Aplicando metadatos...', duration: 500 },
+        { message: 'Generando nombre de archivo...', duration: 300 },
+        { message: 'Configurando formato de salida...', duration: 400 },
+        { message: 'Procesando imagen...', duration: 700 },
+        { message: 'Generando archivo...', duration: 600 },
+        { message: 'Iniciando descarga...', duration: 600 }
       ];
 
-      const progressPromise = simulateProgressSteps(downloadSteps, 2800);
+      const progressPromise = simulateProgressSteps(downloadSteps, 3500);
 
       const hasAlpha = hasImageAlphaChannel(canvas);
       const requestedMimeType = getMimeType(outputFormat);

@@ -6721,13 +6721,16 @@
 
         batchManager.captureCurrentConfig(filterString, null, null, null, renderImageForBatch);
 
-        // Procesar — el callback actualiza el progress overlay global
-        await batchManager.processQueue((progress) => {
+        // Procesar — el callback actualiza el progress overlay global.
+        // minDelay garantiza al menos 3s de barra visible para buena UX.
+        const minDelay = new Promise(resolve => setTimeout(resolve, 3000));
+        const processPromise = batchManager.processQueue((progress) => {
           updateProgress(
             progress.percentage,
             'Procesando imagen ' + progress.current + ' de ' + progress.total + '...'
           );
         });
+        await Promise.all([processPromise, minDelay]);
 
         hideProgressBar();
 
@@ -6748,12 +6751,13 @@
       try {
         showProgressBar('Generando ZIP...');
         const steps = [
-          { message: 'Comprimiendo imágenes...', duration: 400 },
-          { message: 'Generando archivo ZIP...', duration: 600 },
-          { message: 'Preparando descarga...', duration: 300 }
+          { message: 'Recopilando imágenes procesadas...', duration: 500 },
+          { message: 'Comprimiendo imágenes...', duration: 800 },
+          { message: 'Generando archivo ZIP...', duration: 900 },
+          { message: 'Preparando descarga...', duration: 800 }
         ];
         const zipPromise = batchManager.exportToZip();
-        await Promise.all([simulateProgressSteps(steps, 1300), zipPromise]);
+        await Promise.all([simulateProgressSteps(steps, 3000), zipPromise]);
         hideProgressBar();
       } catch (error) {
         console.error('Error descargando ZIP:', error);
