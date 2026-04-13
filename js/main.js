@@ -2690,6 +2690,7 @@
           }
 
           currentImage = img;
+          comparisonNeedsUpdate = true;
           
           // Store original dimensions for resize functionality
           originalWidth = img.width;
@@ -4931,6 +4932,7 @@
         newImage.onload = function() {
           // Update current image
           currentImage = newImage;
+          comparisonNeedsUpdate = true;
           
           // Update preview canvas
           const canvas = document.getElementById('preview-canvas');
@@ -5216,6 +5218,7 @@
       const newImage = new Image();
       newImage.onload = function() {
         currentImage = newImage;
+        comparisonNeedsUpdate = true;
         currentImage.width = newWidth;
         currentImage.height = newHeight;
         
@@ -5381,6 +5384,7 @@
 
     function removeSelectedFile() {
       currentImage = null;
+      comparisonNeedsUpdate = true;
       currentFile = null;
       originalExtension = 'jpg';
       watermarkImagePreview = null;
@@ -7269,6 +7273,7 @@
           const croppedImage = new Image();
           croppedImage.onload = () => {
             currentImage = croppedImage;
+            comparisonNeedsUpdate = true;
             closeCropPanel();
             UIManager.showSuccess('✅ Imagen recortada correctamente');
             
@@ -7378,6 +7383,7 @@
     let comparisonMode = false;
     let comparisonSliderPosition = 50; // Porcentaje (0-100)
     let comparisonOriginalCanvas = null; // Canvas de imagen original
+    let comparisonNeedsUpdate = true; // Control de caché para comparación
     let isDraggingSlider = false;
 
     /**
@@ -7454,11 +7460,13 @@
       const overlay = document.getElementById('comparison-overlay');
       const toggleBtn = document.getElementById('compare-toggle-btn');
       const mainCanvas = document.getElementById('preview-canvas');
+      const originalCanvas = document.getElementById('comparison-canvas-original');
+      const editedCanvas = document.getElementById('comparison-canvas-edited');
       
       if (comparisonMode) {
         // Activar modo comparación
         
-        // 1. Guardar copia de imagen original
+        // 1. Guardar copia de imagen original (solo si es necesario)
         saveOriginalImageForComparison();
         
         // 2. Renderizar ambos canvas
@@ -7489,10 +7497,26 @@
           COMPARAR
         `;
         
+        // Limpieza de memoria: Reducir dimensiones de canvases de comparación
+        if (originalCanvas) { originalCanvas.width = 0; originalCanvas.height = 0; }
+        if (editedCanvas) { editedCanvas.width = 0; editedCanvas.height = 0; }
+
+        // Liberar canvas original cacheado si la imagen es grande (>4 MP)
+        if (comparisonOriginalCanvas) {
+          const pixels = comparisonOriginalCanvas.width * comparisonOriginalCanvas.height;
+          if (pixels > 4000000) {
+            comparisonOriginalCanvas.width = 0;
+            comparisonOriginalCanvas.height = 0;
+            comparisonOriginalCanvas = null;
+            comparisonNeedsUpdate = true;
+          }
+        }
+
+        // Resetear slider al centro para la próxima apertura
+        comparisonSliderPosition = 50;
+
         // Mostrar canvas principal
         if (mainCanvas) mainCanvas.style.opacity = '1';
-        
-        UIManager.showSuccess('MODO COMPARACIÓN DESACTIVADO');
       }
     }
 
@@ -7500,14 +7524,22 @@
      * Guarda copia de la imagen original sin ediciones
      */
     function saveOriginalImageForComparison() {
+      // Si ya tenemos el canvas y no necesita actualización, usar el caché
+      if (comparisonOriginalCanvas && !comparisonNeedsUpdate) return;
       if (!currentImage) return;
       
-      // Crear canvas temporal con imagen original
-      comparisonOriginalCanvas = document.createElement('canvas');
+      // Crear o dimensionar canvas temporal con imagen original
+      if (!comparisonOriginalCanvas) {
+        comparisonOriginalCanvas = document.createElement('canvas');
+      }
+      
       comparisonOriginalCanvas.width = currentImage.width;
       comparisonOriginalCanvas.height = currentImage.height;
       const ctx = comparisonOriginalCanvas.getContext('2d');
       ctx.drawImage(currentImage, 0, 0);
+      
+      // Resetear bandera de actualización
+      comparisonNeedsUpdate = false;
     }
 
     /**
