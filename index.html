@@ -1780,6 +1780,18 @@
        Generado con: npm run build (o npx gulp js).
        Los archivos fuente individuales en js/ se mantienen para
        tests y debugging — no borrarlos. -->
+  <!-- Progress overlay para descarga -->
+  <div id="progress-overlay" class="progress-overlay">
+    <div class="progress-card">
+      <p id="progress-title" class="progress-card__title">Procesando...</p>
+      <div class="progress-card__track">
+        <div id="progress-bar" class="progress-card__bar"></div>
+      </div>
+      <p id="progress-text" class="progress-card__text">0%</p>
+      <p id="progress-eta" class="progress-card__eta"></p>
+    </div>
+  </div>
+
   <script src="dist/js/app.min.js"></script>
 </body>
 </html>
