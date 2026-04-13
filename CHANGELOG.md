@@ -4,6 +4,14 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.5.8] - 2026-04-13
+
+### Fixed
+- **Marcador de posición personalizada invisible**: al activar el modo "Posición personalizada" (tanto en texto como en imagen), la cruz de posicionamiento no se renderizaba de forma proactiva (esperaba a un trigger de arrastre) y a veces quedaba fuera del viewport. **Fix**: inicializar las coordenadas exactas en el centro del preview canvas al instante tras la activación del modal, llamar al renderizado de la cruz (`showPositionMarker/showTextPositionMarker`), y ejecutar un `scrollIntoView({ behavior: 'smooth', block: 'center' })` suave para que la zona de trabajo se enfoque en pantalla.
+- **Favicon atascado en caché (Globo gris)**: solucionar problema nativo de navegadores estrictos (Chrome/Safari) donde un error inicial "404 Favicon no encontrado" quedaba bloqueado en su caché profunda forzando a ver un icono vacío. **Fix**: añadir parámetro de *Cache Busting* (`?v=3.5.8`) a las rutas HTML en los meta tags `<link rel="icon">` en `index.html` para el `.png` y `.ico`, rompiendo la caché rebelde, validando el parámetro estricto `sizes="any"`, conservando la limpieza de proyecto alojando los archivos ordenados en `/images/favicon_io/`.
+
+---
+
 ## [3.5.7] - 2026-04-13
 
 ### Added

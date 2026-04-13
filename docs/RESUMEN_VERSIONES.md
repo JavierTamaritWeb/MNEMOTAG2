@@ -9,7 +9,8 @@
 
 | Version | Fecha | Caracteristicas Principales | Estado |
 |---------|-------|----------------------------|--------|
-| **v3.5.7** | 13 Abr 2026 | Batch processing arreglado (5 bugs), 9 tests regresion, gulp watch, defaults watermark | **Actual** |
+| **v3.5.8** | 13 Abr 2026 | Custom Position / Favicon visibility fix | **Actual** |
+| **v3.5.7** | 13 Abr 2026 | Batch processing arreglado (5 bugs), 9 tests regresion, gulp watch, defaults watermark | Estable |
 | **v3.5.6** | 11 Abr 2026 | Fixes: SRI roto en dist, heic2any 404, originalWidth no declarado | Estable |
 | **v3.5.5** | 11 Abr 2026 | dist/index.html produccion autocontenido (minificado -36%, workers copiados) | Estable |
 | **v3.5.4** | 11 Abr 2026 | dist/images con conversion WebP + AVIF via sharp (PNG -98%) | Estable |
@@ -90,6 +91,10 @@
 ### v3.5.6 — Fixes
 - SRI roto en dist (replace demasiado agresivo en URLs CDN)
 - originalWidth/originalHeight no declarados tras var→const/let
+
+### v3.5.8 — Fixes de UI y Cache
+- **Marcador de posición personalizada invisible** arreglado con auto-scroll y cálculo inmediato de coordenadas al activarse.
+- **Favicon atascado en caché** arreglado rompiendo la caché estricta (`?v=3.5.8`) en el HTML manteniendo el asset en su lugar correcto.
 
 ### v3.5.7 — Batch processing + watermark defaults
 - 5 bugs del batch arreglados: ZIP download, IDs watermark, posiciones, filtros CSS, renderFn

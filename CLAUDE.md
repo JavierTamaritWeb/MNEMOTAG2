@@ -190,7 +190,7 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 
 ## Versioning and commits
 
-**Current version: v3.5.7**.
+**Current version: v3.5.8**.
 - **v3.5.0**: Gulp 5 build system (SCSS + JS bundle + minification + browser-sync), zoom-pan-manager extracted.
 - **v3.5.1–v3.5.2**: Code audit — 4 critical + 14 moderate fixes (onclick→data-action, console guards, var→const/let, null guards).
 - **v3.5.3**: Output movido a `dist/`, SCSS reorganizado en subcarpetas (`abstracts/`, `base/`, `layout/`, `components/`, `pages/`, `modules/`).
@@ -198,6 +198,7 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 - **v3.5.5**: `dist/index.html` de produccion (minificado -36%, workers + SW copiados).
 - **v3.5.6**: Fixes — SRI roto en dist, heic2any 404, originalWidth no declarado.
 - **v3.5.7**: Batch processing arreglado (5 bugs: ZIP download, IDs watermark, posiciones con canvas global, filtros CSS, renderFn). 9 tests de regresion. Gulp watch mejorado. Defaults de watermark personalizados. CI workflows eliminados.
+- **v3.5.8**: Fix UI marcador invisible en posición personalizada y cache-busting persistente de favicon.
 - **v3.4.x** (15 releases): CSP/SRI, ESLint/Stylelint CI, accessibility, curves live preview, filter presets, ImageBitmap undo/redo, 5 managers extracted, Web Worker for autoBalance, Playwright E2E, AVIF EXIF injection.
 
 **Tests**: 217/217 Node + 86/86 binarios. Quick smoke check: `npm test` (runs both Node runners). `git log` remains the authoritative source for the actual commit version.
