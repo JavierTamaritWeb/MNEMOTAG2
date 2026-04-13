@@ -7558,11 +7558,16 @@
       const ctxOriginal = originalCanvas.getContext('2d');
       ctxOriginal.drawImage(comparisonOriginalCanvas, 0, 0);
       
-      // Canvas editado (con todos los filtros y ediciones)
+      // Canvas editado (con filtros CSS renderizados en los píxeles)
       editedCanvas.width = mainCanvas.width;
       editedCanvas.height = mainCanvas.height;
       const ctxEdited = editedCanvas.getContext('2d');
+      const filterString = mainCanvas.style.filter || '';
+      if (filterString) {
+        ctxEdited.filter = filterString;
+      }
       ctxEdited.drawImage(mainCanvas, 0, 0);
+      ctxEdited.filter = 'none';
       
       // Aplicar clipping según posición del slider
       updateSliderPosition();
