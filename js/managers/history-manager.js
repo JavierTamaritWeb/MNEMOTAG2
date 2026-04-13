@@ -38,7 +38,7 @@ const historyManager = {
    * Fallback a canvas.toDataURL() si createImageBitmap no está disponible
    * (navegadores muy viejos) o si falla por canvas tainted.
    */
-  saveState: function() {
+  saveState: async function() {
     if (!canvas || !currentImage) return;
 
     // Remover estados futuros si estamos en medio del historial.
@@ -51,6 +51,8 @@ const historyManager = {
     const baseState = {
       metadata: this.getCurrentMetadata(),
       watermarkConfig: this.getCurrentWatermarkConfig(),
+      filterState: this.getCurrentFilterState(),
+      canvasFilter: canvas.style.filter || '',
       fileBaseName: fileBaseName || 'imagen',
       timestamp: Date.now()
     };
@@ -59,7 +61,6 @@ const historyManager = {
     const commitState = function (state) {
       self.states.push(state);
       self.currentIndex++;
-      // Limitar número de estados (techo absoluto).
       while (self.states.length > self.maxStates) {
         const removed = self.states.shift();
         if (removed && removed.bitmap && removed.bitmap.close) removed.bitmap.close();
@@ -68,28 +69,23 @@ const historyManager = {
       self.updateUndoRedoButtons();
     };
 
-    // Estrategia 1: ImageBitmap (preferida).
+    // Estrategia 1: ImageBitmap (preferida). Ahora con await.
     if (typeof createImageBitmap === 'function') {
       try {
-        createImageBitmap(canvas).then(function (bitmap) {
-          commitState(Object.assign({}, baseState, { bitmap: bitmap }));
-        }).catch(function (err) {
-          MNEMOTAG_DEBUG && console.warn('historyManager: createImageBitmap falló, fallback a dataURL:', err);
-          commitState(Object.assign({}, baseState, { imageData: canvas.toDataURL() }));
-        });
+        const bitmap = await createImageBitmap(canvas);
+        commitState(Object.assign({}, baseState, { bitmap: bitmap }));
         return;
       } catch (err) {
-        MNEMOTAG_DEBUG && console.warn('historyManager: createImageBitmap lanzó, fallback a dataURL:', err);
+        MNEMOTAG_DEBUG && console.warn('historyManager: createImageBitmap falló, fallback a dataURL:', err);
       }
     }
 
-    // Estrategia 2 (fallback legacy): dataURL con el cap de memoria clásico.
+    // Estrategia 2 (fallback legacy): dataURL.
     const dataURL = canvas.toDataURL();
     const newSize = dataURL.length;
     if (newSize > HISTORY_MAX_TOTAL_SIZE) {
       MNEMOTAG_DEBUG && console.warn(
-        `historyManager: snapshot demasiado grande (${(newSize / 1024 / 1024).toFixed(1)} MB), ` +
-        `excede el tope de ${(HISTORY_MAX_TOTAL_SIZE / 1024 / 1024)} MB. No se guarda al historial.`
+        `historyManager: snapshot demasiado grande (${(newSize / 1024 / 1024).toFixed(1)} MB). No se guarda.`
       );
       return;
     }
@@ -183,6 +179,14 @@ const historyManager = {
   },
   
   /**
+   * Obtener estado actual de los filtros (brillo, contraste, etc.)
+   */
+  getCurrentFilterState: function() {
+    if (typeof FilterManager === 'undefined') return null;
+    return Object.assign({}, FilterManager.filters);
+  },
+
+  /**
    * Obtener configuración actual de marcas de agua
    * @returns {Object} Configuración de marcas de agua
    */
@@ -267,6 +271,23 @@ const historyManager = {
         if (typeof updateFilenamePreview === 'function') {
           updateFilenamePreview();
         }
+      }
+
+      // Restaurar filtros CSS (brillo, contraste, etc.)
+      if (state.filterState && typeof FilterManager !== 'undefined') {
+        Object.entries(state.filterState).forEach(([key, value]) => {
+          FilterManager.filters[key] = value;
+          FilterManager.updateFilterDisplay(key, value);
+          const slider = document.getElementById(key);
+          if (slider) slider.value = value;
+        });
+        if (typeof FilterCache !== 'undefined') {
+          FilterCache.markDirty();
+        }
+      }
+      // Restaurar el CSS filter del canvas
+      if (state.canvasFilter !== undefined && canvas) {
+        canvas.style.filter = state.canvasFilter;
       }
 
       if (typeof toggleWatermarkType === 'function') {
