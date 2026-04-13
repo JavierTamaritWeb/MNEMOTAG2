@@ -6118,10 +6118,10 @@
           }
         }, { description: 'Rehacer acción' });
         
-        // Ctrl/Cmd + S: Guardar/Exportar (solo cuando NO estés en un input)
+        // Ctrl/Cmd + S: Guardar/Exportar con barra de progreso
         keyboardShortcuts.register('s', ['ctrl'], async () => {
           if (currentImage) {
-            await ExportManager.downloadImage(); // v3.4.10
+            await ExportManager.downloadImageWithProgress();
           }
         }, { description: 'Guardar imagen' });
         
@@ -6163,25 +6163,27 @@
         // Ctrl/Cmd + Shift + X: Exportar con ajustes actuales
         keyboardShortcuts.register('x', ['ctrl', 'shift'], async () => {
           if (currentImage) {
-            await ExportManager.downloadImageWithProgress(); // v3.4.10
-            UIManager.showSuccess('✅ Imagen exportada');
+            await ExportManager.downloadImageWithProgress();
           } else {
-            UIManager.showInfo('ℹ️ Carga una imagen primero');
+            UIManager.showInfo('Carga una imagen primero');
           }
         }, { description: 'Exportar imagen con ajustes' });
         
         // Espacio: Vista antes/después (mantener presionado)
-        let originalCanvas = null;
-        keyboardShortcuts.register(' ', [], (e) => {
-          if (!currentImage || !canvas) return;
-          
-          if (e.type === 'keydown' && !originalCanvas) {
-            // Guardar estado actual y mostrar original
-            originalCanvas = canvas.toDataURL();
-            showOriginalImage();
-            UIManager.showInfo('👁️ Mostrando imagen original');
-          }
+        let spaceHeld = false;
+        keyboardShortcuts.register(' ', [], () => {
+          if (!currentImage || !canvas || spaceHeld) return;
+          spaceHeld = true;
+          showOriginalImage();
+          UIManager.showInfo('Mostrando imagen original');
         }, { description: 'Ver imagen original (mantener presionado)', preventDefault: false });
+
+        document.addEventListener('keyup', (e) => {
+          if (e.key === ' ' && spaceHeld) {
+            spaceHeld = false;
+            updatePreview();
+          }
+        });
         
         // Esc: Cancelar operación actual
         keyboardShortcuts.register('escape', [], () => {
@@ -6230,19 +6232,18 @@
           }
         }, { description: 'Abrir procesamiento por lotes' });
         
-        // Ctrl/Cmd + T: Abrir panel de capas de texto
-        keyboardShortcuts.register('t', ['ctrl'], () => {
+        // Ctrl/Cmd + Shift + T: Abrir panel de capas de texto
+        // (Ctrl+T abre pestaña nueva en Chrome — usar Shift)
+        keyboardShortcuts.register('t', ['ctrl', 'shift'], () => {
           if (typeof window.openTextLayersPanel === 'function') {
             window.openTextLayersPanel();
-            UIManager.showInfo('📝 Panel de texto activado');
           }
         }, { description: 'Abrir panel de capas de texto' });
-        
-        // Ctrl/Cmd + R: Abrir modo recorte
-        keyboardShortcuts.register('r', ['ctrl'], () => {
+
+        // Ctrl/Cmd + Shift + C ya usado para copiar. Usar Alt+C para recorte.
+        keyboardShortcuts.register('c', ['alt'], () => {
           if (typeof window.openCropPanel === 'function') {
             window.openCropPanel();
-            UIManager.showInfo('✂️ Modo recorte activado');
           }
         }, { description: 'Abrir modo recorte' });
         
