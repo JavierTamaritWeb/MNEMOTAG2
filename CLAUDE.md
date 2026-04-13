@@ -96,7 +96,48 @@ These globals are referenced throughout `main.js` and read by some managers — 
 3. Heavy filters go through `WorkerManager` (`js/managers/worker-manager.js`), which spins up a pool of `Worker` instances pointing at `js/image-processor.js`. If workers or `OffscreenCanvas` aren't supported, or initialization fails, the code falls back to `js/utils/fallback-processor.js` on the main thread. Note: the worker path was historically wrong (`'workers/image-processor.js'` — file was never there); it was corrected to `'js/image-processor.js'`. This means the worker pool was effectively dead until that fix, so any "worker performance" baseline before that change is meaningless.
 4. Watermarks (text and/or image), text layers, crop, and rotation are composited in `main.js`. The export itself uses the native canvas (no workers) regardless of the above.
 5. Export goes through `helpers.canvasToBlob` (`js/utils/helpers.js:170`), which probes WebP/AVIF support; if `canvas.toBlob` with the requested type fails, it emits a `console.warn` and falls back via `canvasToBlob_fallback`. **The fallback only produces PNG/JPEG** — WebP/AVIF only work via the native `canvas.toBlob` path. Don't assume a `.webp` request will yield WebP on every browser. **JPEG export with alpha**: when the user picks JPEG and the source canvas has transparency, `main.js` first calls `flattenCanvasForJpeg(canvas)` (in `helpers.js`) which returns a new canvas with a white background and the original drawn on top. This avoids the JPEG codec rendering transparent areas as black (its default). PNG/WebP/AVIF do **not** flatten — they preserve alpha. Before v3.3.2, `determineFallbackFormat` silently substituted PNG for JPEG when alpha was present; that bug was fixed.
-6. Saving uses the **File System Access API** (`showSaveFilePicker`, gated by `if ('showSaveFilePicker' in window)` at `main.js:3981`) when available, otherwise an `<a download>` link. **Do not** pass the result of `queryPermission()` as `startIn` — that bug (caught in 3.1.4) caused silent download failures.
+6. Saving uses the **File System Access API** (`showSaveFilePicker`, gated by `if ('showSaveFilePicker' in window)`) when available, otherwise an `<a download>` link. **Do not** pass the result of `queryPermission()` as `startIn` — that bug (caught in 3.1.4) caused silent download failures.
+
+### Progress overlay system
+
+Reusable progress bar for long operations. To add a new progress bar to any feature, follow this pattern:
+
+**HTML** (already in `index.html`):
+```html
+<div id="progress-overlay" class="progress-overlay">
+  <div class="progress-card">
+    <p id="progress-title" class="progress-card__title">Procesando...</p>
+    <div class="progress-card__track">
+      <div id="progress-bar" class="progress-card__bar"></div>
+    </div>
+    <p id="progress-text" class="progress-card__text">0%</p>
+    <p id="progress-eta" class="progress-card__eta"></p>
+  </div>
+</div>
+```
+
+**JS API** (defined in `main.js`, available to all managers via closure):
+- `showProgressBar(title)` — shows the overlay with the given title, resets bar to 0%.
+- `updateProgress(percentage, message, eta)` — sets bar width, text, and optionally updates title and ETA.
+- `hideProgressBar()` — hides the overlay.
+- `simulateProgressSteps(steps, totalDuration)` — animates through an array of `{message, duration}` steps. Returns a Promise that resolves when all steps complete.
+
+**Usage example** (from `export-manager.js` `downloadImageWithProgress`):
+```js
+showProgressBar('Iniciando descarga...');
+const steps = [
+  { message: 'Obteniendo metadatos...', duration: 300 },
+  { message: 'Procesando imagen...', duration: 600 },
+  { message: 'Generando archivo...', duration: 500 }
+];
+await simulateProgressSteps(steps, 2000);
+hideProgressBar();  // BEFORE opening save dialog
+const handle = await window.showSaveFilePicker(options);
+```
+
+**Critical rule**: always call `hideProgressBar()` BEFORE any blocking browser dialog (`showSaveFilePicker`, `confirm`, etc.), not after. The dialog blocks JS execution, so the bar would stay visible behind it.
+
+**CSS** (in `src/scss/modules/_modals.scss`): `.progress-overlay`, `.progress-card`, `.progress-card__track`, `.progress-card__bar`, `.progress-card__title`, `.progress-card__text`, `.progress-card__eta`. Supports dark mode via `[data-theme="dark"]`.
 
 ### Watermark drag-and-drop system
 

@@ -6,6 +6,10 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ## [3.5.7] - 2026-04-13
 
+### Added
+- **Progress overlay** para descarga: barra de progreso animada (gradiente azul→verde) con pasos, porcentaje y ETA. HTML en `index.html`, CSS en `_modals.scss`, JS API reutilizable (`showProgressBar`, `updateProgress`, `hideProgressBar`, `simulateProgressSteps`).
+- **Hover verde** en boton Descargar: transicion azul→verde con scale + translateY al hover, feedback tactil en active. Dark mode incluido.
+
 ### Fixed — Batch processing: watermarks identicas a previsualizacion
 - **downloadBatchZip TypeError**: `exportToZip()` devuelve un objeto, no un Blob. `URL.createObjectURL(objeto)` lanzaba TypeError. Fix: `exportToZip()` ya descarga internamente.
 - **IDs de watermark incorrectos**: `watermarkText` → `watermark-text`, `watermarkSize` → `watermark-size`, etc. La funcion `getCurrentWatermarks()` siempre devolvia null.
