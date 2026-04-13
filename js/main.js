@@ -7464,17 +7464,21 @@
       const editedCanvas = document.getElementById('comparison-canvas-edited');
       
       if (comparisonMode) {
-        // Activar: capturar imagen original y renderizar comparación in-place
+        // 1. Capturar imagen original
         saveOriginalImageForComparison();
-        renderComparisonCanvases();
 
-        // Mostrar overlay ENCIMA del canvas (no ocultar el canvas)
+        // 2. Mostrar overlay PRIMERO (necesario para que tenga dimensiones)
         overlay.style.display = 'block';
+
+        // 3. Renderizar en el siguiente frame (cuando el overlay ya tiene layout)
+        requestAnimationFrame(() => {
+          renderComparisonCanvases();
+        });
 
         toggleBtn.classList.add('active');
         toggleBtn.innerHTML = '<i class="fas fa-times" aria-hidden="true"></i> Cerrar';
 
-        UIManager.showInfo('Arrastra el slider para comparar');
+        UIManager.showInfo('Arrastra el slider o usa \u2190 \u2192 para comparar');
 
       } else {
         // Desactivar: ocultar overlay, limpiar memoria
