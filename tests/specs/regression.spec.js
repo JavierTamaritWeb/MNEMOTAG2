@@ -1241,10 +1241,13 @@ describe('Regresión — batch-manager.js usa renderFn (v3.5.6)', function () {
     const src = await fetchSource('../js/managers/batch-manager.js');
     // Debe usar renderFn
     expect(src).toContain('this.currentConfig.renderFn');
-    // NO debe tener implementación propia de filtros por píxeles
+    // NO debe tener implementación propia (código muerto eliminado)
     expect(src).not.toContain('this.applyFilters(');
     expect(src).not.toContain('getImageData(0, 0');
-    expect(src).not.toContain('(filters.brightness');
+    expect(src).not.toContain('applyWatermarks(ctx');
+    expect(src).not.toContain('_renderTextLayers(');
+    expect(src).not.toContain('_getTextPosition(');
+    expect(src).not.toContain('_getImagePosition(');
   });
 
   it('captureCurrentConfig acepta renderFn como parámetro', async function () {

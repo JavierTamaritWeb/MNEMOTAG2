@@ -8,7 +8,7 @@
         const bootCount = prev ? (prev.count + 1) : 1;
         const deltaMs = prev ? (now - prev.ts) : null;
         sessionStorage.setItem('mnemotag-boot-info', JSON.stringify({ ts: now, count: bootCount }));
-        console.warn('[MnemoTag debug] Arranque #' + bootCount + (deltaMs !== null ? ' (hace ' + Math.round(deltaMs / 1000) + 's)' : ''));
+        MNEMOTAG_DEBUG && console.warn('[MnemoTag debug] Arranque #' + bootCount + (deltaMs !== null ? ' (hace ' + Math.round(deltaMs / 1000) + 's)' : ''));
       } catch (e) { /* sessionStorage puede fallar */ }
 
       window.addEventListener('error', function (e) {
@@ -345,7 +345,7 @@
           toggleWatermarkType();
         }
       } catch (e) {
-        console.warn('restoreWatermarkState: error restaurando:', e);
+        MNEMOTAG_DEBUG && console.warn('restoreWatermarkState: error restaurando:', e);
       }
     }
 
@@ -475,7 +475,7 @@
             const isBrowserSync = url.indexOf('browser-sync') !== -1;
 
             if (isLiveServer || isBrowserSync) {
-              console.warn(
+              MNEMOTAG_DEBUG && console.warn(
                 '%c[MnemoTag] WebSocket de Live Reload BLOQUEADO: ' + url,
                 'background:#f59e0b;color:#000;font-weight:bold;padding:2px 6px;border-radius:4px;'
               );
@@ -520,7 +520,7 @@
         window.WebSocket.prototype = OrigWebSocket.prototype;
 
       } catch (e) {
-        console.warn('[MnemoTag] No se pudo monkey-patchear WebSocket:', e);
+        MNEMOTAG_DEBUG && console.warn('[MnemoTag] No se pudo monkey-patchear WebSocket:', e);
       }
     })();
 
@@ -1308,7 +1308,7 @@
                       await document.fonts.load(`16px "${fontFamily}"`);
                     }
                   } catch (error) {
-                    console.warn(`Error cargando fuente ${fontFamily}:`, error);
+                    MNEMOTAG_DEBUG && console.warn(`Error cargando fuente ${fontFamily}:`, error);
                   }
                 }
                 debouncedUpdatePreview(e);
@@ -1586,7 +1586,7 @@
           });
           
         } else {
-          console.warn(`❌ No se pudo configurar sincronización para ${sliderId}:`, {
+          MNEMOTAG_DEBUG && console.warn(`❌ No se pudo configurar sincronización para ${sliderId}:`, {
             slider: !!slider,
             numberInput: !!numberInput
           });
@@ -1611,13 +1611,13 @@
             if (typeof FilterManager !== 'undefined' && FilterManager.applyFilter) {
               FilterManager.applyFilter();
             } else {
-              console.warn('❌ FilterManager no está disponible');
+              MNEMOTAG_DEBUG && console.warn('❌ FilterManager no está disponible');
             }
           });
         } else {
-          console.warn(`❌ No se encontró elemento para ${filterId}`);
-          console.warn(`    - Slider encontrado: ${!!slider}`);
-          console.warn(`    - ValueDisplay encontrado: ${!!valueDisplay}`);
+          MNEMOTAG_DEBUG && console.warn(`❌ No se encontró elemento para ${filterId}`);
+          MNEMOTAG_DEBUG && console.warn(`    - Slider encontrado: ${!!slider}`);
+          MNEMOTAG_DEBUG && console.warn(`    - ValueDisplay encontrado: ${!!valueDisplay}`);
         }
       });
       
@@ -1631,7 +1631,7 @@
           if (typeof FilterManager !== 'undefined' && FilterManager.applyPreset) {
             FilterManager.applyPreset(preset);
           } else {
-            console.warn('❌ FilterManager no está disponible para preset');
+            MNEMOTAG_DEBUG && console.warn('❌ FilterManager no está disponible para preset');
           }
         });
       });
@@ -1643,7 +1643,7 @@
           if (typeof FilterManager !== 'undefined' && FilterManager.reset) {
             FilterManager.reset();
           } else {
-            console.warn('❌ FilterManager no está disponible para reset');
+            MNEMOTAG_DEBUG && console.warn('❌ FilterManager no está disponible para reset');
           }
         });
       }
@@ -2067,7 +2067,7 @@
         const content = document.getElementById(`${section}-content`);
         
         if (!header || !content) {
-          console.warn(`No se encontró header o content para sección: ${section}`);
+          MNEMOTAG_DEBUG && console.warn(`No se encontró header o content para sección: ${section}`);
           return;
         }
         
@@ -2267,7 +2267,7 @@
       // Mostrar advertencias si existen
       if (validation.warnings && validation.warnings.length > 0) {
         validation.warnings.forEach(warning => {
-          console.warn('Advertencia:', warning.message, warning.details);
+          MNEMOTAG_DEBUG && console.warn('Advertencia:', warning.message, warning.details);
           // Opcionalmente mostrar advertencias al usuario
           UIManager.showWarning && UIManager.showWarning(warning.message);
         });
@@ -2617,7 +2617,7 @@
             // Mostrar advertencias sobre dimensiones si existen
             if (dimensionValidation.warnings && dimensionValidation.warnings.length > 0) {
               dimensionValidation.warnings.forEach(warning => {
-                console.warn('Advertencia de dimensiones:', warning.message, warning.details);
+                MNEMOTAG_DEBUG && console.warn('Advertencia de dimensiones:', warning.message, warning.details);
               });
             }
 
@@ -2980,7 +2980,7 @@
         });
         
       } catch (error) {
-        console.warn('⚠️ Worker falló, usando fallback:', error);
+        MNEMOTAG_DEBUG && console.warn('⚠️ Worker falló, usando fallback:', error);
         updatePreviewStandard();
       }
     }
@@ -3046,7 +3046,7 @@
     // Función auxiliar para redibujar el canvas completo desde cero
     function redrawCompleteCanvas() {
       if (!canvas || !ctx || !currentImage) {
-        console.warn('⚠️ No se puede redibujar: canvas, ctx o currentImage no disponibles');
+        MNEMOTAG_DEBUG && console.warn('⚠️ No se puede redibujar: canvas, ctx o currentImage no disponibles');
         return;
       }
       
@@ -3184,7 +3184,7 @@
         watermarkImg.onerror = function() {
           // R1: la decodificación de la imagen falló (archivo corrupto, formato
           // no soportado, etc.). Antes esto era silencioso.
-          console.warn('No se pudo decodificar la imagen de la marca de agua');
+          MNEMOTAG_DEBUG && console.warn('No se pudo decodificar la imagen de la marca de agua');
           if (typeof UIManager !== 'undefined' && UIManager.showError) {
             UIManager.showError('No se pudo cargar la imagen de la marca de agua. Comprueba que el archivo no esté corrupto.');
           }
@@ -3194,7 +3194,7 @@
       reader.onerror = function() {
         // R1: el FileReader falló al leer el archivo (permiso denegado, I/O,
         // archivo eliminado mientras se leía, etc.). Antes esto era silencioso.
-        console.warn('FileReader falló al leer la imagen de la marca de agua');
+        MNEMOTAG_DEBUG && console.warn('FileReader falló al leer la imagen de la marca de agua');
         if (typeof UIManager !== 'undefined' && UIManager.showError) {
           UIManager.showError('No se pudo leer el archivo de la marca de agua. Inténtalo de nuevo.');
         }
@@ -3403,10 +3403,31 @@
           updatePositioningClasses();
         }
         
-        // Si ya hay una posición personalizada, mostrar el marcador
+        // Si no hay posición inicial, calcular el centro del canvas para empezar
+        if (!customImagePosition && typeof imageWatermarkBounds !== 'undefined' && imageWatermarkBounds) {
+          customImagePosition = {
+            x: imageWatermarkBounds.x + imageWatermarkBounds.width / 2,
+            y: imageWatermarkBounds.y + imageWatermarkBounds.height / 2
+          };
+        } else if (!customImagePosition && canvas) {
+          customImagePosition = {
+            x: canvas.width / 2,
+            y: canvas.height / 2
+          };
+        }
+
+        // Mostrar el marcador
         if (customImagePosition) {
           showPositionMarker();
         }
+        
+        // Hacer scroll suave hacia el canvas para que el usuario vea el área de trabajo
+        setTimeout(() => {
+          const previewContainer = document.querySelector('.preview-container');
+          if (previewContainer) {
+            previewContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 100);
       } else {
         isPositioningMode = false;
         // Si este era el modo activo, limpiarlo
@@ -3450,10 +3471,31 @@
           updatePositioningClasses();
         }
         
-        // Si ya hay una posición personalizada, mostrar el marcador
+        // Si no hay posición inicial, calcular el centro del canvas para empezar
+        if (!customTextPosition && typeof textWatermarkBounds !== 'undefined' && textWatermarkBounds) {
+          customTextPosition = {
+            x: textWatermarkBounds.x + textWatermarkBounds.width / 2,
+            y: textWatermarkBounds.y + textWatermarkBounds.height / 2
+          };
+        } else if (!customTextPosition && canvas) {
+          customTextPosition = {
+            x: canvas.width / 2,
+            y: canvas.height / 2
+          };
+        }
+
+        // Mostrar el marcador
         if (customTextPosition) {
           showTextPositionMarker();
         }
+        
+        // Hacer scroll suave hacia el canvas para que el usuario vea el área de trabajo
+        setTimeout(() => {
+          const previewContainer = document.querySelector('.preview-container');
+          if (previewContainer) {
+            previewContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 100);
       } else {
         isTextPositioningMode = false;
         // Si este era el modo activo, limpiarlo
@@ -6037,7 +6079,7 @@
         if (canvas) {
           cropManager = new CropManager(canvas);
         } else {
-          console.warn('⚠️ Canvas no disponible, CropManager no inicializado');
+          MNEMOTAG_DEBUG && console.warn('⚠️ Canvas no disponible, CropManager no inicializado');
         }
         
         
@@ -7595,10 +7637,10 @@
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('./service-worker.js', { scope: './' })
             .then((reg) => {
-              console.warn('[App] Service Worker registrado:', reg.scope);
+              MNEMOTAG_DEBUG && console.warn('[App] Service Worker registrado:', reg.scope);
             })
             .catch((err) => {
-              console.warn('[App] Service Worker no se pudo registrar:', err);
+              MNEMOTAG_DEBUG && console.warn('[App] Service Worker no se pudo registrar:', err);
             });
         });
       }
