@@ -336,6 +336,9 @@ window.ExportManager = (function () {
       await new Promise(resolve => setTimeout(resolve, 900));
       await progressPromise;
 
+      // Ocultar progress ANTES de abrir el diálogo de guardar
+      hideProgressBar();
+
       if ('showSaveFilePicker' in window) {
         const options = {
           suggestedName: fullFilename,
