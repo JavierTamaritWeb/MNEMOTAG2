@@ -6372,11 +6372,9 @@
       
       if (!dropzone || !fileInput) return;
 
-      // Click to select files
-      dropzone.onclick = (e) => {
-        if (e.target === dropzone || e.target.closest('.dropzone-content')) {
-          fileInput.click();
-        }
+      // Click en cualquier parte del dropzone abre el selector de archivos
+      dropzone.onclick = () => {
+        fileInput.click();
       };
 
       // File input change
