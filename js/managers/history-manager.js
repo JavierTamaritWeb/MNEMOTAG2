@@ -164,17 +164,42 @@ const historyManager = {
    * Actualizar el estado visual de los botones deshacer/rehacer
    */
   updateUndoRedoButtons: function() {
+    const canUndo = this.canUndo();
+    const canRedo = this.canRedo();
+
     const undoBtn = document.getElementById('undo-btn');
     const redoBtn = document.getElementById('redo-btn');
 
     if (undoBtn) {
-      undoBtn.disabled = !this.canUndo();
-      undoBtn.style.opacity = this.canUndo() ? '1' : '0.5';
+      undoBtn.disabled = !canUndo;
+      undoBtn.style.opacity = canUndo ? '1' : '0.5';
     }
 
     if (redoBtn) {
-      redoBtn.disabled = !this.canRedo();
-      redoBtn.style.opacity = this.canRedo() ? '1' : '0.5';
+      redoBtn.disabled = !canRedo;
+      redoBtn.style.opacity = canRedo ? '1' : '0.5';
+    }
+
+    // Botones de navegación del panel de historial
+    const prevBtn = document.getElementById('history-prev-btn');
+    const nextBtn = document.getElementById('history-next-btn');
+    if (prevBtn) {
+      prevBtn.disabled = !canUndo;
+      prevBtn.style.opacity = canUndo ? '1' : '0.4';
+    }
+    if (nextBtn) {
+      nextBtn.disabled = !canRedo;
+      nextBtn.style.opacity = canRedo ? '1' : '0.4';
+    }
+
+    // Indicador de posición
+    const posEl = document.getElementById('history-position');
+    if (posEl) {
+      if (this.states.length > 0) {
+        posEl.textContent = (this.currentIndex + 1) + ' / ' + this.states.length;
+      } else {
+        posEl.textContent = '';
+      }
     }
 
     // v3.3.14: refresca el panel de historial visual si el caller lo

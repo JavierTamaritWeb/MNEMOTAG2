@@ -1350,7 +1350,8 @@
   color: #f9fafb;
 }
 
-.history-panel__close {
+.history-panel__close,
+.history-panel__nav {
   background: transparent;
   border: none;
   cursor: pointer;
@@ -1358,16 +1359,34 @@
   color: #6b7280;
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
+  transition: background 0.15s, color 0.15s;
 }
 
-.history-panel__close:hover {
+.history-panel__close:hover,
+.history-panel__nav:hover:not(:disabled) {
   background: #e5e7eb;
   color: #111827;
 }
 
-[data-theme="dark"] .history-panel__close:hover {
+.history-panel__nav:disabled {
+  cursor: default;
+}
+
+.history-panel__position {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: #9ca3af;
+  margin-left: 0.5rem;
+}
+
+[data-theme="dark"] .history-panel__close:hover,
+[data-theme="dark"] .history-panel__nav:hover:not(:disabled) {
   background: #374151;
   color: #f9fafb;
+}
+
+[data-theme="dark"] .history-panel__position {
+  color: #6b7280;
 }
 
 .history-panel__grid {

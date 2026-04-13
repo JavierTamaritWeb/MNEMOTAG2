@@ -1173,6 +1173,15 @@
             }
           });
         }
+        // Botones de navegación del historial
+        const historyPrevBtn = document.getElementById('history-prev-btn');
+        const historyNextBtn = document.getElementById('history-next-btn');
+        if (historyPrevBtn) {
+          historyPrevBtn.addEventListener('click', () => historyManager.undo());
+        }
+        if (historyNextBtn) {
+          historyNextBtn.addEventListener('click', () => historyManager.redo());
+        }
         // v3.4.6: botón "Vaciar historial" — libera memoria GPU.
         const historyClearBtn = document.getElementById('history-clear-btn');
         if (historyClearBtn) {
@@ -4768,6 +4777,13 @@
         });
 
         grid.appendChild(thumb);
+
+        // Scroll automático al estado actual
+        if (item.isCurrent) {
+          requestAnimationFrame(() => {
+            thumb.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+          });
+        }
       });
     }
 

@@ -1126,14 +1126,20 @@
             <div id="history-panel" class="history-panel hidden" inert>
               <div class="history-panel__header">
                 <h4 class="history-panel__title">
-                  <i class="fas fa-history"></i> Historial visual
+                  <i class="fas fa-history"></i> Historial
+                  <span id="history-position" class="history-panel__position"></span>
                 </h4>
                 <div class="flex gap-2">
-                  <!-- v3.4.6: botón Vaciar historial (libera memoria GPU) -->
-                  <button type="button" id="history-clear-btn" class="history-panel__close" aria-label="Vaciar historial" title="Vaciar el historial (libera memoria)">
+                  <button type="button" id="history-prev-btn" class="history-panel__nav" aria-label="Estado anterior" title="Ir al estado anterior" disabled>
+                    <i class="fas fa-chevron-left"></i>
+                  </button>
+                  <button type="button" id="history-next-btn" class="history-panel__nav" aria-label="Estado siguiente" title="Ir al estado siguiente" disabled>
+                    <i class="fas fa-chevron-right"></i>
+                  </button>
+                  <button type="button" id="history-clear-btn" class="history-panel__close" aria-label="Vaciar historial" title="Vaciar historial">
                     <i class="fas fa-trash-alt"></i>
                   </button>
-                  <button type="button" id="history-panel-close" class="history-panel__close" aria-label="Cerrar panel de historial">
+                  <button type="button" id="history-panel-close" class="history-panel__close" aria-label="Cerrar panel" title="Cerrar">
                     <i class="fas fa-times"></i>
                   </button>
                 </div>
