@@ -6111,12 +6111,7 @@
           }
         }, { description: 'Rehacer acción' });
         
-        keyboardShortcuts.register('y', ['ctrl'], () => {
-          if (historyManager && historyManager.canRedo()) {
-            historyManager.redo();
-            UIManager.showSuccess('Rehecho');
-          }
-        }, { description: 'Rehacer acción' });
+        // Ctrl+Y eliminado (Y está en la mano derecha). Usar Ctrl+Shift+Z.
         
         // Ctrl/Cmd + S: Guardar/Exportar con barra de progreso
         keyboardShortcuts.register('s', ['ctrl'], async () => {
@@ -6193,8 +6188,8 @@
           }
         }, { description: 'Cancelar operación actual', preventDefault: false });
         
-        // Delete: Eliminar capa seleccionada (solo cuando NO estés en un input)
-        keyboardShortcuts.register('delete', [], () => {
+        // Backspace: Eliminar capa seleccionada (solo cuando NO estés en un input)
+        keyboardShortcuts.register('backspace', [], () => {
           if (textLayerManager && textLayerManager.activeLayerId) {
             const layer = textLayerManager.getActiveLayer();
             if (layer && confirm(`¿Eliminar capa "${layer.text}"?`)) {
@@ -6247,32 +6242,26 @@
           }
         }, { description: 'Abrir modo recorte' });
         
-        // Ctrl/Cmd + ?: Ver atajos de teclado
-        keyboardShortcuts.register('/', ['ctrl', 'shift'], () => {
+        // Ctrl+Shift+A: Ver atajos de teclado
+        keyboardShortcuts.register('a', ['ctrl', 'shift'], () => {
           if (typeof window.openShortcutsModal === 'function') {
             window.openShortcutsModal();
           }
         }, { description: 'Ver atajos de teclado' });
-        
-        // +: Zoom in
-        keyboardShortcuts.register('+', [], () => {
+
+        // Ctrl + =: Zoom in (= está en la mano izquierda junto a Backspace)
+        keyboardShortcuts.register('=', ['ctrl'], () => {
           zoomIn();
-        }, { description: 'Aumentar zoom', preventDefault: false });
-        
-        // -: Zoom out
-        keyboardShortcuts.register('-', [], () => {
-          zoomOut();
-        }, { description: 'Reducir zoom', preventDefault: false });
-        
-        // 0: Zoom 100%
-        keyboardShortcuts.register('0', [], () => {
-          resetZoom();
-        }, { description: 'Restaurar zoom 100%', preventDefault: false });
-        
-        // K: Toggle comparison mode
-        keyboardShortcuts.register('k', ['ctrl'], () => {
+        }, { description: 'Aumentar zoom' });
+
+        // Ctrl + -: Zoom out (guión en la fila superior, mano izquierda)
+        // Nota: '-' sin modificador no se registra para no bloquear la tecla
+        // en campos de texto.
+
+        // Ctrl+E: Toggle modo comparación
+        keyboardShortcuts.register('e', ['ctrl'], () => {
           toggleComparisonMode();
-        }, { description: 'Activar/desactivar modo comparación', preventDefault: true });
+        }, { description: 'Activar/desactivar modo comparación' });
         
         
       } catch (error) {
