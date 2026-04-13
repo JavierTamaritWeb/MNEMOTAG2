@@ -1,6 +1,6 @@
 # MNEMOTAG - DOCUMENTACION TECNICA
 
-**Version:** 3.5.6
+**Version:** 3.5.7
 **Ultima actualizacion:** 11 de abril de 2026
 
 ---
@@ -65,10 +65,10 @@ MNEMOTAG2/
 
 ## Estadisticas
 
-- **Version:** 3.5.6
+- **Version:** 3.5.7
 - **Archivos JS:** 24 (bundled en app.min.js)
 - **Managers:** 14 modulos especializados
-- **Tests:** 186 + 86 + 5 E2E = 277 aserciones totales
+- **Tests:** 217 + 86 = 303 aserciones totales
 - **Build:** Gulp 5 (SCSS + JS concat + terser)
 
 ---

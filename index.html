@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MnemoTag v3.5.6</title>
+  <title>MnemoTag v3.5.7</title>
   
   <!-- Favicon moderno con SVG -->
   <link rel="icon" type="image/svg+xml" href="images/favicon.svg">
@@ -404,7 +404,7 @@
                           <option value="Georgia">Georgia</option>
                           <option value="Roboto">Roboto</option>
                           <option value="Montserrat">Montserrat</option>
-                          <option value="Montserrat Alternates">Montserrat Alternates</option>
+                          <option value="Montserrat Alternates" selected>Montserrat Alternates</option>
                           <option value="Open Sans">Open Sans</option>
                           <option value="Lato">Lato</option>
                           <option value="Poppins">Poppins</option>
@@ -417,7 +417,7 @@
                       </div>
                       <div class="mb-4">
                         <label for="watermark-color" class="block text-gray-700 font-medium mb-2 form-label">Color</label>
-                        <input type="color" id="watermark-color" name="watermark-color" value="#000000"
+                        <input type="color" id="watermark-color" name="watermark-color" value="#f790b2"
                                class="w-full h-10 cursor-pointer">
                       </div>
                       <div class="mb-4">
@@ -433,7 +433,7 @@
                           <option value="bottom-left">Inferior izquierda</option>
                           <option value="bottom-center">Inferior centro</option>
                           <option value="bottom-right">Inferior derecha</option>
-                          <option value="custom">🎯 Posición personalizada (arrastra para mover)</option>
+                          <option value="custom" selected>🎯 Posición personalizada (arrastra para mover)</option>
                         </select>
                       </div>
                       <div id="custom-text-position-info" class="mb-4" style="display: none;">
@@ -510,9 +510,9 @@
                         <select id="watermark-image-size" name="watermark-image-size"
                                 class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-select">
                           <option value="small">Pequeño</option>
-                          <option value="medium" selected>Mediano</option>
+                          <option value="medium">Mediano</option>
                           <option value="large">Grande</option>
-                          <option value="custom">Personalizado</option>
+                          <option value="custom" selected>Personalizado</option>
                         </select>
                       </div>
                       <div class="mb-4">
@@ -542,7 +542,7 @@
                           <option value="bottom-left">Inferior izquierda</option>
                           <option value="bottom-center">Inferior centro</option>
                           <option value="bottom-right">Inferior derecha</option>
-                          <option value="custom">🎯 Posición personalizada (arrastra para mover)</option>
+                          <option value="custom" selected>🎯 Posición personalizada (arrastra para mover)</option>
                         </select>
                       </div>
                       <div id="custom-position-info" class="mb-4" style="display: none;">
@@ -554,17 +554,17 @@
                         </div>
                       </div>
                     </div>
-                    <div id="watermark-image-custom-size" class="watermark-options__custom-size">
+                    <div id="watermark-image-custom-size" class="watermark-options__custom-size--visible">
                       <label class="block text-gray-700 font-medium mb-2 form-label">Tamaño personalizado</label>
                       <div class="grid grid-cols-2 gap-4">
                         <div>
                           <label for="watermark-image-width" class="block text-sm text-gray-600 mb-1 form-label">Ancho (px)</label>
-                          <input type="number" id="watermark-image-width" name="watermark-image-width" min="10" max="1000" placeholder="ANCHO"
+                          <input type="number" id="watermark-image-width" name="watermark-image-width" min="10" max="1000" value="50" placeholder="ANCHO"
                                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input">
                         </div>
                         <div>
                           <label for="watermark-image-height" class="block text-sm text-gray-600 mb-1 form-label">Alto (px)</label>
-                          <input type="number" id="watermark-image-height" name="watermark-image-height" min="10" max="1000" placeholder="ALTO"
+                          <input type="number" id="watermark-image-height" name="watermark-image-height" min="10" max="1000" value="50" placeholder="ALTO"
                                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 form-input">
                         </div>
                       </div>

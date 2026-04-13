@@ -4,6 +4,30 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.5.7] - 2026-04-13
+
+### Fixed — Batch processing: watermarks identicas a previsualizacion
+- **downloadBatchZip TypeError**: `exportToZip()` devuelve un objeto, no un Blob. `URL.createObjectURL(objeto)` lanzaba TypeError. Fix: `exportToZip()` ya descarga internamente.
+- **IDs de watermark incorrectos**: `watermarkText` → `watermark-text`, `watermarkSize` → `watermark-size`, etc. La funcion `getCurrentWatermarks()` siempre devolvia null.
+- **Watermarks con implementacion propia**: el batch tenia su propia version de filtros y watermarks que no coincidia con la previsualizacion. Fix: `renderImageForBatch()` closure que captura el estado del editor y usa las mismas funciones de main.js.
+- **Posiciones calculadas con canvas global**: `getTextWatermarkPosition()` y `getImageWatermarkPosition()` usaban el canvas de previsualizacion (~800px) para calcular coordenadas, pero pintaban en canvas del batch (dimensiones originales). Fix: funciones locales `batchWmPos`/`batchImgPos` que reciben cw/ch.
+- **Filtros CSS**: el batch usaba manipulacion de pixeles basica. Ahora usa `ctx.filter = FilterManager.getFilterString()` (identico a la preview).
+- **getImageWatermarkPosition**: usaba formulas de baseline de texto (desbordaba en posiciones bottom-*). Reescrita con switch propio para imagenes (top-left origin).
+
+### Added
+- **9 tests de regresion** para batch processing que cubren los 5 bugs arreglados.
+- **Gulp watch mejorado**: watchers para JS, SCSS, images, HTML, service-worker con logging de cambios. `npx gulp` ahora se queda esperando (default = dev).
+
+### Changed
+- **Defaults de watermark**: fuente Montserrat Alternates, color #f790b2, posicion personalizada (texto e imagen), tamaño personalizado 50x50 px.
+- **Workflows CI eliminados**: `test.yml`, `lint.yml`, `e2e.yml` eliminados del repositorio.
+
+### Verificacion
+- `node tests/run-in-node.js` → **217/217 OK**
+- `node tests/binary-validation.js` → **86/86 OK**
+
+---
+
 ## [3.5.6] - 2026-04-11
 
 ### Fixed

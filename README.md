@@ -4,7 +4,7 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos. 100% cliente, sin backend.
 
-![Version](https://img.shields.io/badge/version-3.5.6-blue.svg)
+![Version](https://img.shields.io/badge/version-3.5.7-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 [![Tests](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml)
@@ -33,7 +33,7 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 
 ### Verificacion
 - `npm run build` genera `dist/` completo
-- `node tests/run-in-node.js` → **209/209 OK**
+- `node tests/run-in-node.js` → **217/217 OK**
 - `node tests/binary-validation.js` → **86/86 OK**
 
 > Versiones anteriores: [CHANGELOG.md](CHANGELOG.md)
@@ -124,7 +124,7 @@ npm run serve   # solo servidor (sin watch)
 
 ```bash
 npm test                         # ejecuta ambos runners
-node tests/run-in-node.js        # 186/186 aserciones de regresion
+node tests/run-in-node.js        # 217/217 aserciones de regresion
 node tests/binary-validation.js  # 86/86 aserciones binarias PNG/WebP/AVIF
 ```
 
