@@ -6559,19 +6559,12 @@
         return;
       }
 
-      const progressSection = document.getElementById('batch-progress');
-      const progressBar = document.getElementById('batch-progress-bar');
-      const progressText = document.getElementById('batch-progress-text');
       const processBtn = document.getElementById('batch-process-btn');
       const downloadBtn = document.getElementById('batch-download-btn');
 
-      if (!progressBar || !progressText || !processBtn) return;
-
       // UI feedback
-      processBtn.disabled = true;
-      if (progressSection) progressSection.style.display = 'block';
-      progressBar.style.width = '0%';
-      progressText.textContent = 'Preparando...';
+      if (processBtn) processBtn.disabled = true;
+      showProgressBar('Procesando lote (' + batchImages.length + ' imágenes)...');
 
       try {
         // Sincronizar batchImages → batchManager.imageQueue
@@ -6730,30 +6723,43 @@
 
         batchManager.captureCurrentConfig(filterString, null, null, null, renderImageForBatch);
 
-        // Procesar — processQueue recibe un callback con objeto {current, total, percentage}
+        // Procesar — el callback actualiza el progress overlay global
         await batchManager.processQueue((progress) => {
-          progressBar.style.width = `${progress.percentage}%`;
-          progressText.textContent = `Procesando ${progress.current}/${progress.total} (${progress.percentage}%)`;
+          updateProgress(
+            progress.percentage,
+            'Procesando imagen ' + progress.current + ' de ' + progress.total + '...'
+          );
         });
 
-        // Mostrar botón de descarga (usa style, no classList, porque el HTML usa style="display:none")
+        hideProgressBar();
+
+        // Mostrar botón de descarga
         if (downloadBtn) downloadBtn.style.display = 'flex';
-        UIManager.showSuccess(`${batchImages.length} imágenes procesadas`);
+        UIManager.showSuccess(batchImages.length + ' imágenes procesadas correctamente');
 
       } catch (error) {
         console.error('Error procesando lote:', error);
+        hideProgressBar();
         UIManager.showError('Error al procesar el lote: ' + error.message);
       } finally {
-        processBtn.disabled = false;
+        if (processBtn) processBtn.disabled = false;
       }
     }
 
     async function downloadBatchZip() {
       try {
-        // exportToZip() ya descarga internamente via downloadBlob
-        await batchManager.exportToZip();
+        showProgressBar('Generando ZIP...');
+        const steps = [
+          { message: 'Comprimiendo imágenes...', duration: 400 },
+          { message: 'Generando archivo ZIP...', duration: 600 },
+          { message: 'Preparando descarga...', duration: 300 }
+        ];
+        const zipPromise = batchManager.exportToZip();
+        await Promise.all([simulateProgressSteps(steps, 1300), zipPromise]);
+        hideProgressBar();
       } catch (error) {
         console.error('Error descargando ZIP:', error);
+        hideProgressBar();
         UIManager.showError('Error al descargar el archivo ZIP');
       }
     }
