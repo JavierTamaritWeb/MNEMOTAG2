@@ -1153,7 +1153,7 @@
             const panel = document.getElementById('history-panel');
             if (panel) {
               panel.classList.add('hidden');
-              panel.setAttribute('aria-hidden', 'true');
+              panel.inert = true;
             }
           });
         }
@@ -4392,10 +4392,8 @@
         // Validar marca de agua de imagen si está habilitada
         if (imageEnabled) {
           const watermarkImageInput = document.getElementById('watermark-image');
-          if (!watermarkImageInput.files[0]) {
-            UIManager.showError('Debe seleccionar una imagen para la marca de agua');
-            form.classList.remove('form-loading');
-            return;
+          if (!watermarkImageInput || !watermarkImageInput.files[0]) {
+            UIManager.showWarning('No hay imagen de marca de agua seleccionada. Se aplicará solo el texto.');
           }
         }
         
@@ -4684,10 +4682,10 @@
       if (isHidden) {
         renderHistoryPanel();
         panel.classList.remove('hidden');
-        panel.setAttribute('aria-hidden', 'false');
+        panel.inert = false;
       } else {
         panel.classList.add('hidden');
-        panel.setAttribute('aria-hidden', 'true');
+        panel.inert = true;
       }
     }
 
