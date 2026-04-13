@@ -23,7 +23,7 @@ class CropManager {
     
     // Handles para resize (8 puntos)
     this.handles = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
-    this.handleSize = 10;
+    this.handleSize = 20;
     
     // Proporciones predefinidas
     this.aspectRatios = {
@@ -145,8 +145,10 @@ class CropManager {
     if (!this.isActive) return;
 
     const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const scaleX = this.canvas.width / rect.width;
+    const scaleY = this.canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
 
     // Verificar si hizo clic en un handle
     const handle = this.getHandleAtPosition(x, y);
@@ -178,8 +180,10 @@ class CropManager {
     if (!this.isActive) return;
 
     const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const scaleX = this.canvas.width / rect.width;
+    const scaleY = this.canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
 
     if (this.isResizing) {
       this.handleResize(x, y);
