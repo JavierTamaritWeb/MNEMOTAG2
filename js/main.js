@@ -7464,44 +7464,27 @@
       const editedCanvas = document.getElementById('comparison-canvas-edited');
       
       if (comparisonMode) {
-        // Activar modo comparación
-        
-        // 1. Guardar copia de imagen original (solo si es necesario)
+        // Activar: capturar imagen original y renderizar comparación in-place
         saveOriginalImageForComparison();
-        
-        // 2. Renderizar ambos canvas
         renderComparisonCanvases();
-        
-        // 3. Mostrar overlay
+
+        // Mostrar overlay ENCIMA del canvas (no ocultar el canvas)
         overlay.style.display = 'block';
-        
-        // 4. Actualizar botón
+
         toggleBtn.classList.add('active');
-        toggleBtn.innerHTML = `
-          <i class="fas fa-times" aria-hidden="true"></i>
-          CERRAR
-        `;
-        
-        // 5. Ocultar canvas principal
-        if (mainCanvas) mainCanvas.style.opacity = '0';
-        
-        UIManager.showSuccess('MODO COMPARACIÓN ACTIVADO - USA ← → PARA MOVER EL SLIDER');
-        
+        toggleBtn.innerHTML = '<i class="fas fa-times" aria-hidden="true"></i> Cerrar';
+
+        UIManager.showInfo('Arrastra el slider para comparar');
+
       } else {
-        // Desactivar modo comparación
-        
+        // Desactivar: ocultar overlay, limpiar memoria
         overlay.style.display = 'none';
         toggleBtn.classList.remove('active');
-        toggleBtn.innerHTML = `
-          <i class="fas fa-sliders-h" aria-hidden="true"></i>
-          COMPARAR
-        `;
-        
-        // Limpieza de memoria: Reducir dimensiones de canvases de comparación
+        toggleBtn.innerHTML = '<i class="fas fa-sliders-h" aria-hidden="true"></i> Comparar';
+
         if (originalCanvas) { originalCanvas.width = 0; originalCanvas.height = 0; }
         if (editedCanvas) { editedCanvas.width = 0; editedCanvas.height = 0; }
 
-        // Liberar canvas original cacheado si la imagen es grande (>4 MP)
         if (comparisonOriginalCanvas) {
           const pixels = comparisonOriginalCanvas.width * comparisonOriginalCanvas.height;
           if (pixels > 4000000) {
@@ -7512,11 +7495,7 @@
           }
         }
 
-        // Resetear slider al centro para la próxima apertura
         comparisonSliderPosition = 50;
-
-        // Mostrar canvas principal
-        if (mainCanvas) mainCanvas.style.opacity = '1';
       }
     }
 
