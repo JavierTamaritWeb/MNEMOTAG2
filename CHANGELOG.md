@@ -4,6 +4,13 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.5.10] - 2026-04-15
+
+### Fixed
+- **Lote: nombres de archivo originales**: `exportToZip` generaba nombres secuenciales (`imagen-001.jpg`, `imagen-002.jpg`) ignorando el nombre original. Ahora cada imagen conserva su nombre real (`imagen-3-11.jpg`, `foto-vacaciones.jpg`) con la extensión del formato de salida.
+
+---
+
 ## [3.5.9] - 2026-04-13
 
 ### Fixed

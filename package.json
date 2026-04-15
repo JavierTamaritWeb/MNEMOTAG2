@@ -1,7 +1,7 @@
 {
   "name": "mnemotag",
   "private": true,
-  "version": "3.5.9",
+  "version": "3.5.10",
   "description": "Editor profesional de metadatos e imágenes — 100% cliente, sin backend",
   "scripts": {
     "build": "gulp build",

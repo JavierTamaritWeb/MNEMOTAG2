@@ -190,7 +190,7 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 
 ## Versioning and commits
 
-**Current version: v3.5.9**.
+**Current version: v3.5.10**.
 - **v3.5.0**: Gulp 5 build system (SCSS + JS bundle + minification + browser-sync), zoom-pan-manager extracted.
 - **v3.5.1–v3.5.2**: Code audit — 4 critical + 14 moderate fixes (onclick→data-action, console guards, var→const/let, null guards).
 - **v3.5.3**: Output movido a `dist/`, SCSS reorganizado en subcarpetas (`abstracts/`, `base/`, `layout/`, `components/`, `pages/`, `modules/`).

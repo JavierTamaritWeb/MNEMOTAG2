@@ -4,7 +4,7 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos. 100% cliente, sin backend.
 
-![Version](https://img.shields.io/badge/version-3.5.9-blue.svg)
+![Version](https://img.shields.io/badge/version-3.5.10-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 [![Tests](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/test.yml)
