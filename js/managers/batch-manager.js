@@ -337,14 +337,14 @@ class BatchManager {
     const zip = new JSZip();
     const folder = zip.folder('mnemotag-batch');
     
-    // Agregar imágenes al ZIP
-    let index = 1;
+    // Agregar imágenes al ZIP conservando el nombre original
     for (const image of this.processedImages) {
       if (image.success && image.blob) {
         const ext = this.currentConfig.outputFormat || 'jpg';
-        const fileName = `imagen-${String(index).padStart(3, '0')}.${ext}`;
+        // Usar el nombre original sin extensión + la extensión del formato de salida
+        const baseName = (image.name || 'imagen').replace(/\.[^/.]+$/, '');
+        const fileName = baseName + '.' + ext;
         folder.file(fileName, image.blob);
-        index++;
       }
     }
     
