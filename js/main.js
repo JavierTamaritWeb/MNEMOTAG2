@@ -2856,24 +2856,34 @@
       // Esto mantiene la calidad mientras se adapta a la pantalla
       if (window.innerWidth <= 768) {
         const maxDisplayWidth = window.innerWidth - 48;
-        if (width > maxDisplayWidth) {
-          const displayRatio = maxDisplayWidth / width;
-          canvas.style.width = maxDisplayWidth + 'px';
-          canvas.style.height = Math.round(height * displayRatio) + 'px';
-        } else {
-          canvas.style.width = width + 'px';
-          canvas.style.height = height + 'px';
+        const maxDisplayHeight = Math.floor(window.innerHeight * 0.6) - 1; // match CSS max-height: 60vh
+        const aspectRatio = height / width;
+        let displayW = Math.min(maxDisplayWidth, width);
+        let displayH = Math.round(displayW * aspectRatio);
+        // Si la altura excede el límite, recalcular desde la altura
+        if (displayH > maxDisplayHeight) {
+          displayH = maxDisplayHeight;
+          displayW = Math.round(displayH / aspectRatio);
         }
+        canvas.style.width = displayW + 'px';
+        canvas.style.height = displayH + 'px';
       } else {
         // Desktop: hacer que el canvas ocupe todo el ancho del contenedor.
-        // Calculamos el tamaño explícito en píxeles para que no quede
-        // limitado por el max-width CSS ni por el tamaño intrínseco.
+        // Calculamos el tamaño explícito en píxeles respetando tanto el ancho
+        // del contenedor como el max-height CSS (75vh) para evitar letterboxing
+        // que rompe la conversión de coordenadas en imágenes verticales.
         const container = canvas.parentElement;
         if (container) {
           const containerWidth = container.clientWidth - 8; // -8 por padding
+          const maxDisplayHeight = Math.floor(window.innerHeight * 0.75) - 1; // match CSS max-height: 75vh
           const aspectRatio = height / width;
-          const displayW = Math.min(containerWidth, width * 2); // hasta 2x el tamaño real
-          const displayH = Math.round(displayW * aspectRatio);
+          let displayW = Math.min(containerWidth, width * 2); // hasta 2x el tamaño real
+          let displayH = Math.round(displayW * aspectRatio);
+          // Si la altura excede 75vh, recalcular ambas dimensiones desde la altura
+          if (displayH > maxDisplayHeight) {
+            displayH = maxDisplayHeight;
+            displayW = Math.round(displayH / aspectRatio);
+          }
           canvas.style.width = displayW + 'px';
           canvas.style.height = displayH + 'px';
         } else {
@@ -2883,16 +2893,54 @@
       }
 
       canvas.style.maxWidth = '100%';
-      canvas.style.objectFit = 'contain';
       
       // Mejorar calidad de renderizado del canvas
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
       
       
-      // DESACTIVADO: El zoom con rueda del mouse se maneja solo en móviles (<768px)
-      // Ver initMouseWheelZoom() para la implementación con detección de dispositivo
     }
+
+    /**
+     * Calcula el rectángulo real del contenido del canvas dentro de su box CSS.
+     * Necesario cuando object-fit: contain (fullscreen, mobile CSS) crea letterboxing,
+     * ya que getBoundingClientRect() devuelve el box CSS completo, no el área de contenido.
+     */
+    function getCanvasContentRect() {
+      const rect = canvas.getBoundingClientRect();
+      const canvasAR = canvas.width / canvas.height;
+      const boxAR = rect.width / rect.height;
+
+      // Fast path: aspect ratios coinciden, no hay letterboxing
+      if (Math.abs(canvasAR - boxAR) < 0.01) {
+        return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+      }
+
+      let contentWidth, contentHeight, offsetX, offsetY;
+      if (canvasAR > boxAR) {
+        // Limitado por ancho (landscape en box estrecho)
+        contentWidth = rect.width;
+        contentHeight = rect.width / canvasAR;
+        offsetX = 0;
+        offsetY = (rect.height - contentHeight) / 2;
+      } else {
+        // Limitado por altura (portrait en box ancho)
+        contentHeight = rect.height;
+        contentWidth = rect.height * canvasAR;
+        offsetX = (rect.width - contentWidth) / 2;
+        offsetY = 0;
+      }
+
+      return {
+        left: rect.left + offsetX,
+        top: rect.top + offsetY,
+        width: contentWidth,
+        height: contentHeight
+      };
+    }
+
+    // DESACTIVADO: El zoom con rueda del mouse se maneja solo en móviles (<768px)
+    // Ver initMouseWheelZoom() para la implementación con detección de dispositivo
 
     // Flag para coalescer múltiples llamadas a updatePreview en un solo RAF.
     // Sin este flag, cada mousemove durante un drag encolaba un RAF
@@ -3618,7 +3666,7 @@
       // No interferir con el pan del zoom
       if (isZoomed) return;
 
-      const rect = canvas.getBoundingClientRect();
+      const rect = getCanvasContentRect();
       const scaleX = canvas.width / rect.width;
       const scaleY = canvas.height / rect.height;
       const x = (event.clientX - rect.left) * scaleX;
@@ -3681,7 +3729,7 @@
      * Maneja el movimiento del arrastre (mousemove)
      */
     function handleDragMove(event) {
-      const rect = canvas.getBoundingClientRect();
+      const rect = getCanvasContentRect();
       const scaleX = canvas.width / rect.width;
       const scaleY = canvas.height / rect.height;
       const x = (event.clientX - rect.left) * scaleX;
@@ -3783,9 +3831,9 @@
       const imageInCustomMode = imagePosition === 'custom';
       
       if (!textInCustomMode && !imageInCustomMode) return;
-      
+
       const touch = event.touches[0];
-      const rect = canvas.getBoundingClientRect();
+      const rect = getCanvasContentRect();
       const scaleX = canvas.width / rect.width;
       const scaleY = canvas.height / rect.height;
       
@@ -3815,9 +3863,9 @@
      */
     function handleTouchMove(event) {
       if (!isDragging) return;
-      
+
       const touch = event.touches[0];
-      const rect = canvas.getBoundingClientRect();
+      const rect = getCanvasContentRect();
       const scaleX = canvas.width / rect.width;
       const scaleY = canvas.height / rect.height;
       
@@ -4029,7 +4077,7 @@
       const canvasHeight = canvas.height;
       
       // Calcular escala de visualización
-      const rect = canvas.getBoundingClientRect();
+      const rect = getCanvasContentRect();
       const scaleX = rect.width / canvasWidth;
       const scaleY = rect.height / canvasHeight;
       
@@ -4057,8 +4105,8 @@
      */
     function handleRulerMouseMove(event) {
       if (!isRulerMode) return;
-      
-      const rect = canvas.getBoundingClientRect();
+
+      const rect = getCanvasContentRect();
       const scaleX = canvas.width / rect.width;
       const scaleY = canvas.height / rect.height;
       
@@ -4078,8 +4126,8 @@
      */
     function updateCrosshair() {
       if (!rulerElements.horizontalLine || !rulerElements.verticalLine) return;
-      
-      const rect = canvas.getBoundingClientRect();
+
+      const rect = getCanvasContentRect();
       const displayX = (currentMouseX / canvas.width) * rect.width;
       const displayY = (currentMouseY / canvas.height) * rect.height;
       
@@ -4098,8 +4146,8 @@
      */
     function updateCoordinates() {
       if (!rulerElements.coordinateDisplay) return;
-      
-      const rect = canvas.getBoundingClientRect();
+
+      const rect = getCanvasContentRect();
       const displayX = (currentMouseX / canvas.width) * rect.width;
       const displayY = (currentMouseY / canvas.height) * rect.height;
       
@@ -4194,26 +4242,30 @@
 
     function showPositionMarker() {
       if (!customImagePosition || !canvas) return;
-      
+
       // Quitar marcador anterior si existe
       removePositionMarker();
-      
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = rect.width / canvas.width;
-      const scaleY = rect.height / canvas.height;
-      
+
+      const contentRect = getCanvasContentRect();
+      const container = canvas.parentElement;
+      if (!container) return;
+      const containerRect = container.getBoundingClientRect();
+      const offsetLeft = contentRect.left - containerRect.left;
+      const offsetTop = contentRect.top - containerRect.top;
+      const scaleX = contentRect.width / canvas.width;
+      const scaleY = contentRect.height / canvas.height;
+
       const marker = document.createElement('div');
       marker.className = 'custom-position-marker';
       marker.id = 'position-marker';
-      
-      const displayX = customImagePosition.x * scaleX;
-      const displayY = customImagePosition.y * scaleY;
-      
+
+      const displayX = offsetLeft + customImagePosition.x * scaleX;
+      const displayY = offsetTop + customImagePosition.y * scaleY;
+
       marker.style.left = displayX + 'px';
       marker.style.top = displayY + 'px';
-      
+
       // Agregar al contenedor del canvas
-      const container = canvas.parentElement;
       container.style.position = 'relative';
       container.appendChild(marker);
     }
@@ -4228,31 +4280,33 @@
     // Funciones para marcadores de posición de texto
     function showTextPositionMarker() {
       if (!customTextPosition || !canvas) return;
-      
+
       // Quitar marcador anterior si existe
       removeTextPositionMarker();
-      
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = rect.width / canvas.width;
-      const scaleY = rect.height / canvas.height;
-      
+
+      const contentRect = getCanvasContentRect();
+      const container = canvas.parentElement;
+      if (!container) return;
+      const containerRect = container.getBoundingClientRect();
+      const offsetLeft = contentRect.left - containerRect.left;
+      const offsetTop = contentRect.top - containerRect.top;
+      const scaleX = contentRect.width / canvas.width;
+      const scaleY = contentRect.height / canvas.height;
+
       const marker = document.createElement('div');
       marker.className = 'custom-position-marker text-marker';
       marker.id = 'text-position-marker';
       marker.style.borderColor = '#3b82f6'; // Color azul para diferenciar del marcador de imagen
-      
-      const displayX = customTextPosition.x * scaleX;
-      const displayY = customTextPosition.y * scaleY;
-      
+
+      const displayX = offsetLeft + customTextPosition.x * scaleX;
+      const displayY = offsetTop + customTextPosition.y * scaleY;
+
       marker.style.left = displayX + 'px';
       marker.style.top = displayY + 'px';
-      
+
       // Agregar al contenedor del canvas
-      const container = canvas.parentElement;
-      if (container) {
-        container.style.position = 'relative';
-        container.appendChild(marker);
-      }
+      container.style.position = 'relative';
+      container.appendChild(marker);
     }
 
     function removeTextPositionMarker() {
@@ -5533,7 +5587,13 @@
         canvas.style.maxWidth = '';
         canvas.style.maxHeight = '';
         canvas.style.objectFit = '';
-        
+
+        // Restaurar dimensiones correctas del canvas
+        if (currentImage) {
+          setupCanvas();
+          updatePreview();
+        }
+
         if (fullscreenBtn) {
           fullscreenBtn.innerHTML = '<i class="fas fa-expand" aria-hidden="true"></i> Pantalla completa';
         }
@@ -6082,6 +6142,11 @@
       window.resizeTimer = setTimeout(function() {
         if (isMobileDevice()) {
           updateMobileLayout();
+        }
+        // Recalcular dimensiones del canvas en cualquier dispositivo
+        if (currentImage) {
+          setupCanvas();
+          updatePreview();
         }
       }, 250);
     });
@@ -6796,16 +6861,44 @@
       try {
         showProgressBar('Generando ZIP...');
         const steps = [
-          { message: 'Recopilando imágenes procesadas...', duration: 500 },
-          { message: 'Comprimiendo imágenes...', duration: 800 },
+          { message: 'Recopilando imágenes procesadas...', duration: 600 },
+          { message: 'Comprimiendo imágenes...', duration: 900 },
           { message: 'Generando archivo ZIP...', duration: 900 },
-          { message: 'Preparando descarga...', duration: 800 }
+          { message: 'Preparando descarga...', duration: 600 }
         ];
-        const zipPromise = batchManager.exportToZip();
-        await Promise.all([simulateProgressSteps(steps, 3000), zipPromise]);
+        // Generar ZIP sin descarga automática — el guardado lo hacemos aquí
+        const zipPromise = batchManager.exportToZip(null, { skipDownload: true });
+        const [, result] = await Promise.all([simulateProgressSteps(steps, 3000), zipPromise]);
         hideProgressBar();
+
+        // Guardar con showSaveFilePicker (Escritorio por defecto) o fallback <a download>
+        if ('showSaveFilePicker' in window) {
+          try {
+            const handle = await window.showSaveFilePicker({
+              suggestedName: result.fileName,
+              startIn: 'desktop',
+              types: [{
+                description: 'Archivo ZIP',
+                accept: { 'application/zip': ['.zip'] }
+              }]
+            });
+            const writable = await handle.createWritable();
+            await writable.write(result.blob);
+            await writable.close();
+            UIManager.showSuccess('ZIP guardado correctamente (' + result.imageCount + ' imágenes)');
+          } catch (pickerError) {
+            // Usuario canceló el diálogo — no es un error
+            if (pickerError.name !== 'AbortError') {
+              throw pickerError;
+            }
+          }
+        } else {
+          // Fallback: descarga clásica con <a download>
+          batchManager.downloadBlob(result.blob, result.fileName);
+          UIManager.showSuccess('ZIP descargado (' + result.imageCount + ' imágenes)');
+        }
       } catch (error) {
-        console.error('Error descargando ZIP:', error);
+        MNEMOTAG_DEBUG && console.error('Error descargando ZIP:', error);
         hideProgressBar();
         UIManager.showError('Error al descargar el archivo ZIP');
       }

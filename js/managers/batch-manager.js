@@ -324,7 +324,7 @@ class BatchManager {
   /**
    * Exportar imágenes procesadas como ZIP
    */
-  async exportToZip(zipName = null) {
+  async exportToZip(zipName = null, options = {}) {
     if (this.processedImages.length === 0) {
       throw new Error('No hay imágenes procesadas para exportar');
     }
@@ -336,7 +336,7 @@ class BatchManager {
 
     const zip = new JSZip();
     const folder = zip.folder('mnemotag-batch');
-    
+
     // Agregar imágenes al ZIP conservando el nombre original
     for (const image of this.processedImages) {
       if (image.success && image.blob) {
@@ -347,24 +347,27 @@ class BatchManager {
         folder.file(fileName, image.blob);
       }
     }
-    
+
     // Generar ZIP
     const content = await zip.generateAsync({
       type: 'blob',
       compression: 'DEFLATE',
       compressionOptions: { level: 6 }
     });
-    
-    // Descargar ZIP
+
     const defaultName = zipName || `mnemotag-batch-${this.formatDate()}.zip`;
-    this.downloadBlob(content, defaultName);
-    
-    
+
+    // Si skipDownload, devolver blob sin descargar (el caller maneja el guardado)
+    if (!options.skipDownload) {
+      this.downloadBlob(content, defaultName);
+    }
+
     return {
       success: true,
       fileName: defaultName,
       size: content.size,
-      imageCount: this.processedImages.length
+      imageCount: this.processedImages.length,
+      blob: content
     };
   }
 

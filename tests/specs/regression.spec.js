@@ -1157,14 +1157,16 @@ describe('Regresión — Code audit moderado (v3.5.2)', function () {
 // v3.5.6+ — Batch processing: watermarks idénticas a previsualización
 // ========================================================================
 
-describe('Regresión — Batch ZIP download (v3.5.6)', function () {
-  it('downloadBatchZip NO usa createObjectURL (exportToZip descarga internamente)', async function () {
+describe('Regresión — Batch ZIP download (v3.5.6+)', function () {
+  it('downloadBatchZip usa exportToZip con skipDownload y showSaveFilePicker', async function () {
     const src = await fetchSource('../js/main.js');
     // Extraer solo la función downloadBatchZip
     const fnStart = src.indexOf('function downloadBatchZip');
-    const fnBlock = src.substring(fnStart, fnStart + 500);
-    expect(fnBlock).not.toContain('createObjectURL');
-    expect(fnBlock).toContain('exportToZip()');
+    const fnBlock = src.substring(fnStart, fnStart + 1200);
+    expect(fnBlock).toContain('exportToZip');
+    expect(fnBlock).toContain('skipDownload: true');
+    expect(fnBlock).toContain('showSaveFilePicker');
+    expect(fnBlock).toContain("startIn: 'desktop'");
   });
 });
 
@@ -1253,5 +1255,101 @@ describe('Regresión — batch-manager.js usa renderFn (v3.5.6)', function () {
   it('captureCurrentConfig acepta renderFn como parámetro', async function () {
     const src = await fetchSource('../js/managers/batch-manager.js');
     expect(src).toContain('renderFn: renderFn || null');
+  });
+});
+
+// ─── Regresión — Coordenadas de watermarks en imágenes portrait (v3.5.11) ───
+
+describe('Regresión — setupCanvas respeta max-height para portrait', function () {
+  it('calcula maxDisplayHeight en la rama desktop', async function () {
+    const src = await fetchSource('../js/main.js');
+    // Debe calcular el límite de altura basado en 75vh
+    expect(src).toContain('window.innerHeight * 0.75');
+    // Y recalcular width cuando height excede el límite
+    expect(src).toMatch(/if\s*\(\s*displayH\s*>\s*maxDisplayHeight\s*\)/);
+    expect(src).toContain('displayW = Math.round(displayH / aspectRatio)');
+  });
+
+  it('calcula maxDisplayHeight en la rama mobile', async function () {
+    const src = await fetchSource('../js/main.js');
+    // Debe calcular el límite de altura para mobile (60vh)
+    expect(src).toContain('window.innerHeight * 0.6');
+  });
+
+  it('NO asigna object-fit: contain en setupCanvas', async function () {
+    const src = await fetchSource('../js/main.js');
+    // La línea object-fit: contain fue eliminada de setupCanvas para evitar
+    // letterboxing que rompe la conversión de coordenadas
+    expect(src).not.toMatch(/canvas\.style\.objectFit\s*=\s*'contain';\s*\n\s*\/\/\s*Mejorar calidad/);
+  });
+});
+
+describe('Regresión — getCanvasContentRect existe y se usa', function () {
+  it('define la función getCanvasContentRect', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('function getCanvasContentRect()');
+    // Debe calcular aspect ratios para detectar letterboxing
+    expect(src).toContain('canvas.width / canvas.height');
+    expect(src).toContain('rect.width / rect.height');
+  });
+
+  it('handleDragStart usa getCanvasContentRect en vez de getBoundingClientRect', async function () {
+    const src = await fetchSource('../js/main.js');
+    // Buscar el patrón dentro de handleDragStart
+    const fnMatch = src.match(/function handleDragStart[\s\S]*?const rect = (get\w+)\(\)/);
+    expect(fnMatch).not.toBe(null);
+    expect(fnMatch[1]).toBe('getCanvasContentRect');
+  });
+
+  it('handleDragMove usa getCanvasContentRect', async function () {
+    const src = await fetchSource('../js/main.js');
+    const fnMatch = src.match(/function handleDragMove[\s\S]*?const rect = (get\w+)\(\)/);
+    expect(fnMatch).not.toBe(null);
+    expect(fnMatch[1]).toBe('getCanvasContentRect');
+  });
+
+  it('handleRulerMouseMove usa getCanvasContentRect', async function () {
+    const src = await fetchSource('../js/main.js');
+    const fnMatch = src.match(/function handleRulerMouseMove[\s\S]*?const rect = (get\w+)\(\)/);
+    expect(fnMatch).not.toBe(null);
+    expect(fnMatch[1]).toBe('getCanvasContentRect');
+  });
+});
+
+describe('Regresión — Marcadores de posición con offset del canvas', function () {
+  it('showPositionMarker calcula offsetLeft/offsetTop del canvas en su container', async function () {
+    const src = await fetchSource('../js/main.js');
+    const fnMatch = src.match(/function showPositionMarker\(\)[\s\S]*?container\.appendChild\(marker\)/);
+    expect(fnMatch).not.toBe(null);
+    const fnBody = fnMatch[0];
+    // Debe usar getCanvasContentRect y calcular offset respecto al container
+    expect(fnBody).toContain('getCanvasContentRect()');
+    expect(fnBody).toContain('container.getBoundingClientRect()');
+    expect(fnBody).toContain('contentRect.left - containerRect.left');
+  });
+
+  it('showTextPositionMarker calcula offsetLeft/offsetTop del canvas en su container', async function () {
+    const src = await fetchSource('../js/main.js');
+    const fnMatch = src.match(/function showTextPositionMarker\(\)[\s\S]*?container\.appendChild\(marker\)/);
+    expect(fnMatch).not.toBe(null);
+    const fnBody = fnMatch[0];
+    expect(fnBody).toContain('getCanvasContentRect()');
+    expect(fnBody).toContain('container.getBoundingClientRect()');
+    expect(fnBody).toContain('contentRect.left - containerRect.left');
+  });
+});
+
+describe('Regresión — Resize recalcula canvas en desktop', function () {
+  it('el resize handler llama setupCanvas + updatePreview cuando hay imagen', async function () {
+    const src = await fetchSource('../js/main.js');
+    // Buscar el handler de resize que incluye setupCanvas
+    const resizeBlock = src.match(/addEventListener\('resize'[\s\S]*?setupCanvas\(\)[\s\S]*?updatePreview\(\)/);
+    expect(resizeBlock).not.toBe(null);
+  });
+
+  it('handleFullscreenChange restaura setupCanvas al salir', async function () {
+    const src = await fetchSource('../js/main.js');
+    const fnMatch = src.match(/function handleFullscreenChange[\s\S]*?setupCanvas\(\)/);
+    expect(fnMatch).not.toBe(null);
   });
 });
