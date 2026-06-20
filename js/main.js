@@ -248,7 +248,21 @@
       initializeApp();
       setupFileNaming();
       initializeTheme();
-      
+
+      // Wiring de seguridad del botón "Limpiar todo" — aislado de initializeApp.
+      // Si setupEventListeners falla en mitad (catch silencioso interno), este
+      // listener garantiza que el botón sigue operativo.
+      try {
+        const btn = document.getElementById('clear-all-btn');
+        if (btn && !btn.dataset.clearAllWired) {
+          btn.dataset.clearAllWired = '1';
+          btn.addEventListener('click', function () {
+            if (window.confirm('¿Limpiar absolutamente TODOS los datos? Se borrarán la imagen, metadatos, marcas de agua, filtros, historial, presets y datos guardados.')) {
+              if (typeof clearAllData === 'function') clearAllData();
+            }
+          });
+        }
+      } catch (e) { MNEMOTAG_DEBUG && console.warn('[boot] clear-all-btn wiring falló:', e); }
     });
 
     // UIManager extraído a js/managers/ui-manager.js
@@ -378,73 +392,139 @@
      * - Presets guardados
      * - sessionStorage de diagnóstico
      * - Toda la clave localStorage de la app
+     * - Caché LRU local (processedImages, thumbnails, watermarkImage)
+     * - FilterCache (LRU de estados de filtros)
+     * - Cache API del Service Worker (caches "mnemotag-*")
      */
     function clearAllData() {
+      // Cada paso envuelto en try/catch: si uno falla, los demás siguen.
+      // Antes, una excepción temprana (p. ej. un getElementById().reset() sobre null)
+      // abortaba toda la función y daba la sensación de que "no se limpiaba nada".
+      const safe = function (label, fn) {
+        try { fn(); }
+        catch (e) { MNEMOTAG_DEBUG && console.warn('[clearAllData] ' + label + ' falló:', e); }
+      };
+
       // 1. Limpiar la imagen cargada
-      if (typeof removeSelectedFile === 'function') {
-        removeSelectedFile();
-      }
+      safe('removeSelectedFile', function () {
+        if (typeof removeSelectedFile === 'function') removeSelectedFile();
+      });
+
+      // Helper: limpia un form sin romper la UI.
+      // Estrategia: (1) form.reset() hace el trabajo pesado y respeta
+      // <option selected> / value="" / defaultChecked; (2) los campos
+      // de texto libre (text/email/url/search/tel/textarea) se vacían a
+      // cadena vacía aunque el HTML tuviera value="algo"; (3) los type=file
+      // se limpian a mano porque reset() no siempre los limpia; (4) se
+      // dispara 'change' en selects/checkboxes para que los handlers de
+      // visibilidad (p. ej. toggleCustomImageSize) resincronicen la UI al
+      // estado restaurado (form.reset NO emite eventos).
+      const forceClearForm = function (form) {
+        if (!form) return;
+        try { form.reset(); } catch (_) { /* ignored */ }
+
+        const emptyableTypes = ['text', 'email', 'url', 'search', 'tel', 'password', ''];
+        form.querySelectorAll('input, textarea').forEach(function (el) {
+          const type = (el.type || '').toLowerCase();
+          if (el.tagName === 'TEXTAREA' || emptyableTypes.includes(type)) {
+            el.value = '';
+          } else if (type === 'file') {
+            try { el.value = ''; } catch (_) { /* ignored */ }
+          }
+        });
+
+        form.querySelectorAll('select, input[type="checkbox"], input[type="radio"]').forEach(function (el) {
+          try { el.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) { /* ignored */ }
+        });
+      };
 
       // 2. Limpiar formulario de metadatos + su localStorage
-      const metaForm = document.getElementById('metadata-form');
-      if (metaForm) metaForm.reset();
-      try { localStorage.removeItem('imageMetadata'); } catch (e) { MNEMOTAG_DEBUG && console.warn('localStorage op failed:', e); }
+      safe('metadata-form clear', function () {
+        forceClearForm(document.getElementById('metadata-form'));
+      });
+      safe('localStorage.imageMetadata', function () { localStorage.removeItem('imageMetadata'); });
 
-      // 3. Limpiar formulario de watermark + su localStorage
-      clearWatermarkState();
+      // 3. Limpiar formulario de watermark (estado + form + localStorage)
+      safe('clearWatermarkState', function () {
+        if (typeof clearWatermarkState === 'function') clearWatermarkState();
+      });
+      safe('watermark-form force-clear', function () {
+        forceClearForm(document.getElementById('watermark-form'));
+      });
 
       // 4. Resetear filtros (brightness, contrast, saturation, blur → 0)
-      ['brightness', 'contrast', 'saturation', 'blur'].forEach(function (id) {
-        const el = document.getElementById(id);
-        if (el) {
-          el.value = id === 'blur' ? '0' : '0';
-          el.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-        const valSpan = document.getElementById(id + '-value');
-        if (valSpan) valSpan.textContent = '0';
+      safe('reset filters sliders', function () {
+        ['brightness', 'contrast', 'saturation', 'blur'].forEach(function (id) {
+          const el = document.getElementById(id);
+          if (el) {
+            el.value = '0';
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+          }
+          const valSpan = document.getElementById(id + '-value');
+          if (valSpan) valSpan.textContent = '0';
+        });
+        if (typeof resetFilters === 'function') resetFilters();
       });
-      if (typeof resetFilters === 'function') {
-        resetFilters();
-      }
 
       // 5. Limpiar historial de undo/redo (libera ImageBitmaps)
-      if (typeof historyManager !== 'undefined' && historyManager.clear) {
-        historyManager.clear();
-      }
+      safe('historyManager.clear', function () {
+        if (typeof historyManager !== 'undefined' && historyManager && historyManager.clear) {
+          historyManager.clear();
+        }
+      });
 
       // 6. Limpiar presets guardados
-      if (typeof PresetManager !== 'undefined') {
+      safe('PresetManager clear', function () {
+        if (typeof PresetManager === 'undefined') return;
         const presets = PresetManager.listPresets();
-        presets.forEach(function (name) {
-          PresetManager.deletePreset(name);
-        });
+        presets.forEach(function (name) { PresetManager.deletePreset(name); });
         const presetSelect = document.getElementById('preset-select');
         if (presetSelect) PresetManager.populateSelect(presetSelect);
-      }
+      });
 
       // 7. Limpiar sessionStorage de diagnóstico
-      try { sessionStorage.removeItem('mnemotag-boot-info'); } catch (e) { MNEMOTAG_DEBUG && console.warn('localStorage op failed:', e); }
+      safe('sessionStorage', function () { sessionStorage.removeItem('mnemotag-boot-info'); });
 
       // 8. Limpiar cualquier otra clave de localStorage que empiece por 'mnemotag-'
-      try {
+      safe('localStorage mnemotag-*', function () {
         const keysToRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
-          if (key && key.startsWith('mnemotag-')) {
-            keysToRemove.push(key);
-          }
+          if (key && key.startsWith('mnemotag-')) keysToRemove.push(key);
         }
         keysToRemove.forEach(function (key) { localStorage.removeItem(key); });
-      } catch (e) { MNEMOTAG_DEBUG && console.warn('localStorage op failed:', e); }
+      });
 
-      // 9. Refrescar UI
-      if (typeof updatePreview === 'function' && canvas && currentImage) {
-        updatePreview();
-      }
+      // 9. Limpiar caché LRU local (processedImages, thumbnails, watermarkImage)
+      safe('cache.clear', function () {
+        if (cache && typeof cache.clear === 'function') cache.clear();
+      });
 
-      if (typeof UIManager !== 'undefined' && UIManager.showSuccess) {
-        UIManager.showSuccess('🗑️ Todos los datos limpiados. La app está como nueva.');
-      }
+      // 10. Limpiar FilterCache (LRU de estados de filtros)
+      safe('FilterCache.clear', function () {
+        if (typeof FilterCache !== 'undefined' && FilterCache && FilterCache.clear) FilterCache.clear();
+      });
+
+      // 11. Limpiar Cache API del Service Worker (mnemotag-*)
+      safe('caches.delete', function () {
+        if (typeof caches !== 'undefined' && caches.keys) {
+          caches.keys().then(function (names) {
+            names.filter(function (n) { return n.startsWith('mnemotag-'); })
+                 .forEach(function (n) { caches.delete(n); });
+          }).catch(function () { /* defensivo */ });
+        }
+      });
+
+      // 12. Refrescar UI
+      safe('updatePreview', function () {
+        if (typeof updatePreview === 'function' && canvas && currentImage) updatePreview();
+      });
+
+      safe('UIManager.showSuccess', function () {
+        if (typeof UIManager !== 'undefined' && UIManager.showSuccess) {
+          UIManager.showSuccess('🗑️ Todos los datos limpiados. La app está como nueva.');
+        }
+      });
     }
 
     // Defensa contra reloads automáticos de Live Server en localhost.
@@ -1099,14 +1179,19 @@
         });
 
         // Botón global "Limpiar todo" en el hero.
-        const clearAllBtn = document.getElementById('clear-all-btn');
-        if (clearAllBtn) {
-          clearAllBtn.addEventListener('click', function () {
-            if (window.confirm('¿Limpiar absolutamente TODOS los datos? Se borrarán la imagen, metadatos, marcas de agua, filtros, historial, presets y datos guardados.')) {
-              clearAllData();
-            }
-          });
-        }
+        // Envuelto en su propio try/catch: este botón es crítico y debe
+        // quedar conectado aunque otros listeners del bloque exterior fallen.
+        try {
+          const clearAllBtn = document.getElementById('clear-all-btn');
+          if (clearAllBtn && !clearAllBtn.dataset.clearAllWired) {
+            clearAllBtn.dataset.clearAllWired = '1';
+            clearAllBtn.addEventListener('click', function () {
+              if (window.confirm('¿Limpiar absolutamente TODOS los datos? Se borrarán la imagen, metadatos, marcas de agua, filtros, historial, presets y datos guardados.')) {
+                clearAllData();
+              }
+            });
+          }
+        } catch (e) { MNEMOTAG_DEBUG && console.warn('clear-all-btn wiring failed:', e); }
 
         // v3.4.5: Filter presets (guardar/cargar/eliminar en localStorage)
         const presetSelect = document.getElementById('preset-select');

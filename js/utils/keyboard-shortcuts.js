@@ -69,17 +69,19 @@ class KeyboardShortcutManager {
    */
   getComboFromEvent(e) {
     const modifiers = [];
-    
+
     // En Mac, usar metaKey (Cmd) en lugar de ctrlKey
     if (this.isMac) {
       if (e.metaKey) modifiers.push('ctrl');
     } else {
       if (e.ctrlKey) modifiers.push('ctrl');
     }
-    
+
     if (e.shiftKey) modifiers.push('shift');
     if (e.altKey) modifiers.push('alt');
-    
+
+    // e.key puede ser undefined en eventos sintéticos, autofill o IME composition
+    if (typeof e.key !== 'string') return '';
     const key = e.key.toLowerCase();
     return this.createCombo(key, modifiers);
   }
@@ -89,11 +91,14 @@ class KeyboardShortcutManager {
    */
   handleKeyDown(e) {
     if (!this.isEnabled) return;
-    
+
+    if (typeof e.key !== 'string') return;
+
     // Ignorar si el foco está en inputs de texto
-    if (this.ignoreTargets.includes(e.target.tagName)) return;
-    
+    if (e.target && this.ignoreTargets.includes(e.target.tagName)) return;
+
     const combo = this.getComboFromEvent(e);
+    if (!combo) return;
     this.activeKeys.add(e.key.toLowerCase());
     
     if (this.shortcuts.has(combo)) {
@@ -117,6 +122,7 @@ class KeyboardShortcutManager {
    * Manejar evento keyup
    */
   handleKeyUp(e) {
+    if (typeof e.key !== 'string') return;
     this.activeKeys.delete(e.key.toLowerCase());
   }
 
@@ -125,7 +131,7 @@ class KeyboardShortcutManager {
    */
   shouldPreventDefault(e) {
     const combo = this.getComboFromEvent(e);
-    if (this.shortcuts.has(combo)) {
+    if (combo && this.shortcuts.has(combo)) {
       return this.shortcuts.get(combo).preventDefault;
     }
     return false;
