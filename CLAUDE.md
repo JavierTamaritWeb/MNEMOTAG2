@@ -4,23 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-MnemoTag is a **client-side, single-page** image editor (vanilla JS, no framework). It applies filters, adds text/image watermarks, crops, and exports JPEG/PNG/WebP/AVIF — all in the browser. **EXIF metadata writing works for JPEG, PNG, WebP and AVIF** (JPEG via piexifjs CDN; PNG/WebP/AVIF via custom binary manipulation). See "EXIF/metadata writing" below for details. Documentation is in Spanish; UI strings, comments, and commit messages are in Spanish too. Since v3.5.0, the project uses **Gulp 5** as build tool (SCSS compilation + JS bundling + minification).
+MnemoTag is a **client-side, single-page** image editor (vanilla JS, no framework). It applies filters, adds text/image watermarks, crops, and exports JPEG/PNG/WebP/AVIF — all in the browser. **EXIF metadata writing works for JPEG, PNG, WebP and AVIF** (TIFF generado con piexifjs local; contenedores PNG/WebP/AVIF mediante manipulación binaria propia). See "EXIF/metadata writing" below for details. Documentation is in Spanish; UI strings, comments, and commit messages are in Spanish too. Since v3.5.0, the project uses **Gulp 5** as build tool (SCSS compilation + JS bundling + minification).
 
 ## Running and developing
 
 The app is a static site with a Gulp-based build system:
 
 - **Setup:** `npm install` (one-time, installs Gulp + SCSS compiler + browser-sync).
-- **Build:** `npm run build` compiles SCSS → `css/styles.css` and bundles 24 JS files → `js/app.min.js`.
+- **Build:** `npm run build` compiles SCSS → `dist/css/styles.css` and bundles 24 JS files → `dist/js/app.min.js`.
 - **Dev:** `npm run dev` runs build + watch + browser-sync on port 5507 (no auto-reload).
 - **Run locally:** open `index.html` in a browser, or use `npm run serve` (browser-sync on port 5507).
-- Tests live in `tests/` and have **two runners** that share the same specs:
+- Tests live in `tests/` and combine Node, binary, browser and Playwright runners:
   - **Browser runner (authoritative).** `tests/index.html` + `tests/test-runner.js` (~250-line custom mini-framework, zero dependencies). Serve the project root with Live Server and open `http://localhost:5505/tests/index.html`. This is the source of truth — it executes against a real DOM, real Canvas, real `fetch()`. Use it before any release.
   - **Node runner (fast / CI / agent-friendly).** `tests/run-in-node.js` runs the same `tests/specs/*.spec.js` files inside a `vm.createContext` with minimal polyfills (`document`, `localStorage`, `performance`, and `fetch` aliased to `fs.readFileSync`). Command: `node tests/run-in-node.js`. Finishes in ~80 ms. No npm, no `package.json`, no `node_modules` — uses only Node's built-in `fs`/`path`/`vm`. Use it as a smoke check before committing, or from any agent that doesn't have a browser. **Caveat:** because the DOM is stubbed, any future test that touches a real `Canvas` 2D context, real layout, or live event dispatch will pass in Node but only the browser runner can truly verify it.
   - **Binary validation runner (low-level).** `tests/binary-validation.js` carga `helpers.js` y `metadata-manager.js` en un VM context con polyfills mínimos, sintetiza un PNG mínimo (1×1 rojo), tres WebP (VP8 lossy, VP8L lossless, VP8X extended) y un AVIF sintético (164 bytes con meta+mdat) **a mano byte por byte**, y verifica que las funciones de manipulación binaria producen output correcto. Comando: `node tests/binary-validation.js`. **86 aserciones**, ~100 ms. Importante: el orden de carga importa — `helpers.js` debe ir antes que `metadata-manager.js` porque `_buildPngExifChunk` usa `crc32`.
-- **Linting:** `npx --yes eslint@9 --no-config-lookup -c eslint.config.js js/` and `npx --yes stylelint "src/scss/**/*.scss" "css/**/*.css"`. Config files: `eslint.config.js` (ESLint 9 flat config) and `.stylelintrc.json` (Stylelint 16, 18 rules).
-- **CI workflows eliminados** (v3.5.7): `test.yml`, `lint.yml`, `e2e.yml` ya no existen. Tests se ejecutan manualmente con `npm test`.
-- **External deps are CDN-loaded** in `index.html` (Tailwind 2.2.19, Font Awesome 6.4.0, JSZip 3.10.1, piexifjs 1.0.6, Google Fonts). `npm install` solo instala devDependencies del build (Gulp, sass, etc.).
+- **Playwright E2E:** `npm run test:e2e` prueba desarrollo y `npm run test:e2e:dist` sirve exclusivamente `dist/`. Ambos deben pasar antes de release.
+- **Linting:** `npm run lint:js` and `npm run lint:css`. ESLint 9 y Stylelint estan fijados en `devDependencies`.
+- **CI/deploy:** los workflows separados de test/lint se eliminaron en v3.5.7; `.github/workflows/deploy.yml` ejecuta checkout limpio, build, tests, lint y publica `dist/` en GitHub Pages.
+- **External deps:** Tailwind, Font Awesome, JSZip, heic2any y Google Fonts se cargan externamente. `piexifjs 1.0.6` se sirve localmente desde `js/vendor/` porque el minificado dinamico de jsDelivr no admite SRI estable.
 
 ## Architecture
 
@@ -149,7 +150,7 @@ When `isRulerMode` is true, `main.js` injects DOM-level ruler/guide elements (tr
 
 ### EXIF/metadata writing — JPEG, PNG, WebP and AVIF
 
-EXIF writing is implemented para **JPEG** (via `piexifjs@1.0.6` cargado por CDN), **PNG** (manipulación binaria del chunk `eXIf`), **WebP** (manipulación RIFF + conversión a VP8X) y **AVIF** (inyección ISOBMFF real desde v3.4.15). Sin librerías externas más allá de piexifjs.
+EXIF writing is implemented para **JPEG** (via `piexifjs@1.0.6` servido desde `js/vendor/`), **PNG** (manipulación binaria del chunk `eXIf`), **WebP** (manipulación RIFF + conversión a VP8X) y **AVIF** (inyección ISOBMFF real desde v3.4.15). Sin librerías externas más allá de piexifjs.
 
 **PNG implementation (v3.3.6)**: el chunk `eXIf` (PNG spec 1.5) recibe el bloque TIFF que genera `piexif.dump()` después de strippearle la cabecera APP1 + `Exif\0\0`. La manipulación está en `MetadataManager._buildPngExifChunk` + `_insertExifChunkInPng`, usando la utilidad `crc32` de `helpers.js`. El chunk se inserta antes del primer `IDAT`. Si ya hay un `eXIf` previo se reemplaza. Defensiva: ante error devuelve el blob original.
 
@@ -193,7 +194,7 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 
 ## Versioning and commits
 
-**Current version: v3.5.10**.
+**Current version: v3.5.12**.
 - **v3.5.0**: Gulp 5 build system (SCSS + JS bundle + minification + browser-sync), zoom-pan-manager extracted.
 - **v3.5.1–v3.5.2**: Code audit — 4 critical + 14 moderate fixes (onclick→data-action, console guards, var→const/let, null guards).
 - **v3.5.3**: Output movido a `dist/`, SCSS reorganizado en subcarpetas (`abstracts/`, `base/`, `layout/`, `components/`, `pages/`, `modules/`).
@@ -202,8 +203,10 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 - **v3.5.6**: Fixes — SRI roto en dist, heic2any 404, originalWidth no declarado.
 - **v3.5.7**: Batch processing arreglado (5 bugs: ZIP download, IDs watermark, posiciones con canvas global, filtros CSS, renderFn). 9 tests de regresion. Gulp watch mejorado. Defaults de watermark personalizados. CI workflows eliminados.
 - **v3.5.8**: Fix UI marcador invisible en posición personalizada y cache-busting persistente de favicon.
+- **v3.5.11**: Auditoria/reauditoria severa, EXIF local, crop y capas sincronizados, limites batch, E2E de `dist` y despliegue GitHub Pages restaurado. Ver `docs/AUDITORIA_V3_5_11_SOLUCIONES.md`.
+- **v3.5.12**: Flecos finales de la auditoria — estado de archivo solo tras validacion, Escape del modal de preview, pinch/orientacion via sistema global de zoom, token de secuencia en preview con worker, cache de watermark por identidad de archivo, timeout en AnalysisManager, clamp de area de recorte, stats reales del cache LRU.
 - **v3.4.x** (15 releases): CSP/SRI, ESLint/Stylelint CI, accessibility, curves live preview, filter presets, ImageBitmap undo/redo, 5 managers extracted, Web Worker for autoBalance, Playwright E2E, AVIF EXIF injection.
 
-**Tests**: 217/217 Node + 86/86 binarios. Quick smoke check: `npm test` (runs both Node runners). `git log` remains the authoritative source for the actual commit version.
+**Tests**: 237/237 Node + 92/92 binarios + 6/6 E2E en desarrollo + 6/6 E2E en `dist`. Quick smoke check: `npm test`; release check: build + lint + ambos E2E. `git log` remains the authoritative source for the actual commit version.
 
 Commit messages follow `Versión X.Y.Z - <descripción>` in Spanish — match this style. `CHANGELOG.md` and the docs under `docs/` are kept hand-updated per release.

@@ -109,31 +109,41 @@
     const cache = {
       watermarkImage: null,
       lastWatermarkConfig: null,
+      lastWatermarkFileKey: null,
       processedImages: new Map(),
       thumbnails: new Map(),
       
       // Configuración del cache
       maxSize: 50, // Máximo 50 imágenes en cache
       maxAge: 30 * 60 * 1000, // 30 minutos
-      
+
+      // Contadores para getStats (sin inicializarlos, hitRate era siempre 0)
+      hitCount: 0,
+      missCount: 0,
+
       // Generar clave única para cache
       generateKey: function(config) {
         return JSON.stringify(config);
       },
-      
+
       // Obtener del cache
       get: function(key) {
         const item = this.processedImages.get(key);
-        if (!item) return null;
-        
+        if (!item) {
+          this.missCount++;
+          return null;
+        }
+
         // Verificar si ha expirado
         if (Date.now() - item.timestamp > this.maxAge) {
           this.processedImages.delete(key);
+          this.missCount++;
           return null;
         }
-        
+
         // Actualizar timestamp (LRU)
         item.timestamp = Date.now();
+        this.hitCount++;
         return item.data;
       },
       
@@ -182,6 +192,7 @@
         this.thumbnails.clear();
         this.watermarkImage = null;
         this.lastWatermarkConfig = null;
+        this.lastWatermarkFileKey = null;
       },
       
       // Obtener estadísticas del cache
@@ -929,13 +940,15 @@
       // Cuando se selecciona un archivo
       fileInput.addEventListener('change', function(e) {
         if (e.target.files.length) {
-          currentFile = e.target.files[0];
-          // Guardar la extensión original del archivo
-          originalExtension = currentFile.name.split('.').pop().toLowerCase();
-          
+          // No mutar currentFile/originalExtension aquí: este listener corre
+          // ANTES de la validación. loadImageWithValidation los asigna cuando
+          // el archivo pasa los checks; asignarlos aquí dejaba estado de un
+          // archivo rechazado mezclado con la imagen anterior.
+          const selectedFile = e.target.files[0];
+
           // Obtener el nombre del archivo sin extensión
-          const fileNameWithoutExtension = currentFile.name.replace(/\.[^/.]+$/, "");
-          
+          const fileNameWithoutExtension = selectedFile.name.replace(/\.[^/.]+$/, "");
+
           // Actualizar el placeholder del campo título
           titleInput.placeholder = fileNameWithoutExtension;
           
@@ -1761,6 +1774,7 @@
       // Clear cache when new image is selected
       cache.watermarkImage = null;
       cache.lastWatermarkConfig = null;
+      cache.lastWatermarkFileKey = null;
       
       // Update button label with filename
       const watermarkInput = document.getElementById('watermark-image');
@@ -2618,7 +2632,15 @@
       const confirmBtn = previewModal.querySelector('.preview-confirm');
       const overlay = previewModal.querySelector('.preview-overlay');
 
+      // closed evita el doble cierre; el listener de Escape se desregistra
+      // SIEMPRE aquí (antes solo se quitaba si el cierre era vía Escape:
+      // cerrar con botón y pulsar Escape después lanzaba NotFoundError en
+      // removeChild y ejecutaba el callback una segunda vez)
+      let closed = false;
       function closePreview(confirmed = false) {
+        if (closed) return;
+        closed = true;
+        document.removeEventListener('keydown', escapeHandler);
         document.body.removeChild(previewModal);
         callback(confirmed);
       }
@@ -2626,7 +2648,7 @@
       closeBtn.addEventListener('click', () => closePreview(false));
       cancelBtn.addEventListener('click', () => closePreview(false));
       confirmBtn.addEventListener('click', () => closePreview(true));
-      
+
       overlay.addEventListener('click', (e) => {
         if (e.target === overlay) {
           closePreview(false);
@@ -2636,7 +2658,6 @@
       // Escape key to close
       const escapeHandler = (e) => {
         if (e.key === 'Escape') {
-          document.removeEventListener('keydown', escapeHandler);
           closePreview(false);
         }
       };
@@ -2647,11 +2668,8 @@
     function loadImageWithValidation(file, knownDimensions = null) {
       UIManager.showLoadingState('Validando imagen...');
 
-      // Guardar información del archivo
-      currentFile = file;
       const fileExtension = file.name.split('.').pop().toLowerCase();
-      originalExtension = fileExtension;
-      
+
       // Verificación adicional del tipo MIME vs extensión
       const mimeToExt = {
         'image/jpeg': ['jpg', 'jpeg'],
@@ -2659,13 +2677,19 @@
         'image/webp': ['webp'],
         'image/avif': ['avif']
       };
-      
+
       const allowedExtensionsForMime = mimeToExt[file.type];
       if (!allowedExtensionsForMime || !allowedExtensionsForMime.includes(fileExtension)) {
         UIManager.hideLoadingState();
         UIManager.showError('La extensión del archivo no coincide con su tipo');
         return;
       }
+
+      // Guardar información del archivo SOLO tras pasar la validación
+      // (asignar antes dejaba currentFile apuntando a un archivo rechazado
+      // mientras currentImage seguía siendo la imagen anterior)
+      currentFile = file;
+      originalExtension = fileExtension;
 
       // Leer archivo con manejo de errores mejorado
       const reader = new FileReader();
@@ -3092,6 +3116,9 @@
       });
     }
     
+    // Contador de secuencia para descartar resultados obsoletos del worker
+    let updatePreviewWithWorkerSeq = 0;
+
     // Actualización del preview usando worker para filtros pesados
     async function updatePreviewWithWorker() {
       try {
@@ -3104,12 +3131,25 @@
         // Dibujar imagen base
         tempCtx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
         const imageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
-        
+
+        // Token de secuencia: si mientras el worker procesa llega otra llamada
+        // (o cambia la imagen/dimensiones), este resultado queda obsoleto y se
+        // descarta en vez de pintarse encima del más reciente
+        const seq = ++updatePreviewWithWorkerSeq;
+
         // Procesar con worker
         const processedImageData = await FilterManager.applyWithWorker(imageData);
-        
+
+        if (seq !== updatePreviewWithWorkerSeq) return;
+        if (processedImageData.width !== canvas.width ||
+            processedImageData.height !== canvas.height) {
+          // La imagen/canvas cambió durante el procesado
+          return;
+        }
+
         // Aplicar resultado en el canvas principal
         requestAnimationFrame(() => {
+          if (seq !== updatePreviewWithWorkerSeq) return;
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           ctx.putImageData(processedImageData, 0, 0);
           
@@ -3301,9 +3341,9 @@
       const watermarkImageInput = document.getElementById('watermark-image');
       if (!watermarkImageInput.files[0]) return;
       
-      // Use cached image if available and configuration hasn't changed
+      const wmFile = watermarkImageInput.files[0];
       const currentConfig = {
-        file: watermarkImageInput.files[0],
+        file: wmFile,
         opacity: document.getElementById('watermark-image-opacity')?.value,
         size: document.getElementById('watermark-image-size')?.value,
         position: document.getElementById('watermark-image-position')?.value,
@@ -3311,11 +3351,15 @@
         height: document.getElementById('watermark-image-height')?.value,
         customPosition: customImagePosition ? JSON.stringify(customImagePosition) : null
       };
-      
-      const configChanged = !cache.lastWatermarkConfig || 
-        JSON.stringify(currentConfig) !== JSON.stringify(cache.lastWatermarkConfig);
-      
-      if (cache.watermarkImage && !configChanged) {
+
+      // La imagen decodificada se cachea por IDENTIDAD DEL ARCHIVO, no por la
+      // config completa: los cambios de opacidad/tamaño/posición (incluido el
+      // drag, que cambia customPosition en cada mousemove) solo requieren
+      // redibujar, no releer el File con FileReader + decode por frame.
+      const fileKey = `${wmFile.name}|${wmFile.size}|${wmFile.lastModified}`;
+
+      if (cache.watermarkImage && cache.lastWatermarkFileKey === fileKey) {
+        cache.lastWatermarkConfig = currentConfig;
         drawCachedWatermark(cache.watermarkImage, currentConfig);
         return;
       }
@@ -3328,6 +3372,7 @@
           // Guardar imagen para referencia en el posicionamiento
           watermarkImagePreview = watermarkImg;
           cache.watermarkImage = watermarkImg;
+          cache.lastWatermarkFileKey = fileKey;
           cache.lastWatermarkConfig = currentConfig;
           drawCachedWatermark(watermarkImg, currentConfig);
         };
@@ -5519,6 +5564,7 @@
       // Limpiar cache
       cache.watermarkImage = null;
       cache.lastWatermarkConfig = null;
+      cache.lastWatermarkFileKey = null;
       
       // Limpiar formularios
       const fileInput = document.getElementById('file-input');
@@ -6040,10 +6086,12 @@
       
       let startX = 0;
       let startY = 0;
-      let scale = 1;
       let initialDistance = 0;
-      
-      // Pinch to zoom
+
+      // Pinch to zoom — actualiza el estado global (currentZoom/isZoomed) y
+      // aplica el transform vía ZoomPanManager. Escribir canvas.style.transform
+      // directamente desincronizaba el pinch del resto del sistema de zoom
+      // (botones, indicador de %, drag de watermarks).
       canvas.addEventListener('touchstart', function(e) {
         if (e.touches.length === 2) {
           // Two finger touch - prepare for zoom
@@ -6055,26 +6103,28 @@
           startY = e.touches[0].clientY;
         }
       }, { passive: false });
-      
+
       canvas.addEventListener('touchmove', function(e) {
         if (e.touches.length === 2) {
           // Pinch zoom
           const currentDistance = getDistance(e.touches[0], e.touches[1]);
           const scaleChange = currentDistance / initialDistance;
-          scale = Math.min(Math.max(0.5, scale * scaleChange), 3);
-          
-          canvas.style.transform = `scale(${scale})`;
+          currentZoom = Math.min(Math.max(minZoom, currentZoom * scaleChange), maxZoom);
+
+          ZoomPanManager.applyZoom();
+          ZoomPanManager.updateZoomLevel();
           initialDistance = currentDistance;
           e.preventDefault();
         }
       }, { passive: false });
-      
+
       canvas.addEventListener('touchend', function(e) {
         if (e.touches.length === 0) {
-          // Reset if scale is too small
-          if (scale < 0.8) {
-            scale = 1;
-            canvas.style.transform = 'scale(1)';
+          // Volver a 100% si quedó casi sin zoom
+          if (currentZoom < 1.05 && currentZoom !== 1.0) {
+            currentZoom = 1.0;
+            ZoomPanManager.applyZoom();
+            ZoomPanManager.updateZoomLevel();
           }
         }
       });
@@ -6127,12 +6177,14 @@
             updatePreview();
           }
           
-          // Reset any zoom applied to canvas
-          const canvas = document.getElementById('preview-canvas');
-          if (canvas) {
-            canvas.style.transform = 'scale(1)';
-          }
-          
+          // Resetear el zoom por el sistema global para no desincronizar
+          // currentZoom/isZoomed del transform aplicado
+          currentZoom = 1.0;
+          isZoomed = false;
+          ZoomPanManager.resetPan();
+          ZoomPanManager.applyZoom();
+          ZoomPanManager.updateZoomLevel();
+
           // Update container widths
           updateMobileLayout();
         }, 100);
@@ -6146,11 +6198,13 @@
     }
     
     function resetCanvasView() {
-      const canvas = document.getElementById('preview-canvas');
-      if (canvas) {
-        canvas.style.transform = 'scale(1)';
-        canvas.style.transformOrigin = 'center';
-      }
+      // Resetear vía el sistema global de zoom (escribir el transform
+      // directamente dejaba currentZoom/isZoomed desincronizados)
+      currentZoom = 1.0;
+      isZoomed = false;
+      ZoomPanManager.resetPan();
+      ZoomPanManager.applyZoom();
+      ZoomPanManager.updateZoomLevel();
     }
     
     function updateMobileLayout() {

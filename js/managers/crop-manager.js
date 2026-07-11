@@ -363,9 +363,19 @@ class CropManager {
    * Mantener área dentro de límites del canvas
    */
   constrainToBounds() {
+    // Acotar primero las dimensiones: sin esto, un área más grande que el
+    // canvas dejaba x/y negativos y applyCrop leía fuera de la imagen
+    // (franjas vacías en el resultado)
+    if (this.cropArea.width > this.canvas.width) {
+      this.cropArea.width = this.canvas.width;
+    }
+    if (this.cropArea.height > this.canvas.height) {
+      this.cropArea.height = this.canvas.height;
+    }
+
     if (this.cropArea.x < 0) this.cropArea.x = 0;
     if (this.cropArea.y < 0) this.cropArea.y = 0;
-    
+
     if (this.cropArea.x + this.cropArea.width > this.canvas.width) {
       this.cropArea.x = this.canvas.width - this.cropArea.width;
     }

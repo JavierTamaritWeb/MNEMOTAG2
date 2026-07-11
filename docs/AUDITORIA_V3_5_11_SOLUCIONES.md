@@ -1,4 +1,4 @@
-# Auditoria severa v3.5.11 — soluciones y reglas de no regresion
+# Auditoria y reauditoria severa v3.5.11 — soluciones y reglas de no regresion
 
 **Fecha:** 11 de julio de 2026  
 **Objetivo:** documentar las correcciones aplicadas tras la auditoria severa para que no se repitan los mismos errores en futuras refactorizaciones.
@@ -7,7 +7,7 @@
 
 ## Resumen ejecutivo
 
-La auditoria encontro fallos reales que no estaban cubiertos por los tests existentes: cadena de Web Workers muerta, crop con excepciones en flujo normal, atajos duplicados, rotacion acumulativa, perdidas silenciosas en batch, corrupcion potencial de AVIF y estados visuales que quedaban desincronizados.
+Las dos auditorias encontraron fallos reales que no estaban cubiertos por los tests existentes: cadena de Web Workers muerta, crop invisible o con controles inoperativos, atajos duplicados, seleccion de capas desincronizada, rotacion acumulativa, agotamiento potencial de memoria en batch, corrupcion potencial de AVIF, EXIF bloqueado por SRI y un despliegue que solo funcionaba en un arbol local con `dist/` preexistente.
 
 La correccion se hizo con dos reglas:
 
@@ -18,17 +18,23 @@ Verificacion final tras las correcciones:
 
 ```bash
 npm test
-# 234/234 tests Node OK
+# 237/237 tests Node OK
 # 92/92 aserciones binarias OK
 
 npm run build
 # OK
 
-npx --yes eslint@9 --no-config-lookup -c eslint.config.js js/
+npm run lint:js
 # 0 errores, warnings no bloqueantes
 
-npx playwright test tests/e2e/smoke.spec.js --config playwright.config.js
-# 5 passed
+npm run lint:css
+# OK
+
+npm run test:e2e
+# 6 passed contra desarrollo
+
+npm run test:e2e:dist
+# 6 passed contra dist/ de produccion
 ```
 
 ---
@@ -92,15 +98,20 @@ Cada operacion debe tener forma estable:
 
 ---
 
-## 2. Crop
+## 2. Crop: panel, sugerencias y ciclo de vida
 
 ### Causa raiz
 
-El flujo de crop llamaba metodos inexistentes o con firma incorrecta:
+El flujo de crop acumulaba varios contratos rotos:
 
 - `cropManager.cancelCrop()` no existia.
 - `cancelCrop()` llamaba a `applyFilters()`, funcion inexistente.
 - `setAspectRatio()` recibia `null` o numeros cuando esperaba una clave string.
+- El panel tenia `style="display: none"`, pero `openCropPanel()` solo anadia `.active`; cambiar `transform` no anula un `display:none` inline.
+- Los botones enviaban indices numericos, mientras `applyCropSuggestion()` buscaba por nombre, por lo que nunca encontraba una sugerencia.
+- El selector de proporcion tenia `onchange` inline y otro listener JS: cada cambio se ejecutaba dos veces.
+- Cada reapertura registraba un juego nuevo de listeners de canvas y podia perder las referencias necesarias para desmontar los anteriores.
+- Escape desactivaba el manager, pero no cerraba el panel ni sincronizaba el estado visual.
 
 Eso provocaba excepciones al cancelar o cerrar el panel, y dejaba listeners vivos.
 
@@ -110,24 +121,32 @@ Eso provocaba excepciones al cancelar o cerrar el panel, y dejaba listeners vivo
 - La cancelacion ya no llama funciones inexistentes.
 - El selector de proporcion normaliza la entrada antes de llamar a `setAspectRatio()`.
 - Despues de cambios que modifican `canvas.width`/`canvas.height`, se recalcula el layout visual con `setupCanvas()` y se actualiza la preview.
+- Abrir establece `display:flex` antes de activar la transicion; cerrar retira `.active`, desactiva el manager y oculta el panel al terminar la animacion.
+- Las sugerencias se resuelven con `suggestions[index]`, el mismo contrato que usan los botones `data-index`.
+- Los controles de proporcion y grid se conectan solo mediante `addEventListener`.
+- `CropManager.setupEventListeners()` desmonta primero cualquier juego anterior.
+- Escape pasa por `closeCropPanel()` y restaura la preview.
 
 ### Regla de no regresion
 
 No llamar metodos de managers por intuicion. Antes de cablear un boton o panel, revisar la API publica real del manager.
 
-Para crop, la API de control debe pasar por:
+Para crop, la API real de control es:
 
-- `CropManager.activate(...)`
+- `CropManager.initCropMode(image)`
 - `CropManager.deactivate()`
 - `CropManager.setAspectRatio(key)`
-- `CropManager.updatePreview()`
+- `CropManager.draw()`
+
+La visibilidad del panel pertenece a `main.js`, no al manager. Toda salida —boton cerrar, cancelar, aplicar o Escape— debe converger en `closeCropPanel()`.
 
 Si se agregan nuevos presets, usar claves string estables. No pasar dimensiones numericas directamente a `setAspectRatio()`.
 
 ### Tests que protegen este bloque
 
-- `tests/specs/regression.spec.js` verifica que crop usa `deactivate/updatePreview`.
-- `tests/e2e/smoke.spec.js` cubre apertura/carga basica en navegador real.
+- `tests/specs/regression.spec.js` protege visibilidad, ausencia de handlers inline, grid, indices y desmontaje.
+- `tests/e2e/smoke.spec.js` carga una imagen, confirma la preview, abre el panel, aplica una sugerencia y comprueba el cierre.
+- El mismo E2E se ejecuta contra desarrollo y contra `dist/`.
 
 ---
 
@@ -217,6 +236,8 @@ El batch podia perder imagenes sin avisar:
 - Dos archivos con mismo basename pero distinta extension podian colisionar.
 - Algunos errores por imagen se contabilizaban como exito.
 - El JPEG del batch no aplanaba transparencia, por lo que podia salir negro.
+- Los limites permitian 50 imagenes de hasta 8192x8192 y 50 MB cada una, sin presupuesto agregado de pixeles.
+- Cada archivo se decodificaba una vez para validar y otra para encolarlo.
 
 ### Solucion aplicada
 
@@ -224,6 +245,8 @@ El batch podia perder imagenes sin avisar:
 - Se evita la sobrescritura silenciosa con nombres unicos.
 - Los errores por imagen se propagan al resumen del proceso.
 - JPEG en batch usa `flattenCanvasForJpeg()` antes de codificar.
+- El lote limita cantidad, tamano por archivo, megapixeles por imagen y megapixeles agregados.
+- La imagen decodificada durante la validacion se reutiliza al crear `imageData`.
 
 ### Regla de no regresion
 
@@ -235,6 +258,8 @@ Al exportar a ZIP:
 - Nunca usar solo `baseName` como clave final.
 - Contar fallos y exitos por separado.
 - Aplanar transparencia si `finalMimeType === 'image/jpeg'`.
+- Presupuestar memoria por pixeles decodificados, no solo por bytes comprimidos.
+- No volver a llamar `loadImageElement()` despues de una validacion que ya devolvio el elemento decodificado.
 
 ### Tests que protegen este bloque
 
@@ -350,12 +375,17 @@ Algunos valores validos se destruian por usar `||`:
 
 Tambien habia listeners hacia IDs inexistentes (`layer-*` en vez de `text-layer-*`).
 
+La reauditoria encontro dos fuentes de seleccion: `activeLayerId` en `main.js` y `TextLayerManager.activeLayerId`. Al seleccionar visualmente otra capa solo cambiaba la primera; Backspace y duplicar consultaban la segunda y podian actuar sobre una capa distinta o sobre una capa oculta despues de cerrar el panel.
+
 ### Solucion aplicada
 
 - Se usa `??` para defaults donde `0` es valido.
 - Se centralizo el acceso a controles con `getTextLayerControl(id)`.
 - Los listeners apuntan a IDs reales.
 - Se eliminaron asignaciones condicionales que rompian ESLint `no-cond-assign`.
+- `selectTextLayer()` valida la capa y sincroniza ambos estados mediante `setActiveLayer()`.
+- Cerrar el panel limpia tambien el estado del manager con `clearActiveLayer()`.
+- Los atajos usan el `activeLayerId` visual y vuelven a sincronizar la seleccion despues de eliminar o duplicar.
 
 ### Regla de no regresion
 
@@ -372,6 +402,8 @@ Usar:
 layer.opacity ?? 100
 layer.position?.x ?? 0
 ```
+
+No introducir una tercera fuente de seleccion. Cualquier seleccion programatica debe pasar por `selectTextLayer(layerId)`; cualquier cierre debe limpiar ambas representaciones.
 
 ---
 
@@ -428,6 +460,9 @@ mnemotag-presets:item:<nombre>
 - Stylelint estaba parseando SCSS como CSS plano.
 - Playwright usaba sintaxis ESM sin que el proyecto declarara `"type": "module"`.
 - Los tests Node estaban verdes pero no cubrian flujos rotos en navegador real.
+- ESLint no estaba instalado localmente y `npx` dependia de red.
+- El smoke llamado "botones clicables" solo comprobaba que existieran en el DOM.
+- Los E2E servian la raiz, pero no `dist/index.html` como artefacto autocontenido.
 
 ### Solucion aplicada
 
@@ -435,6 +470,9 @@ mnemotag-presets:item:<nombre>
 - Playwright se ajusto a CommonJS.
 - Se agregaron regresiones de auditoria y casos binarios AVIF.
 - El smoke E2E valida carga real del bundle, managers globales y ausencia de errores criticos de consola.
+- ESLint 9 queda fijado en `devDependencies`; `js/vendor/**` y `dist/**` se excluyen por ser dependencia externa y artefactos generados.
+- `test:e2e` valida desarrollo y `test:e2e:dist` sirve exclusivamente `dist/`.
+- El E2E de crop realiza acciones reales; no se limita a `toBeAttached()`.
 
 ### Regla de no regresion
 
@@ -443,12 +481,68 @@ Antes de una release, ejecutar como minimo:
 ```bash
 npm test
 npm run build
-npx --yes eslint@9 --no-config-lookup -c eslint.config.js js/
-npx --yes stylelint "src/scss/**/*.scss" "css/**/*.css"
-npx playwright test tests/e2e/smoke.spec.js --config playwright.config.js
+npm run lint:js
+npm run lint:css
+npm run test:e2e
+npm run test:e2e:dist
 ```
 
 Si Playwright falla arrancando el servidor por permisos locales, repetirlo en un entorno con permiso para abrir el puerto definido en `playwright.config.js`.
+
+---
+
+## 13. EXIF y dependencias externas
+
+### Causa raiz
+
+`piexifjs` se cargaba desde una URL minificada dinamicamente de jsDelivr con SRI. El propio recurso advierte que no admite SRI estable: distintos nodos entregaron variantes con hashes distintos y Chromium bloqueo la libreria. Como los cuatro formatos construyen el TIFF con `piexif`, JPEG, PNG, WebP y AVIF dejaron de escribir metadatos a la vez y degradaron silenciosamente.
+
+### Solucion aplicada
+
+- `piexifjs@1.0.6` se sirve desde `js/vendor/piexif.min.js`.
+- Gulp copia el archivo a `dist/js/vendor/`.
+- El service worker lo incluye en precache.
+- Playwright exige `typeof window.piexif === 'object'`.
+
+### Regla de no regresion
+
+No aplicar SRI a recursos que el proveedor genera dinamicamente. Para una dependencia critica del pipeline y pequena, preferir una copia local versionada con licencia/cabecera conservada. Si cambia la dependencia, verificar desarrollo y `dist/`.
+
+---
+
+## 14. GitHub Pages y checkout limpio
+
+### Causa raiz
+
+La demo enlazada respondia 404: `dist/` esta correctamente ignorado, pero no habia un workflow activo que lo generase y publicase. El primer workflow nuevo fallo porque ejecutaba `npm test` antes de `npm run build`; tres specs leen `dist/css/styles.css` y solo pasaban localmente porque el desarrollador ya tenia `dist/` generado. Despues, Actions no pudo crear por primera vez el sitio Pages con su token de integracion.
+
+### Solucion aplicada
+
+- `.github/workflows/deploy.yml` hace checkout, `npm ci`, build, tests, lint, upload y deploy.
+- El build ocurre antes de los tests que inspeccionan `dist/`.
+- GitHub Pages se habilito una vez con fuente `workflow` mediante una cuenta autorizada.
+- El workflow publica exclusivamente `dist/`.
+- La URL publica se verifico con HTTP 200 despues del despliegue.
+
+### Regla de no regresion
+
+Un release debe funcionar desde un checkout limpio. Nunca confiar en un `dist/` local ignorado. El orden obligatorio del job es:
+
+```text
+npm ci -> npm run build -> npm test -> lint -> upload dist -> deploy
+```
+
+No eliminar `deploy.yml` mientras README anuncie una demo en GitHub Pages. Si Pages se recrea o transfiere, habilitar previamente la fuente GitHub Actions en la configuracion del repositorio.
+
+### Verificacion remota
+
+```bash
+gh run list --workflow deploy.yml --limit 1
+gh run watch <run-id> --exit-status
+curl -I https://javiertamaritweb.github.io/MNEMOTAG2/
+```
+
+No considerar terminado un push de release hasta que el workflow concluya correctamente y la URL publica responda 200.
 
 ---
 
@@ -467,6 +561,9 @@ Si Playwright falla arrancando el servidor por permisos locales, repetirlo en un
 - Recalcular `setupCanvas()` si cambia el tamano real.
 - Guardar historial solo despues de completar una operacion valida.
 - Resetear o reclampear zoom/pan cuando corresponda.
+- Confirmar que el panel pasa de `display:none` a visible y vuelve a ocultarse.
+- Abrir/cerrar varias veces y comprobar que no se multiplican listeners.
+- Probar al menos una sugerencia por click real.
 
 ### Export/batch
 
@@ -474,6 +571,7 @@ Si Playwright falla arrancando el servidor por permisos locales, repetirlo en un
 - Aplanar JPEG con alpha.
 - No tragar errores por imagen.
 - No duplicar logica visual fuera del render principal.
+- Aplicar presupuesto agregado de pixeles al lote.
 
 ### Metadatos binarios
 
@@ -487,6 +585,14 @@ Si Playwright falla arrancando el servidor por permisos locales, repetirlo en un
 - Todo listener temporal debe desmontarse.
 - No usar `dark:` de Tailwind; usar `[data-theme="dark"]`.
 - No usar `||` para defaults donde `0` sea valido.
+- Mantener una sola seleccion efectiva de capa y sincronizar manager/UI.
+
+### Release y despliegue
+
+- Ejecutar E2E contra raiz y contra `dist/`.
+- Probar desde checkout limpio o CI, nunca solo con artefactos locales.
+- Esperar el workflow Pages y comprobar HTTP 200.
+- Confirmar que dependencias criticas locales se copian a `dist/` y precache.
 
 ---
 
@@ -496,6 +602,9 @@ Si Playwright falla arrancando el servidor por permisos locales, repetirlo en un
 |---|---|
 | Contrato worker/filtros | `tests/specs/regression.spec.js` |
 | Crop/fullscreen/atajos | `tests/specs/regression.spec.js` |
+| Crop funcional real | `tests/e2e/smoke.spec.js` en desarrollo y `dist/` |
+| Seleccion de capas | `tests/specs/regression.spec.js` |
+| Disponibilidad de piexif | `tests/e2e/smoke.spec.js` |
 | AVIF offsets/boxes | `tests/binary-validation.js` |
 | Carga real en navegador | `tests/e2e/smoke.spec.js` |
 | Regresiones historicas | `tests/specs/regression.spec.js` |
@@ -512,3 +621,5 @@ Los tests Node son utiles como smoke rapido, pero no sustituyen:
 - revision de contratos entre managers cuando se extrae codigo desde `main.js`.
 
 Si una correccion solo cambia texto de tests sin cubrir el flujo que fallo, no se considera cerrada.
+
+Del mismo modo, un build local verde no demuestra que el despliegue funcione: CI debe partir de checkout limpio y la URL publica debe verificarse despues de publicar.

@@ -55,12 +55,26 @@ window.AnalysisManager = (function () {
     }
   }
 
+  // Timeout de seguridad: si el worker se cuelga sin responder ni disparar
+  // 'error', la promesa quedaba pendiente para siempre y el caller nunca
+  // llegaba a su fallback main-thread.
+  const WORKER_TIMEOUT_MS = 15000;
+
   function _runInWorker(op, imageData, extra) {
     const worker = _getWorker();
     if (!worker) return Promise.reject(new Error('Worker no disponible'));
     return new Promise(function (resolve, reject) {
       const id = ++_messageId;
-      _pendingMessages.set(id, { resolve: resolve, reject: reject });
+      const timeoutId = setTimeout(function () {
+        if (_pendingMessages.has(id)) {
+          _pendingMessages.delete(id);
+          reject(new Error('AnalysisManager: timeout del worker (' + op + ')'));
+        }
+      }, WORKER_TIMEOUT_MS);
+      _pendingMessages.set(id, {
+        resolve: function (v) { clearTimeout(timeoutId); resolve(v); },
+        reject: function (e) { clearTimeout(timeoutId); reject(e); }
+      });
       const msg = Object.assign({ id: id, op: op, imageData: imageData }, extra || {});
       try {
         // Nota: ImageData no es directamente transferable, pero su
@@ -68,6 +82,7 @@ window.AnalysisManager = (function () {
         // transferable para evitar copia en imágenes grandes.
         worker.postMessage(msg, [imageData.data.buffer]);
       } catch (err) {
+        clearTimeout(timeoutId);
         _pendingMessages.delete(id);
         reject(err);
       }

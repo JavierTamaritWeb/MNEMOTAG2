@@ -1,6 +1,6 @@
 # Indice de Documentacion - MNEMOTAG v3.5.11
 
-**Fecha**: 13 de abril de 2026
+**Fecha**: 11 de julio de 2026
 
 ---
 
@@ -18,7 +18,7 @@
 |-----------|-------------|
 | [**README.md**](README.md) | Indice tecnico + estructura del proyecto |
 | [**RESUMEN_VERSIONES.md**](RESUMEN_VERSIONES.md) | Tabla comparativa de todas las versiones |
-| [**AUDITORIA_V3_5_11_SOLUCIONES.md**](AUDITORIA_V3_5_11_SOLUCIONES.md) | Soluciones de la auditoria severa y reglas de no regresion |
+| [**AUDITORIA_V3_5_11_SOLUCIONES.md**](AUDITORIA_V3_5_11_SOLUCIONES.md) | Postmortem de auditoria/reauditoria, causas raiz, contratos, despliegue y reglas de no regresion |
 | [**DRAG_DROP_SYSTEM.md**](DRAG_DROP_SYSTEM.md) | Implementacion del sistema de arrastre |
 | [**ZOOM_OPTIMIZADO.md**](ZOOM_OPTIMIZADO.md) | Zoom diferenciado por dispositivo |
 
@@ -41,4 +41,4 @@ Los siguientes documentos fueron eliminados por estar obsoletos. Su contenido es
 
 ---
 
-**Ultima actualizacion**: 13 de abril de 2026
+**Ultima actualizacion**: 11 de julio de 2026

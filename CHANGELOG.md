@@ -4,13 +4,20 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
-## [Unreleased]
+## [3.5.12] - 2026-07-11
 
 ### Fixed
-- Panel y ciclo de vida del recorte, sugerencias automáticas, grid y cancelación con Escape.
-- Selección única de capas de texto para evitar que los atajos actúen sobre otra capa.
-- Límites agregados de memoria en lotes y eliminación de la doble decodificación de imágenes.
-- Cobertura E2E funcional para recorte y build `dist`, ESLint local y despliegue de GitHub Pages.
+- **Estado de archivo solo tras validación**: `setupFileNaming` y `loadImageWithValidation` ya no asignan `currentFile`/`originalExtension` antes de pasar los checks — un archivo rechazado dejaba estado mezclado con la imagen anterior.
+- **Modal de preview sin listener fantasma**: el `keydown` de Escape se desregistra siempre al cerrar (antes solo si el cierre era vía Escape; cerrarlo con botón y pulsar Escape después lanzaba `NotFoundError` y ejecutaba el callback dos veces).
+- **Zoom móvil sincronizado**: pinch, cambio de orientación y `resetCanvasView` pasan por el sistema global (`currentZoom`/`ZoomPanManager.applyZoom`) en vez de escribir `transform` directamente, que desincronizaba botones, indicador de % y drag de watermarks.
+- **Preview con worker sin resultados obsoletos**: token de secuencia + guard de dimensiones en `updatePreviewWithWorker` — una respuesta tardía del worker ya no pisa el render más reciente ni pinta con dimensiones antiguas.
+- **Marca de agua sin re-decodificación por frame**: la imagen se cachea por identidad del archivo (nombre/tamaño/mtime); arrastrar la marca ya no dispara FileReader + decode en cada `mousemove`.
+- **AnalysisManager con timeout**: los mensajes al worker de análisis rechazan a los 15 s si el worker se cuelga sin responder, permitiendo el fallback main-thread (antes el auto-balance quedaba pendiente para siempre).
+- **Área de recorte acotada**: `constrainToBounds` limita también width/height al canvas — el área ya no podía crecer más que la imagen dejando x/y negativos y franjas vacías en el export.
+- **Estadísticas del cache reales**: `hitCount`/`missCount` inicializados e incrementados en `cache.get` (el `hitRate` era siempre 0).
+
+### Documentation
+- Postmortem v3.5.11 ampliado con la reauditoria: crop, capas, memoria batch, EXIF local, E2E de `dist`, checkout limpio y despliegue GitHub Pages.
 
 ---
 
@@ -20,6 +27,10 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 - **Documentacion de auditoria severa v3.5.11**: nuevo documento `docs/AUDITORIA_V3_5_11_SOLUCIONES.md` con causas raiz, soluciones aplicadas, reglas de no regresion, checklist por subsistema y pruebas que protegen cada bloque critico.
 
 ### Fixed
+- Panel y ciclo de vida del recorte, sugerencias automáticas, grid y cancelación con Escape.
+- Selección única de capas de texto para evitar que los atajos actúen sobre otra capa.
+- Límites agregados de memoria en lotes y eliminación de la doble decodificación de imágenes.
+- Cobertura E2E funcional para recorte y build `dist`, ESLint local y despliegue de GitHub Pages.
 - **EXIF restaurado en navegador**: `piexifjs` se sirve localmente porque jsDelivr genera su archivo minificado dinámicamente y no admite un SRI estable; Chromium lo bloqueaba e inutilizaba la escritura de metadatos en JPEG, PNG, WebP y AVIF.
 - **Caché PWA y versión sincronizadas**: aplicación, paquete y service worker usan v3.5.11 para invalidar recursos antiguos.
 - **Errores globales sin duplicados**: eliminado el segundo par de listeners `error`/`unhandledrejection` y protegido el logging global con `MNEMOTAG_DEBUG`.

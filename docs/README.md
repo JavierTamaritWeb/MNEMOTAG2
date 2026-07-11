@@ -1,7 +1,7 @@
 # MNEMOTAG - DOCUMENTACION TECNICA
 
-**Version:** 3.5.7
-**Ultima actualizacion:** 11 de abril de 2026
+**Version:** 3.5.11
+**Ultima actualizacion:** 11 de julio de 2026
 
 ---
 
@@ -23,7 +23,7 @@
 
 ## Documentacion tecnica
 
-- [**AUDITORIA_V3_5_11_SOLUCIONES.md**](AUDITORIA_V3_5_11_SOLUCIONES.md) — Soluciones de la auditoria severa y reglas de no regresion
+- [**AUDITORIA_V3_5_11_SOLUCIONES.md**](AUDITORIA_V3_5_11_SOLUCIONES.md) — Postmortem completo de auditoria y reauditoria, con barreras de no regresion
 - [**DRAG_DROP_SYSTEM.md**](DRAG_DROP_SYSTEM.md) — Implementacion tecnica del sistema de arrastre
 - [**ZOOM_OPTIMIZADO.md**](ZOOM_OPTIMIZADO.md) — Sistema de zoom diferenciado por dispositivo
 
@@ -58,7 +58,7 @@ MNEMOTAG2/
 │   ├── utils/                  # 7 utilidades
 │   └── managers/               # 14 managers (IIFE)
 ├── images/                     # Imagenes fuente
-├── tests/                      # 209 + 86 aserciones + Playwright E2E
+├── tests/                      # 237 Node + 92 binarias + Playwright E2E
 └── docs/                       # Esta documentacion
 ```
 
@@ -66,13 +66,13 @@ MNEMOTAG2/
 
 ## Estadisticas
 
-- **Version:** 3.5.7
+- **Version:** 3.5.11
 - **Archivos JS:** 24 (bundled en app.min.js)
 - **Managers:** 14 modulos especializados
-- **Tests:** 217 + 86 = 303 aserciones totales
+- **Tests:** 237 Node + 92 binarias + 6 E2E en desarrollo y 6 en dist
 - **Build:** Gulp 5 (SCSS + JS concat + terser)
 
 ---
 
 **Autor:** Javier Tamarit
-**Ultima actualizacion:** 11 de abril de 2026
+**Ultima actualizacion:** 11 de julio de 2026
