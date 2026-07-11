@@ -697,7 +697,7 @@
         
         
       } catch (error) {
-        console.error('Error al inicializar la aplicación:', error);
+        MNEMOTAG_DEBUG && console.error('Error al inicializar la aplicación:', error);
         UIManager.showError('Error al inicializar la aplicación. Por favor, recarga la página.');
       }
     }
@@ -706,13 +706,13 @@
     function setupGlobalErrorHandling() {
       // Manejar errores no capturados
       window.addEventListener('error', function(event) {
-        console.error('Error global capturado:', event.error);
+        MNEMOTAG_DEBUG && console.error('Error global capturado:', event.error);
         UIManager.showError('Ha ocurrido un error inesperado. Por favor, inténtalo de nuevo.');
       });
 
       // Manejar promesas rechazadas no capturadas
       window.addEventListener('unhandledrejection', function(event) {
-        console.error('Promesa rechazada no manejada:', event.reason);
+        MNEMOTAG_DEBUG && console.error('Promesa rechazada no manejada:', event.reason);
         UIManager.showError('Error de procesamiento. Por favor, inténtalo de nuevo.');
         event.preventDefault();
       });
@@ -5820,17 +5820,6 @@
       
       return result;
     }
-
-    // Enhanced error handling
-    window.addEventListener('error', (event) => {
-      console.error('Global error:', event.error);
-      showError('Se ha producido un error inesperado');
-    });
-
-    window.addEventListener('unhandledrejection', (event) => {
-      console.error('Unhandled promise rejection:', event.reason);
-      showError('Error en operación asíncrona');
-    });
 
     // MetadataManager extraído a js/managers/metadata-manager.js
 

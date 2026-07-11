@@ -1,7 +1,7 @@
 # 🚀 Resumen Ejecutivo de Versiones - MNEMOTAG
 
 **Documento**: Resumen de evolucion del proyecto
-**Ultima actualizacion**: 15 de abril de 2026 (v3.5.10)
+**Ultima actualizacion**: 11 de julio de 2026 (v3.5.11)
 
 ---
 
@@ -9,7 +9,8 @@
 
 | Version | Fecha | Caracteristicas Principales | Estado |
 |---------|-------|----------------------------|--------|
-| **v3.5.10** | 15 Abr 2026 | Lote respeta nombres originales de archivo | **Actual** |
+| **v3.5.11** | 11 Jul 2026 | Auditoría severa, EXIF/SRI, workers y estabilidad | **Actual** |
+| **v3.5.10** | 15 Abr 2026 | Lote respeta nombres originales de archivo | Estable |
 | **v3.5.9** | 13 Abr 2026 | Undo/Redo Restoration + UI Spacing Fix | Estable |
 | **v3.5.8** | 13 Abr 2026 | Custom Position / Favicon visibility fix | Estable |
 | **v3.5.7** | 13 Abr 2026 | Batch processing arreglado (5 bugs), 9 tests regresion, gulp watch, defaults watermark | Estable |
@@ -582,4 +583,3 @@ v3.1.3: ⭐⭐⭐⭐⭐ (4.8/5) - Proyección basada en mejoras
 **Versión del documento**: 1.0
 
 ✨ **De aplicación simple a herramienta profesional en 4 versiones** ✨
-

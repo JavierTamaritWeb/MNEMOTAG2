@@ -44,6 +44,7 @@ test.describe('MnemoTag smoke test', () => {
     });
 
     expect(realErrors).toEqual([]);
+    await expect.poll(() => page.evaluate(() => typeof window.piexif)).toBe('object');
   });
 
   test('expone los managers globales en window', async ({ page }) => {

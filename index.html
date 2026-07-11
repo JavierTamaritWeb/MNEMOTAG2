@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MnemoTag v3.5.10</title>
+  <title>MnemoTag v3.5.11</title>
   
   <!-- Favicon: 32x32 primero (Chrome pestaña), 16x16 fallback, ICO legacy -->
   <link rel="icon" type="image/png" sizes="32x32" href="images/favicon_io/favicon-32x32.png?v=3.5.8">
@@ -1748,10 +1748,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
             integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG"
             crossorigin="anonymous"></script>
-    <!-- piexifjs para escribir EXIF en JPEG (lectura/escritura de metadatos reales) -->
-    <script src="https://cdn.jsdelivr.net/npm/piexifjs@1.0.6/piexif.min.js"
-            integrity="sha384-pQscxfezjt6vZacoDAQEvU7OYak0dB/9o/VoBbzD8SrYGu63hWctWY25MxxIXSAX"
-            crossorigin="anonymous"></script>
+    <!-- piexifjs local: jsDelivr genera piexif.min.js dinámicamente y no admite SRI estable. -->
+    <script src="js/vendor/piexif.min.js"></script>
     <!-- v3.3.15: heic2any para convertir HEIC/HEIF (formatos del iPhone) a JPEG en cliente -->
     <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"
             integrity="sha384-OTofQ0MEeiSgh62havBcemCIK0gqj809wX6UA0uPISNMRnR6NZyCdGzX3SbLrgwL"

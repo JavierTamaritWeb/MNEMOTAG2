@@ -172,15 +172,17 @@ async function html() {
 async function copyAssets() {
   // Workers (no se bundlean — los carga new Worker())
   await mkdir(path.join(DIST, 'js/workers'), { recursive: true });
+  await mkdir(path.join(DIST, 'js/vendor'), { recursive: true });
   await copyFile('js/image-processor.js', path.join(DIST, 'js/image-processor.js'));
   await copyFile('js/workers/analysis-worker.js', path.join(DIST, 'js/workers/analysis-worker.js'));
+  await copyFile('js/vendor/piexif.min.js', path.join(DIST, 'js/vendor/piexif.min.js'));
 
   // Service Worker — reescribir rutas dist/ → rutas relativas
   let sw = await readFile('service-worker.js', 'utf8');
   sw = sw.replace(/\.\/dist\//g, './');
   await writeFile(path.join(DIST, 'service-worker.js'), sw, 'utf8');
 
-  console.log('  workers + service-worker copied to dist/');
+  console.log('  workers + vendor assets + service-worker copied to dist/');
 }
 
 // ============================================================

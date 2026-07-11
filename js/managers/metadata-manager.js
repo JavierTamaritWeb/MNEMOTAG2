@@ -471,11 +471,10 @@ const MetadataManager = {
   // un patrón frágil. Si en el futuro se necesita import/export JSON,
   // habrá que rediseñarlo con validación de campos y un esquema fijo.
 
-  // ===== ESCRITURA REAL DE EXIF EN JPEG =====
-  // Estas funciones requieren `piexif` (cargado por CDN en index.html).
-  // Si la librería no está disponible o el formato no es JPEG, devuelven el
-  // input sin tocar — degradación elegante. Solo soportan JPEG; PNG/WebP/AVIF
-  // no llevan EXIF aquí (el blob/dataURL sale tal cual del canvas).
+  // ===== ESCRITURA REAL DE EXIF =====
+  // Estas funciones requieren `piexif` (servido localmente desde index.html).
+  // Si la librería no está disponible, devuelven el input sin tocar. El objeto
+  // TIFF generado aquí alimenta los embeddings JPEG, PNG, WebP y AVIF.
 
   /**
    * Construye el objeto EXIF a partir de los metadatos del formulario.

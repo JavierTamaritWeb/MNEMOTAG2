@@ -77,7 +77,7 @@ describe('Regresión — Escritura real de EXIF en JPEG (v3.4.10 en export-manag
     expect(src).toContain('MetadataManager.embedExifInJpegDataUrl');
   });
 
-  it('index.html carga piexifjs desde CDN', async function () {
+  it('index.html carga piexifjs', async function () {
     const src = await fetchSource('../index.html');
     expect(src).toContain('piexifjs');
     expect(src).toContain('piexif.min.js');
@@ -1289,6 +1289,15 @@ describe('Regresión — setupCanvas respeta max-height para portrait', function
 });
 
 describe('Regresión — Auditoría severa v3.5.11', function () {
+  it('piexif se sirve localmente y solo hay un manejador global de cada tipo', async function () {
+    const html = await fetchSource('../index.html');
+    const main = await fetchSource('../js/main.js');
+    expect(html).toContain('src="js/vendor/piexif.min.js"');
+    expect(html).not.toContain('cdn.jsdelivr.net/npm/piexifjs');
+    expect((main.match(/window\.addEventListener\('error'/g) || []).length).toBe(2);
+    expect((main.match(/window\.addEventListener\('unhandledrejection'/g) || []).length).toBe(2);
+  });
+
   it('filter-manager ejecuta el debounce de worker y no llama a WorkerManager.processImage', async function () {
     const src = await fetchSource('../js/managers/filter-manager.js');
     expect(src).toContain('this._workerDebouncedUpdate()');

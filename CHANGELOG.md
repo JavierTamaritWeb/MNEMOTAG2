@@ -6,8 +6,18 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ## [Unreleased]
 
+---
+
+## [3.5.11] - 2026-07-11
+
 ### Added
 - **Documentacion de auditoria severa v3.5.11**: nuevo documento `docs/AUDITORIA_V3_5_11_SOLUCIONES.md` con causas raiz, soluciones aplicadas, reglas de no regresion, checklist por subsistema y pruebas que protegen cada bloque critico.
+
+### Fixed
+- **EXIF restaurado en navegador**: `piexifjs` se sirve localmente porque jsDelivr genera su archivo minificado dinámicamente y no admite un SRI estable; Chromium lo bloqueaba e inutilizaba la escritura de metadatos en JPEG, PNG, WebP y AVIF.
+- **Caché PWA y versión sincronizadas**: aplicación, paquete y service worker usan v3.5.11 para invalidar recursos antiguos.
+- **Errores globales sin duplicados**: eliminado el segundo par de listeners `error`/`unhandledrejection` y protegido el logging global con `MNEMOTAG_DEBUG`.
+- **Cobertura de regresión**: Playwright exige que `window.piexif` esté disponible y Node protege el SRI y el cableado único de errores.
 
 ---
 
