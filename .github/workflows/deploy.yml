@@ -27,10 +27,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Los specs de regresión inspeccionan también artefactos de dist/.
+      - run: npm run build
       - run: npm test
       - run: npm run lint:js
       - run: npm run lint:css
-      - run: npm run build
       - uses: actions/configure-pages@v5
         with:
           enablement: true
