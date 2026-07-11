@@ -1289,6 +1289,24 @@ describe('Regresión — setupCanvas respeta max-height para portrait', function
 });
 
 describe('Regresión — Auditoría severa v3.5.11', function () {
+  it('recorte abre el panel, no usa handlers inline y aplica sugerencias por índice', async function () {
+    const html = await fetchSource('../index.html');
+    const main = await fetchSource('../js/main.js');
+    expect(html).not.toContain('onchange="changeCropAspectRatio()"');
+    expect(html).not.toContain('onchange="toggleCropGrid()"');
+    expect(main).toContain("panel.style.display = 'flex'");
+    expect(main).toContain('const suggestion = suggestions[index]');
+    expect(main).toContain("cropGridCheckbox.addEventListener('change', toggleCropGrid)");
+  });
+
+  it('selección de capas se sincroniza y los atajos usan el estado visual', async function () {
+    const main = await fetchSource('../js/main.js');
+    expect(main).toContain('textLayerManager.setActiveLayer(layerId)');
+    expect(main).toContain('textLayerManager.clearActiveLayer()');
+    expect(main).toContain('textLayerManager.getLayer(activeLayerId)');
+    expect(main).toContain('textLayerManager.duplicateLayer(activeLayerId)');
+  });
+
   it('piexif se sirve localmente y solo hay un manejador global de cada tipo', async function () {
     const html = await fetchSource('../index.html');
     const main = await fetchSource('../js/main.js');

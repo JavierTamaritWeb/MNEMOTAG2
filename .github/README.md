@@ -1,12 +1,16 @@
 # GitHub Actions
 
-Los workflows de CI (`test.yml`, `lint.yml`, `e2e.yml`) fueron eliminados
-en v3.5.7. Los tests se ejecutan manualmente:
+Los workflows de CI independientes (`test.yml`, `lint.yml`, `e2e.yml`) fueron
+eliminados en v3.5.7. `deploy.yml` valida, construye y publica `dist/` en
+GitHub Pages en cada push a `main`. Los tests también se pueden ejecutar
+manualmente:
 
 ```bash
-npm test                         # 217 + 86 = 303 aserciones
-node tests/run-in-node.js        # 217 aserciones de regresion
-node tests/binary-validation.js  # 86 aserciones binarias PNG/WebP/AVIF
+npm test                         # Node + binarios
+npm run test:e2e                 # Chromium contra la raíz de desarrollo
+npm run test:e2e:dist            # Chromium contra dist/ de producción
+npm run lint:js                  # ESLint local
+npm run lint:css                 # Stylelint local
 ```
 
 ## Build system

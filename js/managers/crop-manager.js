@@ -72,6 +72,8 @@ class CropManager {
    * Configurar event listeners
    */
   setupEventListeners() {
+    // La inicialización puede repetirse; retirar siempre el juego anterior.
+    this.removeEventListeners();
     this.boundMouseDown = this.handleMouseDown.bind(this);
     this.boundMouseMove = this.handleMouseMove.bind(this);
     this.boundMouseUp = this.handleMouseUp.bind(this);

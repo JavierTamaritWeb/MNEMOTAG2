@@ -128,6 +128,26 @@ test.describe('MnemoTag smoke test', () => {
     expect(fatalErrors).toEqual([]);
   });
 
+  test('recorte abre controles y aplica una sugerencia', async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'networkidle' });
+    const fixturePath = path.resolve(__dirname, 'fixtures', '1x1.png');
+    await page.locator('#file-input').setInputFiles(fixturePath);
+    await page.locator('.preview-confirm').click();
+    await expect(page.locator('#editor-container')).toBeVisible();
+
+    await page.locator('#crop-mode-btn').click();
+    const panel = page.locator('#crop-panel');
+    await expect(panel).toBeVisible();
+
+    const before = await page.evaluate(() => window.cropManager.cropArea.width);
+    await panel.locator('[data-action="applyCropSuggestion"][data-index="1"]').click();
+    const after = await page.evaluate(() => window.cropManager.cropArea.width);
+    expect(after).not.toBe(before);
+
+    await panel.locator('[data-action="closeCropPanel"]').click();
+    await expect(panel).toBeHidden();
+  });
+
   test('AppState.snapshot() devuelve estado válido al arrancar', async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'networkidle' });
 

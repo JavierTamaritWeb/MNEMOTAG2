@@ -12,8 +12,10 @@ class BatchManager {
     this.processedImages = [];
     this.currentConfig = null;
     this.isProcessing = false;
-    this.maxImages = 50;
-    this.maxFileSize = 50 * 1024 * 1024; // 50MB por imagen
+    this.maxImages = 20;
+    this.maxFileSize = AppConfig.maxFileSize;
+    this.maxPixelsPerImage = 36 * 1000 * 1000;
+    this.maxTotalPixels = 80 * 1000 * 1000;
     
     // Formatos soportados
     this.supportedFormats = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -45,7 +47,20 @@ class BatchManager {
       const validation = await this.validateImage(file);
 
       if (validation.valid) {
-        const imageData = await this.loadImageFromFile(file);
+        const queuedPixels = this.imageQueue.reduce(
+          (total, item) => total + item.imageData.width * item.imageData.height,
+          0
+        );
+        const filePixels = validation.img.width * validation.img.height;
+        if (queuedPixels + filePixels > this.maxTotalPixels) {
+          results.rejected.push({
+            name: file.name,
+            reason: 'El lote supera el límite seguro de 80 megapíxeles decodificados'
+          });
+          continue;
+        }
+        // Reutilizar la imagen ya decodificada durante la validación.
+        const imageData = this.imageDataFromElement(validation.img);
         
         this.imageQueue.push({
           id: this.generateId(),
@@ -91,7 +106,7 @@ class BatchManager {
     if (file.size > this.maxFileSize) {
       return {
         valid: false,
-        error: `Archivo demasiado grande: ${(file.size / 1024 / 1024).toFixed(1)}MB (máx: 50MB)`
+        error: `Archivo demasiado grande: ${(file.size / 1024 / 1024).toFixed(1)}MB (máx: ${Math.round(this.maxFileSize / 1024 / 1024)}MB)`
       };
     }
 
@@ -106,14 +121,14 @@ class BatchManager {
         };
       }
 
-      if (img.width > 8192 || img.height > 8192) {
+      if (img.width * img.height > this.maxPixelsPerImage) {
         return {
           valid: false,
-          error: `Dimensiones demasiado grandes: ${img.width}x${img.height} (máx: 8192x8192)`
+          error: `Imagen demasiado grande: ${img.width}x${img.height} (máx: 36 megapíxeles)`
         };
       }
 
-      return { valid: true };
+      return { valid: true, img: img };
       
     } catch (error) {
       return {
@@ -150,7 +165,10 @@ class BatchManager {
    */
   async loadImageFromFile(file) {
     const img = await this.loadImageElement(file);
-    
+    return this.imageDataFromElement(img);
+  }
+
+  imageDataFromElement(img) {
     return {
       img: img,
       width: img.width,

@@ -10,11 +10,16 @@
     "serve": "gulp serve",
     "scss": "gulp scss",
     "js": "gulp js",
-    "test": "node tests/run-in-node.js && node tests/binary-validation.js"
+    "test": "node tests/run-in-node.js && node tests/binary-validation.js",
+    "test:e2e": "playwright test",
+    "test:e2e:dist": "playwright test -c playwright.dist.config.js",
+    "lint:js": "eslint --no-config-lookup -c eslint.config.js js/",
+    "lint:css": "stylelint \"src/scss/**/*.scss\""
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
     "browser-sync": "^3.0.4",
+    "eslint": "^9.39.5",
     "gulp": "^5.0.0",
     "gulp-clean-css": "^4.3.0",
     "gulp-concat": "^2.6.1",

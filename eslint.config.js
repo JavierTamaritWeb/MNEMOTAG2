@@ -262,6 +262,10 @@ const BASE_RULES = {
 };
 
 export default [
+  // Dependencias vendorizadas y artefactos generados no forman parte del lint.
+  {
+    ignores: ['js/vendor/**', 'dist/**']
+  },
   // Browser scripts (main.js, utils, managers)
   {
     files: ['js/**/*.js'],

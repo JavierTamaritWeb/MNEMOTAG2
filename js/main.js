@@ -1316,7 +1316,7 @@
               applyTextTemplate(btn.getAttribute('data-template'));
               break;
             case 'applyCropSuggestion':
-              applyCropSuggestion(parseInt(btn.getAttribute('data-index')));
+              applyCropSuggestion(parseInt(btn.getAttribute('data-index'), 10));
               break;
           }
         });
@@ -6381,17 +6381,20 @@
         // Esc: Cancelar operación actual
         keyboardShortcuts.register('escape', [], () => {
           if (cropManager && cropManager.isActive) {
-            cropManager.deactivate();
+            closeCropPanel();
+            updatePreview();
             UIManager.showInfo('❌ Modo recorte cancelado');
           }
         }, { description: 'Cancelar operación actual', preventDefault: false });
         
         // Backspace: Eliminar capa seleccionada (solo cuando NO estés en un input)
         keyboardShortcuts.register('backspace', [], () => {
-          if (textLayerManager && textLayerManager.activeLayerId) {
-            const layer = textLayerManager.getActiveLayer();
+          if (textLayerManager && activeLayerId) {
+            const layer = textLayerManager.getLayer(activeLayerId);
             if (layer && confirm(`¿Eliminar capa "${layer.text}"?`)) {
-              textLayerManager.removeLayer(textLayerManager.activeLayerId);
+              textLayerManager.removeLayer(activeLayerId);
+              activeLayerId = textLayerManager.activeLayerId;
+              updateTextLayersList();
               updatePreview();
               UIManager.showSuccess('🗑️ Capa eliminada');
             }
@@ -6400,8 +6403,9 @@
         
         // Ctrl/Cmd + D: Duplicar capa
         keyboardShortcuts.register('d', ['ctrl'], async () => {
-          if (textLayerManager && textLayerManager.activeLayerId) {
-            const duplicate = await textLayerManager.duplicateLayer(textLayerManager.activeLayerId);
+          if (textLayerManager && activeLayerId) {
+            const duplicate = await textLayerManager.duplicateLayer(activeLayerId);
+            selectTextLayer(duplicate.id);
             updatePreview();
             UIManager.showSuccess(`📋 Capa duplicada: ${duplicate.text}`);
           } else {
@@ -7038,6 +7042,7 @@
           panel.style.display = 'none'; // Ocultar después de transición
         }, 300);
         activeLayerId = null;
+        if (textLayerManager) textLayerManager.clearActiveLayer();
       }
     }
 
@@ -7166,10 +7171,10 @@
     }
 
     function selectTextLayer(layerId) {
-      activeLayerId = layerId;
       const layer = textLayerManager.getLayer(layerId);
-      
       if (!layer) return;
+      activeLayerId = layerId;
+      textLayerManager.setActiveLayer(layerId);
 
       // Actualizar lista
       updateTextLayersList();
@@ -7391,7 +7396,10 @@
 
       const panel = document.getElementById('crop-panel');
       if (panel) {
-        panel.classList.add('active');
+        // Evitar listeners duplicados si el botón se pulsa repetidamente.
+        if (cropManager.isActive) cropManager.deactivate();
+        panel.style.display = 'flex';
+        requestAnimationFrame(() => panel.classList.add('active'));
         cropActive = true;
         
         // Inicializar crop mode
@@ -7410,6 +7418,9 @@
         if (cropManager) {
           cropManager.deactivate();
         }
+        setTimeout(() => {
+          if (!panel.classList.contains('active')) panel.style.display = 'none';
+        }, 300);
       }
     }
 
@@ -7450,13 +7461,8 @@
 
     function toggleCropGrid() {
       if (!cropManager) return;
-      
-      const btn = document.getElementById('crop-grid-btn');
-      cropManager.showGrid = !cropManager.showGrid;
-      
-      if (btn) {
-        btn.textContent = cropManager.showGrid ? 'Ocultar Cuadrícula' : 'Mostrar Cuadrícula';
-      }
+      const checkbox = document.getElementById('crop-show-grid');
+      cropManager.showGrid = checkbox ? checkbox.checked : !cropManager.showGrid;
       
       // Redibujar si está activo
       if (cropManager.isActive) {
@@ -7464,12 +7470,12 @@
       }
     }
 
-    function applyCropSuggestion(type) {
+    function applyCropSuggestion(index) {
       if (!currentImage || !cropManager) return;
 
       try {
         const suggestions = cropManager.suggestCrops();
-        const suggestion = suggestions.find(s => s.name === type);
+        const suggestion = suggestions[index];
 
         if (suggestion) {
           cropManager.applySuggestion(suggestion);
@@ -7611,6 +7617,11 @@
       const aspectRatioSelect = document.getElementById('crop-aspect-ratio');
       if (aspectRatioSelect) {
         aspectRatioSelect.addEventListener('change', changeCropAspectRatio);
+      }
+
+      const cropGridCheckbox = document.getElementById('crop-show-grid');
+      if (cropGridCheckbox) {
+        cropGridCheckbox.addEventListener('change', toggleCropGrid);
       }
 
     }

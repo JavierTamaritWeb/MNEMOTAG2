@@ -6,6 +6,12 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ## [Unreleased]
 
+### Fixed
+- Panel y ciclo de vida del recorte, sugerencias automáticas, grid y cancelación con Escape.
+- Selección única de capas de texto para evitar que los atajos actúen sobre otra capa.
+- Límites agregados de memoria en lotes y eliminación de la doble decodificación de imágenes.
+- Cobertura E2E funcional para recorte y build `dist`, ESLint local y despliegue de GitHub Pages.
+
 ---
 
 ## [3.5.11] - 2026-07-11
