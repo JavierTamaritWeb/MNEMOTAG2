@@ -8,8 +8,8 @@ class ImageProcessor {
     this.supportOffscreenCanvas = typeof OffscreenCanvas !== 'undefined';
   }
 
-  // Procesar imagen con filtros específicos
-  processImage(imageData, filters) {
+  // Procesar imagen con operaciones o filtros específicos
+  processImage(imageData, operationsOrFilters) {
     try {
       
       // Validar entrada
@@ -17,8 +17,12 @@ class ImageProcessor {
         throw new Error('ImageData inválido');
       }
       
+      const operations = Array.isArray(operationsOrFilters)
+        ? operationsOrFilters
+        : this.filtersToOperations(operationsOrFilters || {});
+
       // Procesar directamente los datos sin canvas innecesario
-      const processedData = this.applyHeavyFilters(imageData, filters);
+      const processedData = this.applyOperations(imageData, operations);
       
       return processedData;
       
@@ -28,33 +32,56 @@ class ImageProcessor {
     }
   }
 
-  // Aplicar filtros computacionalmente pesados
-  applyHeavyFilters(imageData, filters) {
+  filtersToOperations(filters) {
+    const order = ['brightness', 'contrast', 'saturation', 'sepia', 'hueRotate', 'blur'];
+    return order
+      .filter(type => filters[type] !== 0 && filters[type] !== undefined && filters[type] !== null)
+      .map(type => ({
+        type: 'filter',
+        config: {
+          type: type === 'hueRotate' ? 'hue-rotate' : type,
+          value: filters[type]
+        }
+      }));
+  }
+
+  // Aplicar operaciones de filtro con la misma semántica que CSS/fallback
+  applyOperations(imageData, operations) {
     const data = new Uint8ClampedArray(imageData.data);
     const width = imageData.width;
     const height = imageData.height;
 
-    // Aplicar blur si es pesado (> 3px)
-    if (filters.blur && Math.abs(filters.blur) > 3) {
-      this.applyBoxBlur(data, width, height, Math.abs(filters.blur));
+    for (const operation of operations) {
+      const config = operation.config || operation;
+      const type = config.type || operation.type;
+      const value = config.value || 0;
+
+      switch (type) {
+        case 'brightness':
+          this.applyBrightness(data, value);
+          break;
+        case 'contrast':
+          this.applyContrast(data, value);
+          break;
+        case 'saturation':
+          this.applySaturation(data, value);
+          break;
+        case 'sepia':
+          this.applySepia(data, value);
+          break;
+        case 'hue-rotate':
+        case 'hueRotate':
+          this.applyHueRotate(data, value);
+          break;
+        case 'blur':
+          if (value > 0) this.applyBoxBlur(data, width, height, value);
+          break;
+        default:
+          break;
+      }
     }
 
-    // Aplicar contrast si es pesado (> 150%)
-    if (filters.contrast && Math.abs(filters.contrast - 100) > 50) {
-      this.applyContrast(data, filters.contrast);
-    }
-
-    // Aplicar saturation si es pesada (> 150%)
-    if (filters.saturation && Math.abs(filters.saturation - 100) > 50) {
-      this.applySaturation(data, filters.saturation);
-    }
-
-    // Aplicar brightness si es pesado
-    if (filters.brightness && Math.abs(filters.brightness - 100) > 50) {
-      this.applyBrightness(data, filters.brightness);
-    }
-
-    return new ImageData(data, width, height);
+    return { data, width, height };
   }
 
   // Algoritmo de Box Blur optimizado
@@ -116,10 +143,9 @@ class ImageProcessor {
     }
   }
 
-  // Aplicar contraste corregido (entrada en porcentaje 0-200)
-  applyContrast(data, contrastPercent) {
-    // Convertir porcentaje a factor: 100% = 1.0, 150% = 1.5, 50% = 0.5
-    const contrast = contrastPercent / 100;
+  // Aplicar contraste corregido (entrada 0 = neutro, como CSS)
+  applyContrast(data, contrastValue) {
+    const contrast = (100 + contrastValue) / 100;
     
     for (let i = 0; i < data.length; i += 4) {
       // Aplicar contraste correctamente
@@ -130,9 +156,9 @@ class ImageProcessor {
     }
   }
 
-  // Aplicar saturación corregida (entrada en porcentaje 0-200)
-  applySaturation(data, saturationPercent) {
-    const saturation = saturationPercent / 100;
+  // Aplicar saturación corregida (entrada 0 = neutro, como CSS)
+  applySaturation(data, saturationValue) {
+    const saturation = (100 + saturationValue) / 100;
     
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i];
@@ -150,9 +176,55 @@ class ImageProcessor {
     }
   }
 
-  // Aplicar brillo optimizado
+  applySepia(data, sepiaValue) {
+    const amount = sepiaValue / 100;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+
+      const tr = 0.393 * r + 0.769 * g + 0.189 * b;
+      const tg = 0.349 * r + 0.686 * g + 0.168 * b;
+      const tb = 0.272 * r + 0.534 * g + 0.131 * b;
+
+      data[i] = Math.min(255, r + amount * (tr - r));
+      data[i + 1] = Math.min(255, g + amount * (tg - g));
+      data[i + 2] = Math.min(255, b + amount * (tb - b));
+    }
+  }
+
+  applyHueRotate(data, hueRotate) {
+    const radians = (hueRotate * Math.PI) / 180;
+    const cos = Math.cos(radians);
+    const sin = Math.sin(radians);
+
+    const matrix = [
+      0.213 + cos * 0.787 - sin * 0.213,
+      0.715 - cos * 0.715 - sin * 0.715,
+      0.072 - cos * 0.072 + sin * 0.928,
+      0.213 - cos * 0.213 + sin * 0.143,
+      0.715 + cos * 0.285 + sin * 0.140,
+      0.072 - cos * 0.072 - sin * 0.283,
+      0.213 - cos * 0.213 - sin * 0.787,
+      0.715 - cos * 0.715 + sin * 0.715,
+      0.072 + cos * 0.928 + sin * 0.072
+    ];
+
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+
+      data[i] = Math.min(255, Math.max(0, matrix[0] * r + matrix[1] * g + matrix[2] * b));
+      data[i + 1] = Math.min(255, Math.max(0, matrix[3] * r + matrix[4] * g + matrix[5] * b));
+      data[i + 2] = Math.min(255, Math.max(0, matrix[6] * r + matrix[7] * g + matrix[8] * b));
+    }
+  }
+
+  // Aplicar brillo optimizado (entrada 0 = neutro, como CSS)
   applyBrightness(data, brightness) {
-    const factor = brightness / 100;
+    const factor = (100 + brightness) / 100;
     
     for (let i = 0; i < data.length; i += 4) {
       data[i] = Math.max(0, Math.min(255, data[i] * factor));
@@ -167,12 +239,15 @@ class ImageProcessor {
 const processor = new ImageProcessor();
 
 self.onmessage = function(e) {
-  const { id, imageData, filters } = e.data;
+  const { id } = e.data;
+  const payload = e.data.data || {};
+  const imageData = e.data.imageData || payload.imageData;
+  const operations = e.data.operations || payload.operations || e.data.filters || payload.filters || [];
   
   try {
     
     // Procesar imagen
-    const processedData = processor.processImage(imageData, filters);
+    const processedData = processor.processImage(imageData, operations);
     
     // CRÍTICO: Clonar buffer antes de transferir para evitar corrupción
     const clonedBuffer = processedData.data.buffer.slice();
@@ -180,6 +255,7 @@ self.onmessage = function(e) {
     // Enviar resultado con transferable object clonado
     self.postMessage({
       id,
+      type: 'complete',
       success: true,
       result: {
         data: new Uint8ClampedArray(clonedBuffer),

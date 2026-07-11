@@ -107,11 +107,18 @@ const UIManager = {
         <span class="error-icon">⚠️</span>
         <div class="error-text">
           <span class="error-message">${typeof SecurityManager !== 'undefined' ? SecurityManager.sanitizeText(message) : message}</span>
-          ${config.stackTrace ? `<details class="error-details"><summary>Detalles técnicos</summary><pre>${config.stackTrace}</pre></details>` : ''}
+          ${config.stackTrace ? `<details class="error-details"><summary>Detalles técnicos</summary><pre>${typeof SecurityManager !== 'undefined' ? SecurityManager.sanitizeText(config.stackTrace) : config.stackTrace}</pre></details>` : ''}
         </div>
-        <button class="error-close" type="button" aria-label="Cerrar" onclick="this.parentElement.parentElement.remove()">×</button>
+        <button class="error-close" type="button" aria-label="Cerrar">×</button>
       </div>
     `;
+
+    // El botón × debe pasar por removeToast para mantener el Set
+    // activeToasts sincronizado (nada de .remove() directo).
+    const errorCloseBtn = errorContainer.querySelector('.error-close');
+    if (errorCloseBtn) {
+      errorCloseBtn.addEventListener('click', () => this.removeToast(errorContainer));
+    }
 
     // Si hay action, construir el botón de forma segura con DOM API.
     // El handler se acepta como función o (deprecado) como string que se
@@ -188,9 +195,15 @@ const UIManager = {
       <div class="warning-content">
         <span class="warning-icon">⚠️</span>
         <span class="warning-message">${typeof SecurityManager !== 'undefined' ? SecurityManager.sanitizeText(message) : message}</span>
-        <button class="warning-close" type="button" aria-label="Cerrar" onclick="this.parentElement.parentElement.remove()">×</button>
+        <button class="warning-close" type="button" aria-label="Cerrar">×</button>
       </div>
     `;
+
+    // Cierre vía removeToast para mantener activeToasts sincronizado.
+    const warningCloseBtn = warningContainer.querySelector('.warning-close');
+    if (warningCloseBtn) {
+      warningCloseBtn.addEventListener('click', () => this.removeToast(warningContainer));
+    }
 
     if (config.action) {
       const actionBtn = document.createElement('button');
@@ -264,9 +277,15 @@ const UIManager = {
       <div class="success-content">
         <span class="success-icon">${config.icon}</span>
         <span class="success-message">${typeof SecurityManager !== 'undefined' ? SecurityManager.sanitizeText(message) : message}</span>
-        <button class="success-close" type="button" aria-label="Cerrar" onclick="this.parentElement.parentElement.remove()">×</button>
+        <button class="success-close" type="button" aria-label="Cerrar">×</button>
       </div>
     `;
+
+    // Cierre vía removeToast para mantener activeToasts sincronizado.
+    const successCloseBtn = successContainer.querySelector('.success-close');
+    if (successCloseBtn) {
+      successCloseBtn.addEventListener('click', () => this.removeToast(successContainer));
+    }
 
     if (config.action) {
       const actionBtn = document.createElement('button');
@@ -327,10 +346,16 @@ const UIManager = {
       <div class="info-content">
         <span class="info-icon">${config.icon}</span>
         <span class="info-message">${typeof SecurityManager !== 'undefined' ? SecurityManager.sanitizeText(message) : message}</span>
-        <button class="info-close" onclick="this.parentElement.parentElement.remove()">×</button>
+        <button class="info-close" type="button" aria-label="Cerrar">×</button>
       </div>
     `;
-    
+
+    // Cierre vía removeToast para mantener activeToasts sincronizado.
+    const infoCloseBtn = infoContainer.querySelector('.info-close');
+    if (infoCloseBtn) {
+      infoCloseBtn.addEventListener('click', () => this.removeToast(infoContainer));
+    }
+
     document.body.appendChild(infoContainer);
     this.activeToasts.add(infoContainer);
     
@@ -353,17 +378,20 @@ const UIManager = {
 
   // Gestión de toasts
   removeToast: function(toast) {
+    if (!toast) return;
+    // Eliminar SIEMPRE del Set, aunque el nodo ya no esté en el DOM.
+    // Si no, se retienen nodos detached y limitActiveToasts elige
+    // repetidamente un toast muerto sin liberar hueco.
+    this.activeToasts.delete(toast);
     if (this.config.animations) {
       toast.style.animation = 'slideOutRight 0.3s ease-in';
       setTimeout(() => {
         if (toast.parentNode) {
           toast.remove();
-          this.activeToasts.delete(toast);
         }
       }, 300);
     } else {
       toast.remove();
-      this.activeToasts.delete(toast);
     }
   },
   

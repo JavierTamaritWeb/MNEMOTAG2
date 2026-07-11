@@ -206,14 +206,19 @@ const MetadataManager = {
    */
   validateCreationDate: function(event) {
     const dateInput = event.target;
-    const selectedDate = new Date(dateInput.value);
+    // Parsear como fecha LOCAL: `new Date('YYYY-MM-DD')` es medianoche UTC
+    // y compararla con límites locales daba falsos positivos/negativos.
+    const selectedDate = this._parseLocalDate(dateInput.value);
+    if (!selectedDate) return;
     const today = new Date();
-    today.setHours(23, 59, 59, 999); // Fin del día actual
-    
+    today.setHours(23, 59, 59, 999); // Fin del día actual (local)
+
     if (selectedDate > today) {
-      const todayFormatted = today.toISOString().split('T')[0];
-      dateInput.value = todayFormatted;
-      
+      // Formatear la corrección con getters LOCALES, no toISOString()
+      // (que es UTC y podía asignar la fecha de mañana).
+      const pad = (n) => String(n).padStart(2, '0');
+      dateInput.value = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+
       if (typeof UIManager !== 'undefined') {
         UIManager.showWarning('La fecha de creación no puede ser futura. Se ha ajustado a hoy.');
       }
@@ -226,21 +231,51 @@ const MetadataManager = {
    */
   getMetadata: function() {
     const creationDateInput = document.getElementById('creationDate');
-    const createdAt = creationDateInput?.value 
-      ? new Date(creationDateInput.value).toISOString()
-      : new Date().toISOString();
-    
+    // Parsear la fecha del formulario (YYYY-MM-DD) como medianoche LOCAL.
+    // `new Date('YYYY-MM-DD')` interpreta medianoche UTC, y al formatear
+    // con getters locales en husos UTC-negativos se obtendría el día anterior.
+    let createdAt = null;
+    if (creationDateInput?.value) {
+      const parsed = this._parseLocalDate(creationDateInput.value);
+      if (parsed) createdAt = parsed.toISOString();
+    }
+    if (!createdAt) createdAt = new Date().toISOString();
+
+    // GPS: `parseFloat(...) || null` convertía el 0 en null (ecuador,
+    // Greenwich o altitud 0 se perdían). Usamos Number.isFinite.
+    const parseCoord = (id) => {
+      const v = parseFloat(document.getElementById(id)?.value);
+      return Number.isFinite(v) ? v : null;
+    };
+
     return {
       title: document.getElementById('metaTitle')?.value || '',
       author: document.getElementById('metaAuthor')?.value || '',
       copyright: document.getElementById('metaCopyright')?.value || '',
       license: document.getElementById('metaLicense')?.value || '',
-      latitude: parseFloat(document.getElementById('metaLatitude')?.value) || null,
-      longitude: parseFloat(document.getElementById('metaLongitude')?.value) || null,
-      altitude: parseFloat(document.getElementById('metaAltitude')?.value) || null,
+      latitude: parseCoord('metaLatitude'),
+      longitude: parseCoord('metaLongitude'),
+      altitude: parseCoord('metaAltitude'),
       createdAt: createdAt,
       software: 'MnemoTag v3.0'
     };
+  },
+
+  /**
+   * Parsea una fecha 'YYYY-MM-DD' como medianoche LOCAL (no UTC).
+   * @param {string} value - Valor del input date
+   * @returns {Date|null} Date local, o null si el formato no es válido
+   */
+  _parseLocalDate: function(value) {
+    if (typeof value !== 'string') return null;
+    const parts = value.split('-');
+    if (parts.length !== 3) return null;
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10);
+    const day = parseInt(parts[2], 10);
+    if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+    const d = new Date(year, month - 1, day);
+    return isNaN(d.getTime()) ? null : d;
   },
   
   /**
@@ -633,9 +668,14 @@ const MetadataManager = {
     chunk[7] = 0x66; // 'f'
     // data
     chunk.set(tiffBytes, 8);
-    // crc32 sobre [type + data]
+    // crc32 sobre [type + data]. Si crc32 no está disponible, lanzamos:
+    // un chunk con CRC=0 sería inválido y el catch del caller devuelve
+    // el blob original (nunca producir un PNG corrupto).
+    if (typeof crc32 !== 'function') {
+      throw new Error('crc32 no disponible: no se puede construir un chunk eXIf válido');
+    }
     const crcInput = chunk.subarray(4, 8 + length);
-    const crc = (typeof crc32 === 'function') ? crc32(crcInput) : 0;
+    const crc = crc32(crcInput);
     dv.setUint32(8 + length, crc, false);
 
     return chunk;
@@ -666,6 +706,11 @@ const MetadataManager = {
       const dataLen = dv.getUint32(0, false);
       const type = String.fromCharCode(pngBytes[pos + 4], pngBytes[pos + 5], pngBytes[pos + 6], pngBytes[pos + 7]);
       const totalLen = 4 + 4 + dataLen + 4;
+      // Un chunk cuya longitud declarada excede el archivo indica PNG
+      // corrupto: lanzamos y el catch del caller devuelve el blob original.
+      if (pos + totalLen > pngBytes.length) {
+        throw new Error('PNG corrupto: chunk ' + type + ' declara más bytes de los que hay en el archivo');
+      }
       chunks.push({ start: pos, length: totalLen, type: type });
       pos += totalLen;
       if (type === 'IEND') break;
@@ -901,6 +946,25 @@ const MetadataManager = {
   },
 
   /**
+   * Recorre los chunks RIFF de un WebP y devuelve true si ya existe un
+   * chunk 'EXIF'. Best-effort: si la estructura de chunks está corrupta,
+   * deja de recorrer (la validación fuerte la hacen otras funciones).
+   * @param {Uint8Array} bytes - WebP completo (incluye RIFF header)
+   * @returns {boolean}
+   */
+  _webpHasExifChunk: function(bytes) {
+    let pos = 12; // saltar RIFF(4) + size(4) + WEBP(4)
+    while (pos + 8 <= bytes.length) {
+      const fourcc = String.fromCharCode(bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]);
+      if (fourcc === 'EXIF') return true;
+      const size = (bytes[pos + 4] | (bytes[pos + 5] << 8) | (bytes[pos + 6] << 16) | (bytes[pos + 7] << 24)) >>> 0;
+      // Los chunks RIFF se alinean a byte par (padding)
+      pos += 8 + size + (size % 2);
+    }
+    return false;
+  },
+
+  /**
    * Caso A: WebP ya extended (VP8X). Añadir el chunk EXIF al final y
    * setear el bit EXIF en el VP8X header.
    */
@@ -975,6 +1039,12 @@ const MetadataManager = {
 
       let newBytes;
       if (dim.type === 'VP8X') {
+        // Defensivo: si el VP8X ya declara EXIF (flag 0x08) o ya contiene
+        // un chunk EXIF, NO añadimos un duplicado — devolvemos el original.
+        if ((webpBytes[20] & 0x08) !== 0 || this._webpHasExifChunk(webpBytes)) {
+          MNEMOTAG_DEBUG && console.warn('embedExifInWebpBlob: el WebP ya tiene EXIF, devolviendo original');
+          return blob;
+        }
         // Ya es extended: solo añadimos EXIF y seteamos el flag
         newBytes = this._addExifToVp8xWebp(webpBytes, exifChunk);
       } else {
@@ -1274,7 +1344,17 @@ const MetadataManager = {
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     let p = fb.bodyStart;
 
+    // Acotar cada lectura contra el final del propio box: un item_count o
+    // extent_count corrupto NO debe leer basura de los boxes siguientes.
+    const limit = ilocBox.end;
+    const need = function(n) {
+      if (p + n > limit) {
+        throw new Error('iloc corrupto: lectura fuera del box');
+      }
+    };
+
     // offset_size(4) + length_size(4) + base_offset_size(4) + index_size OR reserved(4)
+    need(2);
     const byte1 = bytes[p++];
     const byte2 = bytes[p++];
     const offset_size = (byte1 >> 4) & 0x0f;
@@ -1286,8 +1366,10 @@ const MetadataManager = {
     // item_count
     let item_count;
     if (fb.version < 2) {
+      need(2);
       item_count = view.getUint16(p); p += 2;
     } else {
+      need(4);
       item_count = view.getUint32(p); p += 4;
     }
 
@@ -1297,14 +1379,17 @@ const MetadataManager = {
 
       // item_ID
       if (fb.version < 2) {
+        need(2);
         item.item_ID = view.getUint16(p); p += 2;
       } else {
+        need(4);
         item.item_ID = view.getUint32(p); p += 4;
       }
 
       // construction_method (solo en version 1 o 2)
       if (fb.version === 1 || fb.version === 2) {
         // 2 bytes: 12 bits reserved + 4 bits construction_method
+        need(2);
         const cm = view.getUint16(p); p += 2;
         item.construction_method = cm & 0x0f;
       } else {
@@ -1312,25 +1397,31 @@ const MetadataManager = {
       }
 
       // data_reference_index
+      need(2);
       item.data_reference_index = view.getUint16(p); p += 2;
 
       // base_offset
+      need(base_offset_size);
       item.base_offset = this._readUintN(view, p, base_offset_size);
       p += base_offset_size;
 
       // extent_count
+      need(2);
       const extent_count = view.getUint16(p); p += 2;
 
       for (let j = 0; j < extent_count; j++) {
         const extent = {};
         if ((fb.version === 1 || fb.version === 2) && index_size > 0) {
+          need(index_size);
           extent.extent_index = this._readUintN(view, p, index_size);
           p += index_size;
         } else {
           extent.extent_index = 0;
         }
+        need(offset_size);
         extent.extent_offset = this._readUintN(view, p, offset_size);
         p += offset_size;
+        need(length_size);
         extent.extent_length = this._readUintN(view, p, length_size);
         p += length_size;
         item.extents.push(extent);
@@ -1412,10 +1503,14 @@ const MetadataManager = {
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     let p = fb.bodyStart;
 
+    // Acotar las lecturas contra el final del propio box: un entry_count
+    // corrupto no debe leer basura de los boxes siguientes en silencio.
     let entry_count;
     if (fb.version === 0) {
+      if (p + 2 > iinfBox.end) throw new Error('iinf corrupto: lectura fuera del box');
       entry_count = view.getUint16(p); p += 2;
     } else {
+      if (p + 4 > iinfBox.end) throw new Error('iinf corrupto: lectura fuera del box');
       entry_count = view.getUint32(p); p += 4;
     }
 
@@ -1428,11 +1523,14 @@ const MetadataManager = {
       let item_ID, item_type = '', item_name = '';
       if (infeFb.version === 2 || infeFb.version === 3) {
         if (infeFb.version === 2) {
+          if (q + 2 > b.end) throw new Error('infe corrupto: lectura fuera del box');
           item_ID = view.getUint16(q); q += 2;
         } else {
+          if (q + 4 > b.end) throw new Error('infe corrupto: lectura fuera del box');
           item_ID = view.getUint32(q); q += 4;
         }
-        // item_protection_index (2 bytes, skip)
+        // item_protection_index (2 bytes, skip) + item_type (4 bytes)
+        if (q + 6 > b.end) throw new Error('infe corrupto: lectura fuera del box');
         q += 2;
         item_type = String.fromCharCode(bytes[q], bytes[q + 1], bytes[q + 2], bytes[q + 3]);
         q += 4;
@@ -1565,8 +1663,15 @@ const MetadataManager = {
       return out;
     }
 
-    // Extender iref existente: leer versión, reusar body + concatenar cdsc
+    // Extender iref existente: leer versión, reusar body + concatenar cdsc.
+    // En iref versión 1 los item_ID de las referencias son de 32 bits, pero
+    // nuestro cdsc se construye con IDs de 16 bits (SingleItemTypeReferenceBox
+    // versión 0). Mezclar ambos corrompería el box: abortamos y el caller
+    // devuelve el blob original.
     const fb = this._readFullBoxHeader(bytes, existingIref);
+    if (fb.version !== 0) {
+      throw new Error('iref versión ' + fb.version + ' no soportado (IDs de 32 bits)');
+    }
     const existingBodyStart = fb.bodyStart;
     const existingBodyLength = existingIref.end - existingBodyStart;
     const newBodyLength = 4 + existingBodyLength + cdscSize; // full box header(4) + body original + cdsc
@@ -1679,9 +1784,12 @@ const MetadataManager = {
       // data_reference_index
       this._writeUintN(out, p, item.data_reference_index || 0, 2); p += 2;
       // base_offset
+      // El desplazamiento en metaGrowth debe aplicarse EXACTAMENTE UNA VEZ:
+      // si el item tiene campo base_offset (base_offset_size > 0) se desplaza
+      // solo el base_offset (los extent_offsets son relativos a él); si no
+      // hay campo base_offset (base_offset_size === 0), se desplazan los
+      // extent_offsets (que entonces son absolutos al archivo).
       if (parsedIloc.base_offset_size > 0) {
-        // Los base_offsets absolutos deben desplazarse en items existentes
-        // si construction_method === 0
         let bo = item.base_offset || 0;
         if (!isNewItem && item.construction_method === 0) {
           bo += metaGrowth;
@@ -1698,11 +1806,11 @@ const MetadataManager = {
           this._writeUintN(out, p, ex.extent_index || 0, parsedIloc.index_size);
           p += parsedIloc.index_size;
         }
-        // extent_offset — desplazar si construction_method===0 y NO es el nuevo item
+        // extent_offset — desplazar SOLO cuando no existe campo base_offset
+        // (base_offset_size === 0); si existe, el desplazamiento ya se aplicó
+        // al base_offset y sumarlo aquí sería un doble desplazamiento.
         let eo = ex.extent_offset;
-        if (!isNewItem && item.construction_method === 0 && (item.base_offset || 0) === 0) {
-          // Si el base_offset es 0, los extent_offsets son absolutos del
-          // archivo y también hay que desplazarlos en metaGrowth.
+        if (!isNewItem && item.construction_method === 0 && parsedIloc.base_offset_size === 0) {
           eo += metaGrowth;
         }
         this._writeUintN(out, p, eo, parsedIloc.offset_size);
@@ -1795,8 +1903,13 @@ const MetadataManager = {
     if (!this._isAvifFile(bytes)) return null;
     const topBoxes = this._parseIsobmffBoxes(bytes);
     const metaBox = topBoxes.find(b => b.type === 'meta');
-    const mdatBox = topBoxes.find(b => b.type === 'mdat');
-    if (!metaBox || !mdatBox) return null;
+    const mdatBoxes = topBoxes.filter(b => b.type === 'mdat');
+    // Defensivo: con más de un mdat top-level, los offsets que apuntan a
+    // mdats posteriores quedarían cortos en exifPayload.length tras anexar
+    // al primero. No lo soportamos: abortar.
+    if (mdatBoxes.length !== 1) return null;
+    const mdatBox = mdatBoxes[0];
+    if (!metaBox) return null;
     // Solo soportamos el orden común: ftyp → meta → mdat
     if (metaBox.start > mdatBox.start) return null;
 
@@ -1804,13 +1917,28 @@ const MetadataManager = {
     if (!metaContents.iinf || !metaContents.iloc || !metaContents.pitm) return null;
 
     const primaryItemId = this._readPitm(bytes, metaContents.pitm);
-    const iinfData = this._readIinf(bytes, metaContents.iinf);
-    const ilocData = this._readIloc(bytes, metaContents.iloc);
+    let iinfData, ilocData;
+    try {
+      iinfData = this._readIinf(bytes, metaContents.iinf);
+      ilocData = this._readIloc(bytes, metaContents.iloc);
+    } catch (err) {
+      MNEMOTAG_DEBUG && console.warn('_injectExifInAvifBytes: iinf/iloc corrupto:', err);
+      return null;
+    }
 
     // Soportamos solo construction_method 0 en las entries existentes
     // (absoluto al archivo). Si algún item usa otra cosa, abortar.
+    // Además, todo extent existente debe caer COMPLETO dentro del body del
+    // mdat: si apuntara más allá de su final (o fuera de él), el
+    // desplazamiento uniforme en metaGrowth no bastaría (el mdat crece en
+    // exifPayload.length al anexar). Abortar en ese caso.
     for (const item of ilocData.items) {
       if (item.construction_method !== 0) return null;
+      for (const ex of item.extents) {
+        const absOffset = (item.base_offset || 0) + ex.extent_offset;
+        if (absOffset < mdatBox.bodyStart) return null;
+        if (absOffset + (ex.extent_length || 0) > mdatBox.end) return null;
+      }
     }
 
     // Calcular item_ID libre
@@ -1822,7 +1950,10 @@ const MetadataManager = {
       if (it.item_ID > maxId) maxId = it.item_ID;
     }
     const newItemId = maxId + 1;
-    if (newItemId > 0xffff && ilocData.version < 2) return null; // iloc v0/v1 solo soporta 16-bit IDs
+    // Abortar SIEMPRE que el nuevo item_ID no quepa en 16 bits: aunque
+    // iloc v2 soporta IDs de 32 bits, el infe que construimos (versión 2)
+    // y el cdsc del iref usan uint16 y truncarían el ID silenciosamente.
+    if (newItemId > 0xffff) return null;
 
     // Ya existe un item 'Exif'? Si sí, no duplicar.
     for (const e of iinfData.entries) {
@@ -1852,8 +1983,14 @@ const MetadataManager = {
     // Segunda pasada corrige el extent_offset del item Exif.
 
     const newInfeBytes = this._buildInfeBoxForExif(newItemId);
-    const newIinfBytes = this._buildIinfWithExtra(bytes, metaContents.iinf, newInfeBytes);
-    const newIrefBytes = this._buildIrefWithCdsc(bytes, metaContents.iref, newItemId, primaryItemId);
+    let newIinfBytes, newIrefBytes;
+    try {
+      newIinfBytes = this._buildIinfWithExtra(bytes, metaContents.iinf, newInfeBytes);
+      newIrefBytes = this._buildIrefWithCdsc(bytes, metaContents.iref, newItemId, primaryItemId);
+    } catch (err) {
+      MNEMOTAG_DEBUG && console.warn('_injectExifInAvifBytes: error construyendo iinf/iref:', err);
+      return null;
+    }
 
     // Calcular el crecimiento del meta box ANTES de reconstruir iloc.
     // Tamaño original del meta:
@@ -1882,15 +2019,23 @@ const MetadataManager = {
     const newIlocSize = oldIlocSize + extraIlocBytes;
     const metaGrowth = (newIinfSize - oldIinfSize) + (newIrefSize - oldIrefSize) + (newIlocSize - oldIlocSize);
 
+    // Entre el final del meta y el inicio del mdat puede haber boxes
+    // top-level intermedios (p. ej. `free`). Esa región (gap) se preserva
+    // VERBATIM en la reconstrucción: como va después del meta, se desplaza
+    // exactamente metaGrowth, igual que el mdat — el desplazamiento de
+    // offsets ya calculado sigue siendo correcto.
+    const gapLength = mdatBox.start - metaBox.end;
+    if (gapLength < 0) return null; // no debería pasar (boxes solapados)
+
     // Offset absoluto dentro del archivo donde empieza el payload EXIF:
-    // después del ftyp + nuevo meta + mdat header.
+    // después del ftyp + nuevo meta + gap preservado + mdat header.
     // new_meta_end = metaBox.start + oldMetaSize + metaGrowth
-    // new_mdat_start = new_meta_end
+    // new_mdat_start = new_meta_end + gapLength
     // mdat header size = mdatBox.headerSize (normalmente 8, 16 con largesize)
     // mdat body original empieza en mdatBox.bodyStart, termina en mdatBox.end.
     // nuevo extent offset = new_mdat_start + mdatHeaderSize + (mdatBox.end - mdatBox.bodyStart)
     const newMetaEnd = metaBox.start + oldMetaSize + metaGrowth;
-    const newMdatStart = newMetaEnd;
+    const newMdatStart = newMetaEnd + gapLength;
     const oldMdatBodyLength = mdatBox.end - mdatBox.bodyStart;
     const exifExtentOffset = newMdatStart + mdatBox.headerSize + oldMdatBodyLength;
 
@@ -1953,20 +2098,27 @@ const MetadataManager = {
     // Anexar el payload EXIF
     newMdatBytes.set(exifPayload, mdatHeaderSize + oldMdatBodyLength);
 
-    // Reconstruir el archivo: [ftyp + otros boxes antes de meta][nuevo meta][nuevo mdat][otros boxes después de mdat]
-    // Identificamos los rangos de la parte "prologo" (antes de meta) y "epilogo" (después de mdat).
+    // Reconstruir el archivo preservando VERBATIM cualquier box top-level
+    // situado entre el final del meta y el inicio del mdat (gap):
+    //   [0, meta.start) + nuevo meta + [meta.end, mdat.start) + nuevo mdat + [mdat.end, EOF)
     const prologEnd = metaBox.start;
     const oldMdatEnd = mdatBox.end;
     const epilogStart = oldMdatEnd;
     const epilogLength = bytes.length - epilogStart;
 
-    const newTotalSize = prologEnd + newMetaBytes.length + newMdatBytes.length + epilogLength;
+    const newTotalSize = prologEnd + newMetaBytes.length + gapLength + newMdatBytes.length + epilogLength;
     const out = new Uint8Array(newTotalSize);
     out.set(bytes.subarray(0, prologEnd), 0);
     out.set(newMetaBytes, prologEnd);
-    out.set(newMdatBytes, prologEnd + newMetaBytes.length);
+    let writeOffset = prologEnd + newMetaBytes.length;
+    if (gapLength > 0) {
+      out.set(bytes.subarray(metaBox.end, mdatBox.start), writeOffset);
+      writeOffset += gapLength;
+    }
+    out.set(newMdatBytes, writeOffset);
+    writeOffset += newMdatBytes.length;
     if (epilogLength > 0) {
-      out.set(bytes.subarray(epilogStart, bytes.length), prologEnd + newMetaBytes.length + newMdatBytes.length);
+      out.set(bytes.subarray(epilogStart, bytes.length), writeOffset);
     }
 
     // Verificación final: el primer box sigue siendo 'ftyp'

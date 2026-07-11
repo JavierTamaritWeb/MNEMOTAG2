@@ -200,14 +200,25 @@ class BatchManager {
    *   con todas las capas (watermarks, filtros, text layers). Recibe (ctx, canvas, img).
    */
   captureCurrentConfig(filterString, watermarks, textLayers, metadata, renderFn) {
+    // Formato/calidad de salida: respetar la configuración global del editor
+    // (select #output-format y slider de calidad, variables de main.js
+    // accesibles por scope de script). Si no son accesibles (tests, uso
+    // aislado), mantener JPEG 0.9 como default documentado.
+    const globalFormat = (typeof outputFormat !== 'undefined' && outputFormat)
+      ? outputFormat
+      : 'jpeg';
+    const globalQuality = (typeof outputQuality === 'number')
+      ? outputQuality
+      : 0.9;
+
     this.currentConfig = {
       filterString: filterString || '',
       watermarks: watermarks || null,
       textLayers: textLayers || null,
       metadata: metadata ? { ...metadata } : null,
       renderFn: renderFn || null,
-      outputFormat: 'jpeg',
-      outputQuality: 0.9,
+      outputFormat: globalFormat,
+      outputQuality: globalQuality,
       timestamp: Date.now()
     };
 
@@ -232,45 +243,81 @@ class BatchManager {
 
     this.isProcessing = true;
     this.processedImages = [];
-    
+
+    // Resolver el MIME de salida UNA vez para todo el lote: si el navegador
+    // no puede codificar el formato configurado (p. ej. AVIF en Firefox),
+    // usar la cadena de fallback estándar del proyecto. Se pasa hasAlpha=true
+    // para que el fallback de WebP/AVIF elija PNG (preserva transparencia).
+    let outputMime = (typeof getMimeType === 'function')
+      ? getMimeType(this.currentConfig.outputFormat)
+      : 'image/' + this.currentConfig.outputFormat;
+    if (typeof determineFallbackFormat === 'function') {
+      try {
+        outputMime = await determineFallbackFormat(true, outputMime);
+      } catch (fallbackError) {
+        MNEMOTAG_DEBUG && console.warn('determineFallbackFormat falló, se mantiene el MIME original:', fallbackError);
+      }
+    }
+    this.currentConfig.outputMime = outputMime;
+    this.currentConfig.outputFormat = outputMime.split('/')[1];
+
     const total = this.imageQueue.length;
-    let processed = 0;
+    let done = 0;
+    const errors = [];
 
     for (const imageItem of this.imageQueue) {
+      let itemResult;
       try {
-        const result = await this.processImage(imageItem);
-        this.processedImages.push(result);
+        itemResult = await this.processImage(imageItem);
         imageItem.processed = true;
-        
-        processed++;
-        
-        if (progressCallback) {
-          progressCallback({
-            current: processed,
-            total: total,
-            percentage: Math.round((processed / total) * 100),
-            currentImage: imageItem.name
-          });
-        }
-        
       } catch (error) {
         console.error(`Error procesando ${imageItem.name}:`, error);
         imageItem.error = error.message;
-        
-        this.processedImages.push({
+        errors.push({ name: imageItem.name, error: error.message });
+        itemResult = {
           success: false,
           name: imageItem.name,
           error: error.message
-        });
+        };
+      }
+      this.processedImages.push(itemResult);
+      done++;
+
+      // El callback de progreso va FUERA del try de procesamiento y en su
+      // propio try silencioso: si el callback lanza, no debe duplicar la
+      // imagen en processedImages ni abortar el lote. Se invoca también
+      // cuando la imagen falla, para que la barra llegue siempre a n/n.
+      if (progressCallback) {
+        try {
+          progressCallback({
+            current: done,
+            total: total,
+            percentage: Math.round((done / total) * 100),
+            currentImage: imageItem.name
+          });
+        } catch (cbError) {
+          MNEMOTAG_DEBUG && console.warn('progressCallback lanzó un error (ignorado):', cbError);
+        }
       }
     }
 
     this.isProcessing = false;
-    
-    
+
+    const failed = errors.length;
+    const succeeded = this.processedImages.filter(img => img.success).length;
+
+    // main.js solo muestra un toast de éxito global tras processQueue, así
+    // que los fallos parciales se avisan desde aquí para que no queden mudos.
+    if (failed > 0 && typeof UIManager !== 'undefined' && typeof UIManager.showWarning === 'function') {
+      UIManager.showWarning(failed + ' de ' + total + ' imágenes no se pudieron procesar');
+    }
+
     return {
       success: true,
-      processed: this.processedImages.length,
+      // processed = SOLO las exitosas (antes contaba también las fallidas)
+      processed: succeeded,
+      failed: failed,
+      errors: errors,
       total: total,
       images: this.processedImages
     };
@@ -300,9 +347,23 @@ class BatchManager {
           ctx.drawImage(imageItem.imageData.img, 0, 0);
         }
 
-        canvas.toBlob((blob) => {
+        const mime = this.currentConfig.outputMime
+          || ('image/' + (this.currentConfig.outputFormat || 'jpeg'));
+
+        // JPEG no tiene canal alpha: aplanar contra el color configurado
+        // para que las zonas transparentes (p. ej. PNG de origen) no salgan
+        // en negro (comportamiento por defecto del codec JPEG).
+        let exportCanvas = canvas;
+        if (mime === 'image/jpeg' && typeof flattenCanvasForJpeg === 'function') {
+          const flattenColor = (typeof getFlattenColor === 'function')
+            ? getFlattenColor()
+            : undefined;
+          exportCanvas = flattenCanvasForJpeg(canvas, flattenColor);
+        }
+
+        exportCanvas.toBlob((blob) => {
           if (!blob) {
-            reject(new Error('Error al generar blob'));
+            reject(new Error('Error al generar blob (' + mime + ')'));
             return;
           }
           resolve({
@@ -313,7 +374,7 @@ class BatchManager {
             width: canvas.width,
             height: canvas.height
           });
-        }, 'image/' + this.currentConfig.outputFormat, this.currentConfig.outputQuality);
+        }, mime, this.currentConfig.outputQuality);
 
       } catch (error) {
         reject(error);
@@ -337,15 +398,36 @@ class BatchManager {
     const zip = new JSZip();
     const folder = zip.folder('mnemotag-batch');
 
-    // Agregar imágenes al ZIP conservando el nombre original
+    // Extensión según el formato de salida real ('jpeg' → 'jpg', etc.)
+    const format = (this.currentConfig && this.currentConfig.outputFormat) || 'jpeg';
+    const ext = (typeof getFileExtension === 'function')
+      ? getFileExtension(format)
+      : format;
+
+    // Agregar imágenes al ZIP conservando el nombre original, DEDUPLICANDO:
+    // dos orígenes distintos (foto.png y foto.jpg) colapsan al mismo nombre
+    // de salida y JSZip sobrescribiría el primero sin avisar. Si el nombre
+    // ya existe, se añade sufijo -2, -3, …
+    const usedNames = new Set();
+    let addedCount = 0;
+
     for (const image of this.processedImages) {
       if (image.success && image.blob) {
-        const ext = this.currentConfig.outputFormat || 'jpg';
-        // Usar el nombre original sin extensión + la extensión del formato de salida
         const baseName = (image.name || 'imagen').replace(/\.[^/.]+$/, '');
-        const fileName = baseName + '.' + ext;
+        let fileName = baseName + '.' + ext;
+        let suffix = 2;
+        while (usedNames.has(fileName)) {
+          fileName = baseName + '-' + suffix + '.' + ext;
+          suffix++;
+        }
+        usedNames.add(fileName);
         folder.file(fileName, image.blob);
+        addedCount++;
       }
+    }
+
+    if (addedCount === 0) {
+      throw new Error('Ninguna imagen se procesó correctamente; no hay nada que exportar');
     }
 
     // Generar ZIP
@@ -366,7 +448,8 @@ class BatchManager {
       success: true,
       fileName: defaultName,
       size: content.size,
-      imageCount: this.processedImages.length,
+      // Solo las imágenes realmente añadidas al ZIP (las fallidas no cuentan)
+      imageCount: addedCount,
       blob: content
     };
   }

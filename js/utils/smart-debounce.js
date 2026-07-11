@@ -41,8 +41,11 @@ const SmartDebounce = {
     return (...args) => {
       this.stats.totalOperations++;
       
-      // Verificar límite de operaciones concurrentes
-      if (this.timers.size >= this.config.maxConcurrentOperations) {
+      // Verificar límite de operaciones concurrentes SOLO para keys nuevas.
+      // Si la key ya tiene un timer pendiente, reemplazarlo no hace crecer
+      // el Map; descartar la invocación aquí perdería el último valor del
+      // slider (el timer viejo se dispararía con el valor obsoleto).
+      if (!this.timers.has(key) && this.timers.size >= this.config.maxConcurrentOperations) {
         if (this.config.enableLogging) {
           MNEMOTAG_DEBUG && console.warn(`⚠️ SmartDebounce: Límite de operaciones concurrentes alcanzado (${this.config.maxConcurrentOperations})`);
         }

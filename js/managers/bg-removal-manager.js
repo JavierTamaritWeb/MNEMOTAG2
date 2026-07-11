@@ -22,6 +22,9 @@ window.BgRemovalManager = (function () {
   // Cache privado del módulo importado (singleton).
   let _module = null;
   let _loading = false;
+  // Guard de reentrada: evita que un doble click lance dos procesados
+  // concurrentes sobre el mismo canvas.
+  let _processing = false;
 
   async function _loadLib() {
     if (_module) return _module;
@@ -49,61 +52,79 @@ window.BgRemovalManager = (function () {
   }
 
   async function removeBackground() {
+    // Guard de reentrada: si ya hay un procesado en curso, ignorar.
+    if (_processing) {
+      MNEMOTAG_DEBUG && console.warn('BgRemovalManager: procesado ya en curso, se ignora la llamada.');
+      return;
+    }
+
     if (typeof canvas === 'undefined' || !canvas || !currentImage) {
       UIManager.showError('Carga una imagen primero para eliminar el fondo.');
       return;
     }
 
-    let mod;
+    _processing = true;
     try {
-      mod = await _loadLib();
-    } catch (err) {
-      console.error('BgRemovalManager: error cargando el modelo de IA:', err);
-      UIManager.showError('No se pudo cargar el modelo de IA: ' + (err.message || err) + '. Comprueba tu conexión y vuelve a intentarlo.');
-      return;
-    }
+      let mod;
+      try {
+        mod = await _loadLib();
+      } catch (err) {
+        console.error('BgRemovalManager: error cargando el modelo de IA:', err);
+        UIManager.showError('No se pudo cargar el modelo de IA: ' + (err.message || err) + '. Comprueba tu conexión y vuelve a intentarlo.');
+        return;
+      }
 
-    // La librería expone su función principal como `removeBackground`
-    // o como default export según la versión. Defensivo.
-    const removeFn = (mod && (mod.removeBackground || mod.default)) || null;
-    if (typeof removeFn !== 'function') {
-      UIManager.showError('La librería de IA cargada no expone la función esperada. Versión incompatible.');
-      return;
-    }
+      // La librería expone su función principal como `removeBackground`
+      // o como default export según la versión. Defensivo.
+      const removeFn = (mod && (mod.removeBackground || mod.default)) || null;
+      if (typeof removeFn !== 'function') {
+        UIManager.showError('La librería de IA cargada no expone la función esperada. Versión incompatible.');
+        return;
+      }
 
-    try {
-      UIManager.showInfo('🤖 Procesando imagen con IA. Esto puede tardar unos segundos…');
+      try {
+        UIManager.showInfo('🤖 Procesando imagen con IA. Esto puede tardar unos segundos…');
 
-      // Convertimos el canvas actual (con todos los filtros y marcas
-      // aplicados) a un blob PNG para preservar la transparencia.
-      const inputBlob = await new Promise(function (resolve, reject) {
-        canvas.toBlob(function (b) { return b ? resolve(b) : reject(new Error('toBlob falló')); }, 'image/png');
-      });
+        // Convertimos el canvas actual (con todos los filtros y marcas
+        // aplicados) a un blob PNG para preservar la transparencia.
+        const inputBlob = await new Promise(function (resolve, reject) {
+          canvas.toBlob(function (b) { return b ? resolve(b) : reject(new Error('toBlob falló')); }, 'image/png');
+        });
 
-      // Llamada a la librería. Devuelve un Blob con fondo transparente.
-      const resultBlob = await removeFn(inputBlob);
+        // Llamada a la librería. Devuelve un Blob con fondo transparente.
+        const resultBlob = await removeFn(inputBlob);
 
-      // Cargar el resultado de vuelta al canvas.
-      const url = URL.createObjectURL(resultBlob);
-      const img = new Image();
-      img.onload = function () {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        URL.revokeObjectURL(url);
+        // Cargar el resultado de vuelta al canvas. Se espera a que la
+        // imagen termine de dibujarse para no liberar el guard antes
+        // de tiempo (el canvas sigue "ocupado" hasta entonces).
+        const url = URL.createObjectURL(resultBlob);
+        await new Promise(function (resolve) {
+          const img = new Image();
+          img.onload = function () {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            URL.revokeObjectURL(url);
 
-        if (typeof historyManager !== 'undefined' && historyManager.saveState) {
-          historyManager.saveState();
-        }
-        UIManager.showSuccess('🪄 Fondo eliminado correctamente');
-      };
-      img.onerror = function () {
-        URL.revokeObjectURL(url);
-        UIManager.showError('No se pudo cargar el resultado del modelo de IA.');
-      };
-      img.src = url;
-    } catch (err) {
-      console.error('BgRemovalManager: error procesando con IA:', err);
-      UIManager.showError('Error al procesar la imagen: ' + (err.message || err));
+            if (typeof historyManager !== 'undefined' && historyManager.saveState) {
+              historyManager.saveState();
+            }
+            UIManager.showSuccess('🪄 Fondo eliminado correctamente');
+            resolve();
+          };
+          img.onerror = function () {
+            URL.revokeObjectURL(url);
+            UIManager.showError('No se pudo cargar el resultado del modelo de IA.');
+            resolve();
+          };
+          img.src = url;
+        });
+      } catch (err) {
+        console.error('BgRemovalManager: error procesando con IA:', err);
+        UIManager.showError('Error al procesar la imagen: ' + (err.message || err));
+      }
+    } finally {
+      // Liberar SIEMPRE el guard, pase lo que pase.
+      _processing = false;
     }
   }
 

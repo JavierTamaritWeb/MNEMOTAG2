@@ -54,10 +54,25 @@ window.ZoomPanManager = (function () {
     UIManager.showSuccess('Zoom reseteado');
   }
 
+  // Re-acotar el pan a los límites del zoom actual. Sin esto, hacer zoom-out
+  // tras un pan al extremo deja la imagen fuera del contenedor.
+  function clampPan() {
+    if (!canvas || currentZoom <= 1) {
+      panX = 0;
+      panY = 0;
+      return;
+    }
+    const maxPX = (canvas.offsetWidth * (currentZoom - 1)) / 2;
+    const maxPY = (canvas.offsetHeight * (currentZoom - 1)) / 2;
+    panX = Math.max(-maxPX, Math.min(maxPX, panX));
+    panY = Math.max(-maxPY, Math.min(maxPY, panY));
+  }
+
   function applyZoom() {
     if (!canvas) return;
     if (currentZoom !== 1.0) {
       isZoomed = true;
+      clampPan();
       canvas.classList.add('zoomed');
       canvas.style.transform = 'scale(' + currentZoom + ') translate(' + panX + 'px, ' + panY + 'px)';
       canvas.style.transformOrigin = 'center center';
@@ -95,6 +110,9 @@ window.ZoomPanManager = (function () {
 
   function initZoomKeyboardShortcuts() {
     document.addEventListener('keydown', function (e) {
+      // No interceptar atajos mientras se escribe en un campo de texto
+      const tag = e.target && e.target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
       if (e.ctrlKey || e.metaKey) {
         switch (e.key) {
           case '+': case '=':

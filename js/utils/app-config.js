@@ -16,7 +16,9 @@
 const AppConfig = {
   // File validation settings
   maxFileSize: 25 * 1024 * 1024, // 25MB
-  allowedTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'],
+  // GIF eliminado: el pipeline nunca lo soportó (SecurityManager y el
+  // resto del código no lo aceptan), tenerlo aquí inducía a error.
+  allowedTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/avif'],
   
   // Canvas settings - Aumentado para mantener calidad original
   maxCanvasWidth: 2400,  // Aumentado de 800 a 2400 para alta resolución

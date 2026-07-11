@@ -90,9 +90,17 @@ const FilterCache = {
   
   // Verificar si el estado ha cambiado
   hasChanged: function(currentState) {
+    // markDirty() fuerza el siguiente re-render aunque el hash no cambie
+    // (lo usan history-manager y FilterManager para invalidar el estado
+    // aplicado). El flag es de un solo uso: se consume aquí.
+    if (this.isDirty) {
+      this.isDirty = false;
+      return true;
+    }
+
     const currentHash = this.generateHash(currentState);
     const hasChanged = this.lastApplied !== currentHash;
-    
+
     return hasChanged;
   },
   

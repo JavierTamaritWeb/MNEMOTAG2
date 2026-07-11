@@ -22,6 +22,15 @@ const PresetManager = {
   ],
 
   /**
+   * Comprueba si un nombre de preset está reservado. "index" (en cualquier
+   * combinación de mayúsculas) se rechaza porque STORAGE_PREFIX + 'index'
+   * colisiona con INDEX_KEY y destruiría el índice de presets.
+   */
+  isReservedName: function (name) {
+    return typeof name === 'string' && name.trim().toLowerCase() === 'index';
+  },
+
+  /**
    * Devuelve la lista de nombres de presets guardados.
    */
   listPresets: function () {
@@ -67,6 +76,14 @@ const PresetManager = {
       }
       return false;
     }
+    // Rechazar el nombre reservado "index": sobrescribiría la clave del
+    // índice de presets en localStorage y destruiría la lista completa.
+    if (this.isReservedName(trimmed)) {
+      if (typeof UIManager !== 'undefined') {
+        UIManager.showError('El nombre "index" está reservado para uso interno. Elige otro nombre para el preset.');
+      }
+      return false;
+    }
 
     const state = this.captureCurrentState();
     try {
@@ -99,6 +116,8 @@ const PresetManager = {
    */
   loadPreset: function (name) {
     if (!name) return false;
+    // "index" (exacto) nunca es un preset válido: es la clave del índice interno.
+    if (name === 'index') return false;
     try {
       const raw = localStorage.getItem(this.STORAGE_PREFIX + name);
       if (!raw) {
@@ -146,6 +165,8 @@ const PresetManager = {
    */
   deletePreset: function (name) {
     if (!name) return false;
+    // Evitar que un borrado de "index" (exacto) elimine la clave del índice interno.
+    if (name === 'index') return false;
     try {
       localStorage.removeItem(this.STORAGE_PREFIX + name);
       const index = this.listPresets().filter(n => n !== name);

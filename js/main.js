@@ -35,7 +35,10 @@
     let isResizing = false;
     
     // Variables para rotación
-    let currentRotation = 0; // Degrees: 0, 90, 180, 270
+    let currentRotation = 0; // Degrees: 0, 90, 180, 270 (solo informativo: cada op se hornea)
+    // Imagen base para "restablecer rotación": se fija al cargar imagen y se
+    // actualiza tras crop/resize (esas operaciones definen el nuevo "original").
+    let transformResetImage = null;
     let isFlippedHorizontally = false;
     let isFlippedVertically = false;
     
@@ -1532,8 +1535,7 @@
         const outputQualitySelect = document.getElementById('output-quality');
         const outputQualityNumber = document.getElementById('quality-number');
         const outputFormatSelect = document.getElementById('output-format');
-        const outputHeader = document.getElementById('output-header');
-        
+
         if (outputQualitySelect) {
           outputQualitySelect.addEventListener('input', handleQualityChange);
           outputQualitySelect.addEventListener('change', handleQualityChange);
@@ -1562,19 +1564,15 @@
           fileBasenameInput.addEventListener('blur', handleFileBaseNameBlur);
         }
         
-        if (outputHeader) {
-          outputHeader.addEventListener('click', () => toggleCollapsible('output'));
-          outputHeader.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              toggleCollapsible('output');
-            }
-          });
-        }
-        
-        // Keyboard shortcuts
-        document.addEventListener('keydown', handleKeyboardShortcuts);
-        
+        // Nota: el header "output" ya queda cableado por setupCollapsibles()
+        // (click delegado + keydown); cablearlo aquí duplicaba el toggle y
+        // Enter/Espacio abría y cerraba la sección en el mismo evento.
+
+        // Nota: los atajos de teclado se gestionan únicamente en
+        // KeyboardShortcutManager (setupKeyboardShortcuts). El handler legacy
+        // duplicaba Ctrl+S (doble export) y Ctrl+Z (doble undo).
+
+
         // Setup bidirectional sync for watermark sliders
         setupWatermarkSliderSync();
         
@@ -2109,46 +2107,10 @@
       validateAndUpdateFileBaseName(sanitizedBaseName);
     }
 
-    // Function to check format support
-    function handleKeyboardShortcuts(e) {
-      // Ctrl+S or Cmd+S to download
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
-        e.preventDefault();
-        if (canvas && currentImage) {
-          ExportManager.downloadImage(); // v3.4.10
-        }
-      }
-      
-      // Ctrl+Z or Cmd+Z to undo
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        if (historyManager.canUndo()) {
-          historyManager.undo();
-        }
-      }
-      
-      // Ctrl+Y or Cmd+Y or Ctrl+Shift+Z to redo
-      if (((e.ctrlKey || e.metaKey) && e.key === 'y') || 
-          ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z')) {
-        e.preventDefault();
-        if (historyManager.canRedo()) {
-          historyManager.redo();
-        }
-      }
-      
-      // Ctrl+R or Cmd+R to reset (prevent page reload)
-      if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
-        e.preventDefault();
-        if (currentImage) {
-          resetChanges();
-        }
-      }
-      
-      // Escape to close any modals or reset focus
-      if (e.key === 'Escape') {
-        document.activeElement.blur();
-      }
-    }
+    // Los atajos de teclado viven en KeyboardShortcutManager
+    // (ver setupKeyboardShortcuts). El handler legacy que existía aquí
+    // duplicaba Ctrl+S/Ctrl+Z con registros del manager y provocaba
+    // doble export / doble undo por pulsación.
 
     function setupCollapsibles() {
       const sections = ['metadata', 'watermark', 'filters', 'output'];
@@ -2763,10 +2725,21 @@
 
       reader.readAsDataURL(file);
     }    // Enhanced image loading with validation
+
+    // Token de generación: si el usuario selecciona otra imagen mientras una
+    // anterior aún decodifica, la carga obsoleta se descarta (sin este token
+    // ganaba la imagen que terminara de decodificar la última, no la elegida).
+    let imageLoadGeneration = 0;
+
     function loadImage(src, fileName) {
       const img = new Image();
-      
+      const generation = ++imageLoadGeneration;
+
       img.onload = function() {
+        if (generation !== imageLoadGeneration) {
+          MNEMOTAG_DEBUG && console.log('Carga de imagen obsoleta descartada:', fileName);
+          return;
+        }
         try {
           // Validar dimensiones de la imagen
           if (img.width < 1 || img.height < 1) {
@@ -2794,8 +2767,9 @@
           currentRotation = 0;
           isFlippedHorizontally = false;
           isFlippedVertically = false;
-          
-          
+          transformResetImage = img;
+
+
           // Sanitizar y mostrar información del archivo
           const sanitizedFileName = SecurityManager.sanitizeText(fileName);
           const fileNameElement = document.getElementById('file-name');
@@ -2844,13 +2818,27 @@
           
           // Configurar canvas
           setupCanvas();
-          
+
           // Initialize zoom
           currentZoom = 1.0;
           isZoomed = false;
           resetPan(); // Reset pan también
+          applyZoom(); // Limpiar el transform CSS del zoom anterior (sin esto
+                       // la imagen nueva heredaba el scale() de la anterior)
           updateZoomLevel();
-          
+
+          // Recentrar posiciones custom de marcas de agua: las coordenadas de
+          // la imagen anterior pueden caer fuera del canvas nuevo (marca
+          // invisible e irrecuperable)
+          if (customImagePosition && canvas) {
+            customImagePosition = { x: canvas.width / 2, y: canvas.height / 2 };
+            if (isPositioningMode) showPositionMarker();
+          }
+          if (customTextPosition && canvas) {
+            customTextPosition = { x: canvas.width / 2, y: canvas.height / 2 };
+            if (isTextPositioningMode) showTextPositionMarker();
+          }
+
           // Mostrar información de la imagen
           updateImageInfo();
           
@@ -2893,6 +2881,9 @@
       // Timeout para imágenes que no cargan
       const timeout = setTimeout(() => {
         if (!img.complete) {
+          // Invalidar la generación: si la imagen termina de cargar más tarde,
+          // su onload se descarta (antes se cargaba igualmente tras el error)
+          imageLoadGeneration++;
           UIManager.hideLoadingState();
           UIManager.showError('La carga de la imagen está tomando demasiado tiempo. Por favor, inténtalo de nuevo.');
         }
@@ -4984,7 +4975,15 @@
     // Funciones de formato extraídas a js/utils/helpers.js
 
     // Initialize resize functionality
+    // Guard: initResize se invoca desde loadImage en CADA carga de imagen;
+    // sin este flag los listeners se acumulaban y un clic en "Aplicar"
+    // ejecutaba el resize una vez por cada imagen cargada en la sesión.
+    let resizeControlsInitialized = false;
+
     function initResize() {
+      if (resizeControlsInitialized) return;
+      resizeControlsInitialized = true;
+
       const widthInput = document.getElementById('resize-width');
       const heightInput = document.getElementById('resize-height');
       const aspectRatioCheckbox = document.getElementById('maintain-aspect-ratio');
@@ -5087,27 +5086,31 @@
         newImage.onload = function() {
           // Update current image
           currentImage = newImage;
+          // El resize define el nuevo "original" para resetRotation
+          transformResetImage = newImage;
           comparisonNeedsUpdate = true;
-          
-          // Update preview canvas
-          const canvas = document.getElementById('preview-canvas');
-          if (canvas) {
-            const ctx = canvas.getContext('2d');
-            canvas.width = newWidth;
-            canvas.height = newHeight;
-            ctx.clearRect(0, 0, newWidth, newHeight);
-            ctx.drawImage(newImage, 0, 0);
-            
-            // Re-apply watermark if present
-            updatePreview();
+
+          // Reacotar posiciones custom de marcas al nuevo tamaño
+          if (customImagePosition) {
+            customImagePosition.x = Math.min(customImagePosition.x, newWidth);
+            customImagePosition.y = Math.min(customImagePosition.y, newHeight);
           }
-          
+          if (customTextPosition) {
+            customTextPosition.x = Math.min(customTextPosition.x, newWidth);
+            customTextPosition.y = Math.min(customTextPosition.y, newHeight);
+          }
+
+          // Re-sincronizar dimensiones internas + tamaño CSS del canvas
+          // (cambiar canvas.width sin recalcular el CSS estiraba el preview)
+          setupCanvas();
+          updatePreview();
+
           // Update image info display
           updateImageInfo();
-          
+
           // Show success message
           showSuccessMessage(`Imagen redimensionada a ${newWidth} × ${newHeight}`);
-          
+
         };
         
         newImage.onerror = function() {
@@ -5241,12 +5244,14 @@
       }
       
       try {
-        // Update rotation state
-        currentRotation = (currentRotation + degrees) % 360;
-        
-        // Apply transformation
-        applyImageTransformation();
-        
+        // Update rotation state (solo para el display)
+        currentRotation = ((currentRotation + degrees) % 360 + 360) % 360;
+
+        // Aplicar SOLO el delta sobre la imagen actual: currentImage ya
+        // contiene las transformaciones anteriores horneadas, así que aplicar
+        // el ángulo acumulado la transformaba dos veces y distorsionaba.
+        applyImageTransformation(degrees, null);
+
         // Update rotation display
         updateRotationDisplay();
         
@@ -5276,10 +5281,11 @@
         } else if (direction === 'vertical') {
           isFlippedVertically = !isFlippedVertically;
         }
-        
-        // Apply transformation
-        applyImageTransformation();
-        
+
+        // Aplicar SOLO el volteo pedido sobre la imagen actual (delta).
+        // Un volteo es su propia inversa: voltear dos veces restaura.
+        applyImageTransformation(0, direction);
+
         // Update rotation display
         updateRotationDisplay();
         
@@ -5298,89 +5304,58 @@
       }
     }
 
-    function applyImageTransformation() {
+    /**
+     * Hornea UNA transformación incremental (delta) sobre currentImage.
+     * @param {number} deltaDegrees - rotación a aplicar en esta operación
+     * @param {string|null} flipAxis - 'horizontal' | 'vertical' | null
+     * currentImage ya contiene las transformaciones anteriores, por lo que
+     * aquí nunca se usa el ángulo acumulado ni las dimensiones originales
+     * pre-transformación (eso causaba doble transformación y distorsión).
+     */
+    function applyImageTransformation(deltaDegrees = 0, flipAxis = null) {
       if (!currentImage) return;
-      
+
       const canvas = document.getElementById('preview-canvas');
       if (!canvas) return;
-      
+
       const ctx = canvas.getContext('2d');
-      
-      // Configurar renderizado de alta calidad
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      
-      // Create a temporary canvas with original image
-      const tempCanvas = document.createElement('canvas');
-      const tempCtx = tempCanvas.getContext('2d');
-      
-      // Configurar alta calidad también en canvas temporal
-      tempCtx.imageSmoothingEnabled = true;
-      tempCtx.imageSmoothingQuality = 'high';
-      
-      // Use original dimensions for source
-      tempCanvas.width = originalWidth;
-      tempCanvas.height = originalHeight;
-      tempCtx.drawImage(currentImage, 0, 0, originalWidth, originalHeight);
-      
-      // Calculate new dimensions based on rotation
-      let newWidth, newHeight;
-      if (currentRotation === 90 || currentRotation === 270) {
-        newWidth = originalHeight;
-        newHeight = originalWidth;
-      } else {
-        newWidth = originalWidth;
-        newHeight = originalHeight;
-      }
-      
-      // Set canvas size
+
+      // Dimensiones reales de la imagen actual (no las originales obsoletas)
+      const srcW = currentImage.naturalWidth || currentImage.width;
+      const srcH = currentImage.naturalHeight || currentImage.height;
+
+      const rot = ((deltaDegrees % 360) + 360) % 360;
+      const swapDims = rot === 90 || rot === 270;
+      const newWidth = swapDims ? srcH : srcW;
+      const newHeight = swapDims ? srcW : srcH;
+
       canvas.width = newWidth;
       canvas.height = newHeight;
-      
-      // Clear canvas
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
       ctx.clearRect(0, 0, newWidth, newHeight);
-      
-      // Save context state
       ctx.save();
-      
-      // Move to center of canvas for transformations
       ctx.translate(newWidth / 2, newHeight / 2);
-      
-      // Apply rotation
-      if (currentRotation !== 0) {
-        ctx.rotate((currentRotation * Math.PI) / 180);
+      if (rot !== 0) {
+        ctx.rotate((rot * Math.PI) / 180);
       }
-      
-      // Apply flips
-      const scaleX = isFlippedHorizontally ? -1 : 1;
-      const scaleY = isFlippedVertically ? -1 : 1;
+      const scaleX = flipAxis === 'horizontal' ? -1 : 1;
+      const scaleY = flipAxis === 'vertical' ? -1 : 1;
       ctx.scale(scaleX, scaleY);
-      
-      // Draw image centered (use original dimensions for drawing)
-      ctx.drawImage(
-        tempCanvas,
-        -originalWidth / 2,
-        -originalHeight / 2,
-        originalWidth,
-        originalHeight
-      );
-      
-      // Restore context state
+      ctx.drawImage(currentImage, -srcW / 2, -srcH / 2, srcW, srcH);
       ctx.restore();
-      
-      // Create new image from canvas for currentImage reference
+
+      // Hornear el resultado como nueva currentImage
       const newImageData = canvas.toDataURL('image/png');
       const newImage = new Image();
       newImage.onload = function() {
         currentImage = newImage;
         comparisonNeedsUpdate = true;
-        currentImage.width = newWidth;
-        currentImage.height = newHeight;
-        
-        // Update image info
+
+        // Re-sincronizar dimensiones internas + CSS del canvas y redibujar
+        setupCanvas();
         updateImageInfo();
-        
-        // Update preview with watermark if present
         updatePreview();
       };
       newImage.src = newImageData;
@@ -5388,41 +5363,30 @@
 
     function resetRotation() {
       if (!currentImage) return;
-      
+
       try {
         // Reset all transformations
         currentRotation = 0;
         isFlippedHorizontally = false;
         isFlippedVertically = false;
-        
-        // Restore original image
-        if (originalWidth && originalHeight) {
-          currentImage.width = originalWidth;
-          currentImage.height = originalHeight;
+
+        // Restaurar la imagen base (fijada al cargar y actualizada tras
+        // crop/resize). currentImage está horneada, así que sin esta
+        // referencia no habría forma de volver al estado sin transformar.
+        if (transformResetImage) {
+          currentImage = transformResetImage;
+          comparisonNeedsUpdate = true;
         }
-        
-        // Redraw original image
-        const canvas = document.getElementById('preview-canvas');
-        if (canvas) {
-          const ctx = canvas.getContext('2d');
-          
-          // Configurar alta calidad
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
-          
-          canvas.width = currentImage.width;
-          canvas.height = currentImage.height;
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(currentImage, 0, 0);
-        }
-        
+
+        setupCanvas();
+
         // Update displays
         updateRotationDisplay();
         updateImageInfo();
         updatePreview();
-        
+
         showSuccessMessage('Rotación restablecida al original');
-        
+
         // v3.5.9: Guardar estado en el historial tras resetear rotación
         if (typeof historyManager !== 'undefined') {
           historyManager.saveState();
@@ -5545,7 +5509,13 @@
       watermarkImagePreview = null;
       customImagePosition = null;
       isPositioningMode = false;
-      
+      customTextPosition = null;
+      isTextPositioningMode = false;
+      transformResetImage = null;
+      currentRotation = 0;
+      isFlippedHorizontally = false;
+      isFlippedVertically = false;
+
       // Limpiar cache
       cache.watermarkImage = null;
       cache.lastWatermarkConfig = null;
@@ -5604,18 +5574,23 @@
         ctx.clearRect(0, 0, canvas.width, canvas.height);
       }
       
-      // Limpiar marcador de posición si existe
+      // Limpiar marcadores de posición si existen (imagen Y texto)
       removePositionMarker();
-      
-      // Ocultar información de posicionamiento personalizado
+      removeTextPositionMarker();
+
+      // Ocultar información de posicionamiento personalizado (imagen y texto)
       const customInfo = document.getElementById('custom-position-info');
       if (customInfo) {
         customInfo.style.display = 'none';
       }
-      
-      // Quitar clase de posicionamiento del canvas
+      const customTextInfo = document.getElementById('custom-text-position-info');
+      if (customTextInfo) {
+        customTextInfo.style.display = 'none';
+      }
+
+      // Quitar clases de posicionamiento del canvas
       if (canvas) {
-        canvas.classList.remove('positioning-mode');
+        canvas.classList.remove('positioning-mode', 'positioning-image', 'positioning-text', 'positioning-both');
       }
       
       // Ocultar preview de metadatos si está visible
@@ -5689,6 +5664,12 @@
         }
       }
     }
+
+    // Registrar el listener: la función existía pero nunca se registraba, así
+    // que salir de pantalla completa con Escape dejaba los estilos inline y el
+    // botón en estado "Salir" para siempre.
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
 
     function showError(message) {
       const notification = document.createElement('div');
@@ -5895,36 +5876,45 @@
       });
     }
     
-    // Función para aplicar solo filtros ligeros (después del worker)
+    // Aplica vía CSS SOLO los filtros que el worker NO horneó en píxeles.
+    // Se llama después del camino worker. La versión anterior leía claves
+    // inexistentes (filters.hue/.grayscale/.invert) y generaba un string CSS
+    // inválido que el CSSOM rechazaba, dejando el filter completo anterior
+    // aplicado ENCIMA de los píxeles ya procesados (filtros dobles).
     function applyCanvasFiltersLight() {
       if (!canvas) return;
-      
-      // Solo aplicar filtros que no son procesados por el worker
-      const lightFilters = {
-        hue: FilterManager.filters.hue,
-        sepia: FilterManager.filters.sepia,
-        grayscale: FilterManager.filters.grayscale,
-        invert: FilterManager.filters.invert
-      };
-      
-      // Generar string de filtros ligeros
+
+      // Claves que el worker hornea (contrato con filter-manager.js).
+      const baked = Array.isArray(FilterManager.workerBakedFilters)
+        ? FilterManager.workerBakedFilters
+        : ['brightness', 'contrast', 'saturation', 'sepia'];
+
+      const f = FilterManager.filters;
       const filterParts = [];
-      
-      if (lightFilters.hue !== 0) {
-        filterParts.push(`hue-rotate(${lightFilters.hue}deg)`);
+
+      if (!baked.includes('brightness') && f.brightness !== 0) {
+        filterParts.push(`brightness(${(100 + f.brightness) / 100})`);
       }
-      if (lightFilters.sepia !== 0) {
-        filterParts.push(`sepia(${lightFilters.sepia}%)`);
+      if (!baked.includes('contrast') && f.contrast !== 0) {
+        filterParts.push(`contrast(${(100 + f.contrast) / 100})`);
       }
-      if (lightFilters.grayscale !== 0) {
-        filterParts.push(`grayscale(${lightFilters.grayscale}%)`);
+      if (!baked.includes('saturation') && f.saturation !== 0) {
+        filterParts.push(`saturate(${(100 + f.saturation) / 100})`);
       }
-      if (lightFilters.invert !== 0) {
-        filterParts.push(`invert(${lightFilters.invert}%)`);
+      if (!baked.includes('sepia') && f.sepia > 0) {
+        filterParts.push(`sepia(${f.sepia}%)`);
       }
-      
+      if (!baked.includes('hueRotate') && f.hueRotate !== 0) {
+        filterParts.push(`hue-rotate(${f.hueRotate}deg)`);
+      }
+      if (!baked.includes('blur') && f.blur > 0) {
+        filterParts.push(`blur(${f.blur}px)`);
+      }
+
+      // String vacío es válido: limpia el filter CSS completo anterior para
+      // que no se acumule sobre los píxeles ya horneados.
       const filterString = filterParts.join(' ');
-      
+
       requestAnimationFrame(() => {
         canvas.style.transition = 'filter 0.2s ease';
         canvas.style.filter = filterString;
@@ -6286,8 +6276,14 @@
         } else {
           MNEMOTAG_DEBUG && console.warn('⚠️ Canvas no disponible, CropManager no inicializado');
         }
-        
-        
+
+        // Exponer referencias de debugging una vez creadas (hacerlo en tiempo
+        // de evaluación del módulo las dejaba congeladas a null)
+        window.keyboardShortcuts = keyboardShortcuts;
+        window.batchManager = batchManager;
+        window.textLayerManager = textLayerManager;
+        window.cropManager = cropManager;
+
       } catch (error) {
         console.error('Error inicializando managers avanzados:', error);
       }
@@ -6348,7 +6344,10 @@
                 if (type.startsWith('image/')) {
                   const blob = await item.getType(type);
                   const file = new File([blob], 'pasted-image.png', { type });
-                  await loadImageFromFile(file);
+                  // Cargar por el flujo completo (validación + editor).
+                  // loadImageFromFile solo decodificaba un <img> que se
+                  // descartaba: el toast decía "pegada" pero nada cambiaba.
+                  await handleFile(file);
                   UIManager.showSuccess('✅ Imagen pegada desde portapapeles');
                   return;
                 }
@@ -6381,6 +6380,11 @@
         document.addEventListener('keyup', (e) => {
           if (e.key === ' ' && spaceHeld) {
             spaceHeld = false;
+            // showOriginalImage limpió el filter CSS; forzar su re-aplicación
+            // (sin markDirty, el gate de FilterCache haría early-return)
+            if (typeof FilterCache !== 'undefined') {
+              FilterCache.markDirty();
+            }
             updatePreview();
           }
         });
@@ -6423,6 +6427,14 @@
             UIManager.showSuccess('🔄 Ajustes reiniciados');
           }
         }, { description: 'Reiniciar filtros y ajustes' });
+
+        // Ctrl/Cmd + R: Descartar cambios (migrado del handler legacy;
+        // solo intercepta la recarga del navegador si hay imagen cargada)
+        keyboardShortcuts.register('r', ['ctrl'], () => {
+          if (currentImage) {
+            resetChanges();
+          }
+        }, { description: 'Descartar cambios de la imagen' });
         
         // Ctrl/Cmd + B: Abrir procesamiento por lotes
         keyboardShortcuts.register('b', ['ctrl'], () => {
@@ -6454,14 +6466,9 @@
           }
         }, { description: 'Ver atajos de teclado' });
 
-        // Ctrl + =: Zoom in (= está en la mano izquierda junto a Backspace)
-        keyboardShortcuts.register('=', ['ctrl'], () => {
-          zoomIn();
-        }, { description: 'Aumentar zoom' });
-
-        // Ctrl + -: Zoom out (guión en la fila superior, mano izquierda)
-        // Nota: '-' sin modificador no se registra para no bloquear la tecla
-        // en campos de texto.
+        // Zoom por teclado (Ctrl/Cmd +, -, 0): gestionado exclusivamente por
+        // ZoomPanManager.initZoomKeyboardShortcuts(). Registrar '=' también
+        // aquí duplicaba el listener y cada pulsación hacía zoom doble.
 
         // Ctrl+E: Toggle modo comparación
         keyboardShortcuts.register('e', ['ctrl'], () => {
@@ -6506,23 +6513,26 @@
      */
     function showOriginalImage() {
       if (!currentImage || !canvas || !ctx) return;
-      
+
+      // Quitar también el filter CSS del elemento canvas: sin esto el "antes"
+      // seguía mostrando brillo/contraste/etc. aplicados vía CSS
+      canvas.style.transition = 'none';
+      canvas.style.filter = '';
+
       // Limpiar canvas
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
+
       // Configurar alta calidad
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
-      
+
       // Dibujar imagen original sin filtros
       ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
     }
-    
-    // Exponer funciones globales para debugging
-    window.keyboardShortcuts = keyboardShortcuts;
-    window.batchManager = batchManager;
-    window.textLayerManager = textLayerManager;
-    window.cropManager = cropManager;
+
+    // Nota: las referencias de debugging (window.keyboardShortcuts, etc.) se
+    // exponen al final de initializeAdvancedManagers(); aquí en tiempo de
+    // evaluación los managers aún valían null y quedaban congeladas a null.
 
     // ============================================
     // FUNCIONES DE INTEGRACIÓN UI v3.1
@@ -6992,9 +7002,17 @@
     function loadImageFromFile(file) {
       return new Promise((resolve, reject) => {
         const img = new Image();
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = URL.createObjectURL(file);
+        const objectUrl = URL.createObjectURL(file);
+        // Revocar siempre el ObjectURL: sin esto se fugaba uno por llamada
+        img.onload = () => {
+          URL.revokeObjectURL(objectUrl);
+          resolve(img);
+        };
+        img.onerror = (err) => {
+          URL.revokeObjectURL(objectUrl);
+          reject(err);
+        };
+        img.src = objectUrl;
       });
     }
 
@@ -7183,10 +7201,14 @@
       el = document.getElementById('text-layer-x');        if (el) el.value = Math.round((layer.position && layer.position.x) || 0);
       el = document.getElementById('text-layer-y');        if (el) el.value = Math.round((layer.position && layer.position.y) || 0);
       el = document.getElementById('text-layer-rotation'); if (el) el.value = layer.rotation || 0;
-      el = document.getElementById('text-layer-opacity');  if (el) el.value = Math.round((layer.opacity || 1) * 100);
+      el = document.getElementById('text-layer-opacity');  if (el) el.value = Math.round((layer.opacity ?? 1) * 100);
       el = document.getElementById('text-layer-shadow');   if (el) el.checked = !!(layer.effects && layer.effects.shadow);
       el = document.getElementById('text-layer-stroke');   if (el) el.checked = !!(layer.effects && layer.effects.stroke);
       el = document.getElementById('text-layer-gradient'); if (el) el.checked = !!(layer.effects && layer.effects.gradient);
+    }
+
+    function getTextLayerControl(id) {
+      return document.getElementById('text-layer-' + id);
     }
 
     async function updateActiveTextLayer() {
@@ -7195,14 +7217,27 @@
       // Construir el objeto updates con la estructura anidada que espera
       // textLayerManager.updateLayer(): font.{family,size}, position.{x,y},
       // effects.{shadow,stroke,gradient}.
-      let e;
-      const fontFamily = (e = document.getElementById('text-layer-font')) ? e.value : 'Roboto';
-      const fontSize = (e = document.getElementById('text-layer-size')) ? parseInt(e.value) || 40 : 40;
-      const posX = (e = document.getElementById('text-layer-x')) ? parseInt(e.value) || 0 : 0;
-      const posY = (e = document.getElementById('text-layer-y')) ? parseInt(e.value) || 0 : 0;
-      const hasShadow = (e = document.getElementById('text-layer-shadow')) ? e.checked : false;
-      const hasStroke = (e = document.getElementById('text-layer-stroke')) ? e.checked : false;
-      const hasGradient = (e = document.getElementById('text-layer-gradient')) ? e.checked : false;
+      const textEl = getTextLayerControl('text');
+      const fontEl = getTextLayerControl('font');
+      const sizeEl = getTextLayerControl('size');
+      const colorEl = getTextLayerControl('color');
+      const xEl = getTextLayerControl('x');
+      const yEl = getTextLayerControl('y');
+      const rotationEl = getTextLayerControl('rotation');
+      const opacityEl = getTextLayerControl('opacity');
+      const shadowEl = getTextLayerControl('shadow');
+      const strokeEl = getTextLayerControl('stroke');
+      const gradientEl = getTextLayerControl('gradient');
+
+      const parsedFontSize = sizeEl ? parseInt(sizeEl.value, 10) : NaN;
+      const parsedX = xEl ? parseInt(xEl.value, 10) : NaN;
+      const parsedY = yEl ? parseInt(yEl.value, 10) : NaN;
+      const parsedRotation = rotationEl ? parseInt(rotationEl.value, 10) : NaN;
+      const parsedOpacity = opacityEl ? parseInt(opacityEl.value, 10) : NaN;
+      const fontFamily = fontEl ? fontEl.value : 'Roboto';
+      const hasShadow = shadowEl ? shadowEl.checked : false;
+      const hasStroke = strokeEl ? strokeEl.checked : false;
+      const hasGradient = gradientEl ? gradientEl.checked : false;
 
       // Para shadow/stroke/gradient: si el checkbox está activo pero el
       // layer ya tenía un objeto previo, lo reutilizamos. Si no tenía,
@@ -7219,12 +7254,15 @@
         : null;
 
       const updates = {
-        text: (e = document.getElementById('text-layer-text')) ? e.value : '',
-        font: { family: fontFamily, size: fontSize },
-        position: { x: posX, y: posY },
-        color: (e = document.getElementById('text-layer-color')) ? e.value : '#ffffff',
-        rotation: (e = document.getElementById('text-layer-rotation')) ? parseInt(e.value) || 0 : 0,
-        opacity: (e = document.getElementById('text-layer-opacity')) ? (parseInt(e.value) || 100) / 100 : 1,
+        text: textEl ? textEl.value : '',
+        font: { family: fontFamily, size: Number.isFinite(parsedFontSize) ? parsedFontSize : 40 },
+        position: {
+          x: Number.isFinite(parsedX) ? parsedX : 0,
+          y: Number.isFinite(parsedY) ? parsedY : 0
+        },
+        color: colorEl ? colorEl.value : '#ffffff',
+        rotation: Number.isFinite(parsedRotation) ? parsedRotation : 0,
+        opacity: Number.isFinite(parsedOpacity) ? parsedOpacity / 100 : 1,
         effects: { shadow: shadowVal, stroke: strokeVal, gradient: gradientVal }
       };
 
@@ -7381,7 +7419,7 @@
         panel.classList.remove('active');
         cropActive = false;
         if (cropManager) {
-          cropManager.cancelCrop();
+          cropManager.deactivate();
         }
       }
     }
@@ -7390,13 +7428,15 @@
       const select = document.getElementById('crop-aspect-ratio');
       if (!select) return;
 
-      const value = select.value;
-      
-      if (value === 'free') {
-        cropManager.setAspectRatio(null);
-      } else {
-        const [w, h] = value.split(':').map(Number);
-        cropManager.setAspectRatio(w / h);
+      if (!cropManager) return;
+
+      // setAspectRatio espera la clave del preset ('free', '1:1', '16:9'...),
+      // que coincide con los values del <select>.
+      try {
+        cropManager.setAspectRatio(select.value);
+      } catch (error) {
+        MNEMOTAG_DEBUG && console.warn('Proporción no válida:', select.value, error);
+        return;
       }
 
       updateCropInfo();
@@ -7467,10 +7507,26 @@
           const croppedImage = new Image();
           croppedImage.onload = () => {
             currentImage = croppedImage;
+            // El recorte define el nuevo "original" para resetRotation
+            transformResetImage = croppedImage;
             comparisonNeedsUpdate = true;
+            // Reacotar posiciones custom de marcas al nuevo tamaño
+            if (customImagePosition) {
+              customImagePosition.x = Math.min(customImagePosition.x, croppedImage.width);
+              customImagePosition.y = Math.min(customImagePosition.y, croppedImage.height);
+            }
+            if (customTextPosition) {
+              customTextPosition.x = Math.min(customTextPosition.x, croppedImage.width);
+              customTextPosition.y = Math.min(customTextPosition.y, croppedImage.height);
+            }
             closeCropPanel();
+            // Re-sincronizar dimensiones internas + tamaño CSS del canvas
+            // (sin esto, el raster recortado se estira en la caja CSS antigua
+            // y el hit-testing de watermarks/regla queda desplazado)
+            setupCanvas();
+            updatePreview();
             UIManager.showSuccess('✅ Imagen recortada correctamente');
-            
+
             // v3.5.9: Guardar estado tras recorte
             if (typeof historyManager !== 'undefined') {
               historyManager.saveState();
@@ -7486,11 +7542,9 @@
 
     function cancelCrop() {
       closeCropPanel();
-      // Redibujar imagen original
+      // Redibujar el preview completo (imagen + watermarks + filtros CSS)
       if (currentImage && canvas && ctx) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
-        applyFilters();
+        updatePreview();
       }
     }
 
@@ -7550,15 +7604,15 @@
       window.closeShortcutsModal = closeShortcutsModal;
 
       // Agregar event listeners para inputs de texto (con debounce)
-      const textInput = document.getElementById('layer-text');
+      const textInput = document.getElementById('text-layer-text');
       if (textInput) {
         textInput.addEventListener('input', debounce(updateActiveTextLayer, 300));
       }
 
       // Event listeners para otros controles de texto
-      ['layer-font', 'layer-size', 'layer-color', 'layer-x', 'layer-y', 
-       'layer-rotation', 'layer-opacity', 'layer-shadow', 'layer-stroke', 'layer-gradient'].forEach(id => {
-        const el = document.getElementById(id);
+      ['font', 'size', 'color', 'x', 'y',
+       'rotation', 'opacity', 'shadow', 'stroke', 'gradient'].forEach(id => {
+        const el = getTextLayerControl(id);
         if (el) {
           el.addEventListener('change', updateActiveTextLayer);
         }
@@ -7898,4 +7952,3 @@
       }
     }
     
-

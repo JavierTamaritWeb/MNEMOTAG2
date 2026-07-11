@@ -12,6 +12,9 @@ class TextLayerManager {
     this.activeLayerId = null;
     this.maxLayers = 10;
     this.loadedFonts = new Set();
+    // Promesas de carga de fuente en curso, por familia. Las cargas
+    // concurrentes de la misma fuente comparten la misma promesa.
+    this.pendingFontLoads = new Map();
     
     // Google Fonts populares
     this.availableFonts = [
@@ -179,37 +182,66 @@ class TextLayerManager {
       return true;
     }
 
+    // Si ya hay una carga en curso de esta fuente, compartir su promesa
+    // en lugar de lanzar una segunda carga (o de saltarse la espera).
+    if (this.pendingFontLoads.has(fontFamily)) {
+      return this.pendingFontLoads.get(fontFamily);
+    }
+
+    const loadPromise = this._doLoadFont(fontFamily);
+    this.pendingFontLoads.set(fontFamily, loadPromise);
+    try {
+      return await loadPromise;
+    } finally {
+      // Quitar la promesa del Map (éxito o fallo) para permitir reintentos.
+      this.pendingFontLoads.delete(fontFamily);
+    }
+  }
+
+  /**
+   * Carga real de la fuente (uso interno de loadFont).
+   * En timeout/error retira el <link> creado para que un reintento
+   * posterior parta de un estado limpio.
+   */
+  async _doLoadFont(fontFamily) {
+    let createdLink = null;
     try {
       // Crear link element para Google Fonts
       const fontUrl = `https://fonts.googleapis.com/css2?family=${fontFamily.replace(/ /g, '+')}:wght@300;400;600;700&display=swap`;
-      
+
       // Verificar si ya existe el link
       const existingLink = document.querySelector(`link[href*="${fontFamily.replace(/ /g, '+')}"]`);
-      
-      if (!existingLink) {
-        const link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = fontUrl;
-        document.head.appendChild(link);
 
-        // Esperar a que la fuente se cargue, con timeout de 5 s para que la
-        // UI no se congele si Google Fonts está caído o lento.
-        const FONT_LOAD_TIMEOUT_MS = 5000;
-        await Promise.race([
-          document.fonts.load(`16px "${fontFamily}"`),
-          new Promise((_, reject) =>
-            setTimeout(
-              () => reject(new Error(`Timeout cargando fuente ${fontFamily} (>${FONT_LOAD_TIMEOUT_MS}ms)`)),
-              FONT_LOAD_TIMEOUT_MS
-            )
-          )
-        ]);
+      if (!existingLink) {
+        createdLink = document.createElement('link');
+        createdLink.rel = 'stylesheet';
+        createdLink.href = fontUrl;
+        document.head.appendChild(createdLink);
       }
-      
+
+      // Esperar SIEMPRE a que la fuente esté disponible (aunque el <link>
+      // ya existiera, puede no haber terminado de cargar), con timeout de
+      // 5 s para que la UI no se congele si Google Fonts está caído o lento.
+      const FONT_LOAD_TIMEOUT_MS = 5000;
+      await Promise.race([
+        document.fonts.load(`16px "${fontFamily}"`),
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`Timeout cargando fuente ${fontFamily} (>${FONT_LOAD_TIMEOUT_MS}ms)`)),
+            FONT_LOAD_TIMEOUT_MS
+          )
+        )
+      ]);
+
       this.loadedFonts.add(fontFamily);
       return true;
-      
+
     } catch (error) {
+      // Retirar el <link> que creamos para no dejar un enlace "fantasma"
+      // que haría que el siguiente loadFont se saltase la verificación.
+      if (createdLink && createdLink.parentNode) {
+        createdLink.remove();
+      }
       console.error(`Error cargando fuente ${fontFamily}:`, error);
       return false;
     }
@@ -223,25 +255,27 @@ class TextLayerManager {
       throw new Error(`Máximo ${this.maxLayers} capas permitidas`);
     }
 
+    // Usar ?? en los campos numéricos: con || un 0 legítimo (posición en
+    // el origen, opacidad 0) se sustituía por el valor por defecto.
     const defaultConfig = {
       text: config.text || 'Nuevo texto',
       font: {
         family: config.font?.family || 'Roboto',
-        size: config.font?.size || 40,
+        size: (Number.isFinite(config.font?.size) && config.font.size > 0) ? config.font.size : 40,
         weight: config.font?.weight || 'normal'
       },
       position: {
-        x: config.position?.x || 50,
-        y: config.position?.y || 50
+        x: config.position?.x ?? 50,
+        y: config.position?.y ?? 50
       },
       color: config.color || '#ffffff',
       effects: {
-        shadow: config.effects?.shadow || null,
-        stroke: config.effects?.stroke || null,
-        gradient: config.effects?.gradient || null
+        shadow: config.effects?.shadow ?? null,
+        stroke: config.effects?.stroke ?? null,
+        gradient: config.effects?.gradient ?? null
       },
       visible: config.visible !== false,
-      opacity: config.opacity || 1
+      opacity: config.opacity ?? 1
     };
 
     // Cargar fuente si es necesario
@@ -367,8 +401,14 @@ class TextLayerManager {
 
     for (const layer of sortedLayers) {
       if (!layer.visible) continue;
-      
-      this.renderLayer(ctx, layer, canvas);
+
+      // Una capa con error (gradiente mal formado, fuente rara, etc.)
+      // no debe abortar el render del resto de capas.
+      try {
+        this.renderLayer(ctx, layer, canvas);
+      } catch (error) {
+        MNEMOTAG_DEBUG && console.warn(`TextLayerManager: error renderizando la capa ${layer.id}, se omite:`, error);
+      }
     }
   }
 
@@ -377,79 +417,95 @@ class TextLayerManager {
    */
   renderLayer(ctx, layer, canvas) {
     ctx.save();
+    // try/finally: si el render de la capa lanza una excepción, el
+    // restore() garantiza que el contexto no queda con estado sucio.
+    try {
+      // Aplicar opacidad global
+      ctx.globalAlpha = layer.opacity;
 
-    // Aplicar opacidad global
-    ctx.globalAlpha = layer.opacity;
+      // Configurar fuente
+      const fontString = `${layer.font.weight} ${layer.font.size}px "${layer.font.family}", sans-serif`;
+      ctx.font = fontString;
+      ctx.textBaseline = 'top';
 
-    // Configurar fuente
-    const fontString = `${layer.font.weight} ${layer.font.size}px "${layer.font.family}", sans-serif`;
-    ctx.font = fontString;
-    ctx.textBaseline = 'top';
-
-    // Aplicar efectos de sombra
-    if (layer.effects.shadow) {
-      const s = layer.effects.shadow;
-      ctx.shadowColor = s.color;
-      ctx.shadowBlur = s.blur;
-      ctx.shadowOffsetX = s.offsetX;
-      ctx.shadowOffsetY = s.offsetY;
-    }
-
-    // Aplicar stroke (borde)
-    if (layer.effects.stroke) {
-      const st = layer.effects.stroke;
-      ctx.strokeStyle = st.color;
-      ctx.lineWidth = st.width;
-      ctx.lineJoin = 'round';
-      ctx.strokeText(layer.text, layer.position.x, layer.position.y);
-    }
-
-    // Aplicar gradiente o color sólido
-    if (layer.effects.gradient) {
-      const g = layer.effects.gradient;
-      let gradient;
-
-      if (g.type === 'linear') {
-        const angle = (g.angle || 0) * Math.PI / 180;
-        const metrics = ctx.measureText(layer.text);
-        const textWidth = metrics.width;
-        const textHeight = layer.font.size;
-
-        const x1 = layer.position.x;
-        const y1 = layer.position.y;
-        const x2 = x1 + textWidth * Math.cos(angle);
-        const y2 = y1 + textHeight * Math.sin(angle);
-
-        gradient = ctx.createLinearGradient(x1, y1, x2, y2);
-      } else {
-        // Radial gradient
-        const metrics = ctx.measureText(layer.text);
-        const centerX = layer.position.x + metrics.width / 2;
-        const centerY = layer.position.y + layer.font.size / 2;
-        const radius = Math.max(metrics.width, layer.font.size) / 2;
-
-        gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+      // Aplicar efectos de sombra
+      if (layer.effects.shadow) {
+        const s = layer.effects.shadow;
+        ctx.shadowColor = s.color;
+        ctx.shadowBlur = s.blur;
+        ctx.shadowOffsetX = s.offsetX;
+        ctx.shadowOffsetY = s.offsetY;
       }
 
-      g.colors.forEach((color, index) => {
-        gradient.addColorStop(index / (g.colors.length - 1), color);
-      });
+      // Aplicar stroke (borde)
+      if (layer.effects.stroke) {
+        const st = layer.effects.stroke;
+        ctx.strokeStyle = st.color;
+        ctx.lineWidth = st.width;
+        ctx.lineJoin = 'round';
+        ctx.strokeText(layer.text, layer.position.x, layer.position.y);
+      }
 
-      ctx.fillStyle = gradient;
-    } else {
-      ctx.fillStyle = layer.color;
+      // Aplicar gradiente o color sólido
+      if (layer.effects.gradient) {
+        const g = layer.effects.gradient;
+        let gradient;
+
+        if (g.type === 'linear') {
+          const angle = (g.angle || 0) * Math.PI / 180;
+          const metrics = ctx.measureText(layer.text);
+          const textWidth = metrics.width;
+          const textHeight = layer.font.size;
+
+          const x1 = layer.position.x;
+          const y1 = layer.position.y;
+          const x2 = x1 + textWidth * Math.cos(angle);
+          const y2 = y1 + textHeight * Math.sin(angle);
+
+          gradient = ctx.createLinearGradient(x1, y1, x2, y2);
+        } else {
+          // Radial gradient
+          const metrics = ctx.measureText(layer.text);
+          const centerX = layer.position.x + metrics.width / 2;
+          const centerY = layer.position.y + layer.font.size / 2;
+          const radius = Math.max(metrics.width, layer.font.size) / 2;
+
+          gradient = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+        }
+
+        const gradientColors = Array.isArray(g.colors) ? g.colors : [];
+        if (gradientColors.length <= 1) {
+          // Con 0 o 1 color no hay gradiente posible: addColorStop con
+          // 0/0 = NaN lanzaría una excepción. Usar color sólido.
+          ctx.fillStyle = gradientColors[0] || layer.color;
+        } else {
+          gradientColors.forEach((color, index) => {
+            gradient.addColorStop(index / (gradientColors.length - 1), color);
+          });
+          ctx.fillStyle = gradient;
+        }
+      } else {
+        ctx.fillStyle = layer.color;
+      }
+
+      // Dibujar texto
+      ctx.fillText(layer.text, layer.position.x, layer.position.y);
+    } finally {
+      ctx.restore();
     }
-
-    // Dibujar texto
-    ctx.fillText(layer.text, layer.position.x, layer.position.y);
-
-    ctx.restore();
   }
 
   /**
    * Aplicar plantilla prediseñada
    */
   async applyTemplate(templateKey, text = 'Título') {
+    // Firma robusta: algunos callers (main.js) pasan dimensiones del canvas
+    // como argumentos extra. Si el segundo argumento no es un string,
+    // usar el texto por defecto en lugar de renderizar "2400".
+    if (typeof text !== 'string') {
+      text = 'Título';
+    }
+
     const template = this.templates[templateKey];
     if (!template) {
       throw new Error(`Plantilla no encontrada: ${templateKey}`);

@@ -41,13 +41,12 @@ const SecurityManager = {
 
   // Validación de archivos de imagen mejorada
   validateImageFile: function(file) {
-    // v3.3.15: HEIC/HEIF se aceptan SOLO si la librería heic2any está
-    // cargada en la página. Si no, el flujo principal mostrará un error
-    // claro antes incluso de llegar aquí.
+    // Nota HEIC/HEIF: main.js convierte esos archivos a JPEG (con heic2any)
+    // ANTES de llamar a validateImageFile, así que aquí nunca llega un MIME
+    // de HEIC/HEIF. Aceptarlos era una rama muerta e inconsistente con
+    // allowedExtensions (que nunca incluyó esas extensiones), así que se
+    // eliminaron de la lista.
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/avif'];
-    if (typeof heic2any !== 'undefined') {
-      allowedTypes.push('image/heic', 'image/heif');
-    }
     const maxSize = AppConfig.maxFileSize; // Usar AppConfig como fuente única
     
     const validation = {
@@ -312,21 +311,25 @@ const SecurityManager = {
 
     for (const [field, rules] of Object.entries(fields)) {
       const value = metadata[field] || '';
-      const sanitized = this.sanitizeText(value);
-      
-      if (rules.required && !sanitized) {
+      // Validar longitud sobre el texto ORIGINAL (trimmed), no sobre el
+      // sanitizado: las entidades expanden ('&' → '&amp;') y un texto
+      // legítimo dentro del límite se rechazaba injustamente.
+      const original = typeof value === 'string' ? value.trim() : '';
+
+      if (rules.required && !original) {
         validation.isValid = false;
         validation.errors[field] = 'Este campo es obligatorio';
         continue;
       }
 
-      if (sanitized.length > rules.maxLength) {
+      if (original.length > rules.maxLength) {
         validation.isValid = false;
         validation.errors[field] = `Máximo ${rules.maxLength} caracteres permitidos`;
         continue;
       }
 
-      validation.sanitized[field] = sanitized;
+      // Sanitizar DESPUÉS de validar la longitud.
+      validation.sanitized[field] = this.sanitizeText(value);
     }
 
     return validation;

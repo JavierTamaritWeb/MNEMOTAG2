@@ -570,11 +570,13 @@ describe('Regresión — Soporte HEIC/HEIF (v3.3.15)', function () {
     expect(src).toContain("toType: 'image/jpeg'");
   });
 
-  it('security-manager.js añade HEIC/HEIF a allowedTypes solo si heic2any está disponible', async function () {
+  it('security-manager.js NO acepta MIME HEIC/HEIF (main.js convierte a JPEG antes de validar)', async function () {
     const src = await fetchSource('../js/managers/security-manager.js');
-    expect(src).toContain("typeof heic2any !== 'undefined'");
-    expect(src).toContain("'image/heic'");
-    expect(src).toContain("'image/heif'");
+    // La rama que añadía los MIME de HEIC a allowedTypes era código muerto
+    // e inconsistente con allowedExtensions (que nunca incluyó heic/heif):
+    // main.js convierte HEIC→JPEG ANTES de llamar a validateImageFile.
+    expect(src).not.toContain("allowedTypes.push('image/heic'");
+    expect(src).not.toContain('image/heif');
   });
 });
 
@@ -772,9 +774,11 @@ describe('Regresión — Export extraído a ExportManager (v3.4.10)', function (
 
   it('main.js delega los listeners de descarga a ExportManager', async function () {
     const src = await fetchSource('../js/main.js');
-    expect(src).toContain('ExportManager.downloadImage()');
     expect(src).toContain('ExportManager.downloadImageWithProgress()');
     expect(src).toContain('ExportManager.downloadMultipleSizes()');
+    // El handler legacy que llamaba a downloadImage() se eliminó: duplicaba
+    // Cmd+S con downloadImageWithProgress().
+    expect(src).not.toContain('ExportManager.downloadImage();');
   });
 
   it('main.js ya NO define las 3 funciones de descarga extraídas', async function () {
@@ -898,7 +902,7 @@ describe('Regresión — Playwright E2E (v3.4.13)', function () {
 
   it('tests/e2e/smoke.spec.js existe con los smoke tests principales', async function () {
     const src = await fetchSource('../tests/e2e/smoke.spec.js');
-    expect(src).toContain("import { test, expect } from '@playwright/test'");
+    expect(src).toContain("const { test, expect } = require('@playwright/test')");
     expect(src).toContain('carga index.html sin errores en consola');
     expect(src).toContain('expone los managers globales en window');
     expect(src).toContain('botones principales existen y son clicables');
@@ -1281,6 +1285,60 @@ describe('Regresión — setupCanvas respeta max-height para portrait', function
     // La línea object-fit: contain fue eliminada de setupCanvas para evitar
     // letterboxing que rompe la conversión de coordenadas
     expect(src).not.toMatch(/canvas\.style\.objectFit\s*=\s*'contain';\s*\n\s*\/\/\s*Mejorar calidad/);
+  });
+});
+
+describe('Regresión — Auditoría severa v3.5.11', function () {
+  it('filter-manager ejecuta el debounce de worker y no llama a WorkerManager.processImage', async function () {
+    const src = await fetchSource('../js/managers/filter-manager.js');
+    expect(src).toContain('this._workerDebouncedUpdate()');
+    expect(src).toContain('WorkerManager.processInWorker');
+    expect(src).not.toContain('WorkerManager.processImage');
+  });
+
+  it('worker-manager usa el protocolo imageData/operations y no error.target.workerId', async function () {
+    const src = await fetchSource('../js/managers/worker-manager.js');
+    expect(src).toContain('imageData: transferableData.data.imageData');
+    expect(src).toContain('operations: transferableData.data.operations');
+    expect(src).toContain('normalizeWorkerResult');
+    expect(src).not.toContain('error.target.workerId');
+  });
+
+  it('image-processor acepta data.imageData/data.operations y usa 0 como neutro', async function () {
+    const src = await fetchSource('../js/image-processor.js');
+    expect(src).toContain('const payload = e.data.data || {}');
+    expect(src).toContain('payload.imageData');
+    expect(src).toContain('payload.operations');
+    expect(src).toContain('(100 + brightness) / 100');
+    expect(src).toContain('(100 + contrastValue) / 100');
+    expect(src).not.toContain('brightness / 100');
+    expect(src).not.toContain('contrastPercent / 100');
+  });
+
+  it('main.js no registra el handler legacy de atajos ni listeners layer-* inexistentes', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).not.toContain('document.addEventListener(\'keydown\', handleKeyboardShortcuts)');
+    expect(src).not.toContain("getElementById('layer-text')");
+    expect(src).not.toContain("'layer-font'");
+    expect(src).toContain("getElementById('text-layer-text')");
+    expect(src).toContain('getTextLayerControl');
+  });
+
+  it('crop usa deactivate/updatePreview y fullscreenchange sí está registrado', async function () {
+    const src = await fetchSource('../js/main.js');
+    expect(src).toContain('cropManager.deactivate()');
+    expect(src).toContain('cropManager.setAspectRatio(select.value)');
+    expect(src).not.toContain('cropManager.cancelCrop()');
+    expect(src).not.toContain('applyFilters();');
+    expect(src).toContain("document.addEventListener('fullscreenchange', handleFullscreenChange)");
+  });
+
+  it('AVIF conserva gaps y evita doble desplazamiento con base_offset_size', async function () {
+    const src = await fetchSource('../js/managers/metadata-manager.js');
+    expect(src).toContain('const gapLength = mdatBox.start - metaBox.end');
+    expect(src).toContain('out.set(bytes.subarray(metaBox.end, mdatBox.start), writeOffset)');
+    expect(src).toContain('parsedIloc.base_offset_size === 0');
+    expect(src).toContain('iref versión');
   });
 });
 

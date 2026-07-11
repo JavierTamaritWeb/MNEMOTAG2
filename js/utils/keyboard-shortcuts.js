@@ -130,6 +130,12 @@ class KeyboardShortcutManager {
    * Verificar si debe prevenir comportamiento por defecto
    */
   shouldPreventDefault(e) {
+    // Aplicar los mismos checks que handleKeyDown: sin ellos, Cmd+Z dentro
+    // de un input bloqueaba el undo nativo del texto, y tras disable()
+    // seguían bloqueados los comportamientos por defecto del navegador.
+    if (!this.isEnabled) return false;
+    if (e.target && this.ignoreTargets.includes(e.target.tagName)) return false;
+
     const combo = this.getComboFromEvent(e);
     if (combo && this.shortcuts.has(combo)) {
       return this.shortcuts.get(combo).preventDefault;

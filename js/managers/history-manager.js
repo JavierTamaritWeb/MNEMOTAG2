@@ -57,6 +57,11 @@ const historyManager = {
 
     // Metadata base común para cualquier estrategia de snapshot.
     const baseState = {
+      // Dimensiones internas del canvas en el momento del snapshot.
+      // Sin ellas, un undo tras un crop dibujaba el bitmap grande sobre
+      // el canvas pequeño (solo se veía una esquina).
+      canvasWidth: canvas.width,
+      canvasHeight: canvas.height,
       metadata: this.getCurrentMetadata(),
       watermarkConfig: this.getCurrentWatermarkConfig(),
       filterState: this.getCurrentFilterState(),
@@ -104,9 +109,20 @@ const historyManager = {
     let totalSize = this.states.reduce((acc, s) => acc + (s.imageData ? s.imageData.length : 0), 0);
     while (this.states.length > 0 && (totalSize + newSize) > HISTORY_MAX_TOTAL_SIZE) {
       const removed = this.states.shift();
-      totalSize -= (removed && removed.imageData ? removed.imageData.length : 0);
-      if (this.currentIndex > 0) this.currentIndex--;
+      if (removed) {
+        totalSize -= (removed.imageData ? removed.imageData.length : 0);
+        // Estados mixtos: si el estado evictado tiene ImageBitmap,
+        // cerrarlo para liberar la memoria GPU (evita leak).
+        if (removed.bitmap && typeof removed.bitmap.close === 'function') {
+          try { removed.bitmap.close(); } catch (e) { /* defensivo */ }
+        }
+      }
+      // El shift desplaza todos los índices una posición: decrementar
+      // siempre (también cuando currentIndex es 0, que pasa a -1 y el
+      // commitState posterior lo deja apuntando al nuevo estado).
+      this.currentIndex--;
     }
+    if (this.currentIndex < -1) this.currentIndex = -1;
     commitState(Object.assign({}, baseState, { imageData: dataURL }));
   },
   
@@ -361,9 +377,21 @@ const historyManager = {
         if (MNEMOTAG_DEBUG) console.log('historyManager: UI Restaurada.');
       };
 
+      // Restaura las dimensiones internas del canvas guardadas en el
+      // estado (p. ej. tras un crop). El ajuste CSS lo hace main.js.
+      const applyCanvasSize = (fallbackW, fallbackH) => {
+        const w = state.canvasWidth || fallbackW;
+        const h = state.canvasHeight || fallbackH;
+        if (w && h && (canvas.width !== w || canvas.height !== h)) {
+          canvas.width = w;
+          canvas.height = h;
+        }
+      };
+
       // Restaurar canvas (ImageBitmap preferido, dataURL fallback)
       if (state.bitmap) {
         try {
+          applyCanvasSize(state.bitmap.width, state.bitmap.height);
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           ctx.drawImage(state.bitmap, 0, 0);
           applyFormState();
@@ -373,6 +401,7 @@ const historyManager = {
       } else if (state.imageData) {
         const img = new Image();
         img.onload = function() {
+          applyCanvasSize(img.width, img.height);
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           ctx.drawImage(img, 0, 0);
           applyFormState();

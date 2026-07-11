@@ -660,6 +660,126 @@ assert(cdscToId === 1, `cdsc to_item_ID=1 (primary) — got ${cdscToId}`);
 const reinjected = MM._injectExifInAvifBytes(injected, tiffBytes);
 assert(reinjected === null, '2ª inyección sobre archivo con Exif previo devuelve null');
 
+// === REGRESIONES v3.5.11: gap top-level y base_offset_size=4 ============
+
+function writeUint32BE(bytes, offset, value) {
+  bytes[offset] = (value >>> 24) & 0xff;
+  bytes[offset + 1] = (value >>> 16) & 0xff;
+  bytes[offset + 2] = (value >>> 8) & 0xff;
+  bytes[offset + 3] = value & 0xff;
+}
+
+function concatUint8Arrays(parts) {
+  const totalLength = parts.reduce((sum, part) => sum + part.length, 0);
+  const out = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.length;
+  }
+  return out;
+}
+
+function buildStructuredAvifWithFreeGap() {
+  const base = buildStructuredAvif();
+  const boxes = MM._parseIsobmffBoxes(base);
+  const meta = boxes.find(b => b.type === 'meta');
+  const mdat = boxes.find(b => b.type === 'mdat');
+  const free = new Uint8Array([
+    0x00, 0x00, 0x00, 0x0C,
+    0x66, 0x72, 0x65, 0x65,
+    0xDE, 0xAD, 0xBE, 0xEF
+  ]);
+  const out = concatUint8Arrays([
+    base.subarray(0, meta.end),
+    free,
+    base.subarray(mdat.start)
+  ]);
+
+  // El mdat se desplazó por el free; el primary extent_offset debe seguir
+  // apuntando al body del mdat.
+  const ilocOffsetInFile = 24 + 12 + 33 + 14 + 35 + 22;
+  const shiftedPrimaryOffset = 24 + 124 + free.length + 8;
+  writeUint32BE(out, ilocOffsetInFile, shiftedPrimaryOffset);
+  return out;
+}
+
+function buildStructuredAvifWithBaseOffsetFieldZero() {
+  const base = buildStructuredAvif();
+  const boxes = MM._parseIsobmffBoxes(base);
+  const meta = boxes.find(b => b.type === 'meta');
+  const mdat = boxes.find(b => b.type === 'mdat');
+  const contents = MM._parseMetaBox(base, meta);
+
+  const ftyp = base.subarray(0, 24);
+  const hdlr = base.subarray(contents.hdlr.start, contents.hdlr.end);
+  const pitm = base.subarray(contents.pitm.start, contents.pitm.end);
+  const iinf = base.subarray(contents.iinf.start, contents.iinf.end);
+  const mdatBytes = base.subarray(mdat.start, mdat.end);
+
+  // iloc v0 con offset_size=4, length_size=4, base_offset_size=4.
+  // base_offset=0 y extent_offset absoluto al body del mdat: layout válido
+  // que antes podía desplazarse mal.
+  const iloc = new Uint8Array(34);
+  writeUint32BE(iloc, 0, 34);
+  iloc[4] = 0x69; iloc[5] = 0x6C; iloc[6] = 0x6F; iloc[7] = 0x63;
+  iloc[8] = 0; iloc[9] = 0; iloc[10] = 0; iloc[11] = 0;
+  iloc[12] = 0x44;
+  iloc[13] = 0x40; // base_offset_size=4, reserved=0
+  iloc[14] = 0; iloc[15] = 1;
+  iloc[16] = 0; iloc[17] = 1;
+  iloc[18] = 0; iloc[19] = 0;
+  writeUint32BE(iloc, 20, 0); // base_offset=0
+  iloc[24] = 0; iloc[25] = 1;
+
+  const metaLength = 8 + 4 + hdlr.length + pitm.length + iinf.length + iloc.length;
+  const primaryOffset = ftyp.length + metaLength + 8;
+  writeUint32BE(iloc, 26, primaryOffset);
+  writeUint32BE(iloc, 30, 8);
+
+  const metaNew = new Uint8Array(metaLength);
+  writeUint32BE(metaNew, 0, metaLength);
+  metaNew[4] = 0x6D; metaNew[5] = 0x65; metaNew[6] = 0x74; metaNew[7] = 0x61;
+  metaNew[8] = 0; metaNew[9] = 0; metaNew[10] = 0; metaNew[11] = 0;
+  let p = 12;
+  metaNew.set(hdlr, p); p += hdlr.length;
+  metaNew.set(pitm, p); p += pitm.length;
+  metaNew.set(iinf, p); p += iinf.length;
+  metaNew.set(iloc, p);
+
+  return concatUint8Arrays([ftyp, metaNew, mdatBytes]);
+}
+
+const avifWithGap = buildStructuredAvifWithFreeGap();
+const gapInjected = MM._injectExifInAvifBytes(avifWithGap, tiffBytes);
+assert(gapInjected !== null, 'AVIF con free entre meta y mdat acepta inyección');
+const gapBoxesNew = MM._parseIsobmffBoxes(gapInjected);
+assert(gapBoxesNew.some(b => b.type === 'free'), 'AVIF inyectado conserva box free intermedio');
+const gapMetaNew = gapBoxesNew.find(b => b.type === 'meta');
+const gapMetaContentsNew = MM._parseMetaBox(gapInjected, gapMetaNew);
+const gapIlocNew = MM._readIloc(gapInjected, gapMetaContentsNew.iloc);
+const gapPrimaryNew = gapIlocNew.items.find(it => it.item_ID === 1);
+const gapPrimaryOffsetNew = gapPrimaryNew.extents[0].extent_offset;
+assert(
+  gapInjected[gapPrimaryOffsetNew] === 0xAA && gapInjected[gapPrimaryOffsetNew + 1] === 0xBB,
+  'AVIF con free conserva datos primary en el offset desplazado'
+);
+
+const avifWithBaseOffset = buildStructuredAvifWithBaseOffsetFieldZero();
+const baseOffsetInjected = MM._injectExifInAvifBytes(avifWithBaseOffset, tiffBytes);
+assert(baseOffsetInjected !== null, 'AVIF con base_offset_size=4 y base_offset=0 acepta inyección');
+const baseOffsetBoxesNew = MM._parseIsobmffBoxes(baseOffsetInjected);
+const baseOffsetMetaNew = baseOffsetBoxesNew.find(b => b.type === 'meta');
+const baseOffsetContentsNew = MM._parseMetaBox(baseOffsetInjected, baseOffsetMetaNew);
+const baseOffsetIlocNew = MM._readIloc(baseOffsetInjected, baseOffsetContentsNew.iloc);
+assert(baseOffsetIlocNew.base_offset_size === 4, 'iloc mantiene base_offset_size=4');
+const baseOffsetPrimaryNew = baseOffsetIlocNew.items.find(it => it.item_ID === 1);
+const baseOffsetAbs = (baseOffsetPrimaryNew.base_offset || 0) + baseOffsetPrimaryNew.extents[0].extent_offset;
+assert(
+  baseOffsetInjected[baseOffsetAbs] === 0xAA && baseOffsetInjected[baseOffsetAbs + 1] === 0xBB,
+  'AVIF con base_offset=0 no desplaza dos veces el primary item'
+);
+
 // ---- Resumen ----------------------------------------------------------------
 
 console.log('\n' + '─'.repeat(60));

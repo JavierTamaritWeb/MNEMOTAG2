@@ -37,6 +37,8 @@ const FilterManager = {
   // Configuración para workers
   useWorkers: false,
   heavyFilterThreshold: 3, // Número de filtros para considerar "pesado"
+  workerBakedFilters: ['brightness', 'contrast', 'saturation', 'sepia', 'hueRotate', 'blur'],
+  _workerDebouncedUpdate: null,
   
   /**
    * Inicializar sistema de filtros
@@ -164,9 +166,63 @@ const FilterManager = {
    */
   scheduleWorkerUpdate: function() {
     if (typeof SmartDebounce !== 'undefined') {
-      SmartDebounce.intelligent('filter-worker-update', () => {
+      if (!this._workerDebouncedUpdate) {
+        this._workerDebouncedUpdate = SmartDebounce.intelligent('filter-worker-update', () => {
+          this.applyFiltersWithWorker();
+        }, 200);
+      }
+      this._workerDebouncedUpdate();
+    } else {
+      this.applyFiltersWithWorker();
+    }
+  },
+
+  /**
+   * Convierte el resultado del worker/fallback a ImageData si llega como
+   * objeto plano desde structured clone.
+   */
+  normalizeImageDataResult: function(result) {
+    if (typeof ImageData !== 'undefined' && result instanceof ImageData) {
+      return result;
+    }
+    if (result && result.data && Number.isFinite(result.width) && Number.isFinite(result.height)) {
+      return new ImageData(new Uint8ClampedArray(result.data), result.width, result.height);
+    }
+    return result;
+  },
+
+  /**
+   * Orden CSS estable de filtros. Evita depender del orden de inserción del
+   * objeto y alinea worker/fallback con getFilterString().
+   */
+  getOrderedFilterEntries: function() {
+    return [
+      ['brightness', this.filters.brightness],
+      ['contrast', this.filters.contrast],
+      ['saturation', this.filters.saturation],
+      ['sepia', this.filters.sepia],
+      ['hueRotate', this.filters.hueRotate],
+      ['blur', this.filters.blur]
+    ];
+  },
+
+  /**
+   * Mapea los nombres internos a los nombres de operación compartidos por
+   * worker y fallback.
+   */
+  filterToOperationType: function(filterName) {
+    return filterName === 'hueRotate' ? 'hue-rotate' : filterName;
+  },
+
+  /**
+   * Ejecuta el debounce de worker inmediatamente (usado por tests y por
+   * cambios que no pasan por applyFilter).
+   */
+  flushWorkerUpdate: function() {
+    if (typeof SmartDebounce !== 'undefined') {
+      SmartDebounce.execute('filter-worker-update', () => {
         this.applyFiltersWithWorker();
-      }, 200); // Más tiempo para workers
+      });
     } else {
       this.applyFiltersWithWorker();
     }
@@ -200,7 +256,7 @@ const FilterManager = {
       
       // Procesar en worker
       if (typeof WorkerManager !== 'undefined') {
-        const result = await WorkerManager.processInWorker(imageData, operations);
+        const result = this.normalizeImageDataResult(await WorkerManager.processInWorker(imageData, operations));
         
         // Aplicar resultado al canvas
         if (result instanceof ImageBitmap) {
@@ -288,12 +344,12 @@ const FilterManager = {
     const operations = [];
     
     // Solo agregar filtros que tienen valores diferentes de 0
-    Object.entries(this.filters).forEach(([filterName, value]) => {
+    this.getOrderedFilterEntries().forEach(([filterName, value]) => {
       if (value !== 0) {
         operations.push({
           type: 'filter',
           config: {
-            type: filterName,
+            type: this.filterToOperationType(filterName),
             value: value
           }
         });
@@ -337,15 +393,15 @@ const FilterManager = {
    * @returns {Promise<ImageData>}
    */
   applyWithWorker: async function(imageData) {
-    const filters = {...this.filters};
-    
+    const operations = this.prepareWorkerOperations();
+
     try {
       if (typeof FilterLoadingManager !== 'undefined') {
         FilterLoadingManager.showWorkerLoading();
       }
       
       if (typeof WorkerManager !== 'undefined') {
-        const result = await WorkerManager.processImage(imageData, filters);
+        const result = this.normalizeImageDataResult(await WorkerManager.processInWorker(imageData, operations));
         if (typeof FilterLoadingManager !== 'undefined') {
           FilterLoadingManager.hideFilterLoading();
         }
@@ -358,8 +414,12 @@ const FilterManager = {
       }
       
       if (typeof FallbackProcessor !== 'undefined') {
-        return FallbackProcessor.processImage(imageData, filters);
+        return FallbackProcessor.processInMainThread(imageData, operations);
       }
+    }
+
+    if (typeof FallbackProcessor !== 'undefined') {
+      return FallbackProcessor.processInMainThread(imageData, operations);
     }
     
     return imageData; // Fallback básico
@@ -371,10 +431,8 @@ const FilterManager = {
    * @returns {ImageData}
    */
   applyWithFallback: function(imageData) {
-    const filters = {...this.filters};
-    
     if (typeof FallbackProcessor !== 'undefined') {
-      return FallbackProcessor.processImage(imageData, filters);
+      return FallbackProcessor.processInMainThread(imageData, this.prepareWorkerOperations());
     }
     
     return imageData; // Fallback básico

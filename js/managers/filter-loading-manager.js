@@ -291,7 +291,11 @@ const FilterLoadingManager = {
     const timeout = setTimeout(() => {
       if (this.activeLoadings.has(key)) {
         MNEMOTAG_DEBUG && console.warn(`⚠️ Loading timeout para ${key}, forzando finalización`);
-        this.hideFilterLoading(key.replace('global', null));
+        // hideFilterLoading espera null para el estado global (el antiguo
+        // key.replace('global', null) producía el string "null" y el
+        // loading global nunca se limpiaba, dejando todos los controles
+        // deshabilitados).
+        this.hideFilterLoading(key === 'global' ? null : key);
         
         // Mostrar mensaje de error si está disponible UIManager
         if (typeof UIManager !== 'undefined') {

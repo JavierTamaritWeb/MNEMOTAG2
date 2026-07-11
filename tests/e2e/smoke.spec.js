@@ -13,12 +13,8 @@
 // validación manual. Este test solo confirma que la integración
 // básica del DOM con los managers funciona.
 
-import { test, expect } from '@playwright/test';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const { test, expect } = require('@playwright/test');
+const path = require('path');
 
 test.describe('MnemoTag smoke test', () => {
   test('carga index.html sin errores en consola', async ({ page }) => {
@@ -35,7 +31,7 @@ test.describe('MnemoTag smoke test', () => {
     await page.goto('/index.html', { waitUntil: 'networkidle' });
 
     // Título contiene la versión actual
-    await expect(page).toHaveTitle(/MnemoTag v3\.4\.\d+/);
+    await expect(page).toHaveTitle(/MnemoTag v3\.5\.\d+/);
 
     // Filtrar errores conocidos que no son bugs: CSP warnings sobre
     // scripts inline de Tailwind en modo CDN, errores de fuentes

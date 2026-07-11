@@ -5,7 +5,7 @@
 // disponible en GitHub Actions y macOS/Linux) para servir el proyecto
 // en http://localhost:8080.
 
-export default {
+module.exports = {
   testDir: './tests/e2e',
   testMatch: /.*\.spec\.js/,
   timeout: 60000,

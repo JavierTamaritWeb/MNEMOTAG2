@@ -134,21 +134,13 @@ const WorkerManager = {
   
   // Manejar mensajes de workers
   handleWorkerMessage: function(e) {
-    const { id, result, error, type } = e.data;
+    const { id, result, error, type, success } = e.data;
     const job = this.activeJobs.get(id);
     
     if (!job) {
       MNEMOTAG_DEBUG && console.warn(`⚠️ Job ${id} no encontrado`);
       return;
     }
-    
-    // Limpiar timeout si existe
-    if (job.timeoutId) {
-      clearTimeout(job.timeoutId);
-    }
-    
-    // Liberar worker
-    this.releaseWorker(job.workerId);
     
     // Procesar resultado según tipo
     if (type === 'progress') {
@@ -158,15 +150,23 @@ const WorkerManager = {
       }
       return;
     }
+
+    // Limpiar timeout si existe
+    if (job.timeoutId) {
+      clearTimeout(job.timeoutId);
+    }
+    
+    // Liberar worker solo en mensaje terminal (no en progress)
+    this.releaseWorker(job.workerId);
     
     // Resolver/rechazar promesa
-    if (error) {
+    if (error || success === false) {
       if (this.config.enableLogging) {
         console.error(`❌ Job ${id} falló:`, error);
       }
-      job.reject(new Error(error));
+      job.reject(new Error(error || 'Worker falló'));
     } else {
-      job.resolve(result);
+      job.resolve(this.normalizeWorkerResult(result));
     }
     
     // Limpiar job
@@ -176,18 +176,22 @@ const WorkerManager = {
   // Manejar errores de workers
   handleWorkerError: function(error) {
     console.error('❌ Error en worker:', error);
+
+    let failedWorkerId = null;
     
     // Incrementar contador de errores del worker
     for (const [id, workerInfo] of this.workers.entries()) {
       if (workerInfo.worker === error.target) {
         workerInfo.errors++;
+        workerInfo.busy = false;
+        failedWorkerId = id;
         break;
       }
     }
     
     // Limpiar jobs activos relacionados
     for (const [jobId, job] of this.activeJobs.entries()) {
-      if (job.workerId === error.target.workerId) {
+      if (job.workerId === failedWorkerId) {
         if (job.timeoutId) {
           clearTimeout(job.timeoutId);
         }
@@ -200,6 +204,19 @@ const WorkerManager = {
   // Manejar errores de mensaje
   handleWorkerMessageError: function(error) {
     console.error('❌ Error de mensaje en worker:', error);
+
+    this.handleWorkerError(error);
+  },
+
+  // Normalizar resultados de structured clone a ImageData cuando sea posible
+  normalizeWorkerResult: function(result) {
+    if (typeof ImageData !== 'undefined' && result instanceof ImageData) {
+      return result;
+    }
+    if (result && result.data && Number.isFinite(result.width) && Number.isFinite(result.height) && typeof ImageData !== 'undefined') {
+      return new ImageData(new Uint8ClampedArray(result.data), result.width, result.height);
+    }
+    return result;
   },
   
   // Procesar imagen en worker con timeout y retry
@@ -243,6 +260,8 @@ const WorkerManager = {
           id: jobId,
           type: 'process',
           data: transferableData.data,
+          imageData: transferableData.data.imageData,
+          operations: transferableData.data.operations,
           options: options
         }, transferableData.transferables);
         

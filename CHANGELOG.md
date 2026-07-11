@@ -4,6 +4,13 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [Unreleased]
+
+### Added
+- **Documentacion de auditoria severa v3.5.11**: nuevo documento `docs/AUDITORIA_V3_5_11_SOLUCIONES.md` con causas raiz, soluciones aplicadas, reglas de no regresion, checklist por subsistema y pruebas que protegen cada bloque critico.
+
+---
+
 ## [3.5.10] - 2026-04-15
 
 ### Fixed

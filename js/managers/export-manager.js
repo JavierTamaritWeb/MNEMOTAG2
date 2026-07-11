@@ -32,6 +32,44 @@
 
 window.ExportManager = (function () {
 
+  // ── Helpers internos ──────────────────────────────────────────────────
+
+  /**
+   * Avisa al usuario de que el navegador no pudo codificar el formato
+   * solicitado y el archivo se ha exportado en otro formato (fallback).
+   */
+  function notifyFormatFallback(requestedMimeType, actualMimeType) {
+    const requested = ((requestedMimeType || '').split('/')[1] || '').toUpperCase();
+    const actual = ((actualMimeType || '').split('/')[1] || '').toUpperCase();
+    MNEMOTAG_DEBUG && console.warn('Formato no soportado por el navegador: ' + requested + ' → ' + actual);
+    UIManager.showWarning('El navegador no soporta ' + requested + '; se ha exportado como ' + actual);
+  }
+
+  /**
+   * Extrae el MIME real de un dataURL ('data:image/png;base64,…' → 'image/png').
+   * Devuelve null si no es un dataURL reconocible.
+   */
+  function dataUrlMimeType(dataUrl) {
+    if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return null;
+    const end = dataUrl.indexOf(';');
+    return end > 5 ? dataUrl.slice(5, end) : null;
+  }
+
+  /**
+   * Recuerda el handle del último guardado exitoso para que startIn reabra
+   * el diálogo en la misma ubicación (un FileSystemFileHandle es válido como
+   * startIn). NUNCA pasar el resultado de queryPermission() como startIn
+   * (regla del proyecto, bug 3.1.4).
+   */
+  function rememberDownloadLocation(handle) {
+    try {
+      lastDownloadDirectory = handle;
+    } catch (err) {
+      // La variable vive en main.js; en entornos de test puede no existir.
+      MNEMOTAG_DEBUG && console.warn('No se pudo recordar la ubicación de descarga:', err);
+    }
+  }
+
   async function downloadMultipleSizes() {
     if (typeof canvas === 'undefined' || !canvas || !currentImage) {
       showError('No hay imagen para exportar.');
@@ -56,7 +94,6 @@ window.ExportManager = (function () {
     }
 
     try {
-      UIManager.showInfo('📦 Generando ZIP con ' + widths.length + ' tamaños…');
       showPositioningBorders = false;
       redrawCompleteCanvas();
 
@@ -79,8 +116,19 @@ window.ExportManager = (function () {
       const sourceHeight = canvas.height;
       const aspectRatio = sourceHeight / sourceWidth;
 
-      for (const targetWidth of widths) {
-        const w = Math.min(targetWidth, sourceWidth);
+      // Deduplicar los anchos EFECTIVOS: varios anchos seleccionados pueden
+      // colapsar al mismo valor si superan el ancho de origen (Math.min),
+      // lo que generaría nombres duplicados que JSZip sobrescribiría.
+      const effectiveWidths = Array.from(new Set(widths.map(tw => Math.min(tw, sourceWidth))));
+      if (effectiveWidths.length < widths.length) {
+        MNEMOTAG_DEBUG && console.info('Anchos colapsados al ajustar al origen: ' + widths.length + ' → ' + effectiveWidths.length);
+      }
+
+      UIManager.showInfo('📦 Generando ZIP con ' + effectiveWidths.length + ' tamaños…');
+
+      let formatFallbackWarned = false;
+
+      for (const w of effectiveWidths) {
         const h = Math.round(w * aspectRatio);
 
         const tempCanvas = document.createElement('canvas');
@@ -96,12 +144,24 @@ window.ExportManager = (function () {
           : tempCanvas;
 
         let blob = await canvasToBlob(sourceForExport, finalMimeType, outputQuality);
+
+        // Mismatch extensión/contenido: si canvasToBlob cayó al fallback,
+        // blob.type refleja el formato REAL — usarlo para la extensión.
+        let fileExtension = extension;
+        if (blob && blob.type && blob.type !== finalMimeType) {
+          fileExtension = getFileExtension(blob.type.split('/')[1]);
+          if (!formatFallbackWarned) {
+            notifyFormatFallback(finalMimeType, blob.type);
+            formatFallbackWarned = true;
+          }
+        }
+
         blob = await MetadataManager.embedExifInJpegBlob(blob);
         blob = await MetadataManager.embedExifInPngBlob(blob);
         blob = await MetadataManager.embedExifInWebpBlob(blob);
         blob = await MetadataManager.embedExifInAvifBlob(blob); // v3.3.17
 
-        zip.file(baseName + '-' + w + 'px.' + extension, blob);
+        zip.file(baseName + '-' + w + 'px.' + fileExtension, blob);
       }
 
       const zipBlob = await zip.generateAsync({ type: 'blob' });
@@ -115,7 +175,7 @@ window.ExportManager = (function () {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      showSuccess('📦 ZIP con ' + widths.length + ' tamaños descargado: ' + baseName + '-multisize.zip');
+      showSuccess('📦 ZIP con ' + effectiveWidths.length + ' tamaños descargado: ' + baseName + '-multisize.zip');
     } catch (err) {
       console.error('Error en downloadMultipleSizes:', err);
       showError('Error al generar el ZIP de varios tamaños: ' + (err.message || err));
@@ -142,8 +202,10 @@ window.ExportManager = (function () {
 
       const hasAlpha = hasImageAlphaChannel(canvas);
       const requestedMimeType = getMimeType(outputFormat);
-      const finalMimeType = await determineFallbackFormat(hasAlpha, requestedMimeType);
-      const finalFormat = finalMimeType.split('/')[1];
+      // let (no const): si canvasToBlob/toDataURL caen a otro formato, se
+      // reasignan con el MIME real para que extensión y contenido coincidan.
+      let finalMimeType = await determineFallbackFormat(hasAlpha, requestedMimeType);
+      let finalFormat = finalMimeType.split('/')[1];
 
       if (finalMimeType !== requestedMimeType) {
         const requestedFormat = outputFormat.toUpperCase();
@@ -171,26 +233,14 @@ window.ExportManager = (function () {
         filename = 'imagen';
       }
 
-      const extension = getFileExtension(finalFormat);
-      const fullFilename = filename + '.' + extension;
+      let extension = getFileExtension(finalFormat);
 
       // File System Access API cuando está disponible
       if ('showSaveFilePicker' in window) {
-        const options = {
-          suggestedName: fullFilename,
-          types: [{
-            description: 'Imágenes',
-            accept: {
-              [finalMimeType]: ['.' + extension]
-            }
-          }],
-          startIn: (typeof lastDownloadDirectory !== 'undefined' && lastDownloadDirectory) || 'desktop'
-        };
-
         try {
-          const handle = await window.showSaveFilePicker(options);
-          const writable = await handle.createWritable();
-
+          // Generar el blob ANTES de abrir el diálogo: si el navegador no
+          // codifica el formato pedido, canvasToBlob cae a JPEG y el nombre
+          // sugerido y el tipo aceptado deben reflejar el contenido real.
           const flattenColor = getFlattenColor();
           if (finalMimeType === 'image/jpeg' && hasAlpha) {
             UIManager.showInfo('🎨 Aplanando transparencia contra ' + flattenColor.toLowerCase() + ' para exportar a JPEG');
@@ -199,12 +249,38 @@ window.ExportManager = (function () {
             ? flattenCanvasForJpeg(canvas, flattenColor)
             : canvas;
           let blob = await canvasToBlob(sourceCanvas, finalMimeType, outputQuality);
+
+          // Mismatch extensión/contenido: usar el tipo REAL del blob
+          if (blob && blob.type && blob.type !== finalMimeType) {
+            notifyFormatFallback(finalMimeType, blob.type);
+            finalMimeType = blob.type;
+            finalFormat = finalMimeType.split('/')[1];
+            extension = getFileExtension(finalFormat);
+          }
+
           blob = await MetadataManager.embedExifInJpegBlob(blob);
           blob = await MetadataManager.embedExifInPngBlob(blob);
           blob = await MetadataManager.embedExifInWebpBlob(blob);
           blob = await MetadataManager.embedExifInAvifBlob(blob);
+
+          const options = {
+            suggestedName: filename + '.' + extension,
+            types: [{
+              description: 'Imágenes',
+              accept: {
+                [finalMimeType]: ['.' + extension]
+              }
+            }],
+            startIn: (typeof lastDownloadDirectory !== 'undefined' && lastDownloadDirectory) || 'desktop'
+          };
+
+          const handle = await window.showSaveFilePicker(options);
+          const writable = await handle.createWritable();
           await writable.write(blob);
           await writable.close();
+
+          // Recordar la ubicación para el próximo startIn
+          rememberDownloadLocation(handle);
 
           const qualityText = finalFormat === 'png' ? '' : ' (calidad: ' + Math.round(outputQuality * 100) + '%)';
           showSuccess('Imagen guardada exitosamente en formato ' + finalFormat.toUpperCase() + qualityText + '!');
@@ -219,7 +295,6 @@ window.ExportManager = (function () {
 
       // Fallback <a download>
       const link = document.createElement('a');
-      link.download = fullFilename;
       const flattenColorFallback = getFlattenColor();
       if (finalMimeType === 'image/jpeg' && hasAlpha) {
         UIManager.showInfo('🎨 Aplanando transparencia contra ' + flattenColorFallback.toLowerCase() + ' para exportar a JPEG');
@@ -227,9 +302,20 @@ window.ExportManager = (function () {
       const fallbackCanvas = (finalMimeType === 'image/jpeg')
         ? flattenCanvasForJpeg(canvas, flattenColorFallback)
         : canvas;
-      let fallbackHref = MetadataManager.embedExifInJpegDataUrl(
-        fallbackCanvas.toDataURL(finalMimeType, outputQuality)
-      );
+      const rawDataUrl = fallbackCanvas.toDataURL(finalMimeType, outputQuality);
+
+      // toDataURL devuelve PNG silenciosamente si el formato no está
+      // soportado: comprobar el MIME real y recalcular la extensión.
+      const actualMime = dataUrlMimeType(rawDataUrl);
+      if (actualMime && actualMime !== finalMimeType) {
+        notifyFormatFallback(finalMimeType, actualMime);
+        finalMimeType = actualMime;
+        finalFormat = finalMimeType.split('/')[1];
+        extension = getFileExtension(finalFormat);
+      }
+      link.download = filename + '.' + extension;
+
+      let fallbackHref = MetadataManager.embedExifInJpegDataUrl(rawDataUrl);
       if (finalMimeType === 'image/png') {
         fallbackHref = await MetadataManager.embedExifInPngDataUrl(fallbackHref);
       } else if (finalMimeType === 'image/webp') {
@@ -286,8 +372,10 @@ window.ExportManager = (function () {
 
       const hasAlpha = hasImageAlphaChannel(canvas);
       const requestedMimeType = getMimeType(outputFormat);
-      const finalMimeType = await determineFallbackFormat(hasAlpha, requestedMimeType);
-      const finalFormat = finalMimeType.split('/')[1];
+      // let (no const): si canvasToBlob/toDataURL caen a otro formato, se
+      // reasignan con el MIME real para que extensión y contenido coincidan.
+      let finalMimeType = await determineFallbackFormat(hasAlpha, requestedMimeType);
+      let finalFormat = finalMimeType.split('/')[1];
 
       if (finalMimeType !== requestedMimeType) {
         const requestedFormat = outputFormat.toUpperCase();
@@ -330,8 +418,7 @@ window.ExportManager = (function () {
         filename = 'imagen-editada';
       }
 
-      const extension = getFileExtension(finalFormat);
-      const fullFilename = filename + '.' + extension;
+      let extension = getFileExtension(finalFormat);
 
       await new Promise(resolve => setTimeout(resolve, 900));
       await progressPromise;
@@ -340,20 +427,10 @@ window.ExportManager = (function () {
       hideProgressBar();
 
       if ('showSaveFilePicker' in window) {
-        const options = {
-          suggestedName: fullFilename,
-          types: [{
-            description: 'Imágenes',
-            accept: {
-              [finalMimeType]: ['.' + extension]
-            }
-          }],
-          startIn: (typeof lastDownloadDirectory !== 'undefined' && lastDownloadDirectory) || 'desktop'
-        };
-
         try {
-          const handle = await window.showSaveFilePicker(options);
-          const writable = await handle.createWritable();
+          // Generar el blob ANTES de abrir el diálogo: si el navegador no
+          // codifica el formato pedido, canvasToBlob cae a JPEG y el nombre
+          // sugerido y el tipo aceptado deben reflejar el contenido real.
           const flattenColor = getFlattenColor();
           if (finalMimeType === 'image/jpeg' && hasAlpha) {
             UIManager.showInfo('🎨 Aplanando transparencia contra ' + flattenColor.toLowerCase() + ' para exportar a JPEG');
@@ -362,12 +439,38 @@ window.ExportManager = (function () {
             ? flattenCanvasForJpeg(canvas, flattenColor)
             : canvas;
           let blob = await canvasToBlob(sourceCanvas, finalMimeType, outputQuality);
+
+          // Mismatch extensión/contenido: usar el tipo REAL del blob
+          if (blob && blob.type && blob.type !== finalMimeType) {
+            notifyFormatFallback(finalMimeType, blob.type);
+            finalMimeType = blob.type;
+            finalFormat = finalMimeType.split('/')[1];
+            extension = getFileExtension(finalFormat);
+          }
+
           blob = await MetadataManager.embedExifInJpegBlob(blob);
           blob = await MetadataManager.embedExifInPngBlob(blob);
           blob = await MetadataManager.embedExifInWebpBlob(blob);
           blob = await MetadataManager.embedExifInAvifBlob(blob);
+
+          const options = {
+            suggestedName: filename + '.' + extension,
+            types: [{
+              description: 'Imágenes',
+              accept: {
+                [finalMimeType]: ['.' + extension]
+              }
+            }],
+            startIn: (typeof lastDownloadDirectory !== 'undefined' && lastDownloadDirectory) || 'desktop'
+          };
+
+          const handle = await window.showSaveFilePicker(options);
+          const writable = await handle.createWritable();
           await writable.write(blob);
           await writable.close();
+
+          // Recordar la ubicación para el próximo startIn
+          rememberDownloadLocation(handle);
 
           hideProgressBar();
 
@@ -384,7 +487,6 @@ window.ExportManager = (function () {
       }
 
       const link = document.createElement('a');
-      link.download = fullFilename;
       const flattenColorFallback = getFlattenColor();
       if (finalMimeType === 'image/jpeg' && hasAlpha) {
         UIManager.showInfo('🎨 Aplanando transparencia contra ' + flattenColorFallback.toLowerCase() + ' para exportar a JPEG');
@@ -392,9 +494,20 @@ window.ExportManager = (function () {
       const fallbackCanvas = (finalMimeType === 'image/jpeg')
         ? flattenCanvasForJpeg(canvas, flattenColorFallback)
         : canvas;
-      let fallbackHrefP = MetadataManager.embedExifInJpegDataUrl(
-        fallbackCanvas.toDataURL(finalMimeType, outputQuality)
-      );
+      const rawDataUrlP = fallbackCanvas.toDataURL(finalMimeType, outputQuality);
+
+      // toDataURL devuelve PNG silenciosamente si el formato no está
+      // soportado: comprobar el MIME real y recalcular la extensión.
+      const actualMimeP = dataUrlMimeType(rawDataUrlP);
+      if (actualMimeP && actualMimeP !== finalMimeType) {
+        notifyFormatFallback(finalMimeType, actualMimeP);
+        finalMimeType = actualMimeP;
+        finalFormat = finalMimeType.split('/')[1];
+        extension = getFileExtension(finalFormat);
+      }
+      link.download = filename + '.' + extension;
+
+      let fallbackHrefP = MetadataManager.embedExifInJpegDataUrl(rawDataUrlP);
       if (finalMimeType === 'image/png') {
         fallbackHrefP = await MetadataManager.embedExifInPngDataUrl(fallbackHrefP);
       } else if (finalMimeType === 'image/webp') {

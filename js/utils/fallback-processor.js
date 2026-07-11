@@ -138,15 +138,15 @@ const FallbackProcessor = {
         case 'filter':
           this.applyFilterFallback(ctx, operation.config);
           break;
-        case 'brightness':
-          this.applyFilterFallback(ctx, { type: 'brightness', value: operation.value || operation.config.value });
-          break;
-        case 'contrast':
-          this.applyFilterFallback(ctx, { type: 'contrast', value: operation.value || operation.config.value });
-          break;
-        case 'saturation':
-          this.applyFilterFallback(ctx, { type: 'saturation', value: operation.value || operation.config.value });
-          break;
+      case 'brightness':
+        this.applyFilterFallback(ctx, { type: 'brightness', value: operation.value ?? operation.config?.value ?? 0 });
+        break;
+      case 'contrast':
+        this.applyFilterFallback(ctx, { type: 'contrast', value: operation.value ?? operation.config?.value ?? 0 });
+        break;
+      case 'saturation':
+        this.applyFilterFallback(ctx, { type: 'saturation', value: operation.value ?? operation.config?.value ?? 0 });
+        break;
         case 'blur':
           this.applyBlurFallback(ctx, operation.config || { value: operation.value });
           break;
@@ -154,6 +154,7 @@ const FallbackProcessor = {
           this.applySepiaFallback(ctx, operation.config || { value: operation.value });
           break;
         case 'hue-rotate':
+        case 'hueRotate':
           this.applyHueRotateFallback(ctx, operation.config || { value: operation.value });
           break;
         default:
@@ -272,8 +273,13 @@ const FallbackProcessor = {
         this.adjustSepiaFallback(data, config.value || 0);
         break;
       case 'hue-rotate':
+      case 'hueRotate':
         this.adjustHueRotateFallback(data, config.value || 0);
         break;
+      case 'blur':
+        ctx.putImageData(imageData, 0, 0);
+        this.applyBlurFallback(ctx, config);
+        return;
       case 'grayscale':
         this.adjustGrayscaleFallback(data);
         break;
@@ -326,15 +332,16 @@ const FallbackProcessor = {
   
   // Métodos de ajuste de filtros (fallback)
   adjustBrightnessFallback: function(data, brightness) {
+    const factor = (100 + brightness) / 100;
     for (let i = 0; i < data.length; i += 4) {
-      data[i] = Math.min(255, Math.max(0, data[i] + brightness));
-      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + brightness));
-      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + brightness));
+      data[i] = Math.min(255, Math.max(0, data[i] * factor));
+      data[i + 1] = Math.min(255, Math.max(0, data[i + 1] * factor));
+      data[i + 2] = Math.min(255, Math.max(0, data[i + 2] * factor));
     }
   },
   
   adjustContrastFallback: function(data, contrast) {
-    const factor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+    const factor = (100 + contrast) / 100;
     for (let i = 0; i < data.length; i += 4) {
       data[i] = Math.min(255, Math.max(0, factor * (data[i] - 128) + 128));
       data[i + 1] = Math.min(255, Math.max(0, factor * (data[i + 1] - 128) + 128));
@@ -455,9 +462,10 @@ const FallbackProcessor = {
     
     Object.entries(filters).forEach(([filterType, value]) => {
       if (value !== 0 && value !== false && value !== null) {
+        const operationType = filterType === 'hueRotate' ? 'hue-rotate' : filterType;
         operations.push({
-          type: filterType,
-          config: { type: filterType, value: value }
+          type: 'filter',
+          config: { type: operationType, value: value }
         });
       }
     });

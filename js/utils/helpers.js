@@ -187,7 +187,14 @@ async function canvasToBlob(canvas, mimeType, quality = 0.9) {
     });
   } catch (error) {
     MNEMOTAG_DEBUG && console.warn(`canvasToBlob falló para ${mimeType}, cayendo a JPEG:`, error.message || error);
-    return canvasToBlob_fallback(canvas, 'image/jpeg', quality);
+    // El fallback codifica SIEMPRE a JPEG: aplanar la transparencia antes,
+    // porque el codec JPEG pinta las zonas con alpha como negro. El blob
+    // resultante lleva blob.type === 'image/jpeg' — los callers deben usar
+    // blob.type (no el MIME solicitado) para calcular la extensión final.
+    const flatCanvas = (mimeType !== 'image/jpeg')
+      ? flattenCanvasForJpeg(canvas)
+      : canvas;
+    return canvasToBlob_fallback(flatCanvas, 'image/jpeg', quality);
   }
 }
 
@@ -201,11 +208,20 @@ async function canvasToBlob(canvas, mimeType, quality = 0.9) {
 function canvasToBlob_fallback(canvas, mimeType, quality = 0.9) {
   return new Promise((resolve, reject) => {
     try {
-      // For formats that don't support quality, ignore the quality parameter
+      // No resolver con null: un blob nulo acabaría en writable.write(null)
+      // o como entrada corrupta en un ZIP. Mejor rechazar explícitamente.
+      const handleBlob = (blob) => {
+        if (blob) {
+          resolve(blob);
+        } else {
+          reject(new Error(`canvasToBlob_fallback: canvas.toBlob devolvió null para ${mimeType}`));
+        }
+      };
+      // PNG no admite parámetro de calidad; ignorarlo en ese caso
       if (mimeType === 'image/png') {
-        canvas.toBlob(resolve, mimeType);
+        canvas.toBlob(handleBlob, mimeType);
       } else {
-        canvas.toBlob(resolve, mimeType, quality);
+        canvas.toBlob(handleBlob, mimeType, quality);
       }
     } catch (error) {
       reject(error);
