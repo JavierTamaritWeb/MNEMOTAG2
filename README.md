@@ -4,7 +4,7 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos. 100% cliente, sin backend.
 
-![Version](https://img.shields.io/badge/version-3.5.12-blue.svg)
+![Version](https://img.shields.io/badge/version-3.5.13-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 [![Deploy to GitHub Pages](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml)
@@ -37,10 +37,10 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 
 ### Verificacion
 - `npm run build` genera `dist/` completo
-- `node tests/run-in-node.js` → **237/237 OK**
+- `node tests/run-in-node.js` → **248/248 OK**
 - `node tests/binary-validation.js` → **92/92 OK**
-- `npm run test:e2e` → **6/6 Chromium desarrollo**
-- `npm run test:e2e:dist` → **6/6 Chromium produccion**
+- `npm run test:e2e` → **7/7 Chromium desarrollo**
+- `npm run test:e2e:dist` → **7/7 Chromium produccion**
 
 > Versiones anteriores: [CHANGELOG.md](CHANGELOG.md)
 
@@ -130,7 +130,7 @@ npm run serve   # solo servidor (sin watch)
 
 ```bash
 npm test                         # ejecuta ambos runners
-node tests/run-in-node.js        # 237/237 aserciones de regresion
+node tests/run-in-node.js        # 248/248 aserciones de regresion
 node tests/binary-validation.js  # 92/92 aserciones binarias PNG/WebP/AVIF
 npm run test:e2e                 # Chromium contra desarrollo
 npm run test:e2e:dist            # Chromium contra dist/ de produccion

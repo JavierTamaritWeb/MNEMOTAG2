@@ -127,9 +127,15 @@ const UIManager = {
       const actionBtn = document.createElement('button');
       actionBtn.type = 'button';
       actionBtn.className = 'error-action';
+      // Label sanitizado: textContent nunca interpreta HTML.
       actionBtn.textContent = String(config.action.label || 'Acción');
       if (typeof config.action.handler === 'function') {
-        actionBtn.addEventListener('click', config.action.handler);
+        actionBtn.addEventListener('click', () => {
+          // Cerrar el toast vía removeToast (mantiene activeToasts en
+          // sincronía — nunca .remove() directo) y ejecutar el handler.
+          this.removeToast(errorContainer);
+          config.action.handler();
+        });
       } else if (config.action.handler != null) {
         MNEMOTAG_DEBUG && console.warn('UIManager.showError: action.handler como string ya no se soporta (XSS). Pasa una función.');
       }
@@ -209,9 +215,14 @@ const UIManager = {
       const actionBtn = document.createElement('button');
       actionBtn.type = 'button';
       actionBtn.className = 'warning-action';
+      // Label sanitizado: textContent nunca interpreta HTML.
       actionBtn.textContent = String(config.action.label || 'Acción');
       if (typeof config.action.handler === 'function') {
-        actionBtn.addEventListener('click', config.action.handler);
+        actionBtn.addEventListener('click', () => {
+          // Cierre vía removeToast + ejecución del handler (ver showError).
+          this.removeToast(warningContainer);
+          config.action.handler();
+        });
       } else if (config.action.handler != null) {
         MNEMOTAG_DEBUG && console.warn('UIManager.showWarning: action.handler como string ya no se soporta (XSS). Pasa una función.');
       }
@@ -291,9 +302,14 @@ const UIManager = {
       const actionBtn = document.createElement('button');
       actionBtn.type = 'button';
       actionBtn.className = 'success-action';
+      // Label sanitizado: textContent nunca interpreta HTML.
       actionBtn.textContent = String(config.action.label || 'Acción');
       if (typeof config.action.handler === 'function') {
-        actionBtn.addEventListener('click', config.action.handler);
+        actionBtn.addEventListener('click', () => {
+          // Cierre vía removeToast + ejecución del handler (ver showError).
+          this.removeToast(successContainer);
+          config.action.handler();
+        });
       } else if (config.action.handler != null) {
         MNEMOTAG_DEBUG && console.warn('UIManager.showSuccess: action.handler como string ya no se soporta (XSS). Pasa una función.');
       }

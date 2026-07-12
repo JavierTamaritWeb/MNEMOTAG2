@@ -4,7 +4,30 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.5.13] - 2026-07-12
+
+### Added
+- **Registro de errores y barreras de no regresion**: nuevo documento `docs/REGISTRO_ERRORES_V3_5_13.md` con causas raiz, correcciones y reglas operativas.
+- **Versionado consistente**: prueba automatica que comprueba `package.json`, `package-lock.json`, README y `CACHE_VERSION` del service worker.
+- **Regresion visual del batch**: prueba que fija las dimensiones del boton `#open-batch-btn` respecto a `.upload__button`.
+
+### Fixed
+- **Boton Procesar en lote**: restauradas las dimensiones compartidas con Seleccionar archivo y Pegar imagen; el override especifico ya no reduce altura ni padding.
+
+### Verification
+- 248 pruebas Node, 92 validaciones binarias y 7 E2E en desarrollo y `dist`.
+
 ## [3.5.12] - 2026-07-11
+
+### Added
+- **18 quick wins del roadmap**: logo hero AVIF/WebP, drag and drop global con multiarchivo a lote, lote accesible antes de cargar una imagen, estados vacíos accionables, metadatos Open Graph/Twitter/canonical y fixtures E2E reales para JPEG/PNG/WebP/AVIF.
+- **Accesibilidad operativa**: progreso con `role="progressbar"`/`aria-live`, etiqueta dinámica del canvas, selector de canales de curvas con `aria-pressed` y contraste reforzado para `text-gray-400`.
+- **Recuperación y DX**: reintento accionable en errores de descarga, reinicio del worker tras timeout y hook pre-commit con tests + ESLint de archivos staged.
+
+### Changed
+- **Menor coste inicial y de memoria**: JSZip/heic2any se cargan bajo demanda con SRI; la carga y el preview usan `createObjectURL`; el watcher JS de desarrollo concatena sin Terser.
+- **Batch y PWA endurecidos**: el lote comparte la validación de `SecurityManager` (incluye AVIF y rechaza GIF) y el service worker resuelve recursos precacheados aunque lleven query string.
+- **Cobertura**: 246 pruebas Node, 92 validaciones binarias y 7 recorridos E2E con fixtures reales.
 
 ### Fixed
 - **Estado de archivo solo tras validación**: `setupFileNaming` y `loadImageWithValidation` ya no asignan `currentFile`/`originalExtension` antes de pasar los checks — un archivo rechazado dejaba estado mezclado con la imagen anterior.

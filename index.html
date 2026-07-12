@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MnemoTag v3.5.12</title>
+  <title>MnemoTag — Editor de imágenes y metadatos EXIF en el navegador</title>
   
   <!-- Favicon: 32x32 primero (Chrome pestaña), 16x16 fallback, ICO legacy -->
   <link rel="icon" type="image/png" sizes="32x32" href="images/favicon_io/favicon-32x32.png?v=3.5.8">
@@ -23,6 +23,22 @@
   <meta name="description" content="Editor profesional de metadatos e imágenes. Añade metadatos EXIF, marcas de agua y aplica filtros. Soporte completo para JPEG, PNG, WebP y AVIF.">
   <meta name="keywords" content="editor imágenes, metadatos EXIF, marca de agua, filtros, JPEG, PNG, WebP, AVIF">
   <meta name="author" content="MnemoTag">
+
+  <!-- SEO social — canonical + Open Graph + Twitter Card -->
+  <link rel="canonical" href="https://javiertamaritweb.github.io/MNEMOTAG2/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="MnemoTag">
+  <meta property="og:locale" content="es_ES">
+  <meta property="og:title" content="MnemoTag — Editor de imágenes y metadatos EXIF en el navegador">
+  <meta property="og:description" content="Añade metadatos EXIF, marcas de agua y filtros profesionales a tus imágenes, 100% en tu navegador. JPEG, PNG, WebP y AVIF.">
+  <meta property="og:url" content="https://javiertamaritweb.github.io/MNEMOTAG2/">
+  <meta property="og:image" content="https://javiertamaritweb.github.io/MNEMOTAG2/images/applicacion.png">
+  <meta property="og:image:width" content="1024">
+  <meta property="og:image:height" content="1024">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="MnemoTag — Editor de imágenes y metadatos EXIF en el navegador">
+  <meta name="twitter:description" content="Añade metadatos EXIF, marcas de agua y filtros profesionales a tus imágenes, 100% en tu navegador.">
+  <meta name="twitter:image" content="https://javiertamaritweb.github.io/MNEMOTAG2/images/applicacion.png">
 
   <!-- v3.4.1 (hardening inicial) + v3.4.14 (fixes de console errors):
        - `frame-ancestors` eliminado: solo tiene efecto vía HTTP header, no vía <meta>.
@@ -63,7 +79,14 @@
     <section class="hero-section mb-12">
       <div class="hero-content">
         <div class="hero-logo">
-          <img src="images/applicacion.png" alt="MnemoTag Logo" class="hero-logo-image">
+          <!-- AVIF/WebP con fallback PNG (1.4 MB → ~22 KB) +
+               dimensiones intrínsecas para evitar layout shift -->
+          <picture>
+            <source srcset="images/applicacion.avif" type="image/avif">
+            <source srcset="images/applicacion.webp" type="image/webp">
+            <img src="images/applicacion.png" alt="MnemoTag Logo" class="hero-logo-image"
+                 width="1024" height="1024" decoding="async" fetchpriority="high">
+          </picture>
         </div>
         <div class="hero-text">
           <h1 class="hero-title">MnemoTag</h1>
@@ -122,6 +145,14 @@
                       title="Pegar imagen desde el portapapeles (Cmd+V / Ctrl+V)">
                 <i class="fas fa-paste" aria-hidden="true"></i>
                 Pegar imagen
+              </button>
+              <button id="open-batch-btn"
+                      type="button"
+                      class="upload__button ml-2"
+                      aria-label="Procesar varias imágenes en lote"
+                      title="Procesar varias imágenes con la misma configuración">
+                <i class="fas fa-layer-group" aria-hidden="true"></i>
+                Procesar en lote
               </button>
               <p class="text-sm text-gray-500 mt-2 upload-info">Formatos: JPG, JPEG, PNG, WEBP, AVIF, HEIC, HEIF · Pega con Cmd+V / Ctrl+V</p>
               <p class="text-sm text-gray-500 upload-info">Tamaño máximo: <span id="max-file-size">25 MB</span></p>
@@ -693,6 +724,12 @@
                             <i class="fas fa-trash" aria-hidden="true"></i>
                           </button>
                         </div>
+                        <div id="preset-empty-state" class="empty-state mt-2" hidden>
+                          <p>No hay presets guardados.</p>
+                          <button type="button" id="preset-empty-cta" class="empty-state__action">
+                            Crear el primero
+                          </button>
+                        </div>
                       </div>
 
                       <button type="button" id="resetFilters" class="reset-filters-btn">
@@ -1070,7 +1107,9 @@
               </div>
             </div>
             <div class="preview__container preview-container relative">
-              <canvas id="preview-canvas" class="preview__canvas"></canvas>
+              <canvas id="preview-canvas" class="preview__canvas"
+                      role="img"
+                      aria-label="Previsualización: sin imagen cargada"></canvas>
               
               <!-- Overlay de comparación antes/después -->
               <div id="comparison-overlay" class="comparison-overlay" style="display: none;">
@@ -1276,7 +1315,9 @@
               <span id="batch-progress-text">Procesando...</span>
               <span id="batch-progress-percent">0%</span>
             </div>
-            <div class="progress-bar-container">
+            <div class="progress-bar-container" role="progressbar"
+                 aria-labelledby="batch-progress-text"
+                 aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
               <div id="batch-progress-bar" class="progress-bar-fill" style="width: 0%"></div>
             </div>
           </div>
@@ -1693,7 +1734,7 @@
         <div class="analysis-modal__body">
           <div class="curves-controls mb-3">
             <label class="text-sm font-medium mr-2">Canal:</label>
-            <div class="curves-channel-tabs" role="tablist">
+            <div class="curves-channel-tabs">
               <button type="button" class="curves-channel-btn active" data-channel="rgb">RGB</button>
               <button type="button" class="curves-channel-btn" data-channel="r">Rojo</button>
               <button type="button" class="curves-channel-btn" data-channel="g">Verde</button>
@@ -1744,17 +1785,13 @@
     </footer>
   </div>
     <!-- External Dependencies (v3.4.1: con SRI para proteger contra CDN tampering) -->
-    <!-- JSZip para batch processing -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
-            integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG"
-            crossorigin="anonymous"></script>
+    <!-- JSZip y heic2any ya NO se cargan aquí — se cargan bajo demanda
+         con ensureJSZip()/ensureHeic2any() (js/utils/helpers.js) solo cuando el
+         usuario exporta un ZIP o sube un HEIC. Ahorra ~325 KB de red y ~1.4 MB
+         de parseo en cada visita. Las URLs y hashes SRI viven en helpers.js. -->
     <!-- piexifjs local: jsDelivr genera piexif.min.js dinámicamente y no admite SRI estable. -->
     <script src="js/vendor/piexif.min.js"></script>
-    <!-- v3.3.15: heic2any para convertir HEIC/HEIF (formatos del iPhone) a JPEG en cliente -->
-    <script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"
-            integrity="sha384-OTofQ0MEeiSgh62havBcemCIK0gqj809wX6UA0uPISNMRnR6NZyCdGzX3SbLrgwL"
-            crossorigin="anonymous"></script>
-    
+
     <!-- Google Fonts API para text layers -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1764,16 +1801,31 @@
        Generado con: npm run build (o npx gulp js).
        Los archivos fuente individuales en js/ se mantienen para
        tests y debugging — no borrarlos. -->
-  <!-- Progress overlay para descarga -->
+  <!-- Progress overlay para descarga: semántica progressbar + aria-live -->
   <div id="progress-overlay" class="progress-overlay">
-    <div class="progress-card">
-      <p id="progress-title" class="progress-card__title">Procesando...</p>
-      <div class="progress-card__track">
+    <div class="progress-card" role="status">
+      <p id="progress-title" class="progress-card__title" aria-live="polite">Procesando...</p>
+      <div class="progress-card__track"
+           role="progressbar"
+           id="progress-track"
+           aria-labelledby="progress-title"
+           aria-valuemin="0"
+           aria-valuemax="100"
+           aria-valuenow="0">
         <div id="progress-bar" class="progress-card__bar"></div>
       </div>
       <p id="progress-text" class="progress-card__text">0%</p>
       <p id="progress-eta" class="progress-card__eta"></p>
     </div>
+  </div>
+
+  <!-- Overlay de drag&drop global: soltar una imagen en cualquier
+       punto de la página la carga en vez de navegar fuera y perder la sesión -->
+  <div id="dnd-overlay" class="dnd-overlay" aria-hidden="true">
+    <p class="dnd-overlay__text">
+      <i class="fas fa-cloud-upload-alt" aria-hidden="true"></i>
+      Suelta la imagen para cargarla
+    </p>
   </div>
 
   <script src="dist/js/app.min.js"></script>

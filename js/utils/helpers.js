@@ -160,6 +160,66 @@ function getMimeType(format) {
   return mimeTypes[format] || 'image/jpeg';
 }
 
+// ===== CARGA DIFERIDA DE DEPENDENCIAS =====
+
+const externalScriptPromises = new Map();
+
+function loadExternalScript({ id, src, integrity, globalName }) {
+  if (typeof window !== 'undefined' && window[globalName]) {
+    return Promise.resolve(window[globalName]);
+  }
+  if (externalScriptPromises.has(id)) return externalScriptPromises.get(id);
+
+  const promise = new Promise((resolve, reject) => {
+    const existing = document.getElementById(id);
+    const script = existing || document.createElement('script');
+    const handleLoad = () => {
+      if (typeof window !== 'undefined' && window[globalName]) {
+        resolve(window[globalName]);
+      } else {
+        externalScriptPromises.delete(id);
+        reject(new Error('La dependencia ' + globalName + ' no expuso su API global'));
+      }
+    };
+    const handleError = () => {
+      externalScriptPromises.delete(id);
+      reject(new Error('No se pudo cargar ' + globalName));
+    };
+
+    script.addEventListener('load', handleLoad, { once: true });
+    script.addEventListener('error', handleError, { once: true });
+    if (!existing) {
+      script.id = id;
+      script.src = src;
+      script.integrity = integrity;
+      script.crossOrigin = 'anonymous';
+      script.async = true;
+      document.head.appendChild(script);
+    }
+  });
+
+  externalScriptPromises.set(id, promise);
+  return promise;
+}
+
+function ensureJSZip() {
+  return loadExternalScript({
+    id: 'mnemotag-jszip',
+    src: 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
+    integrity: 'sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG',
+    globalName: 'JSZip'
+  });
+}
+
+function ensureHeic2any() {
+  return loadExternalScript({
+    id: 'mnemotag-heic2any',
+    src: 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js',
+    integrity: 'sha384-OTofQ0MEeiSgh62havBcemCIK0gqj809wX6UA0uPISNMRnR6NZyCdGzX3SbLrgwL',
+    globalName: 'heic2any'
+  });
+}
+
 // ===== CONVERSIÓN DE CANVAS =====
 
 /**

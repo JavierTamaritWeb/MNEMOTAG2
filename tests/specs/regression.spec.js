@@ -274,7 +274,9 @@ describe('Regresión — XSS latente en toasts (ui-manager)', function () {
 
     // Después del fix debe haber createElement + addEventListener + textContent
     expect(src).toContain("createElement('button')");
-    expect(src).toContain("addEventListener('click', config.action.handler)");
+    expect(src).toContain("actionBtn.addEventListener('click', () => {");
+    expect(src).toContain('config.action.handler()');
+    expect(src).toContain('this.removeToast(errorContainer)');
     expect(src).toContain('actionBtn.textContent');
   });
 
@@ -546,10 +548,13 @@ describe('Regresión — Histórico visual con thumbnails (v3.3.14)', function (
 });
 
 describe('Regresión — Soporte HEIC/HEIF (v3.3.15)', function () {
-  it('index.html carga heic2any desde CDN', async function () {
-    const src = await fetchSource('../index.html');
-    expect(src).toContain('heic2any');
-    expect(src).toContain('heic2any.min.js');
+  it('helpers.js carga heic2any bajo demanda con SRI', async function () {
+    const html = await fetchSource('../index.html');
+    const helpers = await fetchSource('../js/utils/helpers.js');
+    expect(html).not.toMatch(/<script[^>]+heic2any\.min\.js/);
+    expect(helpers).toContain('function ensureHeic2any');
+    expect(helpers).toContain('heic2any.min.js');
+    expect(helpers).toContain('integrity:');
   });
 
   it('index.html acepta .heic y .heif en el input de archivo', async function () {
@@ -565,6 +570,7 @@ describe('Regresión — Soporte HEIC/HEIF (v3.3.15)', function () {
     expect(src).toContain('async function handleFile');
     expect(src).toContain("file.type === 'image/heic'");
     expect(src).toContain("file.type === 'image/heif'");
+    expect(src).toContain('await ensureHeic2any()');
     expect(src).toContain('await heic2any');
     // Conversión a JPEG con quality 0.92
     expect(src).toContain("toType: 'image/jpeg'");
@@ -577,6 +583,107 @@ describe('Regresión — Soporte HEIC/HEIF (v3.3.15)', function () {
     // main.js convierte HEIC→JPEG ANTES de llamar a validateImageFile.
     expect(src).not.toContain("allowedTypes.push('image/heic'");
     expect(src).not.toContain('image/heif');
+  });
+});
+
+describe('Regresión — 18 quick wins de v3.5.13', function () {
+  it('sirve el logo hero con picture AVIF/WebP/PNG', async function () {
+    const html = await fetchSource('../index.html');
+    expect(html).toContain('<picture>');
+    expect(html).toContain('images/applicacion.avif');
+    expect(html).toContain('images/applicacion.webp');
+  });
+
+  it('protege el drop global y deriva múltiples archivos al lote', async function () {
+    const main = await fetchSource('../js/main.js');
+    expect(main).toContain('function setupGlobalDragAndDrop');
+    expect(main).toContain("document.addEventListener('drop'");
+    expect(main).toContain('addBatchImages(files)');
+  });
+
+  it('carga JSZip bajo demanda y no desde el HTML inicial', async function () {
+    const html = await fetchSource('../index.html');
+    const helpers = await fetchSource('../js/utils/helpers.js');
+    expect(html).not.toMatch(/<script[^>]+jszip\.min\.js/);
+    expect(helpers).toContain('function ensureJSZip');
+    expect(helpers).toContain('jszip.min.js');
+  });
+
+  it('usa ObjectURL y lo revoca en preview y carga principal', async function () {
+    const main = await fetchSource('../js/main.js');
+    const security = await fetchSource('../js/managers/security-manager.js');
+    expect(main).toContain('URL.createObjectURL(file)');
+    expect(main).toContain('URL.revokeObjectURL(objectUrl)');
+    expect(security).toContain('URL.createObjectURL(file)');
+    expect(security).not.toContain('reader.readAsDataURL(file)');
+  });
+
+  it('expone progreso, canvas y curvas con semántica accesible', async function () {
+    const html = await fetchSource('../index.html');
+    const main = await fetchSource('../js/main.js');
+    const curves = await fetchSource('../js/managers/curves-manager.js');
+    expect(html).toContain('role="progressbar"');
+    expect(html).toContain('aria-live="polite"');
+    expect(main).toContain("canvas.setAttribute(\n          'aria-label'");
+    expect(curves).toContain("setAttribute('aria-pressed'");
+  });
+
+  it('ofrece lote temprano y estados vacíos accionables', async function () {
+    const html = await fetchSource('../index.html');
+    const main = await fetchSource('../js/main.js');
+    expect(html).toContain('id="open-batch-btn"');
+    expect(html).toContain('id="preset-empty-cta"');
+    expect(main).toContain("action.textContent = 'Añadir primera capa'");
+  });
+
+  it('incluye metadatos sociales y cache offline tolerante a query strings', async function () {
+    const html = await fetchSource('../index.html');
+    const sw = await fetchSource('../service-worker.js');
+    expect(html).toContain('rel="canonical"');
+    expect(html).toContain('property="og:title"');
+    expect(html).toContain('name="twitter:card"');
+    expect(sw).toContain('{ ignoreSearch: true }');
+  });
+
+  it('unifica validación batch y reinicia workers tras timeout', async function () {
+    const batch = await fetchSource('../js/managers/batch-manager.js');
+    const worker = await fetchSource('../js/managers/worker-manager.js');
+    expect(batch).toContain('SecurityManager.validateImageFile(file)');
+    expect(batch).toContain("'image/avif'");
+    expect(batch).not.toContain("'image/gif'");
+    expect(worker).toContain('this.restartWorker(workerInfo.id)');
+  });
+
+  it('ofrece reintento de descarga, contraste y watcher sin terser', async function () {
+    const exportsSource = await fetchSource('../js/managers/export-manager.js');
+    const scss = await fetchSource('../src/scss/components/_components.scss');
+    const gulp = await fetchSource('../gulpfile.js');
+    expect(exportsSource).toContain("label: 'Reintentar'");
+    expect(scss).toContain('.text-gray-400');
+    expect(gulp).toContain('function jsBundleDev()');
+    expect(gulp).toContain('series(jsBundleDev, copyAssets)');
+  });
+
+  it('mantiene el botón de lote con las dimensiones de upload__button', async function () {
+    const scss = await fetchSource('../src/scss/modules/_modals.scss');
+    const buttonRule = scss.match(/#open-batch-btn\s*\{[\s\S]*?\}/);
+    expect(buttonRule).not.toBe(null);
+    expect(buttonRule[0]).toContain('min-height: 56px');
+    expect(buttonRule[0]).toContain('min-width: 200px');
+    expect(buttonRule[0]).toContain('padding: 16px 36px');
+    expect(buttonRule[0]).not.toContain('min-height: 0');
+  });
+
+  it('mantiene sincronizadas las versiones de la aplicación y el cache PWA', async function () {
+    const pkg = JSON.parse(await fetchSource('../package.json'));
+    const lock = JSON.parse(await fetchSource('../package-lock.json'));
+    const sw = await fetchSource('../service-worker.js');
+    const readme = await fetchSource('../README.md');
+    expect(pkg.version).toBe('3.5.13');
+    expect(lock.version).toBe(pkg.version);
+    expect(lock.packages[''].version).toBe(pkg.version);
+    expect(sw).toContain(`mnemotag-v${pkg.version}`);
+    expect(readme).toContain(`version-${pkg.version}-blue`);
   });
 });
 

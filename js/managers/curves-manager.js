@@ -34,6 +34,30 @@ window.CurvesManager = (function () {
     previewRafPending: false
   };
 
+  // Etiquetas en español de cada canal para accesibilidad (aria-label del canvas).
+  const _CHANNEL_LABELS = {
+    rgb: 'canal RGB (todos los canales)',
+    r: 'canal rojo',
+    g: 'canal verde',
+    b: 'canal azul'
+  };
+
+  // Sincroniza el estado visual y accesible del selector de canal:
+  // clase .active + aria-pressed en cada botón (patrón toggle-button)
+  // y aria-label descriptivo del canvas según el canal activo.
+  function _syncChannelA11y(modal) {
+    modal.querySelectorAll('.curves-channel-btn').forEach(b => {
+      const isActive = b.getAttribute('data-channel') === _state.activeChannel;
+      b.classList.toggle('active', isActive);
+      b.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+    const cv = document.getElementById('curves-canvas');
+    if (cv) {
+      const label = _CHANNEL_LABELS[_state.activeChannel] || _state.activeChannel;
+      cv.setAttribute('aria-label', 'Editor de curvas del ' + label);
+    }
+  }
+
   function open() {
     if (typeof canvas === 'undefined' || !canvas || !currentImage) {
       UIManager.showError('Carga una imagen primero para editar curvas.');
@@ -62,10 +86,8 @@ window.CurvesManager = (function () {
       modal.classList.remove('hidden');
     }
 
-    // Reset visual del tab activo.
-    modal.querySelectorAll('.curves-channel-btn').forEach(b => {
-      b.classList.toggle('active', b.getAttribute('data-channel') === 'rgb');
-    });
+    // Reset visual y accesible del selector de canal (RGB activo).
+    _syncChannelA11y(modal);
 
     _setupUI();
     _redrawCanvas();
@@ -116,12 +138,11 @@ window.CurvesManager = (function () {
     if (!modal || modal.dataset.curvesInitialized === '1') return;
     modal.dataset.curvesInitialized = '1';
 
-    // Tabs de canal
+    // Selector de canal (botones toggle con aria-pressed).
     modal.querySelectorAll('.curves-channel-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        modal.querySelectorAll('.curves-channel-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
         _state.activeChannel = btn.getAttribute('data-channel');
+        _syncChannelA11y(modal);
         _redrawCanvas();
       });
     });

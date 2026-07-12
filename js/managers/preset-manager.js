@@ -206,6 +206,9 @@ const PresetManager = {
     if (currentValue && presets.includes(currentValue)) {
       selectEl.value = currentValue;
     }
+
+    const emptyState = document.getElementById('preset-empty-state');
+    if (emptyState) emptyState.hidden = presets.length !== 0;
   }
 };
 

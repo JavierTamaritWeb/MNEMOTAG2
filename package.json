@@ -1,7 +1,7 @@
 {
   "name": "mnemotag",
   "private": true,
-  "version": "3.5.12",
+  "version": "3.5.13",
   "description": "Editor profesional de metadatos e imágenes — 100% cliente, sin backend",
   "scripts": {
     "build": "gulp build",
@@ -11,6 +11,7 @@
     "scss": "gulp scss",
     "js": "gulp js",
     "test": "node tests/run-in-node.js && node tests/binary-validation.js",
+    "prepare": "git config core.hooksPath .githooks",
     "test:e2e": "playwright test",
     "test:e2e:dist": "playwright test -c playwright.dist.config.js",
     "lint:js": "eslint --no-config-lookup -c eslint.config.js js/",

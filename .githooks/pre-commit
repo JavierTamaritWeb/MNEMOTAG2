@@ -1,0 +1,44 @@
+#!/bin/sh
+# Pre-commit hook de MnemoTag — sin dependencias externas.
+#
+# 1. Corre los runners Node (npm test: 248 specs + 92 aserciones binarias).
+# 2. Corre ESLint SOLO sobre los .js staged (rápido, no lintea todo el repo).
+#
+# Se activa con: npm run prepare  (git config core.hooksPath .githooks)
+# Se puede saltar puntualmente con: git commit --no-verify
+
+set -e
+
+# Raíz del repo (el hook puede ejecutarse desde cualquier cwd)
+cd "$(git rev-parse --show-toplevel)"
+
+echo "[pre-commit] Ejecutando tests (runners Node)..."
+if ! npm test --silent; then
+  echo ""
+  echo "[pre-commit] ✗ Tests en rojo — commit abortado."
+  echo "[pre-commit]   (usa 'git commit --no-verify' para saltarte el hook)"
+  exit 1
+fi
+
+# ESLint solo sobre los .js staged (Added/Copied/Modified).
+# Se excluyen los directorios que eslint.config.js ya ignora (vendor, dist)
+# y el bundle generado js/app.min.js.
+STAGED_JS=$(git diff --cached --name-only --diff-filter=ACM | \
+  grep -E '\.js$' | \
+  grep -v -E '^(dist/|js/vendor/|js/app\.min\.js)' || true)
+
+if [ -n "$STAGED_JS" ]; then
+  echo "[pre-commit] Ejecutando ESLint sobre los .js staged..."
+  # --no-warn-ignored: los archivos sin bloque en la flat config no fallan
+  if ! echo "$STAGED_JS" | xargs npx --no-install eslint --no-config-lookup -c eslint.config.js --no-warn-ignored; then
+    echo ""
+    echo "[pre-commit] ✗ ESLint con errores — commit abortado."
+    echo "[pre-commit]   (usa 'git commit --no-verify' para saltarte el hook)"
+    exit 1
+  fi
+else
+  echo "[pre-commit] Sin .js staged — ESLint omitido."
+fi
+
+echo "[pre-commit] ✓ Todo en verde."
+exit 0

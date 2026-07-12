@@ -218,17 +218,16 @@ const SecurityManager = {
   // Generar preview del archivo antes de cargar
   generateFilePreview: function(file, callback) {
     if (!file || typeof callback !== 'function') {
-      callback(null, 'Parámetros inválidos para generar preview');
+      if (typeof callback === 'function') callback(null, 'Parámetros inválidos para generar preview');
       return;
     }
 
-    const reader = new FileReader();
-    
-    reader.onload = function(e) {
-      try {
+    const objectUrl = URL.createObjectURL(file);
+    try {
         const img = new Image();
         
         img.onload = function() {
+          URL.revokeObjectURL(objectUrl);
           // Crear canvas para el preview
           const previewCanvas = document.createElement('canvas');
           const previewCtx = previewCanvas.getContext('2d');
@@ -266,20 +265,15 @@ const SecurityManager = {
         };
         
         img.onerror = function() {
+          URL.revokeObjectURL(objectUrl);
           callback(null, 'Error al cargar la imagen para preview');
         };
         
-        img.src = e.target.result;
+        img.src = objectUrl;
       } catch (error) {
+        URL.revokeObjectURL(objectUrl);
         callback(null, 'Error al procesar el archivo: ' + error.message);
       }
-    };
-    
-    reader.onerror = function() {
-      callback(null, 'Error al leer el archivo');
-    };
-    
-    reader.readAsDataURL(file);
   },
 
   // Formatear tamaño de archivo

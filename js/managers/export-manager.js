@@ -46,6 +46,34 @@ window.ExportManager = (function () {
   }
 
   /**
+   * Mapea err.name a un mensaje accionable en español para los errores
+   * de descarga. AbortError NO pasa por aquí (se silencia antes).
+   */
+  function downloadErrorMessage(error) {
+    switch (error && error.name) {
+      case 'NotAllowedError':
+        return 'Permiso denegado para guardar el archivo. Revisa los permisos del navegador e inténtalo de nuevo.';
+      case 'SecurityError':
+        return 'El contexto no es seguro: la descarga requiere HTTPS o localhost.';
+      case 'QuotaExceededError':
+        return 'Espacio insuficiente para guardar la imagen. Libera espacio en disco e inténtalo de nuevo.';
+      default:
+        return 'Error al descargar la imagen.';
+    }
+  }
+
+  /**
+   * Muestra el error de descarga con botón "Reintentar" que relanza la
+   * función de descarga correspondiente.
+   */
+  function showDownloadError(error, retryFn) {
+    UIManager.showError(downloadErrorMessage(error), {
+      category: 'download',
+      action: { label: 'Reintentar', handler: () => retryFn() }
+    });
+  }
+
+  /**
    * Extrae el MIME real de un dataURL ('data:image/png;base64,…' → 'image/png').
    * Devuelve null si no es un dataURL reconocible.
    */
@@ -74,6 +102,11 @@ window.ExportManager = (function () {
     if (typeof canvas === 'undefined' || !canvas || !currentImage) {
       showError('No hay imagen para exportar.');
       return;
+    }
+    // Carga bajo demanda de JSZip (helpers.js): el <script> de CDN ya no
+    // está en index.html. Si falla, el check siguiente informa al usuario.
+    if (typeof ensureJSZip === 'function') {
+      try { await ensureJSZip(); } catch (e) { /* el check siguiente informa */ }
     }
     if (typeof JSZip === 'undefined') {
       showError('JSZip no está cargado. No se puede generar el ZIP.');
@@ -334,7 +367,9 @@ window.ExportManager = (function () {
 
     } catch (error) {
       console.error('Error al descargar:', error);
-      showError('Error al descargar la imagen.');
+      // AbortError = cancelación del usuario — se mantiene silencioso.
+      if (error && error.name === 'AbortError') return;
+      showDownloadError(error, downloadImage);
     } finally {
       showPositioningBorders = true;
       redrawCompleteCanvas();
@@ -529,7 +564,9 @@ window.ExportManager = (function () {
     } catch (error) {
       console.error('Error al descargar:', error);
       hideProgressBar();
-      showError('Error al descargar la imagen.');
+      // AbortError = cancelación del usuario — se mantiene silencioso.
+      if (error && error.name === 'AbortError') return;
+      showDownloadError(error, downloadImageWithProgress);
     } finally {
       showPositioningBorders = true;
       redrawCompleteCanvas();

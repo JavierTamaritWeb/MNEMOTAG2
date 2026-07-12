@@ -1,7 +1,7 @@
 'use strict';
 
 // =============================================================================
-// MnemoTag Service Worker — v3.5.12
+// MnemoTag Service Worker — v3.5.13
 // =============================================================================
 //
 // Estrategia de cache:
@@ -27,7 +27,7 @@
 // `js/main.js`.
 // =============================================================================
 
-const CACHE_VERSION = 'mnemotag-v3.5.12';
+const CACHE_VERSION = 'mnemotag-v3.5.13';
 const CACHE_NAME_APP = CACHE_VERSION + '-app';
 const CACHE_NAME_CDN = CACHE_VERSION + '-cdn';
 
@@ -44,7 +44,17 @@ const PRECACHE_URLS = [
   './js/workers/analysis-worker.js',
   './images/favicon.svg',
   './images/favicon_io/favicon.ico',
-  './images/favicon_io/site.webmanifest'
+  './images/favicon_io/site.webmanifest',
+  './images/applicacion.png',
+  './images/applicacion.webp',
+  './images/applicacion.avif'
+];
+
+// CSS de CDN a precachear en `install` (no bloqueante: si un CDN falla,
+// el install sigue adelante — se cachearán en runtime vía networkFirst).
+const CDN_PRECACHE_URLS = [
+  'https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css',
+  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
 ];
 
 // Hosts considerados "CDN externa" — se aplica network-first.
@@ -73,6 +83,17 @@ self.addEventListener('install', (event) => {
             })
           )
         );
+      })
+      .then(() => {
+        // Precache de CSS de CDN en el cache CDN, en un addAll separado y
+        // no bloqueante: las respuestas opacas de CDN se pueden cachear,
+        // pero si algún CDN falla NO debe romper el install (lo crítico
+        // ya está cacheado arriba).
+        return caches.open(CACHE_NAME_CDN)
+          .then((cdnCache) => cdnCache.addAll(CDN_PRECACHE_URLS))
+          .catch((err) => {
+            console.warn('[SW] No se pudieron precachear los CSS de CDN (se cachearán en runtime):', err);
+          });
       })
       .then(() => self.skipWaiting())
   );
@@ -134,7 +155,9 @@ self.addEventListener('fetch', (event) => {
 
 async function cacheFirst(request, cacheName) {
   const cache = await caches.open(cacheName);
-  const cached = await cache.match(request);
+  // ignoreSearch: los favicons se piden con ?v=X.Y.Z (cache-busting) y sin
+  // esto nunca matchearían el precache — offline real al primer uso.
+  const cached = await cache.match(request, { ignoreSearch: true });
   if (cached) return cached;
 
   try {

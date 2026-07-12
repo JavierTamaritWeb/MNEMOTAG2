@@ -17,9 +17,12 @@ class BatchManager {
     this.maxPixelsPerImage = 36 * 1000 * 1000;
     this.maxTotalPixels = 80 * 1000 * 1000;
     
-    // Formatos soportados
-    this.supportedFormats = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    
+    // Formatos soportados — SOLO se usa en el fallback de validateImage
+    // cuando SecurityManager no está disponible (runner Node, uso aislado).
+    // Debe mantenerse alineado con SecurityManager.validateImageFile:
+    // sin GIF (la app no lo soporta) y con AVIF (sí lo soporta).
+    this.supportedFormats = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/avif'];
+
   }
 
   /**
@@ -92,25 +95,49 @@ class BatchManager {
 
   /**
    * Validar imagen individual
+   *
+   * La validación de tipo/tamaño/nombre/extensión se delega en
+   * SecurityManager.validateImageFile (fuente única de verdad de los
+   * formatos soportados por la app). Si SecurityManager no está disponible
+   * (runner Node, uso aislado del manager), se usa un fallback local
+   * equivalente y alineado: sin GIF, con AVIF.
+   *
+   * Checks propios del batch que SecurityManager NO cubre y se conservan
+   * aquí: decodificación real de la imagen, dimensiones mínimas y límite
+   * de 36 megapíxeles por imagen. (El límite AGREGADO de 80 megapíxeles
+   * del lote completo se comprueba en addImages, no aquí.)
    */
   async validateImage(file) {
-    // Verificar tipo
-    if (!this.supportedFormats.includes(file.type)) {
-      return {
-        valid: false,
-        error: `Formato no soportado: ${file.type}`
-      };
+    if (typeof SecurityManager !== 'undefined' &&
+        typeof SecurityManager.validateImageFile === 'function') {
+      const secResult = SecurityManager.validateImageFile(file);
+      if (!secResult.isValid) {
+        const firstError = (secResult.errors && secResult.errors[0]) || null;
+        return {
+          valid: false,
+          error: firstError
+            ? firstError.message + (firstError.details ? ' — ' + firstError.details : '')
+            : 'Archivo no válido'
+        };
+      }
+    } else {
+      // Fallback local (sin SecurityManager): tipo y tamaño básicos
+      if (!file || !this.supportedFormats.includes(file.type)) {
+        return {
+          valid: false,
+          error: `Formato no soportado: ${file ? file.type : 'archivo ausente'}`
+        };
+      }
+
+      if (file.size > this.maxFileSize) {
+        return {
+          valid: false,
+          error: `Archivo demasiado grande: ${(file.size / 1024 / 1024).toFixed(1)}MB (máx: ${Math.round(this.maxFileSize / 1024 / 1024)}MB)`
+        };
+      }
     }
 
-    // Verificar tamaño
-    if (file.size > this.maxFileSize) {
-      return {
-        valid: false,
-        error: `Archivo demasiado grande: ${(file.size / 1024 / 1024).toFixed(1)}MB (máx: ${Math.round(this.maxFileSize / 1024 / 1024)}MB)`
-      };
-    }
-
-    // Intentar cargar imagen para validar dimensiones
+    // Intentar cargar imagen para validar dimensiones (check propio del batch)
     try {
       const img = await this.loadImageElement(file);
       
@@ -244,6 +271,63 @@ class BatchManager {
   }
 
   /**
+   * Anotar accesibilidad ARIA en los elementos de progreso del batch.
+   *
+   * El markup vive en index.html (overlay global #progress-bar/#progress-text
+   * que actualiza main.js durante el lote, y el bloque del modal batch
+   * #batch-progress-bar/#batch-progress-text), así que los atributos se
+   * añaden vía setAttribute al iniciar el procesamiento — sin editar HTML.
+   * No-op silencioso si no hay DOM (runner Node) o faltan los elementos.
+   */
+  _setupProgressA11y() {
+    if (typeof document === 'undefined' || typeof document.getElementById !== 'function') {
+      return;
+    }
+    try {
+      for (const id of ['progress-track']) {
+        const bar = document.getElementById(id);
+        if (!bar || typeof bar.setAttribute !== 'function') continue;
+        bar.setAttribute('role', 'progressbar');
+        bar.setAttribute('aria-valuemin', '0');
+        bar.setAttribute('aria-valuemax', '100');
+        bar.setAttribute('aria-valuenow', '0');
+      }
+      const batchBar = document.querySelector('#batch-progress .progress-bar-container');
+      if (batchBar) batchBar.setAttribute('aria-valuenow', '0');
+      for (const id of ['progress-text', 'batch-progress-text']) {
+        const text = document.getElementById(id);
+        if (!text || typeof text.setAttribute !== 'function') continue;
+        // El texto de estado se anuncia a lectores de pantalla sin robar foco
+        text.setAttribute('aria-live', 'polite');
+      }
+    } catch (a11yError) {
+      MNEMOTAG_DEBUG && console.warn('No se pudieron anotar atributos ARIA de progreso:', a11yError);
+    }
+  }
+
+  /**
+   * Actualizar aria-valuenow de las barras de progreso del batch.
+   * @param {number} percentage - Porcentaje 0-100
+   */
+  _updateProgressA11y(percentage) {
+    if (typeof document === 'undefined' || typeof document.getElementById !== 'function') {
+      return;
+    }
+    try {
+      for (const id of ['progress-track']) {
+        const bar = document.getElementById(id);
+        if (bar && typeof bar.setAttribute === 'function') {
+          bar.setAttribute('aria-valuenow', String(percentage));
+        }
+      }
+      const batchBar = document.querySelector('#batch-progress .progress-bar-container');
+      if (batchBar) batchBar.setAttribute('aria-valuenow', String(percentage));
+    } catch (a11yError) {
+      MNEMOTAG_DEBUG && console.warn('No se pudo actualizar aria-valuenow:', a11yError);
+    }
+  }
+
+  /**
    * Procesar cola de imágenes
    */
   async processQueue(progressCallback) {
@@ -261,6 +345,10 @@ class BatchManager {
 
     this.isProcessing = true;
     this.processedImages = [];
+
+    // Accesibilidad: anotar role/aria-* en los elementos de progreso al
+    // iniciar el procesamiento (el markup vive en index.html).
+    this._setupProgressA11y();
 
     // Resolver el MIME de salida UNA vez para todo el lote: si el navegador
     // no puede codificar el formato configurado (p. ej. AVIF en Firefox),
@@ -301,6 +389,11 @@ class BatchManager {
       this.processedImages.push(itemResult);
       done++;
 
+      const percentage = Math.round((done / total) * 100);
+
+      // Accesibilidad: reflejar el avance en aria-valuenow de las barras.
+      this._updateProgressA11y(percentage);
+
       // El callback de progreso va FUERA del try de procesamiento y en su
       // propio try silencioso: si el callback lanza, no debe duplicar la
       // imagen en processedImages ni abortar el lote. Se invoca también
@@ -310,7 +403,7 @@ class BatchManager {
           progressCallback({
             current: done,
             total: total,
-            percentage: Math.round((done / total) * 100),
+            percentage: percentage,
             currentImage: imageItem.name
           });
         } catch (cbError) {
@@ -406,6 +499,12 @@ class BatchManager {
   async exportToZip(zipName = null, options = {}) {
     if (this.processedImages.length === 0) {
       throw new Error('No hay imágenes procesadas para exportar');
+    }
+
+    // Carga diferida de JSZip si el helper existe (helpers.js). El guard
+    // typeof hace el cambio seguro aunque el helper aún no esté definido.
+    if (typeof ensureJSZip === 'function') {
+      await ensureJSZip();
     }
 
     // Verificar que JSZip esté disponible

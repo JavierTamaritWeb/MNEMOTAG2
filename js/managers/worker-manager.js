@@ -235,8 +235,30 @@ const WorkerManager = {
       // Configurar timeout
       const timeout = options.timeout || this.config.timeout;
       const timeoutId = setTimeout(() => {
-        this.releaseWorker(workerInfo.id);
         this.activeJobs.delete(jobId);
+
+        // Reiniciar el worker colgado: terminate + worker nuevo (busy=false).
+        // Si el reinicio falla, al menos liberarlo para no bloquear el pool.
+        const restarted = this.restartWorker(workerInfo.id);
+        if (!restarted) {
+          this.releaseWorker(workerInfo.id);
+        } else {
+          MNEMOTAG_DEBUG && console.warn(`⚠️ Worker ${workerInfo.id} reiniciado por timeout del job ${jobId}`);
+        }
+
+        // El terminate mata también cualquier otro job que compartiera este
+        // worker (getAvailableWorker puede reutilizar workers ocupados):
+        // rechazarlos para que sus promesas no queden colgadas.
+        for (const [otherId, otherJob] of this.activeJobs.entries()) {
+          if (otherJob.workerId === workerInfo.id) {
+            if (otherJob.timeoutId) {
+              clearTimeout(otherJob.timeoutId);
+            }
+            this.activeJobs.delete(otherId);
+            otherJob.reject(new Error('Worker reiniciado por timeout de otro job'));
+          }
+        }
+
         reject(new Error(`Worker timeout después de ${timeout}ms`));
       }, timeout);
       

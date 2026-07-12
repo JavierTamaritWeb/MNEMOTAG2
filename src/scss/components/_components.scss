@@ -1774,10 +1774,35 @@
       color: var(--text-tertiary) !important;
     }
 
+    /* Mejora de contraste: gray-400 de Tailwind (#9ca3af) no cumple AA en tema claro */
+    .text-gray-400 {
+      color: var(--text-tertiary) !important;
+    }
+
     .upload-text {
       color: var(--text-primary) !important;
       transition: var(--transition);
       font-weight: 500;
+    }
+
+    .empty-state {
+      padding: 12px;
+      text-align: center;
+      color: var(--text-secondary);
+      border: 1px dashed var(--border-color);
+      border-radius: 6px;
+    }
+
+    .empty-state__action {
+      margin-top: 8px;
+      color: #1d4ed8;
+      font-weight: 600;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    [data-theme="dark"] .empty-state__action {
+      color: #93c5fd;
     }
 
     .upload-info {

@@ -1130,6 +1130,8 @@
           removeFile.addEventListener('click', removeSelectedFile);
         }
 
+        setupGlobalDragAndDrop();
+
         // v3.3.11: Paste global desde el portapapeles. Antes solo había un
         // shortcut Cmd+Shift+V vía keyboardShortcuts; ahora cualquier Cmd+V
         // natural sobre la página dispara la carga de la imagen pegada.
@@ -1139,6 +1141,12 @@
         const pasteBtn = document.getElementById('paste-image-btn');
         if (pasteBtn) {
           pasteBtn.addEventListener('click', handlePasteButtonClick);
+        }
+
+
+        const openBatchBtn = document.getElementById('open-batch-btn');
+        if (openBatchBtn) {
+          openBatchBtn.addEventListener('click', openBatchModal);
         }
 
         // v3.3.11 / v3.4.10: extraído a ExportManager.
@@ -1215,6 +1223,7 @@
         const presetSaveBtn = document.getElementById('preset-save-btn');
         const presetLoadBtn = document.getElementById('preset-load-btn');
         const presetDeleteBtn = document.getElementById('preset-delete-btn');
+        const presetEmptyCta = document.getElementById('preset-empty-cta');
         if (typeof PresetManager !== 'undefined' && presetSelect) {
           // Poblar el select al arrancar.
           PresetManager.populateSelect(presetSelect);
@@ -1257,6 +1266,11 @@
               PresetManager.deletePreset(name);
               PresetManager.populateSelect(presetSelect);
             }
+          });
+        }
+        if (presetEmptyCta && presetNameInput) {
+          presetEmptyCta.addEventListener('click', function () {
+            presetNameInput.focus();
           });
         }
         // v3.3.14: Panel de historial visual.
@@ -2232,6 +2246,65 @@
       }
     }
 
+    function isSupportedDroppedImage(file) {
+      if (!file) return false;
+      return file.type.startsWith('image/') || /\.(?:jpe?g|png|webp|avif|heic|heif)$/i.test(file.name || '');
+    }
+
+    function setupGlobalDragAndDrop() {
+      const overlay = document.getElementById('dnd-overlay');
+      let dragDepth = 0;
+
+      document.addEventListener('dragenter', (e) => {
+        if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes('Files')) return;
+        e.preventDefault();
+        dragDepth++;
+        if (overlay) {
+          overlay.classList.add('show');
+          overlay.setAttribute('aria-hidden', 'false');
+        }
+      });
+
+      document.addEventListener('dragover', (e) => {
+        if (e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files')) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+        }
+      });
+
+      document.addEventListener('dragleave', (e) => {
+        if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes('Files')) return;
+        dragDepth = Math.max(0, dragDepth - 1);
+        if (dragDepth === 0 && overlay) {
+          overlay.classList.remove('show');
+          overlay.setAttribute('aria-hidden', 'true');
+        }
+      });
+
+      document.addEventListener('drop', (e) => {
+        dragDepth = 0;
+        if (overlay) {
+          overlay.classList.remove('show');
+          overlay.setAttribute('aria-hidden', 'true');
+        }
+
+        // Los dropzones específicos conservan su comportamiento propio.
+        if (e.target && e.target.closest && e.target.closest('#drop-area, #batch-dropzone')) return;
+
+        e.preventDefault();
+        const files = Array.from((e.dataTransfer && e.dataTransfer.files) || [])
+          .filter(isSupportedDroppedImage);
+        if (files.length === 1) {
+          handleFile(files[0]);
+        } else if (files.length > 1) {
+          openBatchModal();
+          addBatchImages(files);
+        } else {
+          UIManager.showError('Suelta una imagen JPG, PNG, WebP, AVIF o HEIC válida.');
+        }
+      });
+    }
+
     function handleFileSelect(e) {
       const file = e.target.files[0];
       if (file) {
@@ -2313,12 +2386,9 @@
         /\.heic$|\.heif$/i.test(file.name || '')
       ));
       if (isHeic) {
-        if (typeof heic2any === 'undefined') {
-          UIManager.showError('Soporte HEIC no disponible: la librería heic2any no se ha cargado. Recarga la página o usa otro formato.');
-          return;
-        }
         try {
           UIManager.showInfo('🔄 Convirtiendo HEIC/HEIF a JPEG...');
+          await ensureHeic2any();
           const converted = await heic2any({
             blob: file,
             toType: 'image/jpeg',
@@ -2691,63 +2761,32 @@
       currentFile = file;
       originalExtension = fileExtension;
 
-      // Leer archivo con manejo de errores mejorado
-      const reader = new FileReader();
-      
-      reader.onload = function(e) {
-        try {
-          const img = new Image();
-          
-          img.onload = function() {
-            // Validar dimensiones
-            const dimensionValidation = SecurityManager.validateImageDimensions(img);
-            
-            if (!dimensionValidation.isValid) {
-              UIManager.hideLoadingState();
-              dimensionValidation.errors.forEach(error => {
-                UIManager.showError(`${error.message}: ${error.details}`);
-              });
-              return;
-            }
-
-            // Mostrar advertencias sobre dimensiones si existen
-            if (dimensionValidation.warnings && dimensionValidation.warnings.length > 0) {
-              dimensionValidation.warnings.forEach(warning => {
-                MNEMOTAG_DEBUG && console.warn('Advertencia de dimensiones:', warning.message, warning.details);
-              });
-            }
-
-            // Proceder con la carga normal
-            loadImage(e.target.result, file.name);
-            
-            // Configurar nombre base del archivo
-            setupInitialFileBaseName(file);
-            
-            // Configurar fecha de creación desde el archivo
-            if (typeof MetadataManager !== 'undefined') {
-              MetadataManager.setupCreationDate(file);
-            }
-          };
-
-          img.onerror = function() {
-            UIManager.hideLoadingState();
-            UIManager.showError('Error al cargar la imagen. El archivo podría estar corrupto.');
-          };
-
-          img.src = e.target.result;
-        } catch (error) {
+      const objectUrl = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = function() {
+        const dimensionValidation = SecurityManager.validateImageDimensions(img);
+        if (!dimensionValidation.isValid) {
+          URL.revokeObjectURL(objectUrl);
           UIManager.hideLoadingState();
-          console.error('Error al procesar la imagen:', error);
-          UIManager.showError('Error al procesar la imagen. Por favor, inténtalo de nuevo.');
+          dimensionValidation.errors.forEach(error => {
+            UIManager.showError(`${error.message}: ${error.details}`);
+          });
+          return;
         }
-      };
-      
-      reader.onerror = function() {
-        UIManager.hideLoadingState();
-        UIManager.showError('Error al leer el archivo. Por favor, inténtalo de nuevo.');
-      };
+        dimensionValidation.warnings.forEach(warning => {
+          MNEMOTAG_DEBUG && console.warn('Advertencia de dimensiones:', warning.message, warning.details);
+        });
 
-      reader.readAsDataURL(file);
+        loadImage(objectUrl, file.name, () => URL.revokeObjectURL(objectUrl));
+        setupInitialFileBaseName(file);
+        if (typeof MetadataManager !== 'undefined') MetadataManager.setupCreationDate(file);
+      };
+      img.onerror = function() {
+        URL.revokeObjectURL(objectUrl);
+        UIManager.hideLoadingState();
+        UIManager.showError('Error al cargar la imagen. El archivo podría estar corrupto.');
+      };
+      img.src = objectUrl;
     }    // Enhanced image loading with validation
 
     // Token de generación: si el usuario selecciona otra imagen mientras una
@@ -2755,18 +2794,25 @@
     // ganaba la imagen que terminara de decodificar la última, no la elegida).
     let imageLoadGeneration = 0;
 
-    function loadImage(src, fileName) {
+    function loadImage(src, fileName, cleanupSrc) {
       const img = new Image();
       const generation = ++imageLoadGeneration;
+      let cleaned = false;
+      const cleanup = () => {
+        if (!cleaned && typeof cleanupSrc === 'function') cleanupSrc();
+        cleaned = true;
+      };
 
       img.onload = function() {
         if (generation !== imageLoadGeneration) {
+          cleanup();
           MNEMOTAG_DEBUG && console.log('Carga de imagen obsoleta descartada:', fileName);
           return;
         }
         try {
           // Validar dimensiones de la imagen
           if (img.width < 1 || img.height < 1) {
+            cleanup();
             UIManager.hideLoadingState();
             UIManager.showError('La imagen no tiene dimensiones válidas');
             return;
@@ -2775,6 +2821,7 @@
           // Validar dimensiones máximas (opcional)
           const maxDimension = 8192; // 8K máximo
           if (img.width > maxDimension || img.height > maxDimension) {
+            cleanup();
             UIManager.hideLoadingState();
             UIManager.showError(`Las dimensiones de la imagen son demasiado grandes. Máximo ${maxDimension}x${maxDimension} píxeles.`);
             return;
@@ -2818,6 +2865,16 @@
           if (thumbnailElement) {
             thumbnailElement.src = src;
             thumbnailElement.style.display = 'block';
+          }
+
+          // La imagen principal ya está decodificada; la URL temporal puede
+          // liberarse sin conservar una copia base64 del archivo completo.
+          if (thumbnailElement) {
+            thumbnailElement.addEventListener('load', cleanup, { once: true });
+            thumbnailElement.addEventListener('error', cleanup, { once: true });
+            setTimeout(cleanup, 5000);
+          } else {
+            cleanup();
           }
           
           // Establecer título inicial si está vacío
@@ -2891,6 +2948,7 @@
           }, 100);
           
         } catch (error) {
+          cleanup();
           UIManager.hideLoadingState();
           console.error('Error al configurar la imagen:', error);
           UIManager.showError('Error al configurar la imagen. Por favor, inténtalo de nuevo.');
@@ -2908,6 +2966,7 @@
           // Invalidar la generación: si la imagen termina de cargar más tarde,
           // su onload se descarta (antes se cargaba igualmente tras el error)
           imageLoadGeneration++;
+          cleanup();
           UIManager.hideLoadingState();
           UIManager.showError('La carga de la imagen está tomando demasiado tiempo. Por favor, inténtalo de nuevo.');
         }
@@ -2920,6 +2979,11 @@
         originalOnload.call(this);
       };
 
+      img.onerror = function() {
+        cleanup();
+        UIManager.hideLoadingState();
+        UIManager.showError('Error al decodificar la imagen.');
+      };
       img.src = src;
     }
 
@@ -4980,6 +5044,14 @@
       const currentSizeDisplay = document.getElementById('current-size-display');
       
       if (!currentImage || !imageInfoElement) return;
+
+      if (canvas) {
+        const name = currentFile && currentFile.name ? currentFile.name : 'imagen cargada';
+        canvas.setAttribute(
+          'aria-label',
+          `Previsualización de ${name}, ${currentImage.width} por ${currentImage.height} píxeles`
+        );
+      }
       
       // Show image info panel
       imageInfoElement.classList.remove('hidden');
@@ -5475,12 +5547,14 @@
       const progressBar = document.getElementById('progress-bar');
       const progressText = document.getElementById('progress-text');
       const progressEta = document.getElementById('progress-eta');
+      const progressTrack = document.getElementById('progress-track');
       
       if (overlay && titleElement) {
         titleElement.textContent = title;
         progressBar.style.width = '0%';
         progressText.textContent = '0%';
         progressEta.textContent = 'Calculando tiempo...';
+        if (progressTrack) progressTrack.setAttribute('aria-valuenow', '0');
         overlay.classList.add('show');
       }
     }
@@ -5489,10 +5563,15 @@
       const progressBar = document.getElementById('progress-bar');
       const progressText = document.getElementById('progress-text');
       const progressEta = document.getElementById('progress-eta');
+      const progressTrack = document.getElementById('progress-track');
       
       if (progressBar && progressText) {
         progressBar.style.width = `${percentage}%`;
         progressText.textContent = `${Math.round(percentage)}%`;
+        if (progressTrack) {
+          const clamped = Math.max(0, Math.min(100, Math.round(percentage)));
+          progressTrack.setAttribute('aria-valuenow', String(clamped));
+        }
         
         if (message) {
           const titleElement = document.getElementById('progress-title');
@@ -5560,6 +5639,7 @@
       currentRotation = 0;
       isFlippedHorizontally = false;
       isFlippedVertically = false;
+      if (canvas) canvas.setAttribute('aria-label', 'Previsualización: sin imagen cargada');
 
       // Limpiar cache
       cache.watermarkImage = null;
@@ -6655,15 +6735,16 @@
       };
     }
 
-    function addBatchImages(files) {
+    async function addBatchImages(files) {
       // Validar límite de imágenes
       if (batchImages.length + files.length > 50) {
         UIManager.showError('Máximo 50 imágenes por lote');
         return;
       }
 
-      files.forEach(file => {
-        if (file.type.startsWith('image/')) {
+      for (const file of files) {
+        const validation = SecurityManager.validateImageFile(file);
+        if (validation.isValid) {
           const reader = new FileReader();
           reader.onload = (e) => {
             batchImages.push({
@@ -6676,8 +6757,11 @@
             updateBatchImagesList();
           };
           reader.readAsDataURL(file);
+        } else {
+          const reason = validation.errors.map(error => error.message).join('. ');
+          UIManager.showError(`${file.name || 'Archivo'}: ${reason}`);
         }
-      });
+      }
     }
 
     function removeBatchImage(imageId) {
@@ -7142,7 +7226,19 @@
       const layers = textLayerManager.getAllLayers();
 
       if (layers.length === 0) {
-        container.innerHTML = '<p class="text-sm text-gray-500 text-center py-4">No hay capas de texto</p>';
+        container.replaceChildren();
+        const empty = document.createElement('div');
+        empty.className = 'empty-state';
+        const message = document.createElement('p');
+        message.textContent = 'No hay capas de texto.';
+        const action = document.createElement('button');
+        action.type = 'button';
+        action.id = 'text-layer-empty-cta';
+        action.className = 'empty-state__action';
+        action.textContent = 'Añadir primera capa';
+        action.addEventListener('click', addNewTextLayer);
+        empty.append(message, action);
+        container.appendChild(empty);
         return;
       }
 

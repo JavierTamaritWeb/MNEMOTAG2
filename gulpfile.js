@@ -6,6 +6,7 @@ const sass = require('gulp-sass')(require('sass'));
 const cleanCSS = require('gulp-clean-css');
 const rename = require('gulp-rename');
 const { rm, mkdir, readdir, readFile, writeFile, copyFile } = require('fs/promises');
+const { existsSync } = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 const { minify } = require('html-minifier-terser');
@@ -72,6 +73,18 @@ function jsBundle() {
     .pipe(dest(DIST_JS));
 }
 
+// Bundle rápido para desarrollo: concat + sourcemaps SIN terser.
+// Genera el mismo app.min.js (mismo nombre para que index.html no cambie),
+// pero tarda milisegundos en lugar de segundos. Solo lo usa el watcher;
+// `npm run build` sigue usando jsBundle (con terser) para producción.
+function jsBundleDev() {
+  return src(JS_FILES)
+    .pipe(sourcemaps.init())
+    .pipe(concat('app.min.js'))
+    .pipe(sourcemaps.write('.'))
+    .pipe(dest(DIST_JS));
+}
+
 function scssCompile() {
   return src('src/scss/main.scss')
     .pipe(sourcemaps.init())
@@ -102,31 +115,48 @@ async function walkDir(dir) {
   return files;
 }
 
+// Procesa UNA imagen: copia a dist/ y, si es PNG/JPEG, genera variantes
+// WebP + AVIF — salvo que esas variantes ya existan en el árbol fuente
+// (p. ej. images/applicacion.webp/.avif están versionadas), en cuyo caso
+// la copia directa ya las lleva a dist/ y no hay que regenerarlas
+// (regenerarlas provocaría además una carrera con la copia según el orden
+// de recorrido). Devuelve true si hubo conversión con sharp.
+async function processImageFile(file) {
+  const rel = path.relative(SRC_IMAGES, file);
+  const destPath = path.join(DIST_IMAGES, rel);
+  await mkdir(path.dirname(destPath), { recursive: true });
+
+  await copyFile(file, destPath);
+
+  const ext = path.extname(file).toLowerCase();
+  if (!CONVERTIBLE_EXT.has(ext)) return false;
+
+  const srcBase = file.replace(/\.[^.]+$/, '');
+  const destBase = destPath.replace(/\.[^.]+$/, '');
+  let converted = false;
+  try {
+    if (!existsSync(srcBase + '.webp')) {
+      await sharp(file).webp({ quality: 80 }).toFile(destBase + '.webp');
+      converted = true;
+    }
+    if (!existsSync(srcBase + '.avif')) {
+      await sharp(file).avif({ quality: 65 }).toFile(destBase + '.avif');
+      converted = true;
+    }
+  } catch (err) {
+    console.error('sharp error on ' + rel + ':', err.message);
+  }
+  return converted;
+}
+
 async function images() {
   const files = await walkDir(SRC_IMAGES);
   let copied = 0;
   let converted = 0;
 
   for (const file of files) {
-    const rel = path.relative(SRC_IMAGES, file);
-    const destPath = path.join(DIST_IMAGES, rel);
-    const destDir = path.dirname(destPath);
-    await mkdir(destDir, { recursive: true });
-
-    await copyFile(file, destPath);
+    if (await processImageFile(file)) converted++;
     copied++;
-
-    const ext = path.extname(file).toLowerCase();
-    if (CONVERTIBLE_EXT.has(ext)) {
-      const baseName = destPath.replace(/\.[^.]+$/, '');
-      try {
-        await sharp(file).webp({ quality: 80 }).toFile(baseName + '.webp');
-        await sharp(file).avif({ quality: 65 }).toFile(baseName + '.avif');
-        converted++;
-      } catch (err) {
-        console.error('sharp error on ' + rel + ':', err.message);
-      }
-    }
   }
 
   console.log('  ' + copied + ' copied, ' + converted + ' converted to WebP+AVIF');
@@ -192,10 +222,10 @@ async function copyAssets() {
 const browserSync = require('browser-sync').create();
 
 function setupWatchers() {
-  // JS: cualquier .js en js/ (excepto dist/) → rebundle
+  // JS: cualquier .js en js/ (excepto dist/) → rebundle rápido (sin terser)
   watch(
     ['js/**/*.js', '!' + DIST + '/**'],
-    series(jsBundle, copyAssets)
+    series(jsBundleDev, copyAssets)
   ).on('change', (file) => console.log('  JS changed: ' + file));
 
   // SCSS: cualquier .scss en src/scss/ → recompilar CSS
@@ -204,11 +234,17 @@ function setupWatchers() {
     scssCompile
   ).on('change', (file) => console.log('  SCSS changed: ' + file));
 
-  // Imágenes: cualquier archivo en images/ → copiar + convertir
-  watch(
-    SRC_IMAGES + '/**/*',
-    images
-  ).on('change', (file) => console.log('  Image changed: ' + file));
+  // Imágenes: procesado INCREMENTAL — solo el archivo añadido/cambiado
+  // se copia y convierte, en vez de recorrer todo images/.
+  const onImageChange = (file) => {
+    console.log('  Image changed: ' + file);
+    processImageFile(file).catch((err) =>
+      console.error('  image error: ' + err.message)
+    );
+  };
+  const imageWatcher = watch(SRC_IMAGES + '/**/*');
+  imageWatcher.on('change', onImageChange);
+  imageWatcher.on('add', onImageChange);
 
   // HTML: index.html → regenerar dist/index.html minificado
   watch(
@@ -268,6 +304,7 @@ function dev(cb) {
 
 exports.clean = clean;
 exports.js = jsBundle;
+exports.jsDev = jsBundleDev;
 exports.scss = scssCompile;
 exports.images = images;
 exports.html = html;

@@ -1,7 +1,7 @@
 # 🚀 Resumen Ejecutivo de Versiones - MNEMOTAG
 
 **Documento**: Resumen de evolucion del proyecto
-**Ultima actualizacion**: 11 de julio de 2026 (v3.5.11)
+**Ultima actualizacion**: 12 de julio de 2026 (v3.5.13)
 
 ---
 
@@ -9,7 +9,9 @@
 
 | Version | Fecha | Caracteristicas Principales | Estado |
 |---------|-------|----------------------------|--------|
-| **v3.5.11** | 11 Jul 2026 | Auditoría severa, EXIF/SRI, workers y estabilidad | **Actual** |
+| **v3.5.13** | 12 Jul 2026 | Registro de errores, barreras de no regresion y boton batch sincronizado | **Actual** |
+| **v3.5.12** | 11 Jul 2026 | Quick wins de rendimiento, accesibilidad, PWA, batch y E2E | Estable |
+| **v3.5.11** | 11 Jul 2026 | Auditoría severa, EXIF/SRI, workers y estabilidad | Estable |
 | **v3.5.10** | 15 Abr 2026 | Lote respeta nombres originales de archivo | Estable |
 | **v3.5.9** | 13 Abr 2026 | Undo/Redo Restoration + UI Spacing Fix | Estable |
 | **v3.5.8** | 13 Abr 2026 | Custom Position / Favicon visibility fix | Estable |

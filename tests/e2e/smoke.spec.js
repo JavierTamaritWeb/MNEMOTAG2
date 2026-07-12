@@ -2,10 +2,10 @@
 //
 // Verifica end-to-end (con un navegador real) que:
 //   1. La app carga sin errores en consola.
-//   2. El título dice "MnemoTag v3.4.x".
+//   2. El título identifica MnemoTag.
 //   3. Los scripts críticos están cargados (managers, utils).
 //   4. Los botones principales son clicables sin lanzar excepciones.
-//   5. Subir una imagen sintética 1x1 via el input de archivo arranca
+//   5. Subir fixtures reales via el input de archivo arranca
 //      el flujo de carga sin errores.
 //
 // NO valida la corrección visual de los filtros, el EXIF embebido, ni
@@ -30,8 +30,7 @@ test.describe('MnemoTag smoke test', () => {
 
     await page.goto('/index.html', { waitUntil: 'networkidle' });
 
-    // Título contiene la versión actual
-    await expect(page).toHaveTitle(/MnemoTag v3\.5\.\d+/);
+    await expect(page).toHaveTitle(/MnemoTag/);
 
     // Filtrar errores conocidos que no son bugs: CSP warnings sobre
     // scripts inline de Tailwind en modo CDN, errores de fuentes
@@ -102,7 +101,7 @@ test.describe('MnemoTag smoke test', () => {
     }
   });
 
-  test('subir imagen 1x1 via input no lanza errores', async ({ page }) => {
+  test('subir una JPEG real con EXIF via input no lanza errores', async ({ page }) => {
     const consoleErrors = [];
     page.on('pageerror', (err) => { consoleErrors.push(err.message); });
 
@@ -110,7 +109,7 @@ test.describe('MnemoTag smoke test', () => {
 
     // Localizar el input file oculto (está en #file-input dentro del
     // área de drop). Playwright puede subir archivos a inputs hidden.
-    const fixturePath = path.resolve(__dirname, 'fixtures', '1x1.png');
+    const fixturePath = path.resolve(__dirname, 'fixtures', 'foto-exif.jpg');
     const input = page.locator('#file-input');
 
     // Forzar visible si está hidden con CSS
@@ -130,7 +129,7 @@ test.describe('MnemoTag smoke test', () => {
 
   test('recorte abre controles y aplica una sugerencia', async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'networkidle' });
-    const fixturePath = path.resolve(__dirname, 'fixtures', '1x1.png');
+    const fixturePath = path.resolve(__dirname, 'fixtures', 'foto-exif.jpg');
     await page.locator('#file-input').setInputFiles(fixturePath);
     await page.locator('.preview-confirm').click();
     await expect(page.locator('#editor-container')).toBeVisible();
@@ -146,6 +145,16 @@ test.describe('MnemoTag smoke test', () => {
 
     await panel.locator('[data-action="closeCropPanel"]').click();
     await expect(panel).toBeHidden();
+  });
+
+  test('decodifica fixtures reales PNG, WebP y AVIF', async ({ page }) => {
+    await page.goto('/index.html', { waitUntil: 'networkidle' });
+    for (const fixture of ['transparente.png', 'muestra.webp', 'muestra.avif']) {
+      await page.locator('#file-input').setInputFiles(path.resolve(__dirname, 'fixtures', fixture));
+      await expect(page.locator('.file-preview-modal')).toBeVisible();
+      await expect(page.locator('.preview-image')).toBeVisible();
+      await page.locator('.preview-cancel').click();
+    }
   });
 
   test('AppState.snapshot() devuelve estado válido al arrancar', async ({ page }) => {
