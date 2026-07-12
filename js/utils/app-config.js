@@ -21,6 +21,10 @@ const AppConfig = {
   // La UI del modal batch y BatchManager leen este valor — no dupliques
   // el número en ningún otro sitio.
   batchMaxImages: 20,
+  // v3.7.0: imágenes del lote procesadas EN PARALELO. Acotado a 1-2 por
+  // BatchManager: la cola decodifica bajo demanda y más de 2 canvas grandes
+  // simultáneos disparan el pico de memoria sin apenas mejorar el tiempo.
+  batchConcurrency: 2,
   // GIF eliminado: el pipeline nunca lo soportó (SecurityManager y el
   // resto del código no lo aceptan), tenerlo aquí inducía a error.
   allowedTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/avif'],

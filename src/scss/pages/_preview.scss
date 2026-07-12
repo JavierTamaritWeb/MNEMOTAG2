@@ -1325,6 +1325,28 @@
       background-color: rgba(255, 255, 255, 0.2);
     }
 
+    /* v3.7.0: botón de acción de los toasts (Reintentar, Restaurar…).
+       Compartido por error/warning/info — hasta ahora salía sin estilo. */
+    .error-action,
+    .warning-action,
+    .info-action {
+      flex-shrink: 0;
+      margin-left: 0.75rem;
+      padding: 0.35rem 0.75rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: inherit;
+      background: rgba(255, 255, 255, 0.18);
+      border: 1px solid rgba(255, 255, 255, 0.45);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.32);
+      }
+    }
+
     @keyframes slideInToast {
       from {
         transform: translateX(100%);

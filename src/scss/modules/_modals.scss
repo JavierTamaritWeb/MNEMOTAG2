@@ -201,6 +201,18 @@
       object-fit: cover;
     }
 
+    /* v3.7.0: sin previews base64 — icono de archivo en lugar de miniatura */
+    .batch-item-icon {
+      width: 100%;
+      aspect-ratio: 2 / 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-tertiary);
+      color: var(--text-tertiary);
+      font-size: 1.5rem;
+    }
+
     .batch-item-info {
       padding: 0.5rem;
       font-size: 0.75rem;
@@ -255,6 +267,22 @@
       &--procesando { color: #2563eb; }
       &--ok { color: #16a34a; }
       &--error { color: #dc2626; }
+      &--cancelada { color: #d97706; } /* v3.7.0: cancelación individual */
+    }
+
+    /* v3.7.0: resumen previo al lote (archivos · megapíxeles · memoria) */
+    .batch-summary {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius);
+
+      i { color: #2563eb; }
     }
 
     /* v3.5.14: reintento por archivo fallido. v3.6.0: sin !important ni

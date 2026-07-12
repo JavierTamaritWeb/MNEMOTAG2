@@ -3,7 +3,14 @@
 /**
  * BatchManager - Sistema de procesamiento por lotes de imágenes
  * Permite cargar múltiples imágenes y aplicarles la misma configuración
- * @version 1.0.0
+ *
+ * v3.7.0: la cola mantiene UNA única representación por imagen — el File
+ * original más sus dimensiones (medidas al validar). Nada de previews base64
+ * ni elementos Image retenidos: la decodificación ocurre bajo demanda en
+ * processImage y el canvas/imagen se liberan inmediatamente al terminar.
+ * El procesamiento corre con concurrencia acotada (AppConfig.batchConcurrency,
+ * máx. 2) y soporta cancelación del lote y por imagen individual.
+ * @version 2.0.0
  */
 
 class BatchManager {
@@ -19,6 +26,10 @@ class BatchManager {
     this.maxFileSize = AppConfig.maxFileSize;
     this.maxPixelsPerImage = 36 * 1000 * 1000;
     this.maxTotalPixels = 80 * 1000 * 1000;
+    // v3.7.0: imágenes procesándose a la vez. Acotado a [1, 2]: más de 2
+    // canvas grandes simultáneos dispara el pico de memoria sin mejorar
+    // apenas el tiempo total (la codificación toBlob es el cuello).
+    this.concurrency = Math.max(1, Math.min(2, (typeof AppConfig !== 'undefined' && AppConfig.batchConcurrency) || 2));
     
     // Formatos soportados — SOLO se usa en el fallback de validateImage
     // cuando SecurityManager no está disponible (runner Node, uso aislado).
@@ -54,10 +65,10 @@ class BatchManager {
 
       if (validation.valid) {
         const queuedPixels = this.imageQueue.reduce(
-          (total, item) => total + item.imageData.width * item.imageData.height,
+          (total, item) => total + item.width * item.height,
           0
         );
-        const filePixels = validation.img.width * validation.img.height;
+        const filePixels = validation.width * validation.height;
         if (queuedPixels + filePixels > this.maxTotalPixels) {
           results.rejected.push({
             name: file.name,
@@ -65,21 +76,22 @@ class BatchManager {
           });
           continue;
         }
-        // Reutilizar la imagen ya decodificada durante la validación.
-        const imageData = this.imageDataFromElement(validation.img);
-        
+        // v3.7.0: única representación por imagen — File + dimensiones.
+        // La imagen decodificada durante la validación se descarta; la
+        // decodificación real ocurre bajo demanda en processImage.
         this.imageQueue.push({
           id: this.generateId(),
           file: file,
           name: file.name,
           size: file.size,
           type: file.type,
-          imageData: imageData,
-          thumbnail: await this.createThumbnail(imageData.img),
+          width: validation.width,
+          height: validation.height,
           processed: false,
-          error: null
+          error: null,
+          cancelled: false
         });
-        
+
         results.added.push(file.name);
       } else {
         results.rejected.push({
@@ -143,23 +155,28 @@ class BatchManager {
     // Intentar cargar imagen para validar dimensiones (check propio del batch)
     try {
       const img = await this.loadImageElement(file);
-      
-      if (img.width < 1 || img.height < 1) {
+      const width = img.width;
+      const height = img.height;
+      // v3.7.0: soltar la referencia decodificada YA — la cola solo guarda
+      // File + dimensiones; la decodificación real es bajo demanda.
+      img.src = '';
+
+      if (width < 1 || height < 1) {
         return {
           valid: false,
           error: 'Dimensiones inválidas'
         };
       }
 
-      if (img.width * img.height > this.maxPixelsPerImage) {
+      if (width * height > this.maxPixelsPerImage) {
         return {
           valid: false,
-          error: `Imagen demasiado grande: ${img.width}x${img.height} (máx: 36 megapíxeles)`
+          error: `Imagen demasiado grande: ${width}x${height} (máx: 36 megapíxeles)`
         };
       }
 
-      return { valid: true, img: img };
-      
+      return { valid: true, width: width, height: height };
+
     } catch (error) {
       return {
         valid: false,
@@ -191,48 +208,51 @@ class BatchManager {
   }
 
   /**
-   * Cargar datos completos de imagen
+   * Medir dimensiones de un File de imagen sin retener la decodificación.
+   * (v3.7.0 — sustituye a los antiguos loadImageFromFile y generador de
+   * miniaturas base64, que retenían el Image decodificado por cada item.)
+   * @returns {Promise<{width: number, height: number}>}
    */
-  async loadImageFromFile(file) {
+  async measureImageFile(file) {
     const img = await this.loadImageElement(file);
-    return this.imageDataFromElement(img);
+    const dims = { width: img.width, height: img.height };
+    img.src = '';
+    return dims;
   }
 
-  imageDataFromElement(img) {
+  /**
+   * Resumen de un conjunto de items {width, height, size} (v3.7.0).
+   * Se usa para el bloque "resumen previo al lote" de la UI: número de
+   * archivos, megapíxeles totales y memoria decodificada estimada
+   * (ancho × alto × 4 bytes RGBA por imagen).
+   * @param {Array<{width: number, height: number, size: number}>} items
+   * @returns {{count: number, totalPixels: number, megapixels: number,
+   *            totalFileBytes: number, estimatedDecodedBytes: number}}
+   */
+  summarizeItems(items) {
+    const list = Array.isArray(items) ? items : [];
+    let totalPixels = 0;
+    let totalFileBytes = 0;
+    for (const item of list) {
+      const w = Number(item && item.width) || 0;
+      const h = Number(item && item.height) || 0;
+      totalPixels += w * h;
+      totalFileBytes += Number(item && item.size) || 0;
+    }
     return {
-      img: img,
-      width: img.width,
-      height: img.height,
-      aspectRatio: img.width / img.height
+      count: list.length,
+      totalPixels: totalPixels,
+      megapixels: totalPixels / 1e6,
+      totalFileBytes: totalFileBytes,
+      estimatedDecodedBytes: totalPixels * 4
     };
   }
 
   /**
-   * Crear thumbnail de imagen
+   * Resumen de la cola actual (v3.7.0).
    */
-  async createThumbnail(img, size = 100) {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    
-    const aspectRatio = img.width / img.height;
-    let width, height;
-    
-    if (aspectRatio > 1) {
-      width = size;
-      height = size / aspectRatio;
-    } else {
-      height = size;
-      width = size * aspectRatio;
-    }
-    
-    canvas.width = width;
-    canvas.height = height;
-    
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(img, 0, 0, width, height);
-    
-    return canvas.toDataURL('image/jpeg', 0.8);
+  getQueueSummary() {
+    return this.summarizeItems(this.imageQueue);
   }
 
   /**
@@ -375,30 +395,14 @@ class BatchManager {
     const errors = [];
     this.cancelRequested = false;
 
-    for (const imageItem of this.imageQueue) {
-      // v3.5.14: cancelación cooperativa — la imagen en curso termina,
-      // las restantes quedan sin procesar (no aparecen en processedImages)
-      if (this.cancelRequested) break;
+    // v3.7.0: procesamiento con concurrencia acotada (1-2 workers). Cada
+    // worker toma el siguiente índice libre de la cola; la cancelación del
+    // lote se comprueba antes de reclamar cada imagen (las en curso terminan)
+    // y la cancelación individual (item.cancelled) salta esa imagen.
+    const queue = this.imageQueue.slice();
+    let nextIndex = 0;
 
-      let itemResult;
-      try {
-        itemResult = await this.processImage(imageItem);
-        imageItem.processed = true;
-      } catch (error) {
-        console.error(`Error procesando ${imageItem.name}:`, error);
-        imageItem.error = error.message;
-        errors.push({ name: imageItem.name, error: error.message });
-        itemResult = {
-          success: false,
-          name: imageItem.name,
-          error: error.message
-        };
-      }
-      // id de la cola para que la UI pueda mapear estados por archivo
-      itemResult.id = imageItem.id;
-      this.processedImages.push(itemResult);
-      done++;
-
+    const notifyProgress = (imageItem, itemResult) => {
       const percentage = Math.round((done / total) * 100);
 
       // Accesibilidad: reflejar el avance en aria-valuenow de las barras.
@@ -418,13 +422,65 @@ class BatchManager {
             // v3.5.14: info por archivo para que la UI marque estados
             id: imageItem.id,
             lastSuccess: itemResult.success,
-            lastError: itemResult.success ? null : itemResult.error
+            lastError: itemResult.success ? null : itemResult.error,
+            // v3.7.0: distinguir "cancelada individualmente" de "error"
+            lastCancelled: !!itemResult.cancelledItem
           });
         } catch (cbError) {
           MNEMOTAG_DEBUG && console.warn('progressCallback lanzó un error (ignorado):', cbError);
         }
       }
-    }
+    };
+
+    const runWorker = async () => {
+      while (true) {
+        // v3.5.14: cancelación cooperativa — la imagen en curso termina,
+        // las restantes quedan sin procesar (no aparecen en processedImages)
+        if (this.cancelRequested) return;
+        const index = nextIndex++;
+        if (index >= queue.length) return;
+        const imageItem = queue[index];
+
+        // v3.7.0: cancelación individual — la imagen se salta y queda
+        // marcada como cancelada (ni procesada ni fallida).
+        if (imageItem.cancelled) {
+          const skippedResult = {
+            success: false,
+            name: imageItem.name,
+            error: 'Cancelada por el usuario',
+            cancelledItem: true,
+            id: imageItem.id
+          };
+          this.processedImages.push(skippedResult);
+          done++;
+          notifyProgress(imageItem, skippedResult);
+          continue;
+        }
+
+        let itemResult;
+        try {
+          itemResult = await this.processImage(imageItem);
+          imageItem.processed = true;
+        } catch (error) {
+          console.error(`Error procesando ${imageItem.name}:`, error);
+          imageItem.error = error.message;
+          errors.push({ name: imageItem.name, error: error.message });
+          itemResult = {
+            success: false,
+            name: imageItem.name,
+            error: error.message
+          };
+        }
+        // id de la cola para que la UI pueda mapear estados por archivo
+        itemResult.id = imageItem.id;
+        this.processedImages.push(itemResult);
+        done++;
+        notifyProgress(imageItem, itemResult);
+      }
+    };
+
+    const workerCount = Math.max(1, Math.min(this.concurrency, queue.length));
+    await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
 
     this.isProcessing = false;
     const cancelled = this.cancelRequested;
@@ -463,6 +519,21 @@ class BatchManager {
   }
 
   /**
+   * Cancelar UNA imagen individual del lote en curso (v3.7.0).
+   * Si aún no ha empezado a procesarse, se salta y queda marcada como
+   * cancelada. Devuelve true si la cancelación se registró.
+   * @param {string|number} id - id del item en la cola
+   */
+  cancelImage(id) {
+    const item = this.imageQueue.find(i => i.id === id);
+    if (item && !item.processed) {
+      item.cancelled = true;
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Reintentar UNA imagen fallida del último lote (v3.5.14).
    * Usa la configuración ya capturada; si tiene éxito, reemplaza la entrada
    * fallida en processedImages para que el ZIP la incluya.
@@ -485,6 +556,7 @@ class BatchManager {
     result.id = item.id;
     item.processed = true;
     item.error = null;
+    item.cancelled = false; // un reintento explícito anula la cancelación individual
 
     const idx = this.processedImages.findIndex(p => p.id === id);
     if (idx >= 0) {
@@ -497,62 +569,82 @@ class BatchManager {
   }
 
   /**
-   * Procesar imagen individual con configuración
+   * Procesar imagen individual con configuración.
+   *
+   * v3.7.0: decodificación BAJO DEMANDA — la cola no retiene imágenes
+   * decodificadas, así que aquí se decodifica el File, se renderiza, se
+   * codifica el blob de salida y se libera TODO (canvas de trabajo, canvas
+   * de aplanado e imagen decodificada) antes de devolver el resultado.
    */
   async processImage(imageItem) {
-    return new Promise((resolve, reject) => {
-      try {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+    // Decodificar bajo demanda desde el File original
+    const img = await this.loadImageElement(imageItem.file);
+    const canvas = document.createElement('canvas');
+    let exportCanvas = canvas;
 
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
+    try {
+      const ctx = canvas.getContext('2d');
 
-        canvas.width = imageItem.imageData.width;
-        canvas.height = imageItem.imageData.height;
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
 
-        // Usar la función de render de main.js que aplica EXACTAMENTE
-        // lo mismo que la previsualización: filtros, watermarks, text layers.
-        if (this.currentConfig.renderFn) {
-          this.currentConfig.renderFn(ctx, canvas, imageItem.imageData.img);
-        } else {
-          // Fallback: render básico sin efectos
-          ctx.drawImage(imageItem.imageData.img, 0, 0);
-        }
+      canvas.width = imageItem.width || img.width;
+      canvas.height = imageItem.height || img.height;
 
-        const mime = this.currentConfig.outputMime
-          || ('image/' + (this.currentConfig.outputFormat || 'jpeg'));
+      // Usar la función de render de main.js que aplica EXACTAMENTE
+      // lo mismo que la previsualización: filtros, watermarks, text layers.
+      if (this.currentConfig.renderFn) {
+        this.currentConfig.renderFn(ctx, canvas, img);
+      } else {
+        // Fallback: render básico sin efectos
+        ctx.drawImage(img, 0, 0);
+      }
 
-        // JPEG no tiene canal alpha: aplanar contra el color configurado
-        // para que las zonas transparentes (p. ej. PNG de origen) no salgan
-        // en negro (comportamiento por defecto del codec JPEG).
-        let exportCanvas = canvas;
-        if (mime === 'image/jpeg' && typeof flattenCanvasForJpeg === 'function') {
-          const flattenColor = (typeof getFlattenColor === 'function')
-            ? getFlattenColor()
-            : undefined;
-          exportCanvas = flattenCanvasForJpeg(canvas, flattenColor);
-        }
+      const mime = this.currentConfig.outputMime
+        || ('image/' + (this.currentConfig.outputFormat || 'jpeg'));
 
-        exportCanvas.toBlob((blob) => {
-          if (!blob) {
+      // JPEG no tiene canal alpha: aplanar contra el color configurado
+      // para que las zonas transparentes (p. ej. PNG de origen) no salgan
+      // en negro (comportamiento por defecto del codec JPEG).
+      if (mime === 'image/jpeg' && typeof flattenCanvasForJpeg === 'function') {
+        const flattenColor = (typeof getFlattenColor === 'function')
+          ? getFlattenColor()
+          : undefined;
+        exportCanvas = flattenCanvasForJpeg(canvas, flattenColor);
+      }
+
+      const outWidth = canvas.width;
+      const outHeight = canvas.height;
+
+      const blob = await new Promise((resolve, reject) => {
+        exportCanvas.toBlob((result) => {
+          if (!result) {
             reject(new Error('Error al generar blob (' + mime + ')'));
             return;
           }
-          resolve({
-            success: true,
-            name: imageItem.name,
-            blob: blob,
-            size: blob.size,
-            width: canvas.width,
-            height: canvas.height
-          });
+          resolve(result);
         }, mime, this.currentConfig.outputQuality);
+      });
 
-      } catch (error) {
-        reject(error);
+      return {
+        success: true,
+        name: imageItem.name,
+        blob: blob,
+        size: blob.size,
+        width: outWidth,
+        height: outHeight
+      };
+    } finally {
+      // v3.7.0: liberación inmediata — vaciar los backing stores de los
+      // canvas de trabajo y soltar la decodificación del Image.
+      if (exportCanvas !== canvas) {
+        exportCanvas.width = 0;
+        exportCanvas.height = 0;
       }
-    });
+      canvas.width = 0;
+      canvas.height = 0;
+      img.src = '';
+    }
   }
 
   /**

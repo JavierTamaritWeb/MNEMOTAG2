@@ -1,24 +1,40 @@
 'use strict';
 
-// ===== PRESET MANAGER (v3.4.5) =====
+// ===== PRESET MANAGER (v3.4.5, ampliado en v3.7.0) =====
 // Guarda/carga/lista/borra presets de filtros en localStorage.
-// Un preset captura los valores de todos los sliders de filtros y los
-// aplica de vuelta al DOM (los listeners existentes de main.js se
-// encargan de recalcular el canvas con los nuevos valores).
+//
+// v3.7.0 (_version: 2): un preset captura el estado COMPLETO de filtros de
+// FilterManager (brightness, contrast, saturation, blur, sepia, hueRotate —
+// incluye lo que aplican los filtros preestablecidos tipo Sepia/Vintage,
+// que no tienen slider propio), no solo los 4 sliders manuales. Los presets
+// v1 antiguos (campos sueltos en el nivel superior) se siguen cargando:
+// sus 4 valores se aplican y el resto se restablece a 0.
+// Los watermarks NO se incluyen (son ortogonales y el usuario suele
+// quererlos por separado por cada imagen).
 
 const PresetManager = {
   STORAGE_PREFIX: 'mnemotag-preset-',
   INDEX_KEY: 'mnemotag-preset-index',
 
-  // IDs de los inputs cuyos valores forman parte de un preset.
-  // Son los sliders + selects de la sección de filtros. Los watermarks
-  // NO se incluyen (son ortogonales y el usuario suele quererlos por
-  // separado por cada imagen).
+  // IDs de los inputs con slider propio (subset de FILTER_KEYS). Se usan
+  // como fallback de captura/aplicación cuando FilterManager no está
+  // disponible (runner Node, uso aislado).
   PRESET_FIELDS: [
     'brightness',
     'contrast',
     'saturation',
     'blur'
+  ],
+
+  // Conjunto COMPLETO de filtros que forman un preset v2. Debe mantenerse
+  // alineado con FilterManager.filters.
+  FILTER_KEYS: [
+    'brightness',
+    'contrast',
+    'saturation',
+    'blur',
+    'sepia',
+    'hueRotate'
   ],
 
   /**
@@ -46,19 +62,70 @@ const PresetManager = {
   },
 
   /**
-   * Lee los valores actuales del DOM y los devuelve como objeto.
+   * Captura el estado COMPLETO de filtros (v3.7.0).
+   * Fuente primaria: FilterManager.filters (incluye sepia/hueRotate de los
+   * filtros preestablecidos). Fallback sin FilterManager: los 4 sliders.
    */
   captureCurrentState: function () {
-    const state = {};
+    const state = { _version: 2, _createdAt: Date.now(), filters: {} };
+
+    if (typeof FilterManager !== 'undefined' && FilterManager.filters) {
+      this.FILTER_KEYS.forEach(key => {
+        const value = Number(FilterManager.filters[key]);
+        state.filters[key] = Number.isFinite(value) ? value : 0;
+      });
+    } else {
+      this.PRESET_FIELDS.forEach(field => {
+        const el = document.getElementById(field);
+        if (el) {
+          const value = Number(el.value);
+          state.filters[field] = Number.isFinite(value) ? value : 0;
+        }
+      });
+    }
+    return state;
+  },
+
+  /**
+   * Aplica un conjunto de valores de filtros al editor (v3.7.0).
+   * Los filtros no presentes en `filters` se restablecen a 0 para que
+   * cargar un preset sea determinista (no hereda restos del estado previo).
+   * Con FilterManager: asigna el estado completo, sincroniza sliders y
+   * displays, y re-renderiza. Sin él (tests aislados): sliders + eventos.
+   */
+  _applyFilterValues: function (filters) {
+    const target = {};
+    this.FILTER_KEYS.forEach(key => {
+      const value = Number(filters && filters[key]);
+      target[key] = Number.isFinite(value) ? value : 0;
+    });
+
+    if (typeof FilterManager !== 'undefined' && FilterManager.filters) {
+      this.FILTER_KEYS.forEach(key => {
+        FilterManager.filters[key] = target[key];
+        if (typeof FilterManager.updateFilterDisplay === 'function') {
+          FilterManager.updateFilterDisplay(key, target[key]);
+        }
+        const slider = (typeof document !== 'undefined') ? document.getElementById(key) : null;
+        if (slider) slider.value = target[key];
+      });
+      if (typeof FilterManager.applyFiltersImmediate === 'function') {
+        FilterManager.applyFiltersImmediate();
+      }
+      return;
+    }
+
+    // Fallback sin FilterManager: solo los sliders con input propio; los
+    // listeners de main.js recalculan el canvas al recibir los eventos.
     this.PRESET_FIELDS.forEach(field => {
-      const el = document.getElementById(field);
-      if (el) {
-        state[field] = el.value;
+      const el = (typeof document !== 'undefined') ? document.getElementById(field) : null;
+      if (!el) return;
+      el.value = target[field];
+      if (typeof el.dispatchEvent === 'function' && typeof Event !== 'undefined') {
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
       }
     });
-    state._version = 1;
-    state._createdAt = Date.now();
-    return state;
   },
 
   /**
@@ -134,17 +201,18 @@ const PresetManager = {
         return false;
       }
 
-      this.PRESET_FIELDS.forEach(field => {
-        if (state[field] !== undefined) {
-          const el = document.getElementById(field);
-          if (el) {
-            el.value = state[field];
-            // Disparar los eventos para que main.js recalcule el canvas.
-            el.dispatchEvent(new Event('input', { bubbles: true }));
-            el.dispatchEvent(new Event('change', { bubbles: true }));
-          }
-        }
-      });
+      // v3.7.0: presets v2 llevan el estado completo en state.filters.
+      // Los v1 antiguos tienen los 4 campos sueltos en el nivel superior:
+      // se aplican esos y el resto se restablece a 0 (retrocompatibilidad).
+      if (state._version >= 2 && state.filters && typeof state.filters === 'object') {
+        this._applyFilterValues(state.filters);
+      } else {
+        const legacy = {};
+        this.PRESET_FIELDS.forEach(field => {
+          if (state[field] !== undefined) legacy[field] = state[field];
+        });
+        this._applyFilterValues(legacy);
+      }
 
       if (typeof UIManager !== 'undefined') {
         UIManager.showSuccess('📂 Preset "' + name + '" cargado');

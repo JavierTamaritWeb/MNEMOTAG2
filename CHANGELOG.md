@@ -4,6 +4,30 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.7.0] - 2026-07-13
+
+Cuarta fase del roadmap: **funcionalidad**.
+
+### Added
+- **Estimación en vivo de la exportación** (`ExportManager.updateExportEstimate` + bloque `#export-estimate` en la pestaña Exportar): tamaño aproximado, dimensiones y formato REAL del archivo final (tras la cadena de fallback), recalculado (debounced, sonda de 480px extrapolada por píxeles) con cada cambio de calidad, formato o re-render del canvas.
+- **Web Share API** (`ExportManager.shareImage` + `#mobile-share-btn` en la barra móvil): comparte la imagen final con el mismo pipeline que la descarga (bordes de posicionamiento fuera, aplanado JPEG, EXIF embebido). El botón solo es visible si `navigator.canShare({files})` lo soporta; si el share falla, cae a la descarga.
+- **Detección explícita de capacidades** (`js/utils/capabilities.js`): codificación WebP/AVIF, clipboard (lectura/escritura), Web Share con archivos y File System Access, cacheado en un snapshot. `applyToUI()` anota en el select de formato el fallback previsto de los formatos no codificables y gatea los elementos `[data-requires-capability]`.
+- **Resumen previo al lote** (`BatchManager.summarizeItems` + `#batch-summary`): número de archivos, megapíxeles totales, memoria decodificada estimada (w×h×4) y concurrencia, actualizado al añadir/quitar imágenes.
+- **Cancelación individual en el lote** (`BatchManager.cancelImage`): una imagen pendiente puede cancelarse con el lote en marcha; queda marcada como cancelada (ni procesada ni fallida) y puede reprocesarse después.
+- **Restauración de sesión con IndexedDB** (`js/managers/session-manager.js`): autosave debounced de la imagen original (File), todo el formulario del panel, los filtros completos y las capas de texto. Al abrir la app con una sesión reciente (<72h), un toast con acción ofrece restaurarla. Limpiar todo o quitar la imagen borra la sesión. La marca de agua de imagen no se restaura (requiere volver a elegir su archivo); su configuración sí.
+- **Presets completos v2** (`PresetManager`): capturan el estado íntegro de filtros de FilterManager (incluye `sepia`/`hueRotate` de los filtros preestablecidos, sin slider propio). Carga determinista (lo no especificado se restablece a 0) y retrocompatible con presets v1.
+- **Acción en toasts informativos** (`UIManager.showInfo` acepta `options.action`, mismo patrón seguro que showError/showWarning) + estilo compartido `.error-action/.warning-action/.info-action`.
+- **Pruebas obligatorias** — Node (`tests/specs/v370.spec.js`, 19 tests: capacidades, presets v2, resumen/concurrencia/cancelación del batch, regresión sin base64, SessionManager sin IndexedDB) y E2E (`tests/e2e/v370.spec.js`: EXIF validado byte a byte sobre la descarga real —APP1/TIFF + Artist/ImageDescription—, undo tras crop, undo tras mover la marca de agua, batch mixto con archivo corrupto, cancelación a mitad de lote sin decodificados retenidos, estimación en vivo, restauración de sesión tras recargar; `tests/e2e/format-fallback.spec.js` corre en **Chromium, Firefox y WebKit** y verifica que el fallback AVIF/WebP devuelve siempre un formato codificable de verdad en cada motor).
+
+### Changed
+- **Cola batch reescrita** (`BatchManager` v2): una única representación por imagen — el `File` original + dimensiones medidas al validar. Sin previews base64 ni `Image` retenidas (la lista muestra icono + nombre + dimensiones + peso); los archivos corruptos se detectan al añadir (decodificación de validación, descartada al instante). `processImage` decodifica bajo demanda y libera canvas de trabajo, canvas de aplanado e imagen inmediatamente. `processQueue` procesa con concurrencia acotada (`AppConfig.batchConcurrency`, máx. 2 workers).
+- `playwright.config.js` añade proyectos `firefox` y `webkit` limitados al spec de fallback de formatos.
+
+### Fixed
+- **Undo tras mover la marca de agua de texto** (`history-manager.js`): el historial no capturaba `customTextPosition` (deshacer dejaba el texto en la posición movida) y guardaba `customImagePosition` por **referencia viva** (los drags mutaban los estados ya guardados). Ambas posiciones se capturan y restauran ahora como copias.
+
+---
+
 ## [3.6.2] - 2026-07-12
 
 Fix de UI: contenido entrecortado en el panel de pestañas (reportado en Exportar).

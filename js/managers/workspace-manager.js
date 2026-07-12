@@ -235,6 +235,18 @@ window.WorkspaceManager = (function () {
         if (main) main.click();
       });
     }
+
+    // v3.7.0: Compartir (Web Share API). El botón solo es visible si
+    // Capabilities detectó navigator.canShare({files}); el flujo tiene
+    // fallback interno a descarga si el share falla.
+    const share = document.getElementById('mobile-share-btn');
+    if (share) {
+      share.addEventListener('click', function () {
+        if (typeof ExportManager !== 'undefined' && ExportManager.shareImage) {
+          ExportManager.shareImage();
+        }
+      });
+    }
   }
 
   // --------------------------------------------------------------

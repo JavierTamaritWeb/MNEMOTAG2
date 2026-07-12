@@ -28,6 +28,7 @@ const SRC_IMAGES = 'images';
 const JS_FILES = [
   'js/utils/app-config.js',
   'js/utils/helpers.js',
+  'js/utils/capabilities.js',
   'js/utils/app-state.js',
   'js/utils/smart-debounce.js',
   'js/utils/filter-cache.js',
@@ -47,6 +48,7 @@ const JS_FILES = [
   'js/managers/analysis-manager.js',
   'js/managers/curves-manager.js',
   'js/managers/bg-removal-manager.js',
+  'js/managers/session-manager.js',
   'js/managers/export-manager.js',
   'js/managers/zoom-pan-manager.js',
   'js/managers/workspace-manager.js',

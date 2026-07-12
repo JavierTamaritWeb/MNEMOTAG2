@@ -11,7 +11,7 @@ MnemoTag is a **client-side, single-page** image editor (vanilla JS, no framewor
 The app is a static site with a Gulp-based build system:
 
 - **Setup:** `npm install` (one-time, installs Gulp + SCSS compiler + browser-sync).
-- **Build:** `npm run build` compiles SCSS → `dist/css/styles.css` and bundles 24 JS files → `dist/js/app.min.js`.
+- **Build:** `npm run build` compiles SCSS → `dist/css/styles.css` and bundles 26 JS files → `dist/js/app.min.js`.
 - **Dev:** `npm run dev` runs build + watch + browser-sync on port 5507 (no auto-reload).
 - **Run locally:** open `index.html` in a browser, or use `npm run serve` (browser-sync on port 5507).
 - Tests live in `tests/` and combine Node, binary, browser and Playwright runners:
@@ -29,7 +29,7 @@ The app is partway through a long-running modularization effort: logic is being 
 
 ### Build system (v3.5.0+)
 
-- **Gulp 5** compiles SCSS → `dist/css/styles.css` and bundles 24 JS files → `dist/js/app.min.js`.
+- **Gulp 5** compiles SCSS → `dist/css/styles.css` and bundles 26 JS files → `dist/js/app.min.js`.
 - **`src/scss/`** organized in subfolders: `abstracts/_variables`, `base/_base`, `layout/_layout`, `components/_components`, `pages/_preview`, `pages/_hero`, `modules/_modals`. Edit these, NOT `dist/css/styles.css`.
 - **`gulpfile.js`** tasks: `jsBundle`, `scssCompile`, `images` (copy + WebP/AVIF via sharp), `html` (minify for production), `copyAssets` (workers + service-worker), `clean`.
 - **`dist/`** is the self-contained production directory: `npm run build` generates it. Deploy `dist/` to any static host.
@@ -52,6 +52,7 @@ js/
 ├── utils/
 │   ├── app-config.js       # AppConfig + MNEMOTAG_DEBUG flag
 │   ├── helpers.js          # debounce/throttle, formatFileSize, canvasToBlob, crc32
+│   ├── capabilities.js     # Detección de capacidades (WebP/AVIF encode, clipboard, share) — v3.7.0
 │   ├── app-state.js        # AppState singleton (getters/setters to main.js vars)
 │   ├── smart-debounce.js   # Adaptive debouncing for filter previews
 │   ├── filter-cache.js     # LRU cache for processed filter results
@@ -74,7 +75,8 @@ js/
     ├── analysis-manager.js     # Histogram, palette, auto-balance (delegates to Worker)
     ├── curves-manager.js       # Curves/levels editor with live preview
     ├── bg-removal-manager.js   # AI background removal (lazy model load)
-    ├── export-manager.js       # Download with EXIF embed chain
+    ├── session-manager.js      # Restauración de sesión con IndexedDB (v3.7.0)
+    ├── export-manager.js       # Download/share with EXIF embed chain + live export estimate
     └── zoom-pan-manager.js     # Zoom buttons/keyboard/wheel + pan navigation
 ```
 
@@ -201,7 +203,7 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 
 ## Versioning and commits
 
-**Current version: v3.6.2**.
+**Current version: v3.7.0**.
 - **v3.5.0**: Gulp 5 build system (SCSS + JS bundle + minification + browser-sync), zoom-pan-manager extracted.
 - **v3.5.1–v3.5.2**: Code audit — 4 critical + 14 moderate fixes (onclick→data-action, console guards, var→const/let, null guards).
 - **v3.5.3**: Output movido a `dist/`, SCSS reorganizado en subcarpetas (`abstracts/`, `base/`, `layout/`, `components/`, `pages/`, `modules/`).
@@ -217,8 +219,9 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 - **v3.6.0**: Fase "base visual y rendimiento" — Tailwind purgado y self-hosted (2.93 MB CDN → 17 KB), subset de Font Awesome (58 iconos, 4.9 KB woff2), selector masivo de botones eliminado (opt-in via c-btn con especificidad identica), componentes cerrados c-* con tokens de diseño consolidados, CSP sin CDNs de estilo/fuentes, capturas de regresion visual en 8 combos (0,00% diff), CSS inicial total 27 KB gzip sin nada externo bloqueante.
 - **v3.6.1**: Fase "area de trabajo" — layout de dos columnas tras cargar (panel 380px con pestañas Metadatos/Marca/Ajustes/Exportar + canvas sticky con toolbar), indicadores de seccion modificada con restauracion por seccion (workspace-manager.js), bottom-sheet movil con barra fija Controles/Descargar, hero compacto, herramientas avanzadas en details, y criterios de aceptacion automatizados en tests/e2e/workspace.spec.js.
 - **v3.6.2**: Fix de contenido entrecortado en el panel de pestañas — las rejillas legadas (config-grid/metadata-grid/geo-grid y Tailwind md:/sm:) usan breakpoints de viewport y forzaban multicolumna dentro del panel de 380px; colapsadas a una columna, compactacion del panel/toolbar con !important para ganar a los overrides legacy por ID, fix del selector .btn:has(i:only-child) que aplastaba botones icono+texto a 48px (icon-only reales marcados con .btn-icon), presets de tamaño en columna, y barrera de regresion anti-desborde en workspace.spec.js.
+- **v3.7.0**: Fase "funcionalidad" — estimación en vivo de export (ExportManager.updateExportEstimate, sonda 480px extrapolada), Web Share API con fallback a descarga (#mobile-share-btn gateado por Capabilities), cola batch reescrita (File+dimensiones, sin base64, decodificación bajo demanda, concurrencia 2, cancelación individual), resumen previo al lote, restauración de sesión con IndexedDB (session-manager.js, autosave debounced + toast con acción Restaurar), presets completos v2 (estado íntegro de FilterManager, retrocompatible v1), detección de capacidades (capabilities.js), fix de historial (customTextPosition no se capturaba y las posiciones custom se guardaban por referencia viva), y pruebas obligatorias: EXIF byte a byte, undo tras crop/watermark, batch mixto, cancelación sin memoria retenida, fallback AVIF/WebP en Chromium+Firefox+WebKit (proyectos nuevos de Playwright).
 - **v3.4.x** (15 releases): CSP/SRI, ESLint/Stylelint CI, accessibility, curves live preview, filter presets, ImageBitmap undo/redo, 5 managers extracted, Web Worker for autoBalance, Playwright E2E, AVIF EXIF injection.
 
-**Tests**: 248/248 Node + 92/92 binarios + 22/22 E2E en desarrollo + 22/22 E2E en `dist` (smoke + axe + capturas de regresión visual). Quick smoke check: `npm test`; release check: build + lint + ambos E2E. `git log` remains the authoritative source for the actual commit version.
+**Tests**: 267/267 Node + 92/92 binarios + 35/35 E2E en desarrollo + 35/35 E2E en `dist` (smoke + axe + capturas de regresión visual + pruebas v3.7.0; el spec `format-fallback` corre además en Firefox y WebKit). Quick smoke check: `npm test`; release check: build + lint + ambos E2E. `git log` remains the authoritative source for the actual commit version.
 
 Commit messages follow `Versión X.Y.Z - <descripción>` in Spanish — match this style. `CHANGELOG.md` and the docs under `docs/` are kept hand-updated per release.

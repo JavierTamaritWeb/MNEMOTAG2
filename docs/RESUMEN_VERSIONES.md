@@ -1,7 +1,7 @@
 # 🚀 Resumen Ejecutivo de Versiones - MNEMOTAG
 
 **Documento**: Resumen de evolucion del proyecto
-**Ultima actualizacion**: 12 de julio de 2026 (v3.6.2)
+**Ultima actualizacion**: 13 de julio de 2026 (v3.7.0)
 
 ---
 
@@ -9,7 +9,8 @@
 
 | Version | Fecha | Caracteristicas Principales | Estado |
 |---------|-------|----------------------------|--------|
-| **v3.6.2** | 12 Jul 2026 | Fix UI del panel: rejillas legadas colapsadas a una columna dentro del panel de 380px, compactacion sobre overrides !important, fix del selector icon-only que aplastaba botones, barrera anti-desborde en E2E | **Actual** |
+| **v3.7.0** | 13 Jul 2026 | Funcionalidad: estimacion en vivo de export, Web Share API, cola batch sin base64 con concurrencia 2 y cancelacion individual, resumen previo al lote, sesion restaurable con IndexedDB, presets completos, deteccion de capacidades, fix undo de watermark, E2E en 3 motores | **Actual** |
+| **v3.6.2** | 12 Jul 2026 | Fix UI del panel: rejillas legadas colapsadas a una columna dentro del panel de 380px, compactacion sobre overrides !important, fix del selector icon-only que aplastaba botones, barrera anti-desborde en E2E | Estable |
 | **v3.6.1** | 12 Jul 2026 | Area de trabajo: panel con pestañas + canvas sticky, toolbar con Descargar siempre visible, sheet movil, secciones con indicador de modificacion y restauracion | Estable |
 | **v3.6.0** | 12 Jul 2026 | Base visual y rendimiento: Tailwind purgado local (2.93 MB→17 KB), subset Font Awesome, boton opt-in c-btn, componentes cerrados + tokens, 27 KB gzip de CSS inicial | Estable |
 | **v3.5.14** | 12 Jul 2026 | Confianza y coherencia: modal de atajos desde el registro real, region aria-live de toasts, ModalController unico, limite batch unificado, estados por archivo con cancelacion y reintento, tests axe | Estable |

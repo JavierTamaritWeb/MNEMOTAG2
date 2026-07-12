@@ -370,16 +370,19 @@ const UIManager = {
     const config = {
       duration: options.duration || this.config.defaultDuration.info,
       icon: options.icon || 'ℹ️',
-      category: options.category || 'general'
+      category: options.category || 'general',
+      // v3.7.0: botón de acción opcional (mismo patrón que showError/
+      // showWarning) — lo usa la oferta de restaurar sesión.
+      action: options.action || null
     };
-    
+
     const infoContainer = document.createElement('div');
     infoContainer.className = 'info-toast';
     infoContainer.setAttribute('data-category', config.category);
     // v3.4.3: accesibilidad — info anunciada con polite.
     // v3.5.14: sin role/aria-live propios — la región persistente los aporta
     infoContainer.setAttribute('aria-atomic', 'true');
-    
+
     infoContainer.innerHTML = `
       <div class="info-content">
         <span class="info-icon">${config.icon}</span>
@@ -392,6 +395,29 @@ const UIManager = {
     const infoCloseBtn = infoContainer.querySelector('.info-close');
     if (infoCloseBtn) {
       infoCloseBtn.addEventListener('click', () => this.removeToast(infoContainer));
+    }
+
+    // Botón de acción construido con DOM API (nunca interpolado — ver
+    // showError para el histórico del vector XSS que motivó este patrón).
+    if (config.action) {
+      const actionBtn = document.createElement('button');
+      actionBtn.type = 'button';
+      actionBtn.className = 'info-action';
+      actionBtn.textContent = String(config.action.label || 'Acción');
+      if (typeof config.action.handler === 'function') {
+        actionBtn.addEventListener('click', () => {
+          this.removeToast(infoContainer);
+          config.action.handler();
+        });
+      } else if (config.action.handler != null) {
+        MNEMOTAG_DEBUG && console.warn('UIManager.showInfo: action.handler como string no se soporta (XSS). Pasa una función.');
+      }
+      const content = infoContainer.querySelector('.info-content');
+      if (content && infoCloseBtn) {
+        content.insertBefore(actionBtn, infoCloseBtn);
+      } else if (content) {
+        content.appendChild(actionBtn);
+      }
     }
 
     this._getToastRegion('polite').appendChild(infoContainer);

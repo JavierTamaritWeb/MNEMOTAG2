@@ -262,7 +262,16 @@ const historyManager = {
       imageOpacity: document.getElementById('watermark-image-opacity')?.value || '50',
       imageSize: document.getElementById('watermark-image-size')?.value || 'medium',
       imagePosition: document.getElementById('watermark-image-position')?.value || 'bottom-right',
-      customPosition: typeof customImagePosition !== 'undefined' ? customImagePosition : null
+      // v3.7.0: COPIAS de las posiciones custom, no referencias vivas — los
+      // drags mutan el objeto en sitio y corrompían los estados guardados.
+      // Antes solo se capturaba la de imagen; la de texto no se restauraba
+      // nunca (undo tras mover el texto dejaba la posición movida).
+      customPosition: (typeof customImagePosition !== 'undefined' && customImagePosition)
+        ? { x: customImagePosition.x, y: customImagePosition.y }
+        : null,
+      customTextPosition: (typeof customTextPosition !== 'undefined' && customTextPosition)
+        ? { x: customTextPosition.x, y: customTextPosition.y }
+        : null
     };
   },
   
@@ -317,8 +326,16 @@ const historyManager = {
             }
           });
 
+          // v3.7.0: restaurar AMBAS posiciones custom como copias. Los
+          // estados antiguos no traían customTextPosition (undefined):
+          // en ese caso se deja la actual (retrocompatibilidad).
           if (config.customPosition && typeof customImagePosition !== 'undefined') {
-            customImagePosition = config.customPosition;
+            customImagePosition = { x: config.customPosition.x, y: config.customPosition.y };
+          }
+          if (config.customTextPosition !== undefined && typeof customTextPosition !== 'undefined') {
+            customTextPosition = config.customTextPosition
+              ? { x: config.customTextPosition.x, y: config.customTextPosition.y }
+              : null;
           }
         }
 

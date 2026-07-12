@@ -734,7 +734,7 @@
                                  maxlength="40"
                                  class="flex-1 px-2 py-1 text-sm border border-gray-300 rounded form-input"
                                  aria-label="Nombre del preset">
-                          <button type="button" id="preset-save-btn" class="c-btn btn btn-outline text-sm" title="Guardar brillo/contraste/saturación/desenfoque actuales como preset">
+                          <button type="button" id="preset-save-btn" class="c-btn btn btn-outline text-sm" title="Guardar el estado completo de filtros (manuales y preestablecidos) como preset">
                             <i class="fas fa-save" aria-hidden="true"></i>
                             Guardar
                           </button>
@@ -830,6 +830,11 @@
                  aria-hidden="false">
               <div class="section__inner">
                 <div class="grid grid-cols-1 gap-6">
+                  <!-- v3.7.0: estimación en vivo del archivo final -->
+                  <div id="export-estimate" class="export-estimate" hidden aria-live="polite">
+                    <i class="fas fa-info-circle" aria-hidden="true"></i>
+                    <span id="export-estimate-text">—</span>
+                  </div>
                   <!-- Configuración de Calidad y Formato -->
                   <div class="config-grid">
                     <!-- Quality Control -->
@@ -1313,6 +1318,12 @@
           <i class="fas fa-sliders-h" aria-hidden="true"></i>
           Controles
         </button>
+        <!-- v3.7.0: Compartir (Web Share API) — visible solo si Capabilities
+             detecta navigator.canShare({files}); si no, queda oculto -->
+        <button type="button" id="mobile-share-btn" class="workspace__mobilebtn" hidden data-requires-capability="shareFiles">
+          <i class="fas fa-share-alt" aria-hidden="true"></i>
+          Compartir
+        </button>
         <button type="button" id="mobile-download-btn" class="workspace__mobilebtn workspace__mobilebtn--primary">
           <i class="fas fa-download" aria-hidden="true"></i>
           Descargar
@@ -1365,7 +1376,13 @@
               <!-- Items se agregarán dinámicamente -->
             </div>
           </div>
-          
+
+          <!-- v3.7.0: resumen previo al procesamiento del lote -->
+          <div id="batch-summary" class="batch-summary mt-3" style="display: none;" aria-live="polite">
+            <i class="fas fa-info-circle" aria-hidden="true"></i>
+            <span id="batch-summary-text">—</span>
+          </div>
+
           <!-- Configuración -->
           <div id="batch-config" class="mt-4 p-4 bg-gray-50 rounded-lg" style="display: none;">
             <h3 class="font-semibold text-gray-700 mb-3">Aplicar a todas las imágenes:</h3>

@@ -1,6 +1,6 @@
 # MNEMOTAG - DOCUMENTACION TECNICA
 
-**Version:** 3.6.2
+**Version:** 3.7.0
 **Ultima actualizacion:** 12 de julio de 2026
 
 ---
@@ -67,7 +67,7 @@ MNEMOTAG2/
 
 ## Estadisticas
 
-- **Version:** 3.6.2
+- **Version:** 3.7.0
 - **Archivos JS:** 24 (bundled en app.min.js)
 - **Managers:** 14 modulos especializados
 - **Tests:** 248 Node + 92 binarias + 7 E2E en desarrollo y 7 en dist

@@ -32,6 +32,19 @@ module.exports = {
     {
       name: 'chromium',
       use: { browserName: 'chromium' }
+    },
+    // v3.7.0: el fallback de codificación AVIF/WebP difiere por motor
+    // (Chromium/Firefox/WebKit). Solo el spec de fallback corre en los
+    // tres; el resto de la suite sigue siendo Chromium-only.
+    {
+      name: 'firefox',
+      use: { browserName: 'firefox' },
+      testMatch: /format-fallback\.spec\.js/
+    },
+    {
+      name: 'webkit',
+      use: { browserName: 'webkit' },
+      testMatch: /format-fallback\.spec\.js/
     }
   ]
 };

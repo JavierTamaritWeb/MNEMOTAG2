@@ -4,12 +4,26 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos. 100% cliente, sin backend.
 
-![Version](https://img.shields.io/badge/version-3.6.2-blue.svg)
+![Version](https://img.shields.io/badge/version-3.7.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 [![Deploy to GitHub Pages](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml)
 
 **Demo en vivo:** [javiertamaritweb.github.io/MNEMOTAG2](https://javiertamaritweb.github.io/MNEMOTAG2/)
+
+---
+
+## NOVEDADES v3.7
+
+### Funcionalidad (v3.7.0)
+- **Estimación en vivo de exportación**: la pestaña Exportar muestra tamaño aproximado, dimensiones y formato REAL del archivo final (tras fallback), actualizado con cada cambio.
+- **Web Share API**: botón Compartir en móvil (visible solo si el navegador soporta compartir archivos), con fallback automático a descarga.
+- **Cola batch reescrita**: una única representación por imagen (File + dimensiones, sin previews base64), decodificación bajo demanda, concurrencia máxima de 2, liberación inmediata de canvas/imágenes, cancelación del lote y por imagen individual.
+- **Resumen previo al lote**: archivos, megapíxeles totales y memoria decodificada estimada antes de procesar.
+- **Restauración de sesión (IndexedDB)**: la imagen y toda la configuración del panel se guardan automáticamente; al volver, la app ofrece restaurar la sesión.
+- **Presets completos**: los presets de filtros guardan el estado íntegro (incluidos sepia/tono de los filtros preestablecidos), con retrocompatibilidad con presets antiguos.
+- **Detección de capacidades**: WebP/AVIF/clipboard/share se detectan antes de mostrar acciones; las opciones no soportadas anuncian su fallback.
+- **Fix de historial**: deshacer tras mover la marca de agua de texto ahora restaura su posición (antes no se capturaba y las posiciones se guardaban por referencia viva).
 
 ---
 
@@ -37,10 +51,10 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 
 ### Verificacion
 - `npm run build` genera `dist/` completo
-- `node tests/run-in-node.js` → **248/248 OK**
+- `node tests/run-in-node.js` → **267/267 OK**
 - `node tests/binary-validation.js` → **92/92 OK**
-- `npm run test:e2e` → **22/22 Chromium desarrollo** (smoke + axe + workspace + capturas visuales)
-- `npm run test:e2e:dist` → **22/22 Chromium produccion**
+- `npm run test:e2e` → **35/35 desarrollo** (Chromium completo + fallback de formatos en Firefox y WebKit)
+- `npm run test:e2e:dist` → **35/35 produccion**
 
 > Versiones anteriores: [CHANGELOG.md](CHANGELOG.md)
 
@@ -84,7 +98,7 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 
 ### ⚙️ Infraestructura
 - **PWA real** con Service Worker (offline tras primera visita, instalable).
-- **Tests**: 248 Node + 92 binarias (PNG/WebP/AVIF) + 21 E2E Playwright (smoke, axe, área de trabajo, regresión visual).
+- **Tests**: 267 Node + 92 binarias (PNG/WebP/AVIF) + 35 E2E Playwright (smoke, axe, área de trabajo, regresión visual, pruebas v3.7.0 y fallback de formatos en 3 motores).
 - **CI/CD**: GitHub Actions con deploy automático a GitHub Pages.
 - **Seguridad**: CSP endurecida (sin CDNs de estilo/fuentes), SRI en los scripts diferidos, sanitización XSS en toasts y batch processor.
 - **Rendimiento (v3.6.0)**: sin CSS externo bloqueante — Tailwind purgado local (2.93 MB → 17 KB) + subset de Font Awesome (58 iconos, 4.9 KB). CSS inicial total: 27 KB gzip.
@@ -131,9 +145,9 @@ npm run serve   # solo servidor (sin watch)
 
 ```bash
 npm test                         # ejecuta ambos runners
-node tests/run-in-node.js        # 248/248 aserciones de regresion
+node tests/run-in-node.js        # 267/267 aserciones de regresion
 node tests/binary-validation.js  # 92/92 aserciones binarias PNG/WebP/AVIF
-npm run test:e2e                 # Chromium contra desarrollo
+npm run test:e2e                 # Chromium + Firefox/WebKit (fallback) contra desarrollo
 npm run test:e2e:dist            # Chromium contra dist/ de produccion
 npm run lint:js                  # ESLint local
 npm run lint:css                 # Stylelint local

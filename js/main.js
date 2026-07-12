@@ -424,6 +424,12 @@
         if (typeof removeSelectedFile === 'function') removeSelectedFile();
       });
 
+      // 1b. v3.7.0: borrar la sesión guardada en IndexedDB — limpiar todo
+      // implica que el usuario NO quiere que se le ofrezca restaurarla.
+      safe('SessionManager.clear', function () {
+        if (typeof SessionManager !== 'undefined') SessionManager.clear();
+      });
+
       // Helper: limpia un form sin romper la UI.
       // Estrategia: (1) form.reset() hace el trabajo pesado y respeta
       // <option selected> / value="" / defaultChecked; (2) los campos
@@ -1589,6 +1595,17 @@
         if (outputFormatSelect) {
           outputFormatSelect.addEventListener('change', handleFormatChange);
         }
+
+        // v3.7.0: calidad y formato alimentan la estimación en vivo del
+        // archivo final (no pasan por updatePreview, que solo re-renderiza).
+        const scheduleEstimate = () => {
+          if (typeof ExportManager !== 'undefined' && ExportManager.scheduleEstimateUpdate) {
+            ExportManager.scheduleEstimateUpdate();
+          }
+        };
+        if (outputQualitySelect) outputQualitySelect.addEventListener('input', scheduleEstimate);
+        if (outputQualityNumber) outputQualityNumber.addEventListener('input', scheduleEstimate);
+        if (outputFormatSelect) outputFormatSelect.addEventListener('change', scheduleEstimate);
         
         // File basename editor
         const fileBasenameInput = document.getElementById('file-basename');
@@ -3129,6 +3146,15 @@
       if (!currentImage || !ctx) {
         FilterLoadingManager.hideFilterLoading();
         return;
+      }
+
+      // v3.7.0: cada re-render alimenta (debounced) la estimación en vivo
+      // de la exportación y el autosave de sesión en IndexedDB.
+      if (typeof ExportManager !== 'undefined' && ExportManager.scheduleEstimateUpdate) {
+        ExportManager.scheduleEstimateUpdate();
+      }
+      if (typeof SessionManager !== 'undefined' && SessionManager.scheduleAutoSave) {
+        SessionManager.scheduleAutoSave();
       }
 
       // Durante un drag activo, forzamos siempre el camino estándar (rápido).
@@ -5678,6 +5704,8 @@
     }
 
     function removeSelectedFile() {
+      // v3.7.0: quitar la imagen explícitamente invalida la sesión guardada
+      if (typeof SessionManager !== 'undefined') SessionManager.clear();
       // v3.6.1: restaurar la dropzone al quitar la imagen
       document.body.classList.remove('has-image');
       currentImage = null;
@@ -6461,6 +6489,16 @@
         window.textLayerManager = textLayerManager;
         window.cropManager = cropManager;
 
+        // v3.7.0: reflejar capacidades del navegador en la UI (opciones de
+        // formato no codificables, botón Compartir) y ofrecer restaurar la
+        // sesión anterior si hay una guardada en IndexedDB.
+        if (typeof Capabilities !== 'undefined') {
+          Capabilities.applyToUI();
+        }
+        if (typeof SessionManager !== 'undefined') {
+          initSessionRestore();
+        }
+
       } catch (error) {
         console.error('Error inicializando managers avanzados:', error);
       }
@@ -6721,12 +6759,160 @@
 
     /**
      * ====================================
+     * RESTAURACIÓN DE SESIÓN (v3.7.0)
+     * ====================================
+     * El estado se guarda en IndexedDB vía SessionManager (autosave debounced
+     * desde updatePreview). Al arrancar, initSessionRestore ofrece recuperar
+     * la última sesión: imagen original + formulario del panel + filtros +
+     * capas de texto. La marca de agua de imagen NO se restaura (requiere el
+     * archivo de la marca); su configuración de formulario sí.
+     */
+
+    const SESSION_STATE_VERSION = 1;
+
+    function collectSessionState() {
+      if (!currentFile || !currentImage) return null;
+
+      // Estado de TODOS los controles con id del panel (metadatos, marca,
+      // ajustes y exportación). Los type=file no son serializables.
+      const formState = {};
+      document.querySelectorAll('#workspace-panel input[id], #workspace-panel select[id], #workspace-panel textarea[id]')
+        .forEach((el) => {
+          const type = (el.type || '').toLowerCase();
+          if (type === 'file') return;
+          if (type === 'checkbox' || type === 'radio') {
+            formState[el.id] = { checked: el.checked };
+          } else {
+            formState[el.id] = { value: el.value };
+          }
+        });
+
+      return {
+        version: SESSION_STATE_VERSION,
+        savedAt: Date.now(),
+        file: currentFile,
+        fileName: currentFile.name || 'imagen',
+        formState: formState,
+        filters: (typeof FilterManager !== 'undefined') ? { ...FilterManager.filters } : null,
+        textLayers: textLayerManager ? textLayerManager.exportConfig() : null
+      };
+    }
+
+    function applySessionFormState(formState) {
+      if (!formState) return;
+      Object.keys(formState).forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const saved = formState[id];
+        try {
+          if (saved && typeof saved.checked === 'boolean') {
+            if (el.checked !== saved.checked) {
+              el.checked = saved.checked;
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          } else if (saved && typeof saved.value === 'string') {
+            if (el.value !== saved.value) {
+              el.value = saved.value;
+              el.dispatchEvent(new Event('input', { bubbles: true }));
+              el.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          }
+        } catch (err) {
+          MNEMOTAG_DEBUG && console.warn('applySessionFormState: campo ' + id + ' falló:', err);
+        }
+      });
+    }
+
+    async function restoreSavedSession(saved) {
+      if (!saved || !saved.file) return;
+      try {
+        SessionManager.setRestoring(true);
+        loadImageWithValidation(saved.file);
+
+        // Esperar a que el flujo de carga asigne currentImage (decodifica
+        // en un onload asíncrono; no hay promesa que encadenar).
+        const deadline = Date.now() + 10000;
+        while (!currentImage && Date.now() < deadline) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+        }
+        if (!currentImage) throw new Error('La imagen de la sesión no terminó de cargar');
+
+        // Margen para que setupCanvas y el updatePreview inicial terminen.
+        await new Promise((resolve) => setTimeout(resolve, 300));
+
+        applySessionFormState(saved.formState);
+
+        // Filtros completos (incluye sepia/hueRotate, que no tienen slider).
+        if (saved.filters && typeof FilterManager !== 'undefined') {
+          Object.keys(FilterManager.filters).forEach((key) => {
+            if (saved.filters[key] !== undefined) {
+              FilterManager.filters[key] = saved.filters[key];
+              FilterManager.updateFilterDisplay(key, saved.filters[key]);
+              const slider = document.getElementById(key);
+              if (slider) slider.value = saved.filters[key];
+            }
+          });
+          FilterManager.applyFiltersImmediate();
+        }
+
+        // Capas de texto (exportConfig/importConfig de TextLayerManager)
+        if (saved.textLayers && textLayerManager) {
+          await textLayerManager.importConfig(saved.textLayers);
+        }
+
+        updatePreview();
+        UIManager.showSuccess('✅ Sesión anterior restaurada');
+      } catch (err) {
+        console.error('No se pudo restaurar la sesión:', err);
+        UIManager.showError('No se pudo restaurar la sesión anterior');
+      } finally {
+        SessionManager.setRestoring(false);
+      }
+    }
+
+    async function initSessionRestore() {
+      if (!SessionManager.isSupported()) return;
+      SessionManager.configureAutoSave(collectSessionState);
+
+      // El autosave se dispara desde updatePreview (cambios de canvas), pero
+      // los campos que no re-renderizan (metadatos, nombre de archivo…)
+      // también deben persistirse: escuchar input/change del panel.
+      const scheduleFromForm = (e) => {
+        if (!currentImage || !e.target || typeof e.target.closest !== 'function') return;
+        if (e.target.closest('#workspace-panel')) {
+          SessionManager.scheduleAutoSave();
+        }
+      };
+      document.addEventListener('input', scheduleFromForm, true);
+      document.addEventListener('change', scheduleFromForm, true);
+
+      const saved = await SessionManager.load();
+      if (!saved || !saved.file || currentImage) return;
+
+      const savedDate = new Date(saved.savedAt);
+      const hh = String(savedDate.getHours()).padStart(2, '0');
+      const mm = String(savedDate.getMinutes()).padStart(2, '0');
+      UIManager.showInfo(
+        'Hay una sesión guardada de "' + (saved.fileName || 'imagen') + '" (' + hh + ':' + mm + ').',
+        {
+          duration: 15000,
+          action: { label: 'Restaurar', handler: () => restoreSavedSession(saved) }
+        }
+      );
+    }
+
+    /**
+     * ====================================
      * BATCH PROCESSING UI
      * ====================================
      */
-    
+
     let batchImages = [];
-    
+    // v3.7.0: true mientras el lote se procesa — habilita los botones de
+    // cancelación individual en la lista (batchManager.isProcessing aún es
+    // false cuando se pinta la lista justo antes de arrancar processQueue).
+    let batchUIProcessing = false;
+
     function openBatchModal() {
       const modal = document.getElementById('batch-modal');
       if (modal) {
@@ -6809,26 +6995,28 @@
         return;
       }
 
+      // v3.7.0: única representación por imagen — File + dimensiones. La
+      // validación de BatchManager decodifica una vez (detecta archivos
+      // corruptos al añadir, no al procesar) y descarta la decodificación.
+      // Nada de previews base64: la lista muestra icono + nombre + datos.
       for (const file of files) {
-        const validation = SecurityManager.validateImageFile(file);
-        if (validation.isValid) {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-            batchImages.push({
-              id: Date.now() + Math.random(),
-              file: file,
-              name: file.name,
-              size: file.size,
-              dataUrl: e.target.result
-            });
-            updateBatchImagesList();
-          };
-          reader.readAsDataURL(file);
+        const validation = batchManager
+          ? await batchManager.validateImage(file)
+          : { valid: false, error: 'El procesador de lotes no está inicializado' };
+        if (validation.valid) {
+          batchImages.push({
+            id: Date.now() + Math.random(),
+            file: file,
+            name: file.name,
+            size: file.size,
+            width: validation.width,
+            height: validation.height
+          });
         } else {
-          const reason = validation.errors.map(error => error.message).join('. ');
-          UIManager.showError(`${file.name || 'Archivo'}: ${reason}`);
+          UIManager.showError(`${file.name || 'Archivo'}: ${validation.error}`);
         }
       }
+      updateBatchImagesList();
     }
 
     function removeBatchImage(imageId) {
@@ -6868,16 +7056,19 @@
       if (configSection) configSection.style.display = 'block';
       if (countSpan) countSpan.textContent = String(batchImages.length);
 
-      // Construir cada item con DOM API: img.name y img.dataUrl son datos
-      // controlados por el usuario y NUNCA deben interpolarse en HTML.
+      // Construir cada item con DOM API: img.name es dato controlado por el
+      // usuario y NUNCA debe interpolarse en HTML.
+      // v3.7.0: sin previews base64 — icono + nombre + dimensiones + peso.
       batchImages.forEach(img => {
         const item = document.createElement('div');
         item.className = 'batch-item';
 
-        const thumb = document.createElement('img');
-        thumb.src = img.dataUrl;
-        thumb.alt = img.name;
-        thumb.className = 'batch-item-thumbnail';
+        const thumb = document.createElement('div');
+        thumb.className = 'batch-item-icon';
+        const thumbIcon = document.createElement('i');
+        thumbIcon.className = 'fas fa-file-image';
+        thumbIcon.setAttribute('aria-hidden', 'true');
+        thumb.appendChild(thumbIcon);
         item.appendChild(thumb);
 
         const info = document.createElement('div');
@@ -6890,7 +7081,8 @@
 
         const size = document.createElement('div');
         size.className = 'batch-item-size';
-        size.textContent = formatFileSize(img.size);
+        const dims = (img.width && img.height) ? img.width + '×' + img.height + ' · ' : '';
+        size.textContent = dims + formatFileSize(img.size);
         info.appendChild(size);
 
         // v3.5.14: estado visible por archivo (pendiente/procesando/ok/error)
@@ -6901,7 +7093,8 @@
             pendiente: '⏳ Pendiente',
             procesando: '⚙️ Procesando…',
             ok: '✅ Procesada',
-            error: '❌ Error'
+            error: '❌ Error',
+            cancelada: '⏹️ Cancelada'
           };
           status.textContent = statusLabels[img.status] || img.status;
           if (img.status === 'error' && img.errorMsg) {
@@ -6912,15 +7105,26 @@
 
         item.appendChild(info);
 
-        // v3.5.14: reintento por archivo fallido
-        if (img.status === 'error') {
+        // v3.5.14: reintento por archivo fallido (v3.7.0: también canceladas)
+        if (img.status === 'error' || img.status === 'cancelada') {
           const retryBtn = document.createElement('button');
           retryBtn.type = 'button';
           retryBtn.className = 'batch-item-retry';
-          retryBtn.textContent = 'Reintentar';
+          retryBtn.textContent = img.status === 'cancelada' ? 'Procesar' : 'Reintentar';
           retryBtn.setAttribute('aria-label', 'Reintentar ' + img.name);
           retryBtn.addEventListener('click', () => retryBatchImage(img.id));
           item.appendChild(retryBtn);
+        }
+
+        // v3.7.0: cancelación individual mientras el lote está en curso
+        if (img.status === 'pendiente' && batchUIProcessing) {
+          const cancelBtn = document.createElement('button');
+          cancelBtn.type = 'button';
+          cancelBtn.className = 'batch-item-retry batch-item-cancel';
+          cancelBtn.textContent = 'Cancelar';
+          cancelBtn.setAttribute('aria-label', 'Cancelar ' + img.name);
+          cancelBtn.addEventListener('click', () => cancelBatchImage(img.id));
+          item.appendChild(cancelBtn);
         }
 
         const removeBtn = document.createElement('button');
@@ -6937,6 +7141,46 @@
         item.appendChild(removeBtn);
         itemsGrid.appendChild(item);
       });
+
+      // v3.7.0: resumen previo al lote (archivos, megapíxeles, memoria)
+      updateBatchSummary();
+    }
+
+    /**
+     * Resumen previo al procesamiento del lote (v3.7.0): número de archivos,
+     * megapíxeles totales y memoria decodificada estimada (w×h×4 bytes).
+     */
+    function updateBatchSummary() {
+      const summaryEl = document.getElementById('batch-summary');
+      const textEl = document.getElementById('batch-summary-text');
+      if (!summaryEl || !textEl) return;
+
+      if (batchImages.length === 0 || !batchManager) {
+        summaryEl.style.display = 'none';
+        return;
+      }
+
+      const summary = batchManager.summarizeItems(batchImages);
+      textEl.textContent =
+        summary.count + (summary.count === 1 ? ' archivo' : ' archivos') +
+        ' · ' + summary.megapixels.toFixed(1) + ' MP totales' +
+        ' · ~' + formatFileSize(summary.estimatedDecodedBytes) + ' de memoria al decodificar' +
+        ' · se procesarán de ' + (AppConfig.batchConcurrency || 2) + ' en ' + (AppConfig.batchConcurrency || 2);
+      summaryEl.style.display = 'flex';
+    }
+
+    /**
+     * Cancela una imagen individual del lote en curso (v3.7.0).
+     */
+    function cancelBatchImage(imageId) {
+      if (!batchManager) return;
+      if (batchManager.cancelImage(imageId)) {
+        const img = batchImages.find(i => i.id === imageId);
+        if (img && img.status === 'pendiente') {
+          img.status = 'cancelada';
+        }
+        updateBatchImagesList();
+      }
     }
 
     /**
@@ -7024,6 +7268,7 @@
 
       // v3.5.14: estado por archivo + cancelación cooperativa
       batchImages.forEach(img => { img.status = 'pendiente'; img.errorMsg = null; });
+      batchUIProcessing = true; // v3.7.0: habilita cancelación individual
       updateBatchImagesList();
 
       showProgressBar('Procesando lote (' + batchImages.length + ' imágenes)...', {
@@ -7034,18 +7279,21 @@
 
       try {
         // Sincronizar batchImages → batchManager.imageQueue
+        // v3.7.0: sin decodificar aquí — la cola guarda File + dimensiones
+        // (medidas al añadir) y BatchManager decodifica bajo demanda.
         batchManager.clearQueue();
         for (const img of batchImages) {
-          const imageObj = await batchManager.loadImageFromFile(img.file);
           batchManager.imageQueue.push({
             id: img.id,
             file: img.file,
             name: img.name,
             size: img.size,
             type: img.file.type,
-            imageData: imageObj,
+            width: img.width,
+            height: img.height,
             processed: false,
-            error: null
+            error: null,
+            cancelled: false
           });
         }
 
@@ -7198,11 +7446,19 @@
             'Procesando imagen ' + progress.current + ' de ' + progress.total + '...'
           );
           // v3.5.14: reflejar el resultado por archivo en la cola visible
+          // (v3.7.0: distinguir cancelación individual de error real)
           const done = batchImages.find(i => i.id === progress.id);
           if (done) {
-            done.status = progress.lastSuccess ? 'ok' : 'error';
-            done.errorMsg = progress.lastError || null;
+            done.status = progress.lastSuccess
+              ? 'ok'
+              : (progress.lastCancelled ? 'cancelada' : 'error');
+            done.errorMsg = (progress.lastSuccess || progress.lastCancelled)
+              ? null
+              : (progress.lastError || null);
           }
+          // v3.7.0: re-pintar la lista en cada avance para que los estados
+          // y los botones de cancelación individual estén al día.
+          updateBatchImagesList();
         });
         const result = await Promise.all([processPromise, minDelay]).then(r => r[0]);
 
@@ -7230,7 +7486,9 @@
         hideProgressBar();
         UIManager.showError('Error al procesar el lote: ' + error.message);
       } finally {
+        batchUIProcessing = false; // v3.7.0
         if (processBtn) processBtn.disabled = false;
+        updateBatchImagesList();
       }
     }
 

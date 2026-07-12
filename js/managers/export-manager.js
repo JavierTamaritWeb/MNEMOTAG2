@@ -573,10 +573,182 @@ window.ExportManager = (function () {
     }
   }
 
+  // ── Estimación en vivo del archivo final (v3.7.0) ────────────────────
+  //
+  // Codifica una sonda reducida del canvas (lado máx. 480px) con el formato
+  // y calidad configurados y extrapola el peso por ratio de píxeles. Es una
+  // estimación (se muestra con "≈"): la compresión no escala linealmente,
+  // pero el orden de magnitud y el formato REAL (tras fallback) sí son
+  // fiables. Debounced + token de secuencia para descartar sondas obsoletas.
+
+  const ESTIMATE_PROBE_MAX_SIDE = 480;
+  const ESTIMATE_DEBOUNCE_MS = 600;
+  let estimateSeq = 0;
+  let estimateTimer = null;
+
+  function formatEstimateSize(bytes) {
+    if (!Number.isFinite(bytes) || bytes < 0) return '—';
+    if (bytes < 1024) return Math.round(bytes) + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+  }
+
+  async function updateExportEstimate() {
+    const container = document.getElementById('export-estimate');
+    const textEl = document.getElementById('export-estimate-text');
+    if (!container || !textEl) return;
+
+    if (typeof canvas === 'undefined' || !canvas || !currentImage ||
+        canvas.width === 0 || canvas.height === 0) {
+      container.hidden = true;
+      return;
+    }
+
+    const seq = ++estimateSeq;
+    try {
+      // Sonda reducida: dibuja el canvas actual a escala.
+      const scale = Math.min(1, ESTIMATE_PROBE_MAX_SIDE / Math.max(canvas.width, canvas.height));
+      const probe = document.createElement('canvas');
+      probe.width = Math.max(1, Math.round(canvas.width * scale));
+      probe.height = Math.max(1, Math.round(canvas.height * scale));
+      const probeCtx = probe.getContext('2d');
+      if (!probeCtx) { container.hidden = true; return; }
+      probeCtx.imageSmoothingEnabled = true;
+      probeCtx.imageSmoothingQuality = 'high';
+      probeCtx.drawImage(canvas, 0, 0, probe.width, probe.height);
+
+      // Alpha y formato real (misma cadena de fallback que la descarga).
+      const hasAlpha = hasImageAlphaChannel(probe);
+      const requestedMime = getMimeType(outputFormat);
+      const finalMime = await determineFallbackFormat(hasAlpha, requestedMime);
+      if (seq !== estimateSeq) return; // sonda obsoleta
+
+      const sourceForProbe = (finalMime === 'image/jpeg')
+        ? flattenCanvasForJpeg(probe, getFlattenColor())
+        : probe;
+      const blob = await canvasToBlob(sourceForProbe, finalMime, outputQuality);
+      if (seq !== estimateSeq) return;
+
+      // El blob puede haber caído a otro formato (blob.type es la verdad).
+      const realMime = (blob && blob.type) || finalMime;
+      const realFormat = (realMime.split('/')[1] || '').toUpperCase();
+
+      // Extrapolación por píxeles. PNG comprime sub-linealmente, así que el
+      // valor es orientativo; para JPEG/WebP el ratio es razonablemente fiel.
+      const ratio = (canvas.width * canvas.height) / (probe.width * probe.height);
+      const estimatedBytes = blob.size * ratio;
+
+      let text = '≈ ' + formatEstimateSize(estimatedBytes) + ' · ' +
+                 canvas.width + '×' + canvas.height + ' px · ' + realFormat;
+      if (realMime !== requestedMime) {
+        text += ' (fallback de ' + (requestedMime.split('/')[1] || '').toUpperCase() + ')';
+      }
+      textEl.textContent = text;
+      container.hidden = false;
+
+      // Liberar backing stores de las sondas.
+      probe.width = 0; probe.height = 0;
+      if (sourceForProbe !== probe) { sourceForProbe.width = 0; sourceForProbe.height = 0; }
+    } catch (err) {
+      MNEMOTAG_DEBUG && console.warn('updateExportEstimate falló (se oculta la estimación):', err);
+      if (seq === estimateSeq) container.hidden = true;
+    }
+  }
+
+  /**
+   * Versión debounced de updateExportEstimate — segura de llamar en cada
+   * re-render del preview (solo codifica tras 600ms de calma).
+   */
+  function scheduleEstimateUpdate() {
+    if (typeof document === 'undefined') return;
+    if (estimateTimer) clearTimeout(estimateTimer);
+    estimateTimer = setTimeout(() => {
+      estimateTimer = null;
+      updateExportEstimate();
+    }, ESTIMATE_DEBOUNCE_MS);
+  }
+
+  // ── Web Share API (v3.7.0) ────────────────────────────────────────────
+  //
+  // Comparte la imagen final (mismo pipeline que la descarga: bordes de
+  // posicionamiento fuera, aplanado JPEG, EXIF embebido) mediante el share
+  // sheet nativo. Pensado para móvil; el botón solo es visible si
+  // Capabilities detectó navigator.canShare({files}). Si el share falla por
+  // falta de soporte real, cae a la descarga normal.
+
+  async function shareImage() {
+    if (typeof canvas === 'undefined' || !canvas || !currentFile) {
+      showError('No hay imagen para compartir.');
+      return;
+    }
+
+    try {
+      showPositioningBorders = false;
+      redrawCompleteCanvas();
+
+      const hasAlpha = hasImageAlphaChannel(canvas);
+      const requestedMimeType = getMimeType(outputFormat);
+      let finalMimeType = await determineFallbackFormat(hasAlpha, requestedMimeType);
+      let finalFormat = finalMimeType.split('/')[1];
+
+      const sourceCanvas = (finalMimeType === 'image/jpeg')
+        ? flattenCanvasForJpeg(canvas, getFlattenColor())
+        : canvas;
+      let blob = await canvasToBlob(sourceCanvas, finalMimeType, outputQuality);
+      if (blob && blob.type && blob.type !== finalMimeType) {
+        finalMimeType = blob.type;
+        finalFormat = finalMimeType.split('/')[1];
+      }
+
+      MetadataManager.applyMetadataToImage(canvas);
+      blob = await MetadataManager.embedExifInJpegBlob(blob);
+      blob = await MetadataManager.embedExifInPngBlob(blob);
+      blob = await MetadataManager.embedExifInWebpBlob(blob);
+      blob = await MetadataManager.embedExifInAvifBlob(blob);
+
+      const basenameInput = document.getElementById('file-basename');
+      const customBaseName = basenameInput ? basenameInput.value.trim() : '';
+      let filename = customBaseName || fileBaseName || 'imagen';
+      if (!SecurityManager.isValidFileBaseName(filename)) filename = 'imagen';
+      const extension = getFileExtension(finalFormat);
+
+      const shareFile = new File([blob], filename + '.' + extension, { type: finalMimeType });
+
+      if (typeof navigator !== 'undefined' && typeof navigator.canShare === 'function' &&
+          navigator.canShare({ files: [shareFile] })) {
+        await navigator.share({
+          files: [shareFile],
+          title: filename
+        });
+        showSuccess('Imagen compartida correctamente');
+        return;
+      }
+
+      // Sin soporte real de share con archivos: fallback a descarga.
+      UIManager.showInfo('Este navegador no permite compartir archivos; descargando en su lugar');
+      await downloadImage();
+    } catch (error) {
+      // AbortError = el usuario cerró el share sheet — silencioso.
+      if (error && error.name === 'AbortError') return;
+      MNEMOTAG_DEBUG && console.warn('Web Share falló, cayendo a descarga:', error);
+      try {
+        await downloadImage();
+      } catch (downloadError) {
+        showError('No se pudo compartir ni descargar la imagen.');
+      }
+    } finally {
+      showPositioningBorders = true;
+      redrawCompleteCanvas();
+    }
+  }
+
   return {
     downloadImage: downloadImage,
     downloadImageWithProgress: downloadImageWithProgress,
-    downloadMultipleSizes: downloadMultipleSizes
+    downloadMultipleSizes: downloadMultipleSizes,
+    updateExportEstimate: updateExportEstimate,
+    scheduleEstimateUpdate: scheduleEstimateUpdate,
+    shareImage: shareImage
   };
 })();
 

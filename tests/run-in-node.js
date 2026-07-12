@@ -156,10 +156,13 @@ function load(rel) {
 
 load('js/utils/app-config.js');
 load('js/utils/helpers.js');
+load('js/utils/capabilities.js');
 load('js/utils/app-state.js');
 load('js/managers/security-manager.js');
 load('js/managers/metadata-manager.js');
 load('js/managers/history-manager.js');
+load('js/managers/batch-manager.js');
+load('js/managers/session-manager.js');
 load('js/managers/preset-manager.js');
 load('js/managers/analysis-manager.js');
 load('js/managers/curves-manager.js');
@@ -212,6 +215,7 @@ const specs = [
   'tests/specs/metadata-manager.spec.js',
   'tests/specs/history-manager.spec.js',
   'tests/specs/regression.spec.js',
+  'tests/specs/v370.spec.js',
 ];
 
 for (const spec of specs) {
