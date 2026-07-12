@@ -217,6 +217,6 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 - **v3.6.0**: Fase "base visual y rendimiento" — Tailwind purgado y self-hosted (2.93 MB CDN → 17 KB), subset de Font Awesome (58 iconos, 4.9 KB woff2), selector masivo de botones eliminado (opt-in via c-btn con especificidad identica), componentes cerrados c-* con tokens de diseño consolidados, CSP sin CDNs de estilo/fuentes, capturas de regresion visual en 8 combos (0,00% diff), CSS inicial total 27 KB gzip sin nada externo bloqueante.
 - **v3.4.x** (15 releases): CSP/SRI, ESLint/Stylelint CI, accessibility, curves live preview, filter presets, ImageBitmap undo/redo, 5 managers extracted, Web Worker for autoBalance, Playwright E2E, AVIF EXIF injection.
 
-**Tests**: 248/248 Node + 92/92 binarios + 7/7 E2E en desarrollo + 7/7 E2E en `dist`. Quick smoke check: `npm test`; release check: build + lint + ambos E2E. `git log` remains the authoritative source for the actual commit version.
+**Tests**: 248/248 Node + 92/92 binarios + 17/17 E2E en desarrollo + 17/17 E2E en `dist` (smoke + axe + capturas de regresión visual). Quick smoke check: `npm test`; release check: build + lint + ambos E2E. `git log` remains the authoritative source for the actual commit version.
 
 Commit messages follow `Versión X.Y.Z - <descripción>` in Spanish — match this style. `CHANGELOG.md` and the docs under `docs/` are kept hand-updated per release.
