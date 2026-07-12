@@ -96,6 +96,120 @@ function scssCompile() {
 }
 
 // ============================================================
+// Tailwind purgado (v3.6.0) — sustituye los 2.93 MB del CDN
+// ============================================================
+// Purga node_modules/tailwindcss/dist/tailwind.min.css contra index.html y
+// js/**/*.js (las clases construidas en JS aparecen como string literals,
+// que el extractor de PurgeCSS tokeniza). Salida: dist/css/tailwind.min.css
+// (~10-20 KB gzip frente a 294 KB gzip del CDN, y sin render-blocking externo).
+
+async function tailwindPurge() {
+  const { PurgeCSS } = require('purgecss');
+  const results = await new PurgeCSS().purge({
+    content: ['index.html', 'js/**/*.js'],
+    css: ['node_modules/tailwindcss/dist/tailwind.min.css'],
+    // Extractor estándar para Tailwind v2: captura clases con ':', '/', '.'
+    defaultExtractor: (content) => content.match(/[\w-/:%.]+(?<!:)/g) || [],
+    safelist: {
+      // Estados aplicados por JS que podrían escapar al extractor
+      standard: ['hidden', 'ring-2', 'ring-blue-500'],
+      // Variantes de color calculadas (compatibilityClass y afines)
+      deep: [],
+      greedy: [/^text-(green|blue|orange|red)-600$/]
+    }
+  });
+  await mkdir(DIST_CSS, { recursive: true });
+  await writeFile(path.join(DIST_CSS, 'tailwind.min.css'), results[0].css);
+  const kb = Math.round(results[0].css.length / 1024);
+  console.log(`  tailwind.min.css purgado: ${kb} KB (original: 2866 KB)`);
+}
+
+// ============================================================
+// Font Awesome subset (v3.6.0) — sustituye los ~170 KB de cdnjs
+// ============================================================
+// Escanea index.html + js/**/*.js buscando clases fa-*, resuelve alias contra
+// el metadata oficial de @fortawesome/fontawesome-free, genera el woff2 solo
+// con esos glifos (fontawesome-subset) y un CSS mínimo con @font-face + los
+// ::before de cada icono. La app solo usa el estilo solid (fas).
+
+const FA_MODIFIERS = new Set([
+  'solid', 'regular', 'brands', 'spin', 'pulse', 'fw', 'lg', 'sm', 'xs',
+  '2x', '3x', '4x', '5x', 'stack', 'inverse', 'border', 'pull-left', 'pull-right'
+]);
+
+async function scanFaIcons() {
+  const sources = ['index.html'];
+  const jsFiles = (await walkDir('js')).filter(f => f.endsWith('.js'));
+  sources.push(...jsFiles);
+
+  const found = new Set();
+  for (const file of sources) {
+    const content = await readFile(file, 'utf8');
+    for (const match of content.matchAll(/\bfa-([a-z0-9][a-z0-9-]*)\b/g)) {
+      if (!FA_MODIFIERS.has(match[1])) found.add(match[1]);
+    }
+  }
+  return [...found].sort();
+}
+
+async function fontawesomeSubsetTask() {
+  const { fontawesomeSubset } = require('fontawesome-subset');
+  // FA 6.4.0 publica el metadata como icon-families.json:
+  // { nombre: { unicode, aliases: { names: [...] }, familyStylesByLicense: { free: [{style}] } } }
+  const iconsMeta = JSON.parse(
+    await readFile('node_modules/@fortawesome/fontawesome-free/metadata/icon-families.json', 'utf8')
+  );
+
+  const hasFreeSolid = (meta) =>
+    ((meta.familyStylesByLicense && meta.familyStylesByLicense.free) || [])
+      .some(fs => fs.style === 'solid');
+
+  // Índice de alias → nombre canónico
+  const aliasIndex = new Map();
+  for (const [name, meta] of Object.entries(iconsMeta)) {
+    aliasIndex.set(name, name);
+    const aliases = (meta.aliases && meta.aliases.names) || [];
+    for (const alias of aliases) aliasIndex.set(alias, name);
+  }
+
+  const requested = await scanFaIcons();
+  const canonical = new Set();
+  const cssRules = [];
+  const unknown = [];
+
+  for (const name of requested) {
+    const target = aliasIndex.get(name);
+    if (!target || !hasFreeSolid(iconsMeta[target])) {
+      unknown.push(name);
+      continue;
+    }
+    canonical.add(target);
+    cssRules.push(`.fa-${name}::before{content:"\\${iconsMeta[target].unicode}"}`);
+  }
+
+  if (unknown.length) {
+    console.warn('  ⚠️ Iconos fa-* sin glifo solid en FA 6.4 (revisar):', unknown.join(', '));
+  }
+
+  await mkdir(DIST + '/webfonts', { recursive: true });
+  await fontawesomeSubset({ solid: [...canonical] }, DIST + '/webfonts', {
+    targetFormats: ['woff2']
+  });
+
+  const css = [
+    '/* Font Awesome 6.4.0 Free (subset MnemoTag v3.6.0) — https://fontawesome.com',
+    '   License: https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1) */',
+    `@font-face{font-family:"Font Awesome 6 Free";font-style:normal;font-weight:900;font-display:block;src:url("../webfonts/fa-solid-900.woff2") format("woff2")}`,
+    `.fa,.fas,.fa-solid{font-family:"Font Awesome 6 Free";font-weight:900;-moz-osx-font-smoothing:grayscale;-webkit-font-smoothing:antialiased;display:var(--fa-display,inline-block);font-style:normal;font-variant:normal;line-height:1;text-rendering:auto}`,
+    cssRules.join('\n')
+  ].join('\n');
+
+  await mkdir(DIST_CSS, { recursive: true });
+  await writeFile(path.join(DIST_CSS, 'fontawesome.min.css'), css);
+  console.log(`  fontawesome.min.css: ${canonical.size} iconos, ${Math.round(css.length / 1024)} KB CSS`);
+}
+
+// ============================================================
 // Images — copiar originales + generar WebP y AVIF
 // ============================================================
 
@@ -306,9 +420,11 @@ exports.clean = clean;
 exports.js = jsBundle;
 exports.jsDev = jsBundleDev;
 exports.scss = scssCompile;
+exports.tailwind = tailwindPurge;
+exports.fontawesome = fontawesomeSubsetTask;
 exports.images = images;
 exports.html = html;
-exports.build = series(clean, parallel(jsBundle, scssCompile, images, html, copyAssets));
+exports.build = series(clean, parallel(jsBundle, scssCompile, tailwindPurge, fontawesomeSubsetTask, images, html, copyAssets));
 exports.watch = series(exports.build, watchOnly);
 exports.serve = serve;
 exports.dev = series(exports.build, dev);

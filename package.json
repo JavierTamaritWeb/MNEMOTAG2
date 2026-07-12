@@ -1,7 +1,7 @@
 {
   "name": "mnemotag",
   "private": true,
-  "version": "3.5.14",
+  "version": "3.6.0",
   "description": "Editor profesional de metadatos e imágenes — 100% cliente, sin backend",
   "scripts": {
     "build": "gulp build",
@@ -19,9 +19,11 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
+    "@fortawesome/fontawesome-free": "^6.4.0",
     "@playwright/test": "^1.61.1",
     "browser-sync": "^3.0.4",
     "eslint": "^9.39.5",
+    "fontawesome-subset": "^4.6.0",
     "gulp": "^5.0.0",
     "gulp-clean-css": "^4.3.0",
     "gulp-concat": "^2.6.1",
@@ -31,9 +33,11 @@
     "gulp-terser": "^2.1.0",
     "html-minifier-terser": "^7.2.0",
     "postcss-scss": "^4.0.9",
+    "purgecss": "^8.0.0",
     "sass": "^1.77.0",
     "sharp": "^0.34.5",
-    "stylelint": "^16.26.1"
+    "stylelint": "^16.26.1",
+    "tailwindcss": "^2.2.19"
   },
   "author": "Javier Tamarit",
   "license": "MIT"

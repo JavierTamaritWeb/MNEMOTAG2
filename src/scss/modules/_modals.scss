@@ -257,16 +257,14 @@
       &--error { color: #dc2626; }
     }
 
-    /* v3.5.14: reintento por archivo fallido. Override explícito de los
-       estilos globales de botón (min-width/min-height/padding masivos). */
+    /* v3.5.14: reintento por archivo fallido. v3.6.0: sin !important ni
+       neutralizadores — el selector masivo de botones pasó a ser opt-in
+       (.c-btn) y este botón dinámico no la lleva. */
     .batch-item-retry {
       display: block;
       width: calc(100% - 1rem);
-      min-width: 0 !important;
-      min-height: 0 !important;
-      height: auto !important;
       margin: 0 0.5rem 0.5rem;
-      padding: 4px 8px !important;
+      padding: 4px 8px;
       font-size: 0.7rem;
       font-weight: 600;
       color: #b91c1c;
@@ -2186,13 +2184,11 @@
   margin: 4px 0 0;
 }
 
-/* v3.5.14: botón Cancelar del overlay de progreso. Override por ID
-   obligatorio (regla del proyecto) para escapar de los estilos globales
-   de botón (min-width 160px / min-height 56px / padding 16px 36px). */
+/* Botón Cancelar del overlay de progreso. v3.6.0: ya no necesita
+   neutralizar los estilos globales de botón (el selector masivo
+   button[type="button"] pasó a ser opt-in vía .c-btn y este botón no
+   la lleva) — estilos propios completos. */
 #progress-cancel {
-  min-width: 0;
-  min-height: 0;
-  height: auto;
   margin-top: 12px;
   padding: 6px 18px;
   font-size: 0.8rem;

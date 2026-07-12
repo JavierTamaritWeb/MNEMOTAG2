@@ -49,16 +49,18 @@
          para compilar helpers. Sin unsafe-eval esas libs fallan con EvalError.
          Es una concesión de seguridad aceptable porque MnemoTag no procesa
          input de terceros que pueda contener código malicioso. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://fonts.googleapis.com; font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' blob: https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; worker-src 'self' blob:; child-src 'self' blob:; manifest-src 'self'; base-uri 'self'; form-action 'self';">
+  <!-- v3.6.0: style-src y font-src ya no necesitan CDNs — Tailwind purgado y
+       Font Awesome subset se sirven localmente. script-src mantiene cdnjs y
+       jsdelivr solo para las cargas diferidas (JSZip, heic2any). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self' blob: https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com; worker-src 'self' blob:; child-src 'self' blob:; manifest-src 'self'; base-uri 'self'; form-action 'self';">
 
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
-        rel="stylesheet"
-        integrity="sha384-HtMZLkYo+pR5/u7zCzXxMJP6QoNnQJt1qkHM0EaOPvGDIzaVZbmYr/TlvUZ/sKAg"
-        crossorigin="anonymous">
-  <link rel="stylesheet"
-        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-        integrity="sha384-iw3OoTErCYJJB9mCa8LNS2hbsQ7M3C0EpIsO/H5+EGAkPGc6rk+V8i04oW/K5xq0"
-        crossorigin="anonymous">
+  <!-- v3.6.0: Tailwind purgado y servido localmente (gulp tailwind):
+       2.93 MB del CDN → ~17 KB con solo las utilidades usadas.
+       Ya no hay CSS externo render-blocking. -->
+  <link rel="stylesheet" href="dist/css/tailwind.min.css">
+  <!-- v3.6.0: subset local de Font Awesome (gulp fontawesome) — solo los
+       iconos usados por la app, en lugar de los ~170 KB de cdnjs. -->
+  <link rel="stylesheet" href="dist/css/fontawesome.min.css">
   <link rel="stylesheet" href="dist/css/styles.css">
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -113,7 +115,7 @@
               <span>Múltiples formatos</span>
             </a>
           </div>
-          <button type="button" id="clear-all-btn"
+          <button class="c-btn" type="button" id="clear-all-btn"
                   title="Limpiar todos los datos: imagen, metadatos, marcas de agua, filtros, historial y presets">
             <i class="fas fa-trash-alt" aria-hidden="true"></i>
             Limpiar todo
@@ -133,14 +135,14 @@
               <p class="text-gray-700 mb-2 upload-text">Arrastra y suelta tu imagen o</p>
               <button id="file-selector"
                       type="button"
-                      class="upload__button"
+                      class="c-btn upload__button"
                       aria-label="Seleccionar archivo">
                 <i class="fas fa-folder-open" aria-hidden="true"></i>
                 Seleccionar archivo
               </button>
               <button id="paste-image-btn"
                       type="button"
-                      class="upload__button ml-2"
+                      class="c-btn upload__button ml-2"
                       aria-label="Pegar imagen desde el portapapeles"
                       title="Pegar imagen desde el portapapeles (Cmd+V / Ctrl+V)">
                 <i class="fas fa-paste" aria-hidden="true"></i>
@@ -148,7 +150,7 @@
               </button>
               <button id="open-batch-btn"
                       type="button"
-                      class="upload__button ml-2"
+                      class="c-btn upload__button ml-2"
                       aria-label="Procesar varias imágenes en lote"
                       title="Procesar varias imágenes con la misma configuración">
                 <i class="fas fa-layer-group" aria-hidden="true"></i>
@@ -228,7 +230,7 @@
                                class="flex-1 px-3 py-2 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 form-input"
                                placeholder="© 2026 TU NOMBRE"
                                maxlength="200">
-                        <button type="button" class="copyright-generator border border-gray-300 px-3" id="autoCopyright" title="Generar copyright automático" aria-label="Generar copyright automático">
+                        <button type="button" class="c-btn copyright-generator border border-gray-300 px-3" id="autoCopyright" title="Generar copyright automático" aria-label="Generar copyright automático">
                           <i class="fas fa-magic" aria-hidden="true"></i>
                         </button>
                       </div>
@@ -265,7 +267,7 @@
                   <div class="mb-6">
                     <label class="block text-gray-700 font-medium mb-2 form-label">
                       <i class="fas fa-map-marker-alt mr-1"></i>Geolocalización
-                      <button type="button" class="gps-button ml-2" id="getCurrentLocation" title="Obtener ubicación actual">
+                      <button type="button" class="c-btn gps-button ml-2" id="getCurrentLocation" title="Obtener ubicación actual">
                         <i class="fas fa-crosshairs"></i> Ubicación actual
                       </button>
                     </label>
@@ -658,39 +660,39 @@
                     <h3 class="text-lg font-medium text-gray-800">Filtros Preestablecidos</h3>
                     
                     <div class="grid grid-cols-2 gap-3">
-                      <button type="button" class="btn btn-outline filter-preset" data-filter="none">
+                      <button type="button" class="c-btn btn btn-outline filter-preset" data-filter="none">
                         Original
                       </button>
-                      <button type="button" class="btn btn-outline filter-preset" data-filter="sepia">
+                      <button type="button" class="c-btn btn btn-outline filter-preset" data-filter="sepia">
                         Sepia
                       </button>
-                      <button type="button" class="btn btn-outline filter-preset" data-filter="grayscale">
+                      <button type="button" class="c-btn btn btn-outline filter-preset" data-filter="grayscale">
                         Blanco y Negro
                       </button>
-                      <button type="button" class="btn btn-outline filter-preset" data-filter="vintage">
+                      <button type="button" class="c-btn btn btn-outline filter-preset" data-filter="vintage">
                         Vintage
                       </button>
-                      <button type="button" class="btn btn-outline filter-preset" data-filter="cold">
+                      <button type="button" class="c-btn btn btn-outline filter-preset" data-filter="cold">
                         Frío
                       </button>
-                      <button type="button" class="btn btn-outline filter-preset" data-filter="warm">
+                      <button type="button" class="c-btn btn btn-outline filter-preset" data-filter="warm">
                         Cálido
                       </button>
                     </div>
                     
                     <div class="mt-4 flex flex-col gap-2">
                       <!-- v3.3.12: Auto-mejorar (auto-balance) -->
-                      <button type="button" id="auto-balance-btn" class="btn btn-primary w-full" title="Mejora automáticamente brillo y contraste analizando los percentiles 1% y 99% de luminosidad">
+                      <button type="button" id="auto-balance-btn" class="c-btn btn btn-primary w-full" title="Mejora automáticamente brillo y contraste analizando los percentiles 1% y 99% de luminosidad">
                         <i class="fas fa-magic" aria-hidden="true"></i>
                         Auto-mejorar imagen
                       </button>
                       <!-- v3.3.13: Curvas y niveles -->
-                      <button type="button" id="curves-btn" class="btn btn-primary w-full" title="Editor de curvas y niveles (estilo Photoshop) por canal o RGB combinado">
+                      <button type="button" id="curves-btn" class="c-btn btn btn-primary w-full" title="Editor de curvas y niveles (estilo Photoshop) por canal o RGB combinado">
                         <i class="fas fa-chart-line" aria-hidden="true"></i>
                         Curvas y niveles
                       </button>
                       <!-- v3.3.18: Eliminar fondo con IA (lazy load del modelo) -->
-                      <button type="button" id="remove-bg-btn" class="btn btn-primary w-full" title="Eliminar el fondo de la imagen usando IA. La primera vez descarga ~10-15 MB del modelo, después funciona offline.">
+                      <button type="button" id="remove-bg-btn" class="c-btn btn btn-primary w-full" title="Eliminar el fondo de la imagen usando IA. La primera vez descarga ~10-15 MB del modelo, después funciona offline.">
                         <i class="fas fa-magic-wand-sparkles" aria-hidden="true"></i>
                         Eliminar fondo (IA)
                       </button>
@@ -707,7 +709,7 @@
                                  maxlength="40"
                                  class="flex-1 px-2 py-1 text-sm border border-gray-300 rounded form-input"
                                  aria-label="Nombre del preset">
-                          <button type="button" id="preset-save-btn" class="btn btn-outline text-sm" title="Guardar brillo/contraste/saturación/desenfoque actuales como preset">
+                          <button type="button" id="preset-save-btn" class="c-btn btn btn-outline text-sm" title="Guardar brillo/contraste/saturación/desenfoque actuales como preset">
                             <i class="fas fa-save" aria-hidden="true"></i>
                             Guardar
                           </button>
@@ -717,22 +719,22 @@
                                   aria-label="Preset guardado">
                             <option value="">— No hay presets guardados —</option>
                           </select>
-                          <button type="button" id="preset-load-btn" class="btn btn-outline text-sm" title="Cargar el preset seleccionado">
+                          <button type="button" id="preset-load-btn" class="c-btn btn btn-outline text-sm" title="Cargar el preset seleccionado">
                             <i class="fas fa-folder-open" aria-hidden="true"></i>
                           </button>
-                          <button type="button" id="preset-delete-btn" class="btn btn-outline text-sm" title="Eliminar el preset seleccionado">
+                          <button type="button" id="preset-delete-btn" class="c-btn btn btn-outline text-sm" title="Eliminar el preset seleccionado">
                             <i class="fas fa-trash" aria-hidden="true"></i>
                           </button>
                         </div>
                         <div id="preset-empty-state" class="empty-state mt-2" hidden>
                           <p>No hay presets guardados.</p>
-                          <button type="button" id="preset-empty-cta" class="empty-state__action">
+                          <button type="button" id="preset-empty-cta" class="c-btn empty-state__action">
                             Crear el primero
                           </button>
                         </div>
                       </div>
 
-                      <button type="button" id="resetFilters" class="reset-filters-btn">
+                      <button type="button" id="resetFilters" class="c-btn reset-filters-btn">
                         <i class="fas fa-undo" aria-hidden="true"></i>
                         RESETEAR FILTROS
                       </button>
@@ -863,22 +865,22 @@
                         <div>
                           <label class="block text-sm font-medium mb-2">Tamaños predefinidos</label>
                           <div class="grid grid-cols-2 gap-2">
-                            <button type="button" class="preset-btn btn-sm" data-width="1920" data-height="1080">
+                            <button type="button" class="c-btn preset-btn btn-sm" data-width="1920" data-height="1080">
                               Full HD<br><span class="text-xs opacity-75">1920×1080</span>
                             </button>
-                            <button type="button" class="preset-btn btn-sm" data-width="1280" data-height="720">
+                            <button type="button" class="c-btn preset-btn btn-sm" data-width="1280" data-height="720">
                               HD<br><span class="text-xs opacity-75">1280×720</span>
                             </button>
-                            <button type="button" class="preset-btn btn-sm" data-width="800" data-height="600">
+                            <button type="button" class="c-btn preset-btn btn-sm" data-width="800" data-height="600">
                               SVGA<br><span class="text-xs opacity-75">800×600</span>
                             </button>
-                            <button type="button" class="preset-btn btn-sm" data-width="1024" data-height="1024">
+                            <button type="button" class="c-btn preset-btn btn-sm" data-width="1024" data-height="1024">
                               Cuadrado<br><span class="text-xs opacity-75">1024×1024</span>
                             </button>
-                            <button type="button" class="preset-btn btn-sm" data-width="1080" data-height="1080">
+                            <button type="button" class="c-btn preset-btn btn-sm" data-width="1080" data-height="1080">
                               Instagram<br><span class="text-xs opacity-75">1080×1080</span>
                             </button>
-                            <button type="button" class="preset-btn btn-sm" data-width="1200" data-height="630">
+                            <button type="button" class="c-btn preset-btn btn-sm" data-width="1200" data-height="630">
                               Facebook<br><span class="text-xs opacity-75">1200×630</span>
                             </button>
                           </div>
@@ -886,11 +888,11 @@
                         
                         <!-- Resize actions -->
                         <div class="flex gap-2">
-                          <button type="button" id="apply-resize" class="btn btn-primary flex-1">
+                          <button type="button" id="apply-resize" class="c-btn btn btn-primary flex-1">
                             <i class="fas fa-check"></i>
                             Aplicar redimensión
                           </button>
-                          <button type="button" id="reset-original-size" class="btn btn-secondary">
+                          <button type="button" id="reset-original-size" class="c-btn btn btn-secondary">
                             <i class="fas fa-undo"></i>
                             Original
                           </button>
@@ -914,19 +916,19 @@
                         
                         <!-- Rotation buttons -->
                         <div class="grid grid-cols-2 gap-2 rotation-controls">
-                          <button type="button" id="rotate-90" class="btn btn-secondary">
+                          <button type="button" id="rotate-90" class="c-btn btn btn-secondary">
                             <i class="fas fa-redo"></i>
                             90° ↻
                           </button>
-                          <button type="button" id="rotate-180" class="btn btn-secondary">
+                          <button type="button" id="rotate-180" class="c-btn btn btn-secondary">
                             <i class="fas fa-sync"></i>
                             180° ↻
                           </button>
-                          <button type="button" id="rotate-270" class="btn btn-secondary">
+                          <button type="button" id="rotate-270" class="c-btn btn btn-secondary">
                             <i class="fas fa-undo"></i>
                             270° ↻
                           </button>
-                          <button type="button" id="reset-rotation" class="btn btn-outline">
+                          <button type="button" id="reset-rotation" class="c-btn btn btn-outline">
                             <i class="fas fa-compass"></i>
                             Original
                           </button>
@@ -934,11 +936,11 @@
                         
                         <!-- Quick actions -->
                         <div class="flex gap-2 button-group">
-                          <button type="button" id="flip-horizontal" class="btn btn-outline flex-1">
+                          <button type="button" id="flip-horizontal" class="c-btn btn btn-outline flex-1">
                             <i class="fas fa-arrows-alt-h"></i>
                             Voltear H
                           </button>
-                          <button type="button" id="flip-vertical" class="btn btn-outline flex-1">
+                          <button type="button" id="flip-vertical" class="c-btn btn btn-outline flex-1">
                             <i class="fas fa-arrows-alt-v"></i>
                             Voltear V
                           </button>
@@ -1053,7 +1055,7 @@
                       </div>
                       <button id="download-multisize-btn"
                               type="button"
-                              class="btn btn-secondary w-full"
+                              class="c-btn btn btn-secondary w-full"
                               aria-label="Descargar varios tamaños como ZIP"
                               title="Genera un ZIP con la imagen redimensionada a cada tamaño marcado">
                         <i class="fas fa-file-archive" aria-hidden="true"></i>
@@ -1165,16 +1167,16 @@
                   <span id="history-position" class="history-panel__position"></span>
                 </h4>
                 <div class="flex gap-2">
-                  <button type="button" id="history-prev-btn" class="history-panel__nav" aria-label="Estado anterior" title="Ir al estado anterior" disabled>
+                  <button type="button" id="history-prev-btn" class="c-btn history-panel__nav" aria-label="Estado anterior" title="Ir al estado anterior" disabled>
                     <i class="fas fa-chevron-left"></i>
                   </button>
-                  <button type="button" id="history-next-btn" class="history-panel__nav" aria-label="Estado siguiente" title="Ir al estado siguiente" disabled>
+                  <button type="button" id="history-next-btn" class="c-btn history-panel__nav" aria-label="Estado siguiente" title="Ir al estado siguiente" disabled>
                     <i class="fas fa-chevron-right"></i>
                   </button>
-                  <button type="button" id="history-clear-btn" class="history-panel__close" aria-label="Vaciar historial" title="Vaciar historial">
+                  <button type="button" id="history-clear-btn" class="c-btn history-panel__close" aria-label="Vaciar historial" title="Vaciar historial">
                     <i class="fas fa-trash-alt"></i>
                   </button>
-                  <button type="button" id="history-panel-close" class="history-panel__close" aria-label="Cerrar panel" title="Cerrar">
+                  <button type="button" id="history-panel-close" class="c-btn history-panel__close" aria-label="Cerrar panel" title="Cerrar">
                     <i class="fas fa-times"></i>
                   </button>
                 </div>
@@ -1217,7 +1219,9 @@
             <!-- Nuevas Funcionalidades v3.1 -->
             <div class="advanced-tools-container">
               <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2 uppercase">
-                <i class="fas fa-sparkles text-purple-500"></i>
+                <!-- El icono "sparkles" a secas es de FA Pro (no renderizaba
+                     ni con el CDN); wand-magic-sparkles es el equivalente free -->
+                <i class="fas fa-wand-magic-sparkles text-purple-500"></i>
                 Herramientas Avanzadas
               </h3>
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -1608,7 +1612,7 @@
           <h3 id="histogram-modal-title" class="analysis-modal__title">
             <i class="fas fa-chart-bar"></i> Histograma RGB y Luminosidad
           </h3>
-          <button type="button" class="analysis-modal__close" data-close-modal="histogram" aria-label="Cerrar">
+          <button type="button" class="c-btn analysis-modal__close" data-close-modal="histogram" aria-label="Cerrar">
             <i class="fas fa-times"></i>
           </button>
         </div>
@@ -1633,7 +1637,7 @@
           <h3 id="curves-modal-title" class="analysis-modal__title">
             <i class="fas fa-chart-line"></i> Curvas y niveles
           </h3>
-          <button type="button" class="analysis-modal__close" data-close-modal="curves" aria-label="Cerrar">
+          <button type="button" class="c-btn analysis-modal__close" data-close-modal="curves" aria-label="Cerrar">
             <i class="fas fa-times"></i>
           </button>
         </div>
@@ -1641,10 +1645,10 @@
           <div class="curves-controls mb-3">
             <label class="text-sm font-medium mr-2">Canal:</label>
             <div class="curves-channel-tabs">
-              <button type="button" class="curves-channel-btn active" data-channel="rgb">RGB</button>
-              <button type="button" class="curves-channel-btn" data-channel="r">Rojo</button>
-              <button type="button" class="curves-channel-btn" data-channel="g">Verde</button>
-              <button type="button" class="curves-channel-btn" data-channel="b">Azul</button>
+              <button type="button" class="c-btn curves-channel-btn active" data-channel="rgb">RGB</button>
+              <button type="button" class="c-btn curves-channel-btn" data-channel="r">Rojo</button>
+              <button type="button" class="c-btn curves-channel-btn" data-channel="g">Verde</button>
+              <button type="button" class="c-btn curves-channel-btn" data-channel="b">Azul</button>
             </div>
           </div>
           <canvas id="curves-canvas" width="280" height="280"></canvas>
@@ -1653,13 +1657,13 @@
             <br>v3.4.4: el canvas principal muestra el resultado <strong>en tiempo real</strong> mientras editas la curva.
           </p>
           <div class="flex gap-2 mt-3 flex-wrap">
-            <button type="button" id="curves-apply-btn" class="btn btn-primary button--action">
+            <button type="button" id="curves-apply-btn" class="c-btn btn btn-primary button--action">
               <i class="fas fa-check"></i> Aplicar a la imagen
             </button>
-            <button type="button" id="curves-cancel-btn" class="btn btn-outline">
+            <button type="button" id="curves-cancel-btn" class="c-btn btn btn-outline">
               <i class="fas fa-times"></i> Cancelar
             </button>
-            <button type="button" id="curves-reset-btn" class="btn btn-outline">
+            <button type="button" id="curves-reset-btn" class="c-btn btn btn-outline">
               <i class="fas fa-undo"></i> Resetear curva
             </button>
           </div>
@@ -1675,7 +1679,7 @@
           <h3 id="palette-modal-title" class="analysis-modal__title">
             <i class="fas fa-palette"></i> Paleta de colores dominantes
           </h3>
-          <button type="button" class="analysis-modal__close" data-close-modal="palette" aria-label="Cerrar">
+          <button type="button" class="c-btn analysis-modal__close" data-close-modal="palette" aria-label="Cerrar">
             <i class="fas fa-times"></i>
           </button>
         </div>

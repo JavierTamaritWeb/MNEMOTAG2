@@ -32,6 +32,44 @@
       --radius-lg: 0.75rem;
       --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       --transition-slow: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+      /* ==========================================================
+         Tokens de diseño (v3.6.0) — escala consolidada.
+         Los componentes cerrados (c-*) consumen SOLO estos tokens;
+         no introducir literales nuevos de espaciado/tamaño en ellos.
+         ========================================================== */
+
+      /* Espaciado (escala de 4px) */
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 20px;
+      --space-6: 24px;
+      --space-8: 32px;
+
+      /* Tamaños de control (altura mínima de elementos interactivos) */
+      --control-sm: 32px;
+      --control-md: 40px;
+      --control-lg: 48px;
+
+      /* Radios adicionales */
+      --radius-sm: 0.25rem;
+      --radius-full: 9999px;
+
+      /* Tipografía de controles */
+      --font-control-sm: 0.75rem;
+      --font-control-md: 0.875rem;
+      --font-control-lg: 1rem;
+
+      /* Estados interactivos */
+      --focus-ring: 0 0 0 3px rgba(59, 130, 246, 0.4);
+      --disabled-opacity: 0.5;
+
+      /* Superficies (alias semánticos de los bg-* existentes) */
+      --surface-raised: var(--bg-card);
+      --surface-sunken: var(--bg-tertiary);
+      --surface-overlay: var(--bg-overlay);
     }
 
     /* Enhanced Dark Mode */
@@ -65,4 +103,7 @@
       --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.4);
       --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
       --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
+
+      /* Tokens de estados interactivos en oscuro */
+      --focus-ring: 0 0 0 3px rgba(96, 165, 250, 0.45);
     }

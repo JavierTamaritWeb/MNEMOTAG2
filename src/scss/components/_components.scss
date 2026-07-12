@@ -543,7 +543,13 @@
       flex-wrap: wrap;
     }
     
-    /* Reset completo de todos los botones */
+    /* Componente cerrado de botón de acción (v3.6.0).
+       ANTES: el selector masivo button[type="button"] imponía estos estilos
+       (min-width 160px, min-height 56px, padding 16px 36px) a TODOS los
+       botones, y cada botón nuevo necesitaba un override por ID para
+       escapar. AHORA es opt-in vía la clase .c-btn: un botón nuevo sin
+       .c-btn no hereda nada y no necesita arreglos posteriores. */
+    button.c-btn,
     .action-buttons .btn,
     .button--action,
     .rotation-controls .btn,
@@ -553,7 +559,6 @@
     #redo-btn,
     #reset-changes,
     #download-image,
-    button[type="button"],
     .btn-secondary,
     .btn-outline {
       /* Base azul mejorada con gradiente sutil */
@@ -593,6 +598,7 @@
     }
     
     /* Estados hover con cambios de color más dramáticos */
+    button.c-btn:hover,
     .action-buttons .btn:hover,
     .button--action:hover,
     .rotation-controls .btn:hover,
@@ -602,7 +608,6 @@
     #redo-btn:hover,
     #reset-changes:hover,
     #download-image:hover,
-    button[type="button"]:hover,
     .btn-secondary:hover,
     .btn-outline:hover {
       background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);

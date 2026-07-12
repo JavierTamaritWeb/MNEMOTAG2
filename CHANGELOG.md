@@ -4,6 +4,28 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.6.0] - 2026-07-12
+
+Segunda fase del roadmap: **base visual y rendimiento**.
+
+### Added
+- **Tailwind purgado y self-hosted** (tarea gulp `tailwind`): PurgeCSS contra `index.html` + `js/**/*.js` con safelist para clases dinámicas. 2.93 MB del CDN (294 KB gzip, render-blocking) → 17 KB locales (3 KB gzip).
+- **Subset de Font Awesome** (tarea gulp `fontawesome`): escaneo automático de clases `fa-*`, resolución de alias con el metadata oficial y generación de woff2 (4.9 KB, 58 iconos) + CSS mínimo. Sustituye los ~170 KB de cdnjs. El icono `fa-sparkles` (solo Pro, nunca renderizó) se cambió por `fa-wand-magic-sparkles`.
+- **Componentes SCSS cerrados** (`src/scss/components/_closed.scss`): familia `c-icon-btn`, `c-toolbar`, `c-tabs`, `c-field`, `c-dialog`, `c-status`, consumiendo solo tokens de diseño. Base para el área de trabajo de la v3.6.1.
+- **Tokens de diseño consolidados** en `_variables.scss`: escala de espaciado (`--space-*`), tamaños de control (`--control-*`), radios, tipografía de controles, `--focus-ring` (claro/oscuro), opacidad disabled y alias de superficies.
+- **Capturas de regresión visual** (`tests/e2e/capture-baseline.spec.js`): 8 combinaciones (1440×900, 1024×768, 390×844, 320×568 × claro/oscuro).
+
+### Changed
+- **El selector masivo `button[type="button"]` eliminado**: los estilos de botón de acción son ahora opt-in vía la clase `c-btn` (selector `button.c-btn`, misma especificidad que el antiguo para no alterar ninguna cascada — verificado con 0,00% de diferencia de píxeles en las 8 capturas). Los botones nuevos ya no necesitan overrides por ID para escapar de estilos globales.
+- **CSP endurecida**: `style-src` y `font-src` ya no permiten cdnjs/jsdelivr (no queda CSS ni fuentes externas); `script-src` los mantiene solo para las cargas diferidas (JSZip, heic2any).
+- **Service worker**: precachea los tres CSS locales + woff2; el precache de CSS de CDN queda vacío.
+- **Overrides por ID reducidos**: `#progress-cancel` y `.batch-item-retry` ya no llevan neutralizadores ni `!important` (los botones sin `c-btn` no heredan nada que neutralizar). Los overrides legacy (`#auto-balance-btn`, etc.) se conservan mientras sus botones mantengan `c-btn`; su limpieza llega con la migración de la v3.6.1.
+
+### Presupuesto (objetivo <50 KB gzip, sin CSS externo bloqueante)
+- CSS inicial total: **27 KB gzip** (styles 22 + tailwind 3 + fontawesome <1) + 4.9 KB de woff2. Cero CSS externo.
+
+---
+
 ## [3.5.14] - 2026-07-12
 
 Primera fase del roadmap de mejora: **confianza y coherencia**.
