@@ -245,6 +245,51 @@
       background: rgba(220, 38, 38, 1);
     }
 
+    /* v3.5.14: estado por archivo (pendiente/procesando/ok/error) */
+    .batch-item-status {
+      margin-top: 0.25rem;
+      font-size: 0.65rem;
+      font-weight: 600;
+
+      &--pendiente { color: var(--text-tertiary); }
+      &--procesando { color: #2563eb; }
+      &--ok { color: #16a34a; }
+      &--error { color: #dc2626; }
+    }
+
+    /* v3.5.14: reintento por archivo fallido. Override explícito de los
+       estilos globales de botón (min-width/min-height/padding masivos). */
+    .batch-item-retry {
+      display: block;
+      width: calc(100% - 1rem);
+      min-width: 0 !important;
+      min-height: 0 !important;
+      height: auto !important;
+      margin: 0 0.5rem 0.5rem;
+      padding: 4px 8px !important;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #b91c1c;
+      background: #fef2f2;
+      border: 1px solid #fca5a5;
+      border-radius: 4px;
+      cursor: pointer;
+
+      &:hover {
+        background: #fee2e2;
+      }
+    }
+
+    [data-theme="dark"] .batch-item-retry {
+      color: #fca5a5;
+      background: rgba(127, 29, 29, 0.2);
+      border-color: #7f1d1d;
+
+      &:hover {
+        background: rgba(127, 29, 29, 0.35);
+      }
+    }
+
     /* Progress Bar */
     .progress-bar-container {
       width: 100%;
@@ -2139,6 +2184,43 @@
   font-size: 0.75rem;
   color: #9ca3af;
   margin: 4px 0 0;
+}
+
+/* v3.5.14: botón Cancelar del overlay de progreso. Override por ID
+   obligatorio (regla del proyecto) para escapar de los estilos globales
+   de botón (min-width 160px / min-height 56px / padding 16px 36px). */
+#progress-cancel {
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  margin-top: 12px;
+  padding: 6px 18px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #b91c1c;
+  background: transparent;
+  border: 1px solid #fca5a5;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background: #fef2f2;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+}
+
+[data-theme="dark"] #progress-cancel {
+  color: #fca5a5;
+  border-color: #7f1d1d;
+
+  &:hover:not(:disabled) {
+    background: rgba(127, 29, 29, 0.25);
+  }
 }
 
 [data-theme="dark"] .progress-card {

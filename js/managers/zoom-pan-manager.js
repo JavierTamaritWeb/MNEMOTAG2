@@ -108,6 +108,17 @@ window.ZoomPanManager = (function () {
     }
   }
 
+  // Fuente de verdad para el modal de atajos: estas entradas describen
+  // EXACTAMENTE lo que maneja el switch de initZoomKeyboardShortcuts().
+  // Si cambias el switch, cambia esta lista.
+  function getKeyboardShortcuts() {
+    return [
+      { key: '+', modifiers: ['ctrl'], description: 'Aumentar zoom', category: 'Vista' },
+      { key: '-', modifiers: ['ctrl'], description: 'Reducir zoom', category: 'Vista' },
+      { key: '0', modifiers: ['ctrl'], description: 'Restablecer zoom al 100%', category: 'Vista' }
+    ];
+  }
+
   function initZoomKeyboardShortcuts() {
     document.addEventListener('keydown', function (e) {
       // No interceptar atajos mientras se escribe en un campo de texto
@@ -228,6 +239,7 @@ window.ZoomPanManager = (function () {
     applyZoom: applyZoom,
     updateZoomLevel: updateZoomLevel,
     initZoomKeyboardShortcuts: initZoomKeyboardShortcuts,
+    getKeyboardShortcuts: getKeyboardShortcuts,
     initMouseWheelZoom: initMouseWheelZoom,
     initPanNavigation: initPanNavigation,
     resetPan: resetPan

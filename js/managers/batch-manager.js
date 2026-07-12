@@ -12,7 +12,10 @@ class BatchManager {
     this.processedImages = [];
     this.currentConfig = null;
     this.isProcessing = false;
-    this.maxImages = 20;
+    // v3.5.14: cancelación cooperativa — se comprueba entre imagen e imagen
+    this.cancelRequested = false;
+    // Límite de imágenes desde AppConfig — única fuente de verdad (v3.5.14)
+    this.maxImages = AppConfig.batchMaxImages;
     this.maxFileSize = AppConfig.maxFileSize;
     this.maxPixelsPerImage = 36 * 1000 * 1000;
     this.maxTotalPixels = 80 * 1000 * 1000;
@@ -370,8 +373,13 @@ class BatchManager {
     const total = this.imageQueue.length;
     let done = 0;
     const errors = [];
+    this.cancelRequested = false;
 
     for (const imageItem of this.imageQueue) {
+      // v3.5.14: cancelación cooperativa — la imagen en curso termina,
+      // las restantes quedan sin procesar (no aparecen en processedImages)
+      if (this.cancelRequested) break;
+
       let itemResult;
       try {
         itemResult = await this.processImage(imageItem);
@@ -386,6 +394,8 @@ class BatchManager {
           error: error.message
         };
       }
+      // id de la cola para que la UI pueda mapear estados por archivo
+      itemResult.id = imageItem.id;
       this.processedImages.push(itemResult);
       done++;
 
@@ -404,7 +414,11 @@ class BatchManager {
             current: done,
             total: total,
             percentage: percentage,
-            currentImage: imageItem.name
+            currentImage: imageItem.name,
+            // v3.5.14: info por archivo para que la UI marque estados
+            id: imageItem.id,
+            lastSuccess: itemResult.success,
+            lastError: itemResult.success ? null : itemResult.error
           });
         } catch (cbError) {
           MNEMOTAG_DEBUG && console.warn('progressCallback lanzó un error (ignorado):', cbError);
@@ -413,13 +427,16 @@ class BatchManager {
     }
 
     this.isProcessing = false;
+    const cancelled = this.cancelRequested;
+    this.cancelRequested = false;
 
     const failed = errors.length;
     const succeeded = this.processedImages.filter(img => img.success).length;
 
-    // main.js solo muestra un toast de éxito global tras processQueue, así
-    // que los fallos parciales se avisan desde aquí para que no queden mudos.
-    if (failed > 0 && typeof UIManager !== 'undefined' && typeof UIManager.showWarning === 'function') {
+    // main.js muestra el resumen (éxito / parcial / cancelado); aquí solo
+    // avisamos de fallos parciales cuando NO hubo cancelación para que no
+    // queden mudos si el caller ignora el detalle.
+    if (failed > 0 && !cancelled && typeof UIManager !== 'undefined' && typeof UIManager.showWarning === 'function') {
       UIManager.showWarning(failed + ' de ' + total + ' imágenes no se pudieron procesar');
     }
 
@@ -430,8 +447,53 @@ class BatchManager {
       failed: failed,
       errors: errors,
       total: total,
+      cancelled: cancelled,
       images: this.processedImages
     };
+  }
+
+  /**
+   * Solicitar la cancelación del lote en curso (v3.5.14).
+   * Cooperativa: la imagen en proceso termina y el resto no se procesa.
+   */
+  requestCancel() {
+    if (this.isProcessing) {
+      this.cancelRequested = true;
+    }
+  }
+
+  /**
+   * Reintentar UNA imagen fallida del último lote (v3.5.14).
+   * Usa la configuración ya capturada; si tiene éxito, reemplaza la entrada
+   * fallida en processedImages para que el ZIP la incluya.
+   * @param {string|number} id - id del item en la cola
+   * @returns {Promise<Object>} resultado del procesamiento
+   */
+  async retryImage(id) {
+    if (this.isProcessing) {
+      throw new Error('Espera a que termine el procesamiento en curso');
+    }
+    if (!this.currentConfig) {
+      throw new Error('No hay configuración de lote capturada');
+    }
+    const item = this.imageQueue.find(i => i.id === id);
+    if (!item) {
+      throw new Error('La imagen ya no está en la cola');
+    }
+
+    const result = await this.processImage(item); // lanza si vuelve a fallar
+    result.id = item.id;
+    item.processed = true;
+    item.error = null;
+
+    const idx = this.processedImages.findIndex(p => p.id === id);
+    if (idx >= 0) {
+      this.processedImages[idx] = result;
+    } else {
+      // La imagen quedó sin procesar (lote cancelado): añadirla
+      this.processedImages.push(result);
+    }
+    return result;
   }
 
   /**

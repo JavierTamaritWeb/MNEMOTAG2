@@ -679,7 +679,7 @@ describe('Regresión — 18 quick wins de v3.5.13', function () {
     const lock = JSON.parse(await fetchSource('../package-lock.json'));
     const sw = await fetchSource('../service-worker.js');
     const readme = await fetchSource('../README.md');
-    expect(pkg.version).toBe('3.5.13');
+    expect(pkg.version).toBe('3.5.14');
     expect(lock.version).toBe(pkg.version);
     expect(lock.packages[''].version).toBe(pkg.version);
     expect(sw).toContain(`mnemotag-v${pkg.version}`);

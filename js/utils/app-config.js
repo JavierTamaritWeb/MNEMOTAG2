@@ -16,6 +16,11 @@
 const AppConfig = {
   // File validation settings
   maxFileSize: 25 * 1024 * 1024, // 25MB
+
+  // ÚNICA fuente de verdad del límite de imágenes por lote (v3.5.14).
+  // La UI del modal batch y BatchManager leen este valor — no dupliques
+  // el número en ningún otro sitio.
+  batchMaxImages: 20,
   // GIF eliminado: el pipeline nunca lo soportó (SecurityManager y el
   // resto del código no lo aceptan), tenerlo aquí inducía a error.
   allowedTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/avif'],

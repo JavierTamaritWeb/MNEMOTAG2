@@ -194,7 +194,7 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 
 ## Versioning and commits
 
-**Current version: v3.5.13**.
+**Current version: v3.5.14**.
 - **v3.5.0**: Gulp 5 build system (SCSS + JS bundle + minification + browser-sync), zoom-pan-manager extracted.
 - **v3.5.1–v3.5.2**: Code audit — 4 critical + 14 moderate fixes (onclick→data-action, console guards, var→const/let, null guards).
 - **v3.5.3**: Output movido a `dist/`, SCSS reorganizado en subcarpetas (`abstracts/`, `base/`, `layout/`, `components/`, `pages/`, `modules/`).
@@ -206,6 +206,7 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 - **v3.5.11**: Auditoria/reauditoria severa, EXIF local, crop y capas sincronizados, limites batch, E2E de `dist` y despliegue GitHub Pages restaurado. Ver `docs/AUDITORIA_V3_5_11_SOLUCIONES.md`.
 - **v3.5.12**: Flecos finales de la auditoria — estado de archivo solo tras validacion, Escape del modal de preview, pinch/orientacion via sistema global de zoom, token de secuencia en preview con worker, cache de watermark por identidad de archivo, timeout en AnalysisManager, clamp de area de recorte, stats reales del cache LRU.
 - **v3.5.13**: Quick wins del roadmap, loaders diferidos, drag and drop global, accesibilidad, batch validado, fixtures E2E y registro de errores con barreras de no regresion. El boton de lote conserva las dimensiones de `.upload__button` mediante un override especifico por ID.
+- **v3.5.14**: Fase "confianza y coherencia" del roadmap — modal de atajos generado del registro real (con categorias), region persistente aria-live de toasts con apilado, ModalController unico (batch/atajos via _openAccessibleModal con modo display), limite de lote unificado en AppConfig.batchMaxImages, estados por archivo en batch con cancelacion y reintento, y auditoria axe automatizada (tests/e2e/a11y.spec.js, cero incidencias serias).
 - **v3.4.x** (15 releases): CSP/SRI, ESLint/Stylelint CI, accessibility, curves live preview, filter presets, ImageBitmap undo/redo, 5 managers extracted, Web Worker for autoBalance, Playwright E2E, AVIF EXIF injection.
 
 **Tests**: 248/248 Node + 92/92 binarios + 7/7 E2E en desarrollo + 7/7 E2E en `dist`. Quick smoke check: `npm test`; release check: build + lint + ambos E2E. `git log` remains the authoritative source for the actual commit version.

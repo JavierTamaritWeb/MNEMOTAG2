@@ -79,6 +79,32 @@ const UIManager = {
     }
   },
 
+
+  // v3.5.14: región persistente de toasts. Los toasts se insertan aquí (no en
+  // body) para que se apilen sin solaparse y los lectores de pantalla los
+  // anuncien vía la región aria-live declarada en index.html. Si la región no
+  // existe (tests, uso aislado), se crea al vuelo como fallback.
+  _getToastRegion: function(level) {
+    const id = level === 'assertive' ? 'toast-region-assertive' : 'toast-region-polite';
+    let live = document.getElementById(id);
+    if (!live) {
+      let region = document.getElementById('toast-region');
+      if (!region) {
+        region = document.createElement('div');
+        region.id = 'toast-region';
+        region.className = 'toast-region';
+        document.body.appendChild(region);
+      }
+      live = document.createElement('div');
+      live.id = id;
+      live.className = 'toast-region__live';
+      live.setAttribute('aria-live', level);
+      live.setAttribute('aria-atomic', 'false');
+      region.appendChild(live);
+    }
+    return live;
+  },
+
   // Enhanced error handling con stack traces y categorización
   showError: function(message, options = {}) {
     const config = {
@@ -95,8 +121,7 @@ const UIManager = {
     errorContainer.className = 'error-toast';
     errorContainer.setAttribute('data-category', config.category);
     // v3.4.3: accesibilidad — los errores son urgentes (assertive).
-    errorContainer.setAttribute('role', 'alert');
-    errorContainer.setAttribute('aria-live', 'assertive');
+    // v3.5.14: sin role/aria-live propios — la región persistente los aporta
     errorContainer.setAttribute('aria-atomic', 'true');
 
     // Construir el HTML SIN el botón de acción para evitar XSS por
@@ -148,7 +173,7 @@ const UIManager = {
       }
     }
 
-    document.body.appendChild(errorContainer);
+    this._getToastRegion('assertive').appendChild(errorContainer);
     this.activeToasts.add(errorContainer);
     
     // Aplicar animación de entrada si está habilitada
@@ -192,8 +217,7 @@ const UIManager = {
     warningContainer.className = 'warning-toast';
     warningContainer.setAttribute('data-category', config.category);
     // v3.4.3: accesibilidad — warnings anunciados con polite.
-    warningContainer.setAttribute('role', 'status');
-    warningContainer.setAttribute('aria-live', 'polite');
+    // v3.5.14: sin role/aria-live propios — la región persistente los aporta
     warningContainer.setAttribute('aria-atomic', 'true');
 
     // HTML sin el botón de acción para evitar XSS (ver showError)
@@ -235,7 +259,7 @@ const UIManager = {
       }
     }
 
-    document.body.appendChild(warningContainer);
+    this._getToastRegion('polite').appendChild(warningContainer);
     this.activeToasts.add(warningContainer);
     
     // Aplicar animación de entrada
@@ -279,8 +303,7 @@ const UIManager = {
     successContainer.className = 'success-toast';
     successContainer.setAttribute('data-category', config.category);
     // v3.4.3: accesibilidad — éxitos anunciados con polite.
-    successContainer.setAttribute('role', 'status');
-    successContainer.setAttribute('aria-live', 'polite');
+    // v3.5.14: sin role/aria-live propios — la región persistente los aporta
     successContainer.setAttribute('aria-atomic', 'true');
 
     // HTML sin el botón de acción para evitar XSS (ver showError)
@@ -322,7 +345,7 @@ const UIManager = {
       }
     }
 
-    document.body.appendChild(successContainer);
+    this._getToastRegion('polite').appendChild(successContainer);
     this.activeToasts.add(successContainer);
     
     // Aplicar animación de entrada
@@ -354,8 +377,7 @@ const UIManager = {
     infoContainer.className = 'info-toast';
     infoContainer.setAttribute('data-category', config.category);
     // v3.4.3: accesibilidad — info anunciada con polite.
-    infoContainer.setAttribute('role', 'status');
-    infoContainer.setAttribute('aria-live', 'polite');
+    // v3.5.14: sin role/aria-live propios — la región persistente los aporta
     infoContainer.setAttribute('aria-atomic', 'true');
     
     infoContainer.innerHTML = `
@@ -372,7 +394,7 @@ const UIManager = {
       infoCloseBtn.addEventListener('click', () => this.removeToast(infoContainer));
     }
 
-    document.body.appendChild(infoContainer);
+    this._getToastRegion('polite').appendChild(infoContainer);
     this.activeToasts.add(infoContainer);
     
     // Aplicar animación de entrada

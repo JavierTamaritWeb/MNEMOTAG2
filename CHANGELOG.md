@@ -4,6 +4,25 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.5.14] - 2026-07-12
+
+Primera fase del roadmap de mejora: **confianza y coherencia**.
+
+### Added
+- **Modal de atajos generado desde el registro real**: el grid se construye al abrir desde `KeyboardShortcutManager.getAllShortcuts()` + `ZoomPanManager.getKeyboardShortcuts()`, clasificado por Edición/Archivo/Herramientas/Vista. El grid estático anterior documentaba 5 combinaciones incorrectas (⌘R decía "recortar" cuando descarta todos los cambios).
+- **Región persistente de notificaciones**: contenedor `#toast-region` con áreas aria-live polite/assertive declarado en index.html; los toasts se apilan en columna sin solaparse y los lectores de pantalla los anuncian de forma fiable.
+- **Cancelación de lote**: botón "Cancelar" en el overlay de progreso (`showProgressBar` acepta `onCancel`); `BatchManager.requestCancel()` detiene el lote cooperativamente entre imágenes.
+- **Estados por archivo en batch**: cada imagen muestra pendiente/procesando/procesada/error, con botón "Reintentar" por archivo fallido (`BatchManager.retryImage`) que reincorpora la imagen al ZIP si tiene éxito.
+- **Auditoría axe automatizada**: `tests/e2e/a11y.spec.js` con `@axe-core/playwright` exige cero incidencias serias/críticas en la página y en el modal de atajos.
+
+### Fixed
+- **ModalController único**: los modales de batch y atajos abren/cierran por `_openAccessibleModal` (focus trap + Escape + restauración de foco), que ahora soporta visibilidad por clase y por `style.display`.
+- **Límite de lote unificado**: `AppConfig.batchMaxImages` (20) es la única fuente — antes convivían tres valores contradictorios (20 en el manager, 50 en main.js y "50 imágenes / 50MB" en el copy del modal, con límite real de archivo de 25MB). El copy se rellena desde AppConfig al abrir.
+- **Cuerpos de modal scrollables accesibles por teclado** (`tabindex="0"`) — incidencia seria de axe.
+- **Resumen del lote fiel al resultado**: éxito solo si no hubo fallos; parcial con detalle por archivo; cancelado con recuento real.
+
+---
+
 ## [3.5.13] - 2026-07-12
 
 ### Added

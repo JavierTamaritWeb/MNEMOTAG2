@@ -49,10 +49,17 @@ class KeyboardShortcutManager {
    */
   register(key, modifiers = [], callback, options = {}) {
     const combo = this.createCombo(key, modifiers);
-    this.shortcuts.set(combo, { 
-      callback, 
+    this.shortcuts.set(combo, {
+      callback,
       description: options.description || '',
-      preventDefault: options.preventDefault !== false 
+      // Categoría para el modal de atajos: 'Edición' | 'Archivo' |
+      // 'Herramientas' | 'Vista'. El modal se genera desde este registro,
+      // así que lo mostrado nunca puede divergir del comportamiento real.
+      category: options.category || 'Otros',
+      preventDefault: options.preventDefault !== false,
+      // Guardamos las partes originales para poder renderizar el combo
+      key,
+      modifiers
     });
   }
 
@@ -157,14 +164,23 @@ class KeyboardShortcutManager {
    */
   getAllShortcuts() {
     const shortcuts = [];
-    this.shortcuts.forEach((value, key) => {
-      const parts = key.split('+');
-      const keyPart = parts.pop();
-      const modifiers = parts;
-      
+    this.shortcuts.forEach((value, comboKey) => {
+      // Usar key/modifiers originales si existen (registro nuevo);
+      // fallback al parseo del combo para registros antiguos.
+      let keyPart, modifiers;
+      if (value.key !== undefined) {
+        keyPart = value.key;
+        modifiers = value.modifiers;
+      } else {
+        const parts = comboKey.split('+');
+        keyPart = parts.pop();
+        modifiers = parts;
+      }
+
       shortcuts.push({
         combo: this.getDisplayCombo(keyPart, modifiers),
-        description: value.description
+        description: value.description,
+        category: value.category || 'Otros'
       });
     });
     return shortcuts;

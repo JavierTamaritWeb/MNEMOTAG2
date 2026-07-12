@@ -4851,10 +4851,20 @@
       )).filter(el => el.offsetParent !== null);
     }
 
-    function _openAccessibleModal(modal, onClose) {
+    /**
+     * ModalController único (v3.5.14): TODOS los modales abren/cierran por
+     * aquí. Soporta dos modos de visibilidad:
+     *  - 'class'   → alterna la clase .hidden (analysis-modals, default)
+     *  - 'display' → alterna style.display flex/none (batch, shortcuts)
+     */
+    function _openAccessibleModal(modal, onClose, visibility = 'class') {
       if (!modal) return;
       const previouslyFocused = document.activeElement;
-      modal.classList.remove('hidden');
+      if (visibility === 'display') {
+        modal.style.display = 'flex';
+      } else {
+        modal.classList.remove('hidden');
+      }
       modal.setAttribute('aria-hidden', 'false');
 
       // Foco inicial: el primer elemento focusable dentro del modal,
@@ -4892,12 +4902,17 @@
       };
 
       document.addEventListener('keydown', keyHandler);
-      _modalKeyHandlers.set(modal, { handler: keyHandler, previouslyFocused, onClose });
+      _modalKeyHandlers.set(modal, { handler: keyHandler, previouslyFocused, onClose, visibility });
     }
 
     function _closeAccessibleModal(modal) {
       if (!modal) return;
-      modal.classList.add('hidden');
+      const stateForVisibility = _modalKeyHandlers.get(modal);
+      if (stateForVisibility && stateForVisibility.visibility === 'display') {
+        modal.style.display = 'none';
+      } else {
+        modal.classList.add('hidden');
+      }
       modal.setAttribute('aria-hidden', 'true');
 
       const state = _modalKeyHandlers.get(modal);
@@ -5541,20 +5556,43 @@
     }
     
     // Progress bar functionality
-    function showProgressBar(title = 'Procesando...') {
+    /**
+     * @param {string} title
+     * @param {Object} [options] - v3.5.14: { onCancel } muestra un botón
+     *   "Cancelar" en el overlay que ejecuta el callback (una sola vez).
+     */
+    function showProgressBar(title = 'Procesando...', options = {}) {
       const overlay = document.getElementById('progress-overlay');
       const titleElement = document.getElementById('progress-title');
       const progressBar = document.getElementById('progress-bar');
       const progressText = document.getElementById('progress-text');
       const progressEta = document.getElementById('progress-eta');
       const progressTrack = document.getElementById('progress-track');
-      
+      const cancelBtn = document.getElementById('progress-cancel');
+
       if (overlay && titleElement) {
         titleElement.textContent = title;
         progressBar.style.width = '0%';
         progressText.textContent = '0%';
         progressEta.textContent = 'Calculando tiempo...';
         if (progressTrack) progressTrack.setAttribute('aria-valuenow', '0');
+
+        if (cancelBtn) {
+          if (typeof options.onCancel === 'function') {
+            cancelBtn.style.display = 'inline-flex';
+            cancelBtn.disabled = false;
+            cancelBtn.textContent = 'Cancelar';
+            cancelBtn.onclick = () => {
+              cancelBtn.disabled = true;
+              cancelBtn.textContent = 'Cancelando…';
+              options.onCancel();
+            };
+          } else {
+            cancelBtn.style.display = 'none';
+            cancelBtn.onclick = null;
+          }
+        }
+
         overlay.classList.add('show');
       }
     }
@@ -6425,7 +6463,7 @@
             historyManager.undo();
             UIManager.showSuccess('Deshecho');
           }
-        }, { description: 'Deshacer última acción' });
+        }, { description: 'Deshacer última acción', category: 'Edición' });
         
         // Ctrl/Cmd + Shift + Z o Ctrl/Cmd + Y: Rehacer
         keyboardShortcuts.register('z', ['ctrl', 'shift'], () => {
@@ -6433,7 +6471,7 @@
             historyManager.redo();
             UIManager.showSuccess('Rehecho');
           }
-        }, { description: 'Rehacer acción' });
+        }, { description: 'Rehacer acción', category: 'Edición' });
         
         // Ctrl+Y eliminado (Y está en la mano derecha). Usar Ctrl+Shift+Z.
         
@@ -6442,7 +6480,7 @@
           if (currentImage) {
             await ExportManager.downloadImageWithProgress();
           }
-        }, { description: 'Guardar imagen' });
+        }, { description: 'Guardar imagen', category: 'Archivo' });
         
         // Ctrl/Cmd + Shift + C: Copiar imagen al portapapeles
         keyboardShortcuts.register('c', ['ctrl', 'shift'], async () => {
@@ -6456,7 +6494,7 @@
           } else {
             UIManager.showInfo('ℹ️ Carga una imagen primero');
           }
-        }, { description: 'Copiar imagen al portapapeles' });
+        }, { description: 'Copiar imagen al portapapeles', category: 'Archivo' });
         
         // Ctrl/Cmd + Shift + V: Pegar imagen desde portapapeles
         keyboardShortcuts.register('v', ['ctrl', 'shift'], async () => {
@@ -6480,7 +6518,7 @@
           } catch (err) {
             UIManager.showError('❌ Error al pegar imagen. Usa Cmd+V nativo en un campo de carga.');
           }
-        }, { description: 'Pegar imagen desde portapapeles' });
+        }, { description: 'Pegar imagen desde portapapeles', category: 'Archivo' });
         
         // Ctrl/Cmd + Shift + X: Exportar con ajustes actuales
         keyboardShortcuts.register('x', ['ctrl', 'shift'], async () => {
@@ -6489,7 +6527,7 @@
           } else {
             UIManager.showInfo('Carga una imagen primero');
           }
-        }, { description: 'Exportar imagen con ajustes' });
+        }, { description: 'Exportar imagen con ajustes', category: 'Archivo' });
         
         // Espacio: Vista antes/después (mantener presionado)
         let spaceHeld = false;
@@ -6498,7 +6536,7 @@
           spaceHeld = true;
           showOriginalImage();
           UIManager.showInfo('Mostrando imagen original');
-        }, { description: 'Ver imagen original (mantener presionado)', preventDefault: false });
+        }, { description: 'Ver imagen original (mantener presionado)', category: 'Vista', preventDefault: false });
 
         document.addEventListener('keyup', (e) => {
           if (e.key === ' ' && spaceHeld) {
@@ -6519,7 +6557,7 @@
             updatePreview();
             UIManager.showInfo('❌ Modo recorte cancelado');
           }
-        }, { description: 'Cancelar operación actual', preventDefault: false });
+        }, { description: 'Cancelar operación actual', category: 'Herramientas', preventDefault: false });
         
         // Backspace: Eliminar capa seleccionada (solo cuando NO estés en un input)
         keyboardShortcuts.register('backspace', [], () => {
@@ -6533,7 +6571,7 @@
               UIManager.showSuccess('🗑️ Capa eliminada');
             }
           }
-        }, { description: 'Eliminar capa seleccionada', preventDefault: false });
+        }, { description: 'Eliminar capa seleccionada', category: 'Edición', preventDefault: false });
         
         // Ctrl/Cmd + D: Duplicar capa
         keyboardShortcuts.register('d', ['ctrl'], async () => {
@@ -6545,7 +6583,7 @@
           } else {
             UIManager.showInfo('ℹ️ Selecciona una capa de texto primero');
           }
-        }, { description: 'Duplicar capa de texto actual' });
+        }, { description: 'Duplicar capa de texto actual', category: 'Edición' });
         
         // Ctrl/Cmd + Shift + R: Reiniciar todos los ajustes
         keyboardShortcuts.register('r', ['ctrl', 'shift'], () => {
@@ -6553,7 +6591,7 @@
             resetFilters();
             UIManager.showSuccess('🔄 Ajustes reiniciados');
           }
-        }, { description: 'Reiniciar filtros y ajustes' });
+        }, { description: 'Reiniciar filtros y ajustes', category: 'Edición' });
 
         // Ctrl/Cmd + R: Descartar cambios (migrado del handler legacy;
         // solo intercepta la recarga del navegador si hay imagen cargada)
@@ -6561,7 +6599,7 @@
           if (currentImage) {
             resetChanges();
           }
-        }, { description: 'Descartar cambios de la imagen' });
+        }, { description: 'Descartar cambios de la imagen', category: 'Edición' });
         
         // Ctrl/Cmd + B: Abrir procesamiento por lotes
         keyboardShortcuts.register('b', ['ctrl'], () => {
@@ -6569,7 +6607,7 @@
             window.openBatchModal();
             UIManager.showInfo('📦 Modo lote activado');
           }
-        }, { description: 'Abrir procesamiento por lotes' });
+        }, { description: 'Abrir procesamiento por lotes', category: 'Herramientas' });
         
         // Ctrl/Cmd + Shift + T: Abrir panel de capas de texto
         // (Ctrl+T abre pestaña nueva en Chrome — usar Shift)
@@ -6577,21 +6615,21 @@
           if (typeof window.openTextLayersPanel === 'function') {
             window.openTextLayersPanel();
           }
-        }, { description: 'Abrir panel de capas de texto' });
+        }, { description: 'Abrir panel de capas de texto', category: 'Herramientas' });
 
         // Ctrl/Cmd + Shift + C ya usado para copiar. Usar Alt+C para recorte.
         keyboardShortcuts.register('c', ['alt'], () => {
           if (typeof window.openCropPanel === 'function') {
             window.openCropPanel();
           }
-        }, { description: 'Abrir modo recorte' });
+        }, { description: 'Abrir modo recorte', category: 'Herramientas' });
         
         // Ctrl+Shift+A: Ver atajos de teclado
         keyboardShortcuts.register('a', ['ctrl', 'shift'], () => {
           if (typeof window.openShortcutsModal === 'function') {
             window.openShortcutsModal();
           }
-        }, { description: 'Ver atajos de teclado' });
+        }, { description: 'Ver atajos de teclado', category: 'Vista' });
 
         // Zoom por teclado (Ctrl/Cmd +, -, 0): gestionado exclusivamente por
         // ZoomPanManager.initZoomKeyboardShortcuts(). Registrar '=' también
@@ -6600,7 +6638,7 @@
         // Ctrl+E: Toggle modo comparación
         keyboardShortcuts.register('e', ['ctrl'], () => {
           toggleComparisonMode();
-        }, { description: 'Activar/desactivar modo comparación' });
+        }, { description: 'Activar/desactivar modo comparación', category: 'Vista' });
         
         
       } catch (error) {
@@ -6676,7 +6714,18 @@
     function openBatchModal() {
       const modal = document.getElementById('batch-modal');
       if (modal) {
-        modal.style.display = 'flex';
+        // Copy de límites desde AppConfig — única fuente de verdad
+        const limitInfo = document.getElementById('batch-limit-info');
+        if (limitInfo) {
+          const maxMB = Math.round(AppConfig.maxFileSize / (1024 * 1024));
+          limitInfo.textContent = `Hasta ${AppConfig.batchMaxImages} imágenes • Máx ${maxMB} MB cada una`;
+        }
+
+        // ModalController: focus trap + Escape + restauración de foco
+        _openAccessibleModal(modal, () => {
+          batchImages = [];
+          updateBatchImagesList();
+        }, 'display');
         setupBatchDropzone();
       }
     }
@@ -6684,9 +6733,8 @@
     function closeBatchModal() {
       const modal = document.getElementById('batch-modal');
       if (modal) {
-        modal.style.display = 'none';
-        batchImages = [];
-        updateBatchImagesList();
+        // _closeAccessibleModal dispara el onClose (limpia la cola)
+        _closeAccessibleModal(modal);
       }
     }
 
@@ -6736,9 +6784,12 @@
     }
 
     async function addBatchImages(files) {
-      // Validar límite de imágenes
-      if (batchImages.length + files.length > 50) {
-        UIManager.showError('Máximo 50 imágenes por lote');
+      // Validar límite de imágenes — única fuente: AppConfig.batchMaxImages
+      // (antes había tres valores contradictorios: 50 aquí, 20 en el manager
+      // y "50 imágenes / 50MB" en el copy del modal)
+      const maxBatch = AppConfig.batchMaxImages;
+      if (batchImages.length + files.length > maxBatch) {
+        UIManager.showError(`Máximo ${maxBatch} imágenes por lote`);
         return;
       }
 
@@ -6826,11 +6877,40 @@
         size.textContent = formatFileSize(img.size);
         info.appendChild(size);
 
+        // v3.5.14: estado visible por archivo (pendiente/procesando/ok/error)
+        if (img.status) {
+          const status = document.createElement('div');
+          status.className = 'batch-item-status batch-item-status--' + img.status;
+          const statusLabels = {
+            pendiente: '⏳ Pendiente',
+            procesando: '⚙️ Procesando…',
+            ok: '✅ Procesada',
+            error: '❌ Error'
+          };
+          status.textContent = statusLabels[img.status] || img.status;
+          if (img.status === 'error' && img.errorMsg) {
+            status.title = img.errorMsg;
+          }
+          info.appendChild(status);
+        }
+
         item.appendChild(info);
+
+        // v3.5.14: reintento por archivo fallido
+        if (img.status === 'error') {
+          const retryBtn = document.createElement('button');
+          retryBtn.type = 'button';
+          retryBtn.className = 'batch-item-retry';
+          retryBtn.textContent = 'Reintentar';
+          retryBtn.setAttribute('aria-label', 'Reintentar ' + img.name);
+          retryBtn.addEventListener('click', () => retryBatchImage(img.id));
+          item.appendChild(retryBtn);
+        }
 
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
         removeBtn.className = 'batch-item-remove';
+        removeBtn.setAttribute('aria-label', 'Quitar ' + img.name + ' del lote');
         removeBtn.addEventListener('click', () => removeBatchImage(img.id));
 
         const icon = document.createElement('i');
@@ -6841,6 +6921,33 @@
         item.appendChild(removeBtn);
         itemsGrid.appendChild(item);
       });
+    }
+
+    /**
+     * Reintenta el procesamiento de UNA imagen fallida del lote (v3.5.14).
+     * Si tiene éxito, BatchManager reemplaza la entrada fallida y el ZIP
+     * pasa a incluirla.
+     */
+    async function retryBatchImage(imageId) {
+      const img = batchImages.find(i => i.id === imageId);
+      if (!img || !batchManager) return;
+
+      img.status = 'procesando';
+      updateBatchImagesList();
+
+      try {
+        await batchManager.retryImage(imageId);
+        img.status = 'ok';
+        img.errorMsg = null;
+        UIManager.showSuccess('✅ ' + img.name + ' procesada correctamente');
+      } catch (error) {
+        img.status = 'error';
+        img.errorMsg = error.message;
+        UIManager.showError('No se pudo procesar ' + img.name + ': ' + error.message, {
+          action: { label: 'Reintentar', handler: () => retryBatchImage(imageId) }
+        });
+      }
+      updateBatchImagesList();
     }
 
     function getCurrentFilters() {
@@ -6898,7 +7005,16 @@
 
       // UI feedback
       if (processBtn) processBtn.disabled = true;
-      showProgressBar('Procesando lote (' + batchImages.length + ' imágenes)...');
+
+      // v3.5.14: estado por archivo + cancelación cooperativa
+      batchImages.forEach(img => { img.status = 'pendiente'; img.errorMsg = null; });
+      updateBatchImagesList();
+
+      showProgressBar('Procesando lote (' + batchImages.length + ' imágenes)...', {
+        onCancel: () => {
+          if (batchManager) batchManager.requestCancel();
+        }
+      });
 
       try {
         // Sincronizar batchImages → batchManager.imageQueue
@@ -7057,22 +7173,41 @@
 
         batchManager.captureCurrentConfig(filterString, null, null, null, renderImageForBatch);
 
-        // Procesar — el callback actualiza el progress overlay global.
-        // minDelay garantiza al menos 3s de barra visible para buena UX.
+        // Procesar — el callback actualiza el progress overlay global y el
+        // estado por archivo. minDelay garantiza al menos 3s de barra visible.
         const minDelay = new Promise(resolve => setTimeout(resolve, 3000));
         const processPromise = batchManager.processQueue((progress) => {
           updateProgress(
             progress.percentage,
             'Procesando imagen ' + progress.current + ' de ' + progress.total + '...'
           );
+          // v3.5.14: reflejar el resultado por archivo en la cola visible
+          const done = batchImages.find(i => i.id === progress.id);
+          if (done) {
+            done.status = progress.lastSuccess ? 'ok' : 'error';
+            done.errorMsg = progress.lastError || null;
+          }
         });
-        await Promise.all([processPromise, minDelay]);
+        const result = await Promise.all([processPromise, minDelay]).then(r => r[0]);
 
         hideProgressBar();
+        updateBatchImagesList();
 
-        // Mostrar botón de descarga
-        if (downloadBtn) downloadBtn.style.display = 'flex';
-        UIManager.showSuccess(batchImages.length + ' imágenes procesadas correctamente');
+        // v3.5.14: resumen fiel al resultado — éxito, parcial o cancelado
+        if (result.cancelled) {
+          UIManager.showInfo(
+            '⏹️ Lote cancelado: ' + result.processed + ' de ' + result.total + ' imágenes procesadas'
+          );
+        } else if (result.failed > 0) {
+          // El detalle por archivo queda en la lista (badges + Reintentar);
+          // BatchManager ya emitió el warning con el recuento de fallos.
+          MNEMOTAG_DEBUG && console.warn('Lote con fallos:', result.errors);
+        } else {
+          UIManager.showSuccess(result.processed + ' imágenes procesadas correctamente');
+        }
+
+        // Mostrar botón de descarga si hay al menos una imagen procesada
+        if (downloadBtn && result.processed > 0) downloadBtn.style.display = 'flex';
 
       } catch (error) {
         console.error('Error procesando lote:', error);
@@ -7699,17 +7834,79 @@
      * ====================================
      */
 
+    // Orden de categorías en el modal de atajos
+    const SHORTCUT_CATEGORIES = ['Edición', 'Archivo', 'Herramientas', 'Vista', 'Otros'];
+
+    /**
+     * Renderiza el grid de atajos desde los registros reales:
+     * KeyboardShortcutManager.getAllShortcuts() + ZoomPanManager.getKeyboardShortcuts().
+     * Así lo mostrado nunca puede divergir del comportamiento (el grid estático
+     * anterior documentaba 5 combinaciones incorrectas).
+     */
+    function renderShortcutsGrid() {
+      const grid = document.getElementById('shortcuts-grid');
+      if (!grid || !keyboardShortcuts) return;
+
+      const entries = keyboardShortcuts.getAllShortcuts();
+
+      // Atajos de zoom: los gestiona ZoomPanManager con su propio listener;
+      // su módulo expone la lista para documentarlos junto al resto.
+      if (typeof ZoomPanManager !== 'undefined' && ZoomPanManager.getKeyboardShortcuts) {
+        ZoomPanManager.getKeyboardShortcuts().forEach(z => {
+          entries.push({
+            combo: keyboardShortcuts.getDisplayCombo(z.key, z.modifiers),
+            description: z.description,
+            category: z.category
+          });
+        });
+      }
+
+      grid.textContent = '';
+      SHORTCUT_CATEGORIES.forEach(cat => {
+        const items = entries.filter(e => e.category === cat && e.description);
+        if (!items.length) return;
+
+        const section = document.createElement('div');
+        section.className = 'shortcut-section';
+
+        const title = document.createElement('h3');
+        title.className = 'shortcut-section-title';
+        title.textContent = cat;
+        section.appendChild(title);
+
+        items.forEach(item => {
+          const row = document.createElement('div');
+          row.className = 'shortcut-item';
+
+          const kbd = document.createElement('kbd');
+          kbd.className = 'shortcut-keys';
+          kbd.textContent = item.combo;
+
+          const desc = document.createElement('span');
+          desc.className = 'shortcut-desc';
+          desc.textContent = item.description;
+
+          row.appendChild(kbd);
+          row.appendChild(desc);
+          section.appendChild(row);
+        });
+
+        grid.appendChild(section);
+      });
+    }
+
     function openShortcutsModal() {
       const modal = document.getElementById('shortcuts-modal');
       if (modal) {
-        modal.style.display = 'flex';
+        renderShortcutsGrid();
+        _openAccessibleModal(modal, null, 'display');
       }
     }
 
     function closeShortcutsModal() {
       const modal = document.getElementById('shortcuts-modal');
       if (modal) {
-        modal.style.display = 'none';
+        _closeAccessibleModal(modal);
       }
     }
 
