@@ -156,6 +156,30 @@ body.has-image #drop-area {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
 
+// Mismo problema con las rejillas legadas de las secciones (config-grid,
+// metadata-grid, geo-grid) y las Tailwind responsive (md:/sm:): sus
+// breakpoints miden el viewport, pero ahora viven en un panel de 340-380px,
+// así que a ≥768px activaban 2-4 columnas imposibles y las tarjetas se
+// recortaban por el borde del panel. Dentro del panel siempre hay una sola
+// columna de tarjetas (las parejas de campos cortos conservan 2 celdas
+// encogibles).
+.workspace__panel {
+  .config-grid,
+  .metadata-grid,
+  .geo-grid,
+  .md\:grid-cols-2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .config-grid {
+    gap: var(--space-4);
+  }
+
+  .sm\:grid-cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .workspace__panel select,
 .workspace__panel input {
   max-width: 100%;
@@ -164,15 +188,37 @@ body.has-image #drop-area {
 
 // Los CTA heredados (c-btn, 160×56px) fueron diseñados para secciones a
 // ancho completo; dentro del panel de 380px se compactan para no romper
-// las rejillas de los formularios
+// las rejillas de los formularios. Con !important porque los overrides
+// legacy por ID (#reset-original-size, button:has(i.fa-save), etc.) fijan
+// min-width/padding/nowrap con !important y recortaban las etiquetas.
 .workspace__panel button.c-btn,
 .workspace__panel .btn {
-  min-width: 0;
-  min-height: var(--control-md);
-  height: auto;
-  padding: var(--space-2) var(--space-3);
-  font-size: var(--font-control-sm);
-  letter-spacing: 0;
+  min-width: 0 !important;
+  min-height: var(--control-md) !important;
+  height: auto !important;
+  padding: var(--space-2) var(--space-3) !important;
+  font-size: var(--font-control-sm) !important;
+  letter-spacing: 0 !important;
+  white-space: normal !important;
+  line-height: 1.3 !important;
+  gap: var(--space-1) !important;
+}
+
+// Los presets de tamaño usan "Nombre<br>dimensiones", pero c-btn es flex y
+// el <br> no rompe línea entre ítems flex: en columna recuperan las dos
+// líneas previstas en vez de desbordar en una sola
+.workspace__panel .preset-btn {
+  flex-direction: column;
+}
+
+// .btn:has(i:only-child) fija 48×48px pensando en botones de solo icono,
+// pero también matchea icono+texto (los nodos de texto no cuentan para
+// :only-child) y aplastaba los botones de rotación. Dentro del área de
+// trabajo el ancho vuelve a ser automático; los icon-only reales llevan
+// la clase explícita .btn-icon y conservan su cuadrado.
+.workspace__panel .btn:has(i:only-child):not(.btn-icon),
+.workspace__toolbar .btn:has(i:only-child):not(.btn-icon) {
+  width: auto;
 }
 
 .workspace__panel-actions {
@@ -244,17 +290,18 @@ body.has-image #drop-area {
 
   // Compactar los botones de acción heredados (.btn/.button--action miden
   // 56px por el componente de acción): dentro de la toolbar deben ser
-  // controles de barra, no CTAs
+  // controles de barra, no CTAs. !important para ganar a los overrides
+  // legacy por ID (#fullscreen-btn fija min-width:280px !important)
   .btn,
   .button--action {
-    min-width: 0;
-    min-height: var(--control-md);
-    height: auto;
-    padding: var(--space-2) var(--space-3);
-    font-size: var(--font-control-sm);
-    gap: var(--space-1);
-    border-radius: var(--radius);
-    letter-spacing: 0;
+    min-width: 0 !important;
+    min-height: var(--control-md) !important;
+    height: auto !important;
+    padding: var(--space-2) var(--space-3) !important;
+    font-size: var(--font-control-sm) !important;
+    gap: var(--space-1) !important;
+    border-radius: var(--radius) !important;
+    letter-spacing: 0 !important;
   }
 
   // Los zoom-controls conservan su píldora oscura (sus .zoom-btn son
@@ -268,6 +315,17 @@ body.has-image #drop-area {
   #download-image {
     min-height: var(--control-md);
   }
+
+  // El override legacy de #fullscreen-btn fija min-width:280px !important
+  // (pensado para la sección a ancho completo); en la barra debe ser un
+  // control más — el ID en el selector iguala su especificidad
+  #fullscreen-btn {
+    min-width: 0 !important;
+    min-height: var(--control-md) !important;
+    padding: var(--space-2) var(--space-3) !important;
+    font-size: var(--font-control-sm) !important;
+    gap: var(--space-1) !important;
+  }
 }
 
 // En anchos intermedios la toolbar oculta las etiquetas y deja iconos
@@ -275,8 +333,8 @@ body.has-image #drop-area {
   .workspace__toolbar .button--action {
     // Ocultar solo los nodos de texto es frágil; envolver sería invasivo.
     // Reducimos padding y fuente: caben todos los controles sin overflow.
-    padding: var(--space-2);
-    font-size: 0.7rem;
+    padding: var(--space-2) !important;
+    font-size: 0.7rem !important;
   }
 }
 

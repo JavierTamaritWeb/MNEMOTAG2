@@ -4,6 +4,21 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.6.2] - 2026-07-12
+
+Fix de UI: contenido entrecortado en el panel de pestañas (reportado en Exportar).
+
+### Fixed
+- **Rejillas legadas dentro del panel** (`src/scss/pages/_workspace.scss`): `.config-grid`, `.metadata-grid`, `.geo-grid` y las Tailwind responsive (`md:grid-cols-2`, `sm:grid-cols-4`) usan breakpoints de viewport, así que a ≥768px forzaban 2-4 columnas dentro del panel de 380px y las tarjetas se recortaban por el borde (Calidad/Redimensionar en Exportar). Dentro del panel colapsan a una columna (las parejas de campos cortos conservan 2 celdas encogibles).
+- **Overrides legacy con `!important`** (`#reset-original-size`, `button:has(i.fa-save)`, `#fullscreen-btn` con `min-width: 280px`…): ganaban a la compactación del panel/toolbar y recortaban etiquetas ("Aplicar redimensión"). La compactación ahora los iguala y los textos largos pueden partir línea (`white-space: normal`).
+- **Selector `.btn:has(i:only-child)` (48×48px)**: pensado para botones de solo icono, también matchea icono+texto (los nodos de texto no cuentan para `:only-child`) y aplastaba los botones de rotación a 48px. En el área de trabajo el ancho vuelve a ser automático; los dos icon-only reales (cargar/borrar preset) llevan ahora la clase explícita `btn-icon`.
+- **Presets de tamaño**: usan `Nombre<br>dimensiones`, pero `c-btn` es flex y el `<br>` no rompe línea entre ítems flex — desbordaban en una sola línea. En columna (`flex-direction: column`) recuperan las dos líneas previstas.
+
+### Added
+- **Barrera de regresión** (`tests/e2e/workspace.spec.js`): recorre las 4 pestañas (con las herramientas avanzadas desplegadas) y falla si cualquier elemento sobresale del borde del panel. E2E: 22/22.
+
+---
+
 ## [3.6.1] - 2026-07-12
 
 Tercera fase del roadmap: **área de trabajo**.

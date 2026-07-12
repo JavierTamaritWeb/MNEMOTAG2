@@ -4,7 +4,7 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos. 100% cliente, sin backend.
 
-![Version](https://img.shields.io/badge/version-3.6.1-blue.svg)
+![Version](https://img.shields.io/badge/version-3.6.2-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 [![Deploy to GitHub Pages](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml)
@@ -39,8 +39,8 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 - `npm run build` genera `dist/` completo
 - `node tests/run-in-node.js` → **248/248 OK**
 - `node tests/binary-validation.js` → **92/92 OK**
-- `npm run test:e2e` → **21/21 Chromium desarrollo** (smoke + axe + workspace + capturas visuales)
-- `npm run test:e2e:dist` → **21/21 Chromium produccion**
+- `npm run test:e2e` → **22/22 Chromium desarrollo** (smoke + axe + workspace + capturas visuales)
+- `npm run test:e2e:dist` → **22/22 Chromium produccion**
 
 > Versiones anteriores: [CHANGELOG.md](CHANGELOG.md)
 

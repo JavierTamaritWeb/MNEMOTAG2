@@ -79,6 +79,41 @@ test.describe('Área de trabajo (v3.6.1)', () => {
     await expect(page.locator('#metaAuthor')).toHaveValue('');
   });
 
+  test('ningún control del panel desborda su pestaña (rejillas legadas)', async ({ page }) => {
+    // Regresión del fallo de v3.6.1: config-grid/metadata-grid/geo-grid y
+    // las rejillas Tailwind responsive usan breakpoints de viewport y a
+    // ≥768px forzaban multicolumna dentro del panel de 380px, recortando
+    // tarjetas y botones por el borde.
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/index.html');
+    await page.waitForLoadState('networkidle');
+    await cargarImagen(page);
+
+    for (const tab of ['metadatos', 'marca', 'ajustes', 'exportar']) {
+      await page.locator('#tab-' + tab).click();
+      if (tab === 'ajustes') {
+        // Incluir también las herramientas avanzadas plegadas
+        await page.locator('.workspace__advanced summary').click();
+      }
+      await page.waitForTimeout(200);
+
+      const desbordes = await page.evaluate((t) => {
+        const panel = document.getElementById('workspace-panel');
+        const derecha = panel.getBoundingClientRect().right;
+        const fuera = [];
+        document.querySelectorAll('#tabpanel-' + t + ' *').forEach((el) => {
+          const r = el.getBoundingClientRect();
+          if (r.width > 0 && r.right - derecha > 1) {
+            fuera.push(el.tagName + (el.id ? '#' + el.id : '') + ' → ' + Math.round(r.right - derecha) + 'px');
+          }
+        });
+        return fuera.slice(0, 10);
+      }, tab);
+
+      expect(desbordes, 'Elementos desbordando la pestaña ' + tab).toEqual([]);
+    }
+  });
+
   test('móvil 320px: sin scroll horizontal, barra fija, sheet no tapa el canvas', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 568 });
     await page.goto('/index.html');

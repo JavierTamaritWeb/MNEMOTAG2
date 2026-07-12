@@ -201,7 +201,7 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 
 ## Versioning and commits
 
-**Current version: v3.6.1**.
+**Current version: v3.6.2**.
 - **v3.5.0**: Gulp 5 build system (SCSS + JS bundle + minification + browser-sync), zoom-pan-manager extracted.
 - **v3.5.1–v3.5.2**: Code audit — 4 critical + 14 moderate fixes (onclick→data-action, console guards, var→const/let, null guards).
 - **v3.5.3**: Output movido a `dist/`, SCSS reorganizado en subcarpetas (`abstracts/`, `base/`, `layout/`, `components/`, `pages/`, `modules/`).
@@ -216,8 +216,9 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 - **v3.5.14**: Fase "confianza y coherencia" del roadmap — modal de atajos generado del registro real (con categorias), region persistente aria-live de toasts con apilado, ModalController unico (batch/atajos via _openAccessibleModal con modo display), limite de lote unificado en AppConfig.batchMaxImages, estados por archivo en batch con cancelacion y reintento, y auditoria axe automatizada (tests/e2e/a11y.spec.js, cero incidencias serias).
 - **v3.6.0**: Fase "base visual y rendimiento" — Tailwind purgado y self-hosted (2.93 MB CDN → 17 KB), subset de Font Awesome (58 iconos, 4.9 KB woff2), selector masivo de botones eliminado (opt-in via c-btn con especificidad identica), componentes cerrados c-* con tokens de diseño consolidados, CSP sin CDNs de estilo/fuentes, capturas de regresion visual en 8 combos (0,00% diff), CSS inicial total 27 KB gzip sin nada externo bloqueante.
 - **v3.6.1**: Fase "area de trabajo" — layout de dos columnas tras cargar (panel 380px con pestañas Metadatos/Marca/Ajustes/Exportar + canvas sticky con toolbar), indicadores de seccion modificada con restauracion por seccion (workspace-manager.js), bottom-sheet movil con barra fija Controles/Descargar, hero compacto, herramientas avanzadas en details, y criterios de aceptacion automatizados en tests/e2e/workspace.spec.js.
+- **v3.6.2**: Fix de contenido entrecortado en el panel de pestañas — las rejillas legadas (config-grid/metadata-grid/geo-grid y Tailwind md:/sm:) usan breakpoints de viewport y forzaban multicolumna dentro del panel de 380px; colapsadas a una columna, compactacion del panel/toolbar con !important para ganar a los overrides legacy por ID, fix del selector .btn:has(i:only-child) que aplastaba botones icono+texto a 48px (icon-only reales marcados con .btn-icon), presets de tamaño en columna, y barrera de regresion anti-desborde en workspace.spec.js.
 - **v3.4.x** (15 releases): CSP/SRI, ESLint/Stylelint CI, accessibility, curves live preview, filter presets, ImageBitmap undo/redo, 5 managers extracted, Web Worker for autoBalance, Playwright E2E, AVIF EXIF injection.
 
-**Tests**: 248/248 Node + 92/92 binarios + 21/21 E2E en desarrollo + 21/21 E2E en `dist` (smoke + axe + capturas de regresión visual). Quick smoke check: `npm test`; release check: build + lint + ambos E2E. `git log` remains the authoritative source for the actual commit version.
+**Tests**: 248/248 Node + 92/92 binarios + 22/22 E2E en desarrollo + 22/22 E2E en `dist` (smoke + axe + capturas de regresión visual). Quick smoke check: `npm test`; release check: build + lint + ambos E2E. `git log` remains the authoritative source for the actual commit version.
 
 Commit messages follow `Versión X.Y.Z - <descripción>` in Spanish — match this style. `CHANGELOG.md` and the docs under `docs/` are kept hand-updated per release.
