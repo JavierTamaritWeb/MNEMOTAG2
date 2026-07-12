@@ -1,7 +1,7 @@
 # 🚀 Resumen Ejecutivo de Versiones - MNEMOTAG
 
 **Documento**: Resumen de evolucion del proyecto
-**Ultima actualizacion**: 12 de julio de 2026 (v3.6.0)
+**Ultima actualizacion**: 12 de julio de 2026 (v3.6.1)
 
 ---
 
@@ -9,7 +9,8 @@
 
 | Version | Fecha | Caracteristicas Principales | Estado |
 |---------|-------|----------------------------|--------|
-| **v3.6.0** | 12 Jul 2026 | Base visual y rendimiento: Tailwind purgado local (2.93 MB→17 KB), subset Font Awesome, boton opt-in c-btn, componentes cerrados + tokens, 27 KB gzip de CSS inicial | **Actual** |
+| **v3.6.1** | 12 Jul 2026 | Area de trabajo: panel con pestañas + canvas sticky, toolbar con Descargar siempre visible, sheet movil, secciones con indicador de modificacion y restauracion | **Actual** |
+| **v3.6.0** | 12 Jul 2026 | Base visual y rendimiento: Tailwind purgado local (2.93 MB→17 KB), subset Font Awesome, boton opt-in c-btn, componentes cerrados + tokens, 27 KB gzip de CSS inicial | Estable |
 | **v3.5.14** | 12 Jul 2026 | Confianza y coherencia: modal de atajos desde el registro real, region aria-live de toasts, ModalController unico, limite batch unificado, estados por archivo con cancelacion y reintento, tests axe | Estable |
 | **v3.5.13** | 12 Jul 2026 | Registro de errores, barreras de no regresion y boton batch sincronizado | Estable |
 | **v3.5.12** | 11 Jul 2026 | Quick wins de rendimiento, accesibilidad, PWA, batch y E2E | Estable |

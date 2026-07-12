@@ -134,6 +134,10 @@ test.describe('MnemoTag smoke test', () => {
     await page.locator('.preview-confirm').click();
     await expect(page.locator('#editor-container')).toBeVisible();
 
+    // v3.6.1: el botón de recorte vive en la pestaña Ajustes, dentro del
+    // desplegable de herramientas avanzadas
+    await page.locator('#tab-ajustes').click();
+    await page.locator('.workspace__advanced summary').click();
     await page.locator('#crop-mode-btn').click();
     const panel = page.locator('#crop-panel');
     await expect(panel).toBeVisible();

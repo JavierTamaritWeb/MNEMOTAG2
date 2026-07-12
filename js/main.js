@@ -702,11 +702,17 @@
         
         // Inicializar managers avanzados
         initializeAdvancedManagers();
-        
+
         // Configurar atajos de teclado
         setupKeyboardShortcuts();
-        
-        
+
+        // v3.6.1: área de trabajo (pestañas, indicadores de sección
+        // modificada, bottom-sheet móvil)
+        if (typeof WorkspaceManager !== 'undefined') {
+          WorkspaceManager.init();
+        }
+
+
       } catch (error) {
         MNEMOTAG_DEBUG && console.error('Error al inicializar la aplicación:', error);
         UIManager.showError('Error al inicializar la aplicación. Por favor, recarga la página.');
@@ -2889,6 +2895,14 @@
           const editorContainer = document.getElementById('editor-container');
           if (editorContainer) {
             editorContainer.classList.remove('editor-container--hidden');
+          }
+
+          // v3.6.1: con imagen cargada la dropzone se oculta (CSS) y las
+          // líneas base de "sección modificada" se capturan con los valores
+          // recién autorrellenados (título, fecha…)
+          document.body.classList.add('has-image');
+          if (typeof WorkspaceManager !== 'undefined') {
+            setTimeout(() => WorkspaceManager.captureBaselines(), 150);
           }
           
           // Mostrar controles de zoom
@@ -5664,6 +5678,8 @@
     }
 
     function removeSelectedFile() {
+      // v3.6.1: restaurar la dropzone al quitar la imagen
+      document.body.classList.remove('has-image');
       currentImage = null;
       comparisonNeedsUpdate = true;
       currentFile = null;

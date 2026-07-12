@@ -1,7 +1,7 @@
 'use strict';
 
 // =============================================================================
-// MnemoTag Service Worker — v3.6.0
+// MnemoTag Service Worker — v3.6.1
 // =============================================================================
 //
 // Estrategia de cache:
@@ -27,7 +27,7 @@
 // `js/main.js`.
 // =============================================================================
 
-const CACHE_VERSION = 'mnemotag-v3.6.0';
+const CACHE_VERSION = 'mnemotag-v3.6.1';
 const CACHE_NAME_APP = CACHE_VERSION + '-app';
 const CACHE_NAME_CDN = CACHE_VERSION + '-cdn';
 
@@ -38,7 +38,7 @@ const PRECACHE_URLS = [
   './',
   './index.html',
   './dist/css/styles.css',
-  // v3.6.0: CSS antes servido por CDN, ahora local (purgado/subset)
+  // v3.6.1: CSS antes servido por CDN, ahora local (purgado/subset)
   './dist/css/tailwind.min.css',
   './dist/css/fontawesome.min.css',
   './dist/webfonts/fa-solid-900.woff2',
@@ -56,7 +56,7 @@ const PRECACHE_URLS = [
 
 // CSS de CDN a precachear en `install` (no bloqueante: si un CDN falla,
 // el install sigue adelante — se cachearán en runtime vía networkFirst).
-// v3.6.0: vacío — Tailwind y Font Awesome ahora se sirven localmente
+// v3.6.1: vacío — Tailwind y Font Awesome ahora se sirven localmente
 // (purgado + subset); solo quedan CDNs de carga diferida (JSZip, heic2any)
 // que se cachean en runtime al primer uso.
 const CDN_PRECACHE_URLS = [];

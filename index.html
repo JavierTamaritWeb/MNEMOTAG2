@@ -78,49 +78,23 @@
 
   <div class="container mx-auto px-4 py-8" style="max-width: 1400px;">
     <!-- Hero Section -->
-    <section class="hero-section mb-12">
-      <div class="hero-content">
-        <div class="hero-logo">
-          <!-- AVIF/WebP con fallback PNG (1.4 MB → ~22 KB) +
-               dimensiones intrínsecas para evitar layout shift -->
-          <picture>
-            <source srcset="images/applicacion.avif" type="image/avif">
-            <source srcset="images/applicacion.webp" type="image/webp">
-            <img src="images/applicacion.png" alt="MnemoTag Logo" class="hero-logo-image"
-                 width="1024" height="1024" decoding="async" fetchpriority="high">
-          </picture>
+    <section class="hero-section hero-section--compact" aria-label="Cabecera">
+      <div class="hero-compact">
+        <picture>
+          <source srcset="images/applicacion.avif" type="image/avif">
+          <source srcset="images/applicacion.webp" type="image/webp">
+          <img src="images/applicacion.png" alt="MnemoTag Logo" class="hero-compact__logo"
+               width="1024" height="1024" decoding="async" fetchpriority="high">
+        </picture>
+        <div class="hero-compact__text">
+          <h1 class="hero-compact__title">MnemoTag</h1>
+          <p class="hero-compact__subtitle">Editor de metadatos e imágenes — 100% en tu navegador</p>
         </div>
-        <div class="hero-text">
-          <h1 class="hero-title">MnemoTag</h1>
-          <p class="hero-subtitle">Editor profesional de metadatos e imágenes</p>
-          <p class="hero-description">
-            Añade metadatos EXIF, marcas de agua y aplica filtros profesionales a tus imágenes. 
-            Soporte completo para JPEG, PNG, WebP y AVIF con fallback inteligente.
-          </p>
-          <div class="hero-features">
-            <a href="#metadata-header" class="hero-feature" data-scroll-to="metadata-header">
-              <i class="fas fa-tags"></i>
-              <span>Metadatos EXIF</span>
-            </a>
-            <a href="#watermark-header" class="hero-feature" data-scroll-to="watermark-header">
-              <i class="fas fa-paint-brush"></i>
-              <span>Marcas de agua</span>
-            </a>
-            <a href="#filters-header" class="hero-feature" data-scroll-to="filters-header">
-              <i class="fas fa-magic"></i>
-              <span>Filtros profesionales</span>
-            </a>
-            <a href="#output-header" class="hero-feature" data-scroll-to="output-header">
-              <i class="fas fa-file-image"></i>
-              <span>Múltiples formatos</span>
-            </a>
-          </div>
-          <button class="c-btn" type="button" id="clear-all-btn"
-                  title="Limpiar todos los datos: imagen, metadatos, marcas de agua, filtros, historial y presets">
-            <i class="fas fa-trash-alt" aria-hidden="true"></i>
-            Limpiar todo
-          </button>
-        </div>
+        <button class="c-btn" type="button" id="clear-all-btn"
+                title="Limpiar todos los datos: imagen, metadatos, marcas de agua, filtros, historial y presets">
+          <i class="fas fa-trash-alt" aria-hidden="true"></i>
+          Limpiar todo
+        </button>
       </div>
     </section>
 
@@ -183,9 +157,45 @@
       </section>
 
       <div id="editor-container" class="editor-container--hidden">
-        <div class="grid--large">
-          <!-- Metadata Section -->
-          <section class="mb-8">
+      <!-- ================================================================
+           v3.6.1: ÁREA DE TRABAJO
+           Grid de dos columnas en escritorio (panel 380px + canvas sticky),
+           bottom-sheet en móvil. Las secciones originales (metadatos, marca,
+           filtros, salida) viven ahora dentro de pestañas SIN cambiar sus IDs:
+           todo el wiring existente de main.js sigue intacto.
+           ================================================================ -->
+      <div class="workspace" id="workspace">
+        <aside class="workspace__panel" id="workspace-panel" aria-label="Controles de edición">
+          <nav class="c-tabs workspace__tabs" role="tablist" aria-label="Secciones de edición">
+            <button class="c-tabs__tab" id="tab-metadatos" role="tab" type="button"
+                    aria-selected="true" aria-controls="tabpanel-metadatos" data-tab="metadatos">
+              <i class="fas fa-tags" aria-hidden="true"></i>
+              <span>Metadatos</span>
+              <span class="workspace__dirty-dot" data-dirty-dot="metadatos" hidden aria-label="Sección modificada"></span>
+            </button>
+            <button class="c-tabs__tab" id="tab-marca" role="tab" type="button"
+                    aria-selected="false" aria-controls="tabpanel-marca" data-tab="marca">
+              <i class="fas fa-signature" aria-hidden="true"></i>
+              <span>Marca</span>
+              <span class="workspace__dirty-dot" data-dirty-dot="marca" hidden aria-label="Sección modificada"></span>
+            </button>
+            <button class="c-tabs__tab" id="tab-ajustes" role="tab" type="button"
+                    aria-selected="false" aria-controls="tabpanel-ajustes" data-tab="ajustes">
+              <i class="fas fa-sliders-h" aria-hidden="true"></i>
+              <span>Ajustes</span>
+              <span class="workspace__dirty-dot" data-dirty-dot="ajustes" hidden aria-label="Sección modificada"></span>
+            </button>
+            <button class="c-tabs__tab" id="tab-exportar" role="tab" type="button"
+                    aria-selected="false" aria-controls="tabpanel-exportar" data-tab="exportar">
+              <i class="fas fa-file-image" aria-hidden="true"></i>
+              <span>Exportar</span>
+              <span class="workspace__dirty-dot" data-dirty-dot="exportar" hidden aria-label="Sección modificada"></span>
+            </button>
+          </nav>
+          <div class="workspace__panels">
+
+          <div class="workspace__tabpanel" id="tabpanel-metadatos" role="tabpanel" aria-labelledby="tab-metadatos">
+<section class="mb-8">
             <div class="bg-white rounded-lg shadow-md p-6 card">
               <div id="metadata-header"
                    class="section__header"
@@ -364,8 +374,16 @@
             </div>
           </section>
 
-          <!-- Watermark Section -->
-          <section class="mb-8">
+            <div class="workspace__panel-actions">
+              <button type="button" class="workspace__restore" data-restore="metadatos">
+                <i class="fas fa-undo" aria-hidden="true"></i>
+                Restaurar sección
+              </button>
+            </div>
+          </div>
+
+          <div class="workspace__tabpanel" id="tabpanel-marca" role="tabpanel" aria-labelledby="tab-marca" hidden>
+<section class="mb-8">
             <div class="bg-white rounded-lg shadow-md p-6 card">
               <div id="watermark-header"
                    class="section__header"
@@ -596,10 +614,17 @@
               </div>
             </div>
           </section>
-        </div>
 
-        <!-- Filters Section -->
-        <section class="mb-8">
+            <div class="workspace__panel-actions">
+              <button type="button" class="workspace__restore" data-restore="marca">
+                <i class="fas fa-undo" aria-hidden="true"></i>
+                Restaurar sección
+              </button>
+            </div>
+          </div>
+
+          <div class="workspace__tabpanel" id="tabpanel-ajustes" role="tabpanel" aria-labelledby="tab-ajustes" hidden>
+<section class="mb-8">
           <div class="bg-white rounded-lg shadow-md p-6 card">
             <div id="filters-header"
                  class="section__header"
@@ -746,8 +771,49 @@
           </div>
         </section>
 
-        <!-- Output Settings Section -->
-        <section class="mb-8">
+            <!-- v3.6.1: opciones avanzadas ocultas hasta que se necesitan -->
+            <details class="workspace__advanced">
+              <summary>
+                <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>
+                Herramientas avanzadas
+              </summary>
+              <div class="advanced-tools-container">
+              <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2 uppercase">
+                <!-- El icono "sparkles" a secas es de FA Pro (no renderizaba
+                     ni con el CDN); wand-magic-sparkles es el equivalente free -->
+                <i class="fas fa-wand-magic-sparkles text-purple-500"></i>
+                Herramientas Avanzadas
+              </h3>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <button id="batch-mode-btn" class="btn btn-secondary button--feature" title="📦 Procesar múltiples imágenes&#10;Atajo: ⌘B">
+                  <i class="fas fa-layer-group"></i>
+                  <span>Lote</span>
+                </button>
+                <button id="text-layers-btn" class="btn btn-secondary button--feature" title="📝 Agregar capas de texto personalizadas&#10;Atajo: ⌘⇧T">
+                  <i class="fas fa-text-height"></i>
+                  <span>Texto</span>
+                </button>
+                <button id="crop-mode-btn" class="btn btn-secondary button--feature" title="✂️ Recortar y redimensionar imagen&#10;Atajo: Alt+C">
+                  <i class="fas fa-crop-alt"></i>
+                  <span>Recortar</span>
+                </button>
+                <button id="shortcuts-help-btn" class="btn btn-secondary button--feature" title="⌨️ Ver todos los atajos de teclado&#10;Atajo: ⌘⇧A">
+                  <i class="fas fa-keyboard"></i>
+                  <span>Atajos</span>
+                </button>
+              </div>
+            </div>
+            </details>
+            <div class="workspace__panel-actions">
+              <button type="button" class="workspace__restore" data-restore="ajustes">
+                <i class="fas fa-undo" aria-hidden="true"></i>
+                Restaurar sección
+              </button>
+            </div>
+          </div>
+
+          <div class="workspace__tabpanel" id="tabpanel-exportar" role="tabpanel" aria-labelledby="tab-exportar" hidden>
+<section class="mb-8">
           <div class="bg-white rounded-lg shadow-md p-6 card">
             <div id="output-header"
                  class="section__header"
@@ -1069,18 +1135,86 @@
           </div>
         </section>
 
-        <!-- Preview Section - Expandido al 95% del viewport en desktop -->
-        <section class="mb-8 preview-section-fullwidth">
-          <div class="bg-white rounded-lg shadow-md p-3 card">
-            <div class="flex justify-between items-center mb-4">
-              <h2 class="text-xl font-semibold">6. Vista previa</h2>
-              <div class="flex gap-2">
-                <button id="fullscreen-btn" class="btn btn-primary button--action">
+            <div class="workspace__panel-actions">
+              <button type="button" class="workspace__restore" data-restore="exportar">
+                <i class="fas fa-undo" aria-hidden="true"></i>
+                Restaurar sección
+              </button>
+            </div>
+          </div>
+          </div>
+        </aside>
+
+        <div class="workspace__main" id="workspace-main">
+
+        <!-- v3.6.1: barra superior del área de trabajo (c-toolbar).
+             Los botones conservan sus IDs originales: todo el wiring de
+             main.js y los atajos siguen funcionando sin cambios. -->
+        <div class="workspace__toolbar c-toolbar" id="workspace-toolbar">
+          <div class="c-toolbar__group">
+            <button id="undo-btn" class="btn btn-primary button--action" disabled title="⏪ Deshacer última acción&#10;Atajo: ⌘Z">
+                  <i class="fas fa-undo-alt" aria-hidden="true"></i>
+                  Deshacer
+                </button>
+            <button id="redo-btn" class="btn btn-primary button--action" disabled title="⏩ Rehacer acción deshecha&#10;Atajo: ⌘⇧Z">
+                  <i class="fas fa-redo-alt" aria-hidden="true"></i>
+                  Rehacer
+                </button>
+            <button id="history-toggle-btn" class="btn btn-primary button--action" title="📜 Ver historial visual">
+                  <i class="fas fa-history" aria-hidden="true"></i>
+                  Historial
+                </button>
+          </div>
+          <div class="c-toolbar__separator"></div>
+          <div class="c-toolbar__group">
+            <button id="reset-changes" class="btn btn-primary button--action" title="Restablecer cambios&#10;Atajo: ⌘⇧R">
+                  <i class="fas fa-refresh" aria-hidden="true"></i>
+                  Restablecer
+                </button>
+            <button id="compare-toggle-btn" class="btn btn-outline button--action" title="Comparar Antes/Después&#10;Atajo: ⌘E">
+                  <i class="fas fa-adjust" aria-hidden="true"></i>
+                  Antes/Después
+                </button>
+          </div>
+          <div class="c-toolbar__separator"></div>
+          <div id="zoom-controls" class="zoom-controls hidden">
+              <button id="zoom-out-btn" class="zoom-btn" title="Alejar (-)">
+                <i class="fas fa-minus"></i>
+              </button>
+              <span id="zoom-level" class="zoom-level">100%</span>
+              <button id="zoom-in-btn" class="zoom-btn" title="Acercar (+)">
+                <i class="fas fa-plus"></i>
+              </button>
+              <button id="zoom-reset-btn" class="zoom-btn zoom-reset" title="Restablecer zoom (Ctrl+0)">
+                <i class="fas fa-search"></i>
+              </button>
+              <button id="ruler-toggle-btn" class="zoom-btn" title="Mostrar/Ocultar reglas métricas y coordenadas">
+                <i class="fas fa-ruler-combined"></i>
+              </button>
+              <!-- v3.3.12: Análisis visual -->
+              <button id="histogram-btn" class="zoom-btn" title="Mostrar histograma RGB y luminosidad">
+                <i class="fas fa-chart-bar"></i>
+              </button>
+              <button id="palette-btn" class="zoom-btn" title="Extraer paleta de colores dominantes">
+                <i class="fas fa-palette"></i>
+              </button>
+            </div>
+          <div class="c-toolbar__group">
+            <button id="fullscreen-btn" class="btn btn-primary button--action">
                   <i class="fas fa-expand" aria-hidden="true"></i>
                   Pantalla completa
                 </button>
-              </div>
-            </div>
+          </div>
+          <div class="c-toolbar__spacer"></div>
+          <button id="download-image" class="btn btn-primary button--action" title="Descargar imagen&#10;Atajo: ⌘S">
+                  <i class="fas fa-download" aria-hidden="true"></i>
+                  Descargar imagen
+                </button>
+        </div>
+
+<section class="mb-8 preview-section-fullwidth">
+          <div class="bg-white rounded-lg shadow-md p-3 card">
+            
             
             <!-- Image Info Section -->
             <div id="image-info" class="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4 hidden image-info">
@@ -1137,28 +1271,7 @@
 
             <!-- v3.4.x: Controles de Zoom y herramientas — fuera del preview
                  para no solaparse con la imagen previsualizada -->
-            <div id="zoom-controls" class="zoom-controls hidden">
-              <button id="zoom-out-btn" class="zoom-btn" title="Alejar (-)">
-                <i class="fas fa-minus"></i>
-              </button>
-              <span id="zoom-level" class="zoom-level">100%</span>
-              <button id="zoom-in-btn" class="zoom-btn" title="Acercar (+)">
-                <i class="fas fa-plus"></i>
-              </button>
-              <button id="zoom-reset-btn" class="zoom-btn zoom-reset" title="Restablecer zoom (Ctrl+0)">
-                <i class="fas fa-search"></i>
-              </button>
-              <button id="ruler-toggle-btn" class="zoom-btn" title="Mostrar/Ocultar reglas métricas y coordenadas">
-                <i class="fas fa-ruler-combined"></i>
-              </button>
-              <!-- v3.3.12: Análisis visual -->
-              <button id="histogram-btn" class="zoom-btn" title="Mostrar histograma RGB y luminosidad">
-                <i class="fas fa-chart-bar"></i>
-              </button>
-              <button id="palette-btn" class="zoom-btn" title="Extraer paleta de colores dominantes">
-                <i class="fas fa-palette"></i>
-              </button>
-            </div>
+            
             <!-- v3.3.14: Panel de histórico visual con thumbnails -->
             <div id="history-panel" class="history-panel hidden" inert>
               <div class="history-panel__header">
@@ -1184,68 +1297,28 @@
               <div id="history-panel-grid" class="history-panel__grid"></div>
             </div>
 
-            <div class="mt-4 flex justify-between gap-3">
-              <div class="flex flex-wrap gap-2">
-                <button id="undo-btn" class="btn btn-primary button--action" disabled title="⏪ Deshacer última acción&#10;Atajo: ⌘Z">
-                  <i class="fas fa-undo-alt" aria-hidden="true"></i>
-                  Deshacer
-                </button>
-                <button id="redo-btn" class="btn btn-primary button--action" disabled title="⏩ Rehacer acción deshecha&#10;Atajo: ⌘⇧Z">
-                  <i class="fas fa-redo-alt" aria-hidden="true"></i>
-                  Rehacer
-                </button>
-                <!-- v3.3.14: Botón para abrir el panel de historial visual -->
-                <button id="history-toggle-btn" class="btn btn-primary button--action" title="📜 Ver historial visual">
-                  <i class="fas fa-history" aria-hidden="true"></i>
-                  Historial
-                </button>
-              </div>
-              <div class="flex gap-2 flex-wrap action-buttons">
-                <button id="reset-changes" class="btn btn-primary button--action" title="Restablecer cambios&#10;Atajo: ⌘⇧R">
-                  <i class="fas fa-refresh" aria-hidden="true"></i>
-                  Restablecer
-                </button>
-                <button id="compare-toggle-btn" class="btn btn-outline button--action" title="Comparar Antes/Después&#10;Atajo: ⌘E">
-                  <i class="fas fa-adjust" aria-hidden="true"></i>
-                  Antes/Después
-                </button>
-                <button id="download-image" class="btn btn-primary button--action" title="Descargar imagen&#10;Atajo: ⌘S">
-                  <i class="fas fa-download" aria-hidden="true"></i>
-                  Descargar imagen
-                </button>
-              </div>
-            </div>
+            
             
             <!-- Nuevas Funcionalidades v3.1 -->
-            <div class="advanced-tools-container">
-              <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2 uppercase">
-                <!-- El icono "sparkles" a secas es de FA Pro (no renderizaba
-                     ni con el CDN); wand-magic-sparkles es el equivalente free -->
-                <i class="fas fa-wand-magic-sparkles text-purple-500"></i>
-                Herramientas Avanzadas
-              </h3>
-              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <button id="batch-mode-btn" class="btn btn-secondary button--feature" title="📦 Procesar múltiples imágenes&#10;Atajo: ⌘B">
-                  <i class="fas fa-layer-group"></i>
-                  <span>Lote</span>
-                </button>
-                <button id="text-layers-btn" class="btn btn-secondary button--feature" title="📝 Agregar capas de texto personalizadas&#10;Atajo: ⌘⇧T">
-                  <i class="fas fa-text-height"></i>
-                  <span>Texto</span>
-                </button>
-                <button id="crop-mode-btn" class="btn btn-secondary button--feature" title="✂️ Recortar y redimensionar imagen&#10;Atajo: Alt+C">
-                  <i class="fas fa-crop-alt"></i>
-                  <span>Recortar</span>
-                </button>
-                <button id="shortcuts-help-btn" class="btn btn-secondary button--feature" title="⌨️ Ver todos los atajos de teclado&#10;Atajo: ⌘⇧A">
-                  <i class="fas fa-keyboard"></i>
-                  <span>Atajos</span>
-                </button>
-              </div>
-            </div>
+            
           </div>
         </section>
+        </div>
       </div>
+
+      <!-- v3.6.1: barra inferior fija en móvil — Descargar siempre accesible
+           y toggle del panel de controles (bottom sheet) -->
+      <div class="workspace__mobilebar" id="workspace-mobilebar">
+        <button type="button" id="mobile-panel-toggle" class="workspace__mobilebtn" aria-expanded="false" aria-controls="workspace-panel">
+          <i class="fas fa-sliders-h" aria-hidden="true"></i>
+          Controles
+        </button>
+        <button type="button" id="mobile-download-btn" class="workspace__mobilebtn workspace__mobilebtn--primary">
+          <i class="fas fa-download" aria-hidden="true"></i>
+          Descargar
+        </button>
+      </div>
+    </div>
     </main>
 
     <!-- ============================== -->

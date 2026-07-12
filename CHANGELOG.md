@@ -4,6 +4,25 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.6.1] - 2026-07-12
+
+Tercera fase del roadmap: **área de trabajo**.
+
+### Added
+- **Layout de trabajo** (`src/scss/pages/_workspace.scss` + `js/managers/workspace-manager.js`): tras cargar una imagen, grid de dos columnas en escritorio — panel de controles de 380px (340px en tablet) y columna de canvas **sticky** con barra de herramientas superior (deshacer, rehacer, historial, restablecer, antes/después, zoom, pantalla completa y **Descargar siempre visible**). Las secciones conservan todos sus IDs: el wiring de main.js quedó intacto.
+- **Pestañas Metadatos / Marca / Ajustes / Exportar** (primer consumidor del componente cerrado `c-tabs`), con navegación por flechas (patrón WAI-ARIA tablist).
+- **Indicadores de sección modificada**: punto en la pestaña cuando la sección difiere de su línea base (capturada al cargar la imagen), con botón "Restaurar sección" por panel que resetea solo ese formulario re-disparando los eventos existentes.
+- **Móvil**: el panel es un bottom-sheet deslizable (cerrado por defecto — ningún control tapa el canvas) y hay una barra inferior fija con "Controles" y "Descargar" (reutiliza el flujo completo del botón principal).
+- **Hero compacto**: cabecera de una línea (logo 48px + título + Limpiar todo); la carga es la primera acción visible y, con imagen cargada, la dropzone se oculta (`body.has-image`).
+- **Opciones avanzadas ocultas hasta ser relevantes**: las herramientas avanzadas (lote, texto, recorte, atajos) viven en un `<details>` dentro de Ajustes.
+- **Criterios de aceptación automatizados** (`tests/e2e/workspace.spec.js`): sin scroll horizontal desde 320px, canvas ≥55% del ancho útil en escritorio (68% real a 1440px), Descargar en viewport sin recorrer la página, sheet móvil sin tapar el canvas, pestañas + indicador + restaurar funcionales.
+
+### Changed
+- El smoke test de recorte navega por la nueva UI (pestaña Ajustes → herramientas avanzadas).
+- `.zoom-controls` vive en la toolbar conservando su píldora oscura (sus botones son iconos claros).
+
+---
+
 ## [3.6.0] - 2026-07-12
 
 Segunda fase del roadmap: **base visual y rendimiento**.

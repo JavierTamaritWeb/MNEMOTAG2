@@ -4,7 +4,7 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos. 100% cliente, sin backend.
 
-![Version](https://img.shields.io/badge/version-3.6.0-blue.svg)
+![Version](https://img.shields.io/badge/version-3.6.1-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 [![Deploy to GitHub Pages](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml)
@@ -39,8 +39,8 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 - `npm run build` genera `dist/` completo
 - `node tests/run-in-node.js` → **248/248 OK**
 - `node tests/binary-validation.js` → **92/92 OK**
-- `npm run test:e2e` → **17/17 Chromium desarrollo** (smoke + axe + capturas visuales)
-- `npm run test:e2e:dist` → **17/17 Chromium produccion**
+- `npm run test:e2e` → **21/21 Chromium desarrollo** (smoke + axe + workspace + capturas visuales)
+- `npm run test:e2e:dist` → **21/21 Chromium produccion**
 
 > Versiones anteriores: [CHANGELOG.md](CHANGELOG.md)
 
@@ -84,7 +84,7 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 
 ### ⚙️ Infraestructura
 - **PWA real** con Service Worker (offline tras primera visita, instalable).
-- **Tests**: 248 Node + 92 binarias (PNG/WebP/AVIF) + 17 E2E Playwright (smoke, axe, regresión visual).
+- **Tests**: 248 Node + 92 binarias (PNG/WebP/AVIF) + 21 E2E Playwright (smoke, axe, área de trabajo, regresión visual).
 - **CI/CD**: GitHub Actions con deploy automático a GitHub Pages.
 - **Seguridad**: CSP endurecida (sin CDNs de estilo/fuentes), SRI en los scripts diferidos, sanitización XSS en toasts y batch processor.
 - **Rendimiento (v3.6.0)**: sin CSS externo bloqueante — Tailwind purgado local (2.93 MB → 17 KB) + subset de Font Awesome (58 iconos, 4.9 KB). CSS inicial total: 27 KB gzip.

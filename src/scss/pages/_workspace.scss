@@ -1,0 +1,420 @@
+// ============================================================
+// Área de trabajo (v3.6.1)
+// ============================================================
+// Escritorio (≥1024px): grid de dos columnas — panel de controles de 380px
+// con pestañas + columna de canvas sticky con toolbar superior.
+// Tablet (768-1023px): panel de 340px.
+// Móvil (<768px): una columna; el panel es un bottom-sheet deslizable y hay
+// una barra inferior fija con Controles + Descargar.
+// Solo tokens de _variables.scss para espaciado/tamaños.
+
+// ------------------------------------------------------------
+// Hero compacto
+// ------------------------------------------------------------
+.hero-section--compact {
+  margin-bottom: var(--space-4);
+}
+
+.hero-compact {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+
+  &__logo {
+    width: var(--control-lg);
+    height: var(--control-lg);
+    flex-shrink: 0;
+  }
+
+  &__text {
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__title {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 800;
+    line-height: 1.2;
+    color: var(--text-primary);
+  }
+
+  &__subtitle {
+    margin: 0;
+    font-size: var(--font-control-sm);
+    color: var(--text-tertiary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+// El botón "Limpiar todo" hereda c-btn (gradiente); compactarlo dentro
+// del header para que no domine la cabecera
+.hero-compact #clear-all-btn {
+  min-width: 0;
+  min-height: var(--control-md);
+  height: auto;
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-control-sm);
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .hero-compact__subtitle {
+    display: none;
+  }
+}
+
+// Con imagen cargada, la dropzone desaparece (queda la fila de file-info):
+// el área de trabajo sube y la carga deja de ocupar pantalla
+body.has-image #drop-area {
+  display: none;
+}
+
+// ------------------------------------------------------------
+// Grid principal
+// ------------------------------------------------------------
+.workspace {
+  display: grid;
+  grid-template-columns: 380px minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (max-width: 1023px) and (min-width: 768px) {
+  .workspace {
+    grid-template-columns: 340px minmax(0, 1fr);
+  }
+}
+
+// ------------------------------------------------------------
+// Panel de controles (columna izquierda / bottom-sheet en móvil)
+// ------------------------------------------------------------
+.workspace__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.workspace__tabs {
+  position: sticky;
+  top: var(--space-2);
+  z-index: 20;
+}
+
+// Cuatro tabs en un panel de 340-380px: compactar para que quepan sin
+// recortarse (el icono se omite en escritorio; en el sheet móvil hay sitio)
+.workspace__tabs .c-tabs__tab {
+  min-height: var(--control-sm);
+  padding: var(--space-2);
+  gap: var(--space-1);
+  font-size: 0.75rem;
+  letter-spacing: 0.01em;
+}
+
+@media (min-width: 768px) {
+  .workspace__tabs .c-tabs__tab i {
+    display: none;
+  }
+}
+
+.workspace__panels {
+  min-width: 0;
+}
+
+.workspace__tabpanel {
+  // Las secciones originales conservan su card; dentro del panel el header
+  // colapsable sobra (la pestaña ES el header) y el contenido va siempre
+  // abierto — sin esto las secciones aparecerían colapsadas y sin forma
+  // de abrirlas.
+  .section__header {
+    display: none;
+  }
+
+  .section__content {
+    max-height: none;
+    overflow: visible;
+    opacity: 1;
+  }
+
+  section {
+    margin-bottom: 0;
+  }
+}
+
+// Las rejillas Tailwind de 2 columnas usan breakpoints de viewport, no de
+// contenedor: a 380px de panel sus celdas desbordan (selects recortados).
+// minmax(0,1fr) obliga a las celdas a encoger con su contenido.
+.workspace__panel .grid-cols-2 {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.workspace__panel select,
+.workspace__panel input {
+  max-width: 100%;
+  min-width: 0;
+}
+
+// Los CTA heredados (c-btn, 160×56px) fueron diseñados para secciones a
+// ancho completo; dentro del panel de 380px se compactan para no romper
+// las rejillas de los formularios
+.workspace__panel button.c-btn,
+.workspace__panel .btn {
+  min-width: 0;
+  min-height: var(--control-md);
+  height: auto;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--font-control-sm);
+  letter-spacing: 0;
+}
+
+.workspace__panel-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-2);
+}
+
+.workspace__restore {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--control-sm);
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: var(--font-control-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition);
+
+  &:hover {
+    color: var(--error);
+    border-color: var(--error);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring);
+  }
+}
+
+// Indicador de sección modificada en la pestaña
+.workspace__dirty-dot {
+  width: var(--space-2);
+  height: var(--space-2);
+  border-radius: var(--radius-full);
+  background: var(--accent-primary);
+  flex-shrink: 0;
+}
+
+// ------------------------------------------------------------
+// Columna del canvas (sticky) + toolbar
+// ------------------------------------------------------------
+.workspace__main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+@media (min-width: 768px) {
+  .workspace__main {
+    position: sticky;
+    top: var(--space-2);
+  }
+}
+
+// La sección de preview ya no es "fullwidth": vive en su columna
+.workspace__main .preview-section-fullwidth {
+  max-width: none;
+  margin: 0;
+}
+
+.workspace__toolbar {
+  flex-wrap: wrap;
+
+  // Compactar los botones de acción heredados (.btn/.button--action miden
+  // 56px por el componente de acción): dentro de la toolbar deben ser
+  // controles de barra, no CTAs
+  .btn,
+  .button--action {
+    min-width: 0;
+    min-height: var(--control-md);
+    height: auto;
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--font-control-sm);
+    gap: var(--space-1);
+    border-radius: var(--radius);
+    letter-spacing: 0;
+  }
+
+  // Los zoom-controls conservan su píldora oscura (sus .zoom-btn son
+  // iconos claros diseñados para ese fondo); solo se anula el margen
+  .zoom-controls {
+    margin: 0;
+    flex-wrap: nowrap;
+  }
+
+  // Descargar destaca como acción primaria de la barra
+  #download-image {
+    min-height: var(--control-md);
+  }
+}
+
+// En anchos intermedios la toolbar oculta las etiquetas y deja iconos
+@media (max-width: 1200px) {
+  .workspace__toolbar .button--action {
+    // Ocultar solo los nodos de texto es frágil; envolver sería invasivo.
+    // Reducimos padding y fuente: caben todos los controles sin overflow.
+    padding: var(--space-2);
+    font-size: 0.7rem;
+  }
+}
+
+// ------------------------------------------------------------
+// Opciones avanzadas ocultas hasta ser relevantes
+// ------------------------------------------------------------
+.workspace__advanced {
+  margin-top: var(--space-3);
+
+  summary {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-height: var(--control-md);
+    padding: var(--space-2) var(--space-3);
+    border: 1px dashed var(--border-color);
+    border-radius: var(--radius);
+    color: var(--text-secondary);
+    font-size: var(--font-control-sm);
+    font-weight: 600;
+    cursor: pointer;
+    user-select: none;
+
+    &:hover {
+      color: var(--text-primary);
+      border-color: var(--border-hover);
+    }
+  }
+
+  &[open] summary {
+    border-style: solid;
+    margin-bottom: var(--space-3);
+  }
+
+  .advanced-tools-container {
+    margin-top: 0;
+  }
+}
+
+// ------------------------------------------------------------
+// Móvil: bottom-sheet + barra inferior fija
+// ------------------------------------------------------------
+.workspace__mobilebar {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .workspace {
+    display: block;
+  }
+
+  // El panel es un bottom-sheet: cerrado por defecto para que NINGÚN
+  // control tape el canvas; se abre con el botón "Controles"
+  .workspace__panel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 900;
+    max-height: 78vh;
+    padding: var(--space-3);
+    overflow-y: auto;
+    background: var(--bg-primary);
+    border-top: 1px solid var(--border-color);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    box-shadow: var(--shadow-xl);
+    transform: translateY(105%);
+    transition: transform 0.25s ease-out;
+    // Dejar visible la barra inferior fija
+    padding-bottom: calc(var(--space-8) + var(--space-6));
+  }
+
+  .workspace__panel--open {
+    transform: translateY(0);
+  }
+
+  .workspace__tabs {
+    top: 0;
+    background: var(--bg-primary);
+    padding-bottom: var(--space-2);
+  }
+
+  .workspace__mobilebar {
+    display: flex;
+    gap: var(--space-2);
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 950;
+    padding: var(--space-2) var(--space-3);
+    padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+    background: var(--surface-raised);
+    border-top: 1px solid var(--border-color);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .workspace__mobilebtn {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    min-height: var(--control-lg);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    background: var(--surface-sunken);
+    color: var(--text-primary);
+    font-size: var(--font-control-md);
+    font-weight: 700;
+    cursor: pointer;
+
+    &:focus-visible {
+      outline: none;
+      box-shadow: var(--focus-ring);
+    }
+
+    &--primary {
+      background: var(--accent-primary);
+      border-color: var(--accent-primary);
+      color: var(--text-inverse);
+    }
+  }
+
+  // Reservar hueco para la barra inferior: nada queda tapado por ella
+  .workspace__main {
+    padding-bottom: calc(var(--control-lg) + var(--space-6));
+  }
+
+  // La toolbar en móvil: scroll horizontal propio, nunca sobre el canvas
+  .workspace__toolbar {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+}
+
+// Tema oscuro
+[data-theme="dark"] .workspace__mobilebtn--primary {
+  color: #0f172a;
+}

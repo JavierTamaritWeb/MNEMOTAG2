@@ -49,6 +49,7 @@ const JS_FILES = [
   'js/managers/bg-removal-manager.js',
   'js/managers/export-manager.js',
   'js/managers/zoom-pan-manager.js',
+  'js/managers/workspace-manager.js',
   'js/main.js'
 ];
 
