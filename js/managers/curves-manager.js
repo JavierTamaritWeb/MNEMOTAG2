@@ -29,9 +29,9 @@ window.CurvesManager = (function () {
       b:   [{ x: 0, y: 0 }, { x: 255, y: 255 }]
     },
     dragIndex: -1,
-    // v3.4.4: snapshot "antes de abrir el modal" para live preview.
-    previewSnapshot: null,
-    previewRafPending: false
+    previewDocumentId: null,
+    previewDocumentRevision: null,
+    previewRafId: null
   };
 
   // Etiquetas en español de cada canal para accesibilidad (aria-label del canvas).
@@ -73,12 +73,9 @@ window.CurvesManager = (function () {
     _state.points.b   = [{ x: 0, y: 0 }, { x: 255, y: 255 }];
     _state.activeChannel = 'rgb';
 
-    try {
-      _state.previewSnapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    } catch (err) {
-      MNEMOTAG_DEBUG && console.warn('CurvesManager.open: no se pudo capturar snapshot para live preview:', err);
-      _state.previewSnapshot = null;
-    }
+    _cancelPreviewFrame();
+    _state.previewDocumentId = AppState.documentId;
+    _state.previewDocumentRevision = AppState.documentRevision;
 
     if (typeof _openAccessibleModal === 'function') {
       _openAccessibleModal(modal, _rollbackPreview);
@@ -94,43 +91,61 @@ window.CurvesManager = (function () {
   }
 
   function _schedulePreview() {
-    if (_state.previewRafPending) return;
-    if (!_state.previewSnapshot || typeof canvas === 'undefined' || !canvas || !ctx) return;
-    _state.previewRafPending = true;
-    requestAnimationFrame(function () {
-      _state.previewRafPending = false;
-      const snap = _state.previewSnapshot;
-      if (!snap) return;
-      const lutR = _buildLutFromPoints(_state.points.r);
-      const lutG = _buildLutFromPoints(_state.points.g);
-      const lutB = _buildLutFromPoints(_state.points.b);
-      const lutRGB = _buildLutFromPoints(_state.points.rgb);
-      const out = ctx.createImageData(snap.width, snap.height);
-      const src = snap.data;
-      const dst = out.data;
-      for (let i = 0; i < src.length; i += 4) {
-        if (src[i + 3] === 0) {
-          dst[i] = src[i];
-          dst[i + 1] = src[i + 1];
-          dst[i + 2] = src[i + 2];
-          dst[i + 3] = 0;
-          continue;
-        }
-        dst[i]     = lutRGB[lutR[src[i]]];
-        dst[i + 1] = lutRGB[lutG[src[i + 1]]];
-        dst[i + 2] = lutRGB[lutB[src[i + 2]]];
-        dst[i + 3] = src[i + 3];
-      }
-      ctx.putImageData(out, 0, 0);
+    if (_state.previewRafId !== null) return;
+    if (!_state.previewDocumentId || typeof canvas === 'undefined' || !canvas || !ctx) return;
+    _state.previewRafId = requestAnimationFrame(function () {
+      _state.previewRafId = null;
+      if (_state.previewDocumentId !== AppState.documentId ||
+          _state.previewDocumentRevision !== AppState.documentRevision) return;
+      const source = AppState.currentImage;
+      if (!source) return;
+      const sourceWidth = source.naturalWidth || source.width;
+      const sourceHeight = source.naturalHeight || source.height;
+      const processed = document.createElement('canvas');
+      processed.width = sourceWidth;
+      processed.height = sourceHeight;
+      const processedCtx = processed.getContext('2d', { willReadFrequently: true });
+      processedCtx.drawImage(source, 0, 0, sourceWidth, sourceHeight);
+      const imageData = processedCtx.getImageData(0, 0, sourceWidth, sourceHeight);
+      processedCtx.putImageData(_applyCurrentLuts(imageData), 0, 0);
+      const result = DocumentRenderer.renderDocument(
+        DocumentRenderer.snapshot({ sourceImage: processed }),
+        canvas
+      );
+      AppState.textWatermarkBounds = result.watermarkBounds?.text || null;
+      AppState.imageWatermarkBounds = result.watermarkBounds?.image || null;
+      AppState.textLayerBounds = result.textLayerBounds || [];
+      processed.width = 0;
+      processed.height = 0;
     });
   }
 
-  function _rollbackPreview() {
-    if (_state.previewSnapshot && typeof canvas !== 'undefined' && canvas && ctx) {
-      ctx.putImageData(_state.previewSnapshot, 0, 0);
+  function _cancelPreviewFrame() {
+    if (_state.previewRafId !== null) cancelAnimationFrame(_state.previewRafId);
+    _state.previewRafId = null;
+  }
+
+  function _applyCurrentLuts(imageData) {
+    const lutR = _buildLutFromPoints(_state.points.r);
+    const lutG = _buildLutFromPoints(_state.points.g);
+    const lutB = _buildLutFromPoints(_state.points.b);
+    const lutRGB = _buildLutFromPoints(_state.points.rgb);
+    const data = imageData.data;
+    for (let i = 0; i < data.length; i += 4) {
+      if (data[i + 3] === 0) continue;
+      data[i] = lutRGB[lutR[data[i]]];
+      data[i + 1] = lutRGB[lutG[data[i + 1]]];
+      data[i + 2] = lutRGB[lutB[data[i + 2]]];
     }
-    _state.previewSnapshot = null;
-    _state.previewRafPending = false;
+    return imageData;
+  }
+
+  function _rollbackPreview() {
+    const hadPreview = Boolean(_state.previewDocumentId);
+    _cancelPreviewFrame();
+    _state.previewDocumentId = null;
+    _state.previewDocumentRevision = null;
+    if (hadPreview && typeof updatePreview === 'function') updatePreview();
   }
 
   function _setupUI() {
@@ -335,42 +350,43 @@ window.CurvesManager = (function () {
     });
   }
 
-  function _applyToImage() {
+  async function _applyToImage() {
     if (typeof canvas === 'undefined' || !canvas || !currentImage) {
       UIManager.showError('No hay imagen sobre la que aplicar las curvas.');
       return;
     }
 
-    // Gracias al live preview el canvas YA tiene la transformación.
-    // Fallback: si no hay snapshot (error en apertura), reaplica.
-    if (!_state.previewSnapshot) {
-      let imageData;
-      try {
-        imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      } catch (err) {
-        UIManager.showError('No se pudo leer el canvas para aplicar curvas.');
-        return;
-      }
-      const lutR = _buildLutFromPoints(_state.points.r);
-      const lutG = _buildLutFromPoints(_state.points.g);
-      const lutB = _buildLutFromPoints(_state.points.b);
-      const lutRGB = _buildLutFromPoints(_state.points.rgb);
-      const data = imageData.data;
-      for (let i = 0; i < data.length; i += 4) {
-        if (data[i + 3] === 0) continue;
-        data[i]     = lutRGB[lutR[data[i]]];
-        data[i + 1] = lutRGB[lutG[data[i + 1]]];
-        data[i + 2] = lutRGB[lutB[data[i + 2]]];
-      }
-      ctx.putImageData(imageData, 0, 0);
+    _cancelPreviewFrame();
+    try {
+      const committed = await DocumentStateManager.enqueueRasterMutation('curves', async function (source) {
+        const resultCanvas = document.createElement('canvas');
+        resultCanvas.width = source.naturalWidth || source.width;
+        resultCanvas.height = source.naturalHeight || source.height;
+        const resultCtx = resultCanvas.getContext('2d', { willReadFrequently: true });
+        resultCtx.drawImage(source, 0, 0, resultCanvas.width, resultCanvas.height);
+        const imageData = resultCtx.getImageData(0, 0, resultCanvas.width, resultCanvas.height);
+        resultCtx.putImageData(_applyCurrentLuts(imageData), 0, 0);
+        return resultCanvas;
+      }, {
+        takeOwnership: true,
+        updateOriginalDimensions: false,
+        updateResetImage: true,
+        rotation: 0,
+        isFlippedHorizontally: false,
+        isFlippedVertically: false,
+        saveHistory: true
+      });
+      if (!committed) return;
+    } catch (err) {
+      MNEMOTAG_DEBUG && console.warn('CurvesManager: no se pudo confirmar el raster:', err);
+      UIManager.showError('No se pudieron aplicar las curvas a la imagen.');
+      return;
     }
-    // Descartar snapshot para que el cierre NO haga rollback.
-    _state.previewSnapshot = null;
-    _state.previewRafPending = false;
 
-    if (typeof historyManager !== 'undefined' && historyManager.saveState) {
-      historyManager.saveState();
-    }
+    // El resultado ya vive en el raster canónico. Descartar el snapshot
+    // evita que el cierre accesible restaure la vista antigua.
+    _state.previewDocumentId = null;
+    _state.previewDocumentRevision = null;
 
     UIManager.showSuccess('📈 Curvas aplicadas a la imagen');
     if (typeof _closeAccessibleModal === 'function') {

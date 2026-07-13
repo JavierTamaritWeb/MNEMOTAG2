@@ -24,13 +24,16 @@ test.describe('v3.7.1 — arquitectura y memoria', () => {
       batch: typeof BatchUIManager.process === 'function',
       manifest: document.querySelector('link[rel="manifest"]')?.getAttribute('href')
     }));
-    expect(contracts).toEqual({
+    // El manifest lleva cache-busting versionado; no acoplar el test a una
+    // versión concreta para que los bumps de release no lo rompan.
+    expect(contracts.manifest).toMatch(/^images\/site\.webmanifest\?v=\d+\.\d+\.\d+$/);
+    expect({ ...contracts, manifest: 'ok' }).toEqual({
       observable: true,
       compositor: true,
       watermark: true,
       exportState: true,
       batch: true,
-      manifest: 'images/site.webmanifest?v=3.7.3'
+      manifest: 'ok'
     });
   });
 

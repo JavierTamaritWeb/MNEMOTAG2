@@ -62,6 +62,24 @@ describe('SecurityManager.validateImageFile', function () {
     const result = SecurityManager.validateImageFile(fakeFile);
     expect(result.isValid).toBe(true);
   });
+
+  it('rechaza markup, controles ASCII y controles bidireccionales en el nombre', function () {
+    const names = [
+      'foto<img>.jpg',
+      'foto\u0000.jpg',
+      'foto\u000a.jpg',
+      'foto\u202egpj.exe.jpg'
+    ];
+    names.forEach(function (name) {
+      const result = SecurityManager.validateImageFile({
+        name: name,
+        type: 'image/jpeg',
+        size: 1024 * 200,
+      });
+      expect(result.isValid).toBe(false);
+      expect(result.errors.map(function (error) { return error.type; })).toContain('UNSAFE_FILENAME');
+    });
+  });
 });
 
 describe('SecurityManager.validateMetadata', function () {
@@ -113,6 +131,30 @@ describe('SecurityManager.validateWatermarkText', function () {
   it('rechaza texto vacío', function () {
     const result = SecurityManager.validateWatermarkText('', 24, 50);
     expect(result.isValid).toBe(false);
+  });
+});
+
+describe('SecurityManager.validateWatermarkImage', function () {
+  it('rechaza una marca de agua que excede su límite residente', function () {
+    const result = SecurityManager.validateWatermarkImageFile({
+      name: 'marca.png',
+      type: 'image/png',
+      size: AppConfig.watermarkMaxFileSize + 1
+    });
+    expect(result.isValid).toBe(false);
+    expect(result.errors.map(function (error) { return error.type; }))
+      .toContain('WATERMARK_FILE_TOO_LARGE');
+  });
+
+  it('rechaza dimensiones o megapíxeles excesivos', function () {
+    expect(SecurityManager.validateWatermarkImageDimensions({
+      naturalWidth: 5000,
+      naturalHeight: 100
+    }).isValid).toBe(false);
+    expect(SecurityManager.validateWatermarkImageDimensions({
+      naturalWidth: 4000,
+      naturalHeight: 4000
+    }).isValid).toBe(true);
   });
 });
 

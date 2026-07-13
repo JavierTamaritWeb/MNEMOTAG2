@@ -165,6 +165,32 @@ describe('v3.7.1 — regresiones de fuente (consumo de AppState y código muerto
     expect(main.includes('function renderMainDocument(')).toBe(true);
   });
 
+  it('export, share y multisize esperan el raster y renderizan una instantánea privada', async function () {
+    const src = await fetchV371Source('../js/managers/export-manager.js');
+    expect(src.includes('await documentStateManager.waitForIdle()')).toBe(true);
+    expect(src.includes('async function prepareAtomicExport()')).toBe(true);
+    expect(src.includes("const exportCanvas = document.createElement('canvas')")).toBe(true);
+    expect(src.includes('DocumentRenderer.renderDocument(documentState, exportCanvas)')).toBe(true);
+    expect(src.includes('showPositioningBorders: false')).toBe(true);
+    expect(src.includes('AppState.showPositioningBorders =')).toBe(false);
+    const preparations = src.match(/await prepareAtomicExport\(\)/g) || [];
+    expect(preparations.length).toBe(4);
+  });
+
+  it('todos los caminos de exportación conservan un snapshot de metadatos', async function () {
+    const exportSrc = await fetchV371Source('../js/managers/export-manager.js');
+    const metadataSrc = await fetchV371Source('../js/managers/metadata-manager.js');
+    expect(exportSrc.includes('MetadataManager.embedExifInBlob(blob, metadata)')).toBe(true);
+    expect(exportSrc.includes('async function encodeExportBlob')).toBe(true);
+    expect(exportSrc.includes('triggerBlobDownload(blob')).toBe(true);
+    expect(exportSrc.includes('fallbackCanvas.toDataURL')).toBe(false);
+    expect(metadataSrc.includes('embedExifInBlob: async function(blob, metadataSnapshot)')).toBe(true);
+    expect(metadataSrc.includes('embedExifInJpegDataUrl: function(dataUrl, metadataSnapshot)')).toBe(true);
+    expect(metadataSrc.includes('embedExifInPngDataUrl: async function(dataUrl, metadataSnapshot)')).toBe(true);
+    expect(metadataSrc.includes('embedExifInWebpDataUrl: async function(dataUrl, metadataSnapshot)')).toBe(true);
+    expect(metadataSrc.includes('embedExifInAvifDataUrl: async function(dataUrl, metadataSnapshot)')).toBe(true);
+  });
+
   it('main.js permanece por debajo de 5.000 líneas', async function () {
     const src = await fetchV371Source('../js/main.js');
     expect(src.split('\n').length < 5000).toBe(true);
@@ -185,7 +211,8 @@ describe('v3.7.1 — regresiones de fuente (consumo de AppState y código muerto
   it('el PWA tiene un manifest canónico e iconos maskable dedicados', async function () {
     const html = await fetchV371Source('../index.html');
     const manifest = await fetchV371Source('../images/site.webmanifest');
-    expect(html.includes('images/site.webmanifest?v=3.7.3')).toBe(true);
+    // Cache-busting versionado sin acoplar el test a una versión concreta.
+    expect(/images\/site\.webmanifest\?v=\d+\.\d+\.\d+/.test(html)).toBe(true);
     expect(html.includes('favicon_io/site.webmanifest')).toBe(false);
     expect(manifest.includes('maskable-192x192.png')).toBe(true);
     expect(manifest.includes('maskable-512x512.png')).toBe(true);
@@ -198,7 +225,7 @@ describe('v3.7.2 — marcas de agua como flujo crítico', function () {
     const watermark = await fetchV371Source('../js/managers/watermark-manager.js');
     const batchUi = await fetchV371Source('../js/managers/batch-ui-manager.js');
     expect(watermark.includes('async function handleWatermarkImageChange()')).toBe(true);
-    expect(watermark.includes('await loadWatermarkImage(watermarkInput.files[0])')).toBe(true);
+    expect(watermark.includes('const watermarkImg = await loadWatermarkImage(file)')).toBe(true);
     expect(watermark.includes('AppState.watermarkImagePreview = watermarkImg')).toBe(true);
     expect(batchUi.indexOf('await WatermarkManager.ensureImageReady()'))
       .toBeLessThan(batchUi.indexOf('batchManager.captureCurrentConfig('));

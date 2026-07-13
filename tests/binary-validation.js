@@ -782,6 +782,21 @@ assert(
 
 // ---- Resumen ----------------------------------------------------------------
 
+// Regresión v3.7.4: AVIF pasaba un Uint8Array al normalizador TIFF, que antes
+// asumía string y llamaba charCodeAt(), anulando silenciosamente la inyección.
+const app1Typed = new Uint8Array([
+  0xFF, 0xE1, 0x00, 0x0C,
+  0x45, 0x78, 0x69, 0x66, 0x00, 0x00,
+  0x49, 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00
+]);
+const typedTiff = MM._piexifBinaryToTiffBytes(app1Typed);
+assert(
+  typedTiff.length === 8 && typedTiff[0] === 0x49 && typedTiff[2] === 0x2A,
+  '_piexifBinaryToTiffBytes acepta Uint8Array para el flujo AVIF'
+);
+assert(MM._isValidTiffBytes(typedTiff), 'la cabecera TIFF normalizada se valida antes de inyectar AVIF');
+assert(!MM._isValidTiffBytes(new Uint8Array(8)), 'se rechaza una cabecera TIFF vacía o corrupta');
+
 console.log('\n' + '─'.repeat(60));
 const total = passed + failed;
 if (failed === 0) {

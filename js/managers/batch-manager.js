@@ -23,11 +23,16 @@ class BatchManager {
     this.isProcessing = false;
     // v3.5.14: cancelación cooperativa — se comprueba entre imagen e imagen
     this.cancelRequested = false;
+    this.runSequence = 0;
+    this.activeRun = null;
+    this.clearAfterRun = false;
     // Límite de imágenes desde AppConfig — única fuente de verdad (v3.5.14)
     this.maxImages = AppConfig.batchMaxImages;
     this.maxFileSize = AppConfig.maxFileSize;
-    this.maxPixelsPerImage = 36 * 1000 * 1000;
-    this.maxTotalPixels = 80 * 1000 * 1000;
+    this.maxPixelsPerImage = AppConfig.batchMaxPixelsPerImage;
+    this.maxTotalPixels = AppConfig.batchMaxTotalPixels;
+    this.workingBytesPerPixel = AppConfig.batchWorkingBytesPerPixel || 8;
+    this.workingMemoryBudgetBytes = AppConfig.batchWorkingMemoryBudgetBytes || 320 * 1024 * 1024;
     // v3.7.0: imágenes procesándose a la vez. Acotado a [1, 2]: más de 2
     // canvas grandes simultáneos dispara el pico de memoria sin mejorar
     // apenas el tiempo total (la codificación toBlob es el cuello).
@@ -47,8 +52,15 @@ class BatchManager {
    * @returns {Promise<Object>} Resultado de la validación
    */
   async addImages(files) {
+    if (this.isProcessing) {
+      return {
+        success: false,
+        error: 'Espera a que termine o cancela el lote antes de añadir imágenes'
+      };
+    }
     const results = {
       added: [],
+      addedItems: [],
       rejected: [],
       total: files.length
     };
@@ -74,14 +86,15 @@ class BatchManager {
         if (queuedPixels + filePixels > this.maxTotalPixels) {
           results.rejected.push({
             name: file.name,
-            reason: 'El lote supera el límite seguro de 80 megapíxeles decodificados'
+            reason: 'El lote supera el límite seguro de ' +
+              Math.round(this.maxTotalPixels / 1000000) + ' megapíxeles decodificados'
           });
           continue;
         }
         // v3.7.0: única representación por imagen — File + dimensiones.
         // La imagen decodificada durante la validación se descarta; la
         // decodificación real ocurre bajo demanda en processImage.
-        this.imageQueue.push({
+        const queueItem = {
           id: this.generateId(),
           file: file,
           name: file.name,
@@ -92,9 +105,12 @@ class BatchManager {
           processed: false,
           error: null,
           cancelled: false
-        });
+        };
+        this.imageQueue.push(queueItem);
 
         results.added.push(file.name);
+        // previewBlob pertenece a la UI y nunca se conserva en la cola.
+        results.addedItems.push({ item: queueItem, previewBlob: validation.previewBlob || null });
       } else {
         results.rejected.push({
           name: file.name,
@@ -103,7 +119,11 @@ class BatchManager {
       }
     }
 
-    
+    if (results.added.length > 0) {
+      this.processedImages = [];
+      this.currentConfig = null;
+    }
+
     return {
       success: true,
       ...results
@@ -171,7 +191,7 @@ class BatchManager {
         if (width * height > this.maxPixelsPerImage) {
           return {
             valid: false,
-            error: `Imagen demasiado grande: ${width}x${height} (máx: 36 megapíxeles)`
+            error: `Imagen demasiado grande: ${width}x${height} (máx: ${Math.round(this.maxPixelsPerImage / 1000000)} megapíxeles)`
           };
         }
 
@@ -439,146 +459,181 @@ class BatchManager {
       throw new Error('No se ha capturado la configuración');
     }
 
-    this.isProcessing = true;
-    this.processedImages = [];
+    const queue = this.imageQueue.slice();
+    const configSnapshot = {
+      ...this.currentConfig,
+      metadata: this.currentConfig.metadata ? { ...this.currentConfig.metadata } : null
+    };
+    const run = {
+      id: ++this.runSequence,
+      queue,
+      config: configSnapshot,
+      results: [],
+      errors: [],
+      cancelRequested: false,
+      controller: typeof window !== 'undefined' && typeof window.AbortController === 'function'
+        ? new window.AbortController()
+        : null
+    };
 
-    // Accesibilidad: anotar role/aria-* en los elementos de progreso al
-    // iniciar el procesamiento (el markup vive en index.html).
+    this.activeRun = run;
+    this.isProcessing = true;
+    this.processedImages = run.results;
+    this.cancelRequested = false;
+    this.clearAfterRun = false;
     this._setupProgressA11y();
 
-    // Resolver el MIME de salida UNA vez para todo el lote: si el navegador
-    // no puede codificar el formato configurado (p. ej. AVIF en Firefox),
-    // usar la cadena de fallback estándar del proyecto. Se pasa hasAlpha=true
-    // para que el fallback de WebP/AVIF elija PNG (preserva transparencia).
-    let outputMime = (typeof getMimeType === 'function')
-      ? getMimeType(this.currentConfig.outputFormat)
-      : 'image/' + this.currentConfig.outputFormat;
-    if (typeof determineFallbackFormat === 'function') {
-      try {
-        outputMime = await determineFallbackFormat(true, outputMime);
-      } catch (fallbackError) {
-        MNEMOTAG_DEBUG && console.warn('determineFallbackFormat falló, se mantiene el MIME original:', fallbackError);
-      }
-    }
-    this.currentConfig.outputMime = outputMime;
-    this.currentConfig.outputFormat = outputMime.split('/')[1];
-
-    const total = this.imageQueue.length;
-    let done = 0;
-    const errors = [];
-    this.cancelRequested = false;
-
-    // v3.7.0: procesamiento con concurrencia acotada (1-2 workers). Cada
-    // worker toma el siguiente índice libre de la cola; la cancelación del
-    // lote se comprueba antes de reclamar cada imagen (las en curso terminan)
-    // y la cancelación individual (item.cancelled) salta esa imagen.
-    const queue = this.imageQueue.slice();
-    let nextIndex = 0;
-
-    const notifyProgress = (imageItem, itemResult) => {
-      const percentage = Math.round((done / total) * 100);
-
-      // Accesibilidad: reflejar el avance en aria-valuenow de las barras.
-      this._updateProgressA11y(percentage);
-
-      // El callback de progreso va FUERA del try de procesamiento y en su
-      // propio try silencioso: si el callback lanza, no debe duplicar la
-      // imagen en processedImages ni abortar el lote. Se invoca también
-      // cuando la imagen falla, para que la barra llegue siempre a n/n.
-      if (progressCallback) {
+    let result;
+    try {
+      // Resolver el MIME una vez y guardarlo exclusivamente en el snapshot
+      // de esta ejecución. currentConfig puede ser sustituido después sin
+      // alterar las tareas que ya están en curso.
+      let outputMime = (typeof getMimeType === 'function')
+        ? getMimeType(configSnapshot.outputFormat)
+        : 'image/' + configSnapshot.outputFormat;
+      if (typeof determineFallbackFormat === 'function') {
         try {
-          progressCallback({
-            current: done,
-            total: total,
-            percentage: percentage,
-            currentImage: imageItem.name,
-            // v3.5.14: info por archivo para que la UI marque estados
-            id: imageItem.id,
-            lastSuccess: itemResult.success,
-            lastError: itemResult.success ? null : itemResult.error,
-            // v3.7.0: distinguir "cancelada individualmente" de "error"
-            lastCancelled: !!itemResult.cancelledItem
-          });
-        } catch (cbError) {
-          MNEMOTAG_DEBUG && console.warn('progressCallback lanzó un error (ignorado):', cbError);
+          outputMime = await determineFallbackFormat(true, outputMime);
+        } catch (fallbackError) {
+          MNEMOTAG_DEBUG && console.warn('determineFallbackFormat falló, se mantiene el MIME original:', fallbackError);
         }
       }
-    };
+      configSnapshot.outputMime = outputMime;
+      configSnapshot.outputFormat = outputMime.split('/')[1];
+      // Mantener la extensión del ZIP sincronizada con el formato realmente
+      // codificado, sin cambiar el objeto que consumen los workers.
+      if (this.activeRun === run) this.currentConfig = configSnapshot;
 
-    const runWorker = async () => {
-      while (true) {
-        // v3.5.14: cancelación cooperativa — la imagen en curso termina,
-        // las restantes quedan sin procesar (no aparecen en processedImages)
-        if (this.cancelRequested) return;
-        const index = nextIndex++;
-        if (index >= queue.length) return;
-        const imageItem = queue[index];
+      const total = queue.length;
+      let done = 0;
+      let nextIndex = 0;
 
-        // v3.7.0: cancelación individual — la imagen se salta y queda
-        // marcada como cancelada (ni procesada ni fallida).
-        if (imageItem.cancelled) {
-          const skippedResult = {
-            success: false,
-            name: imageItem.name,
-            error: 'Cancelada por el usuario',
-            cancelledItem: true,
-            id: imageItem.id
-          };
-          this.processedImages.push(skippedResult);
+      const notifyProgress = (imageItem, itemResult) => {
+        const percentage = Math.round((done / total) * 100);
+        this._updateProgressA11y(percentage);
+        if (progressCallback) {
+          try {
+            progressCallback({
+              current: done,
+              total,
+              percentage,
+              currentImage: imageItem.name,
+              id: imageItem.id,
+              lastSuccess: itemResult.success,
+              lastError: itemResult.success ? null : itemResult.error,
+              lastCancelled: !!itemResult.cancelledItem
+            });
+          } catch (cbError) {
+            MNEMOTAG_DEBUG && console.warn('progressCallback lanzó un error (ignorado):', cbError);
+          }
+        }
+      };
+
+      const runWorker = async () => {
+        while (true) {
+          if (run.cancelRequested) return;
+          const index = nextIndex++;
+          if (index >= queue.length) return;
+          const imageItem = queue[index];
+
+          if (imageItem.cancelled) {
+            const skippedResult = {
+              success: false,
+              name: imageItem.name,
+              error: 'Cancelada por el usuario',
+              cancelledItem: true,
+              id: imageItem.id
+            };
+            run.results.push(skippedResult);
+            done++;
+            notifyProgress(imageItem, skippedResult);
+            continue;
+          }
+
+          let itemResult;
+          try {
+            imageItem.processing = true;
+            itemResult = await this.processImage(imageItem, configSnapshot, run);
+            if (imageItem.cancelled) {
+              itemResult = {
+                success: false,
+                name: imageItem.name,
+                error: 'Cancelada por el usuario',
+                cancelledItem: true
+              };
+            } else {
+              imageItem.processed = true;
+            }
+          } catch (error) {
+            if (imageItem.cancelled) {
+              itemResult = {
+                success: false,
+                name: imageItem.name,
+                error: 'Cancelada por el usuario',
+                cancelledItem: true
+              };
+            } else {
+              MNEMOTAG_DEBUG && console.error(`Error procesando ${imageItem.name}:`, error);
+              imageItem.error = error.message;
+              run.errors.push({ name: imageItem.name, error: error.message });
+              itemResult = {
+                success: false,
+                name: imageItem.name,
+                error: error.message
+              };
+            }
+          } finally {
+            imageItem.processing = false;
+          }
+          itemResult.id = imageItem.id;
+          run.results.push(itemResult);
           done++;
-          notifyProgress(imageItem, skippedResult);
-          continue;
+          notifyProgress(imageItem, itemResult);
         }
+      };
 
-        let itemResult;
-        try {
-          itemResult = await this.processImage(imageItem);
-          imageItem.processed = true;
-        } catch (error) {
-          console.error(`Error procesando ${imageItem.name}:`, error);
-          imageItem.error = error.message;
-          errors.push({ name: imageItem.name, error: error.message });
-          itemResult = {
-            success: false,
-            name: imageItem.name,
-            error: error.message
-          };
-        }
-        // id de la cola para que la UI pueda mapear estados por archivo
-        itemResult.id = imageItem.id;
-        this.processedImages.push(itemResult);
-        done++;
-        notifyProgress(imageItem, itemResult);
+      const largestImagePixels = queue.reduce(
+        (largest, item) => Math.max(largest, (item.width || 0) * (item.height || 0)),
+        1
+      );
+      const memoryBoundConcurrency = Math.max(1, Math.floor(
+        this.workingMemoryBudgetBytes / (largestImagePixels * this.workingBytesPerPixel)
+      ));
+      const workerCount = Math.max(1, Math.min(
+        this.concurrency,
+        memoryBoundConcurrency,
+        queue.length
+      ));
+      await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
+
+      const failed = run.errors.length;
+      const succeeded = run.results.filter(image => image.success).length;
+      if (failed > 0 && !run.cancelRequested &&
+          typeof UIManager !== 'undefined' && typeof UIManager.showWarning === 'function') {
+        UIManager.showWarning(failed + ' de ' + total + ' imágenes no se pudieron procesar');
       }
-    };
 
-    const workerCount = Math.max(1, Math.min(this.concurrency, queue.length));
-    await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
-
-    this.isProcessing = false;
-    const cancelled = this.cancelRequested;
-    this.cancelRequested = false;
-
-    const failed = errors.length;
-    const succeeded = this.processedImages.filter(img => img.success).length;
-
-    // main.js muestra el resumen (éxito / parcial / cancelado); aquí solo
-    // avisamos de fallos parciales cuando NO hubo cancelación para que no
-    // queden mudos si el caller ignora el detalle.
-    if (failed > 0 && !cancelled && typeof UIManager !== 'undefined' && typeof UIManager.showWarning === 'function') {
-      UIManager.showWarning(failed + ' de ' + total + ' imágenes no se pudieron procesar');
+      result = {
+        success: true,
+        processed: succeeded,
+        failed,
+        errors: run.errors,
+        total,
+        cancelled: run.cancelRequested,
+        images: run.results
+      };
+    } finally {
+      const mustClear = this.clearAfterRun;
+      if (this.activeRun === run) {
+        this.activeRun = null;
+        this.isProcessing = false;
+      }
+      this.cancelRequested = false;
+      this.clearAfterRun = false;
+      if (mustClear) this._resetQueue();
     }
 
-    return {
-      success: true,
-      // processed = SOLO las exitosas (antes contaba también las fallidas)
-      processed: succeeded,
-      failed: failed,
-      errors: errors,
-      total: total,
-      cancelled: cancelled,
-      images: this.processedImages
-    };
+    return result;
   }
 
   /**
@@ -588,6 +643,10 @@ class BatchManager {
   requestCancel() {
     if (this.isProcessing) {
       this.cancelRequested = true;
+      if (this.activeRun) {
+        this.activeRun.cancelRequested = true;
+        this.activeRun.controller?.abort();
+      }
     }
   }
 
@@ -649,7 +708,8 @@ class BatchManager {
    * codifica el blob de salida y se libera TODO (canvas de trabajo, canvas
    * de aplanado e imagen decodificada) antes de devolver el resultado.
    */
-  async processImage(imageItem) {
+  async processImage(imageItem, config = this.currentConfig) {
+    if (!config) throw new Error('No hay configuración de lote disponible');
     // Decodificar bajo demanda desde el File original
     const img = await this.loadImageElement(imageItem.file);
     const canvas = document.createElement('canvas');
@@ -665,38 +725,46 @@ class BatchManager {
       canvas.height = imageItem.height || img.height;
 
       DocumentRenderer.renderDocument(
-        Object.assign({}, this.currentConfig.documentState, {
+        Object.assign({}, config.documentState, {
           sourceImage: img,
           showPositioningBorders: false
         }),
         canvas
       );
 
-      const mime = this.currentConfig.outputMime
-        || ('image/' + (this.currentConfig.outputFormat || 'jpeg'));
+      const mime = config.outputMime
+        || ('image/' + (config.outputFormat || 'jpeg'));
 
       // JPEG no tiene canal alpha: aplanar contra el color configurado
       // para que las zonas transparentes (p. ej. PNG de origen) no salgan
       // en negro (comportamiento por defecto del codec JPEG).
-      if (mime === 'image/jpeg' && typeof flattenCanvasForJpeg === 'function') {
+      if (mime === 'image/jpeg') {
         const flattenColor = (typeof getFlattenColor === 'function')
           ? getFlattenColor()
-          : undefined;
-        exportCanvas = flattenCanvasForJpeg(canvas, flattenColor);
+          : '#ffffff';
+        // Pintar el fondo detrás de los píxeles existentes evita un segundo
+        // canvas RGBA completo (otros 144 MB para una imagen de 36 MP).
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-over';
+        ctx.fillStyle = flattenColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.restore();
       }
 
       const outWidth = canvas.width;
       const outHeight = canvas.height;
 
-      const blob = await new Promise((resolve, reject) => {
+      let blob = await new Promise((resolve, reject) => {
         exportCanvas.toBlob((result) => {
           if (!result) {
             reject(new Error('Error al generar blob (' + mime + ')'));
             return;
           }
           resolve(result);
-        }, mime, this.currentConfig.outputQuality);
+        }, mime, config.outputQuality);
       });
+
+      blob = await this.embedMetadata(blob, config);
 
       return {
         success: true,
@@ -717,6 +785,25 @@ class BatchManager {
       canvas.height = 0;
       img.src = '';
     }
+  }
+
+  /**
+   * Inserta el snapshot EXIF capturado al iniciar el lote. Si el usuario
+   * pidió metadatos, una degradación silenciosa se considera un error de esa
+   * imagen: nunca se marca como correcta una salida que perdió sus EXIF.
+   */
+  async embedMetadata(blob, config) {
+    if (!config?.metadata) return blob;
+    if (typeof MetadataManager === 'undefined' ||
+        typeof MetadataManager.embedExifInBlob !== 'function') {
+      throw new Error('El escritor de metadatos no está disponible');
+    }
+
+    const enrichedBlob = await MetadataManager.embedExifInBlob(blob, config.metadata);
+    if (!enrichedBlob || enrichedBlob === blob) {
+      throw new Error('No se pudieron insertar los metadatos en el archivo generado');
+    }
+    return enrichedBlob;
   }
 
   /**
@@ -830,9 +917,12 @@ class BatchManager {
    * Eliminar imagen de la cola
    */
   removeImage(id) {
+    if (this.isProcessing) return false;
     const index = this.imageQueue.findIndex(img => img.id === id);
     if (index !== -1) {
       this.imageQueue.splice(index, 1);
+      this.processedImages = [];
+      this.currentConfig = null;
       return true;
     }
     return false;
@@ -842,6 +932,16 @@ class BatchManager {
    * Limpiar cola completa
    */
   clearQueue() {
+    if (this.isProcessing) {
+      this.clearAfterRun = true;
+      this.requestCancel();
+      return false;
+    }
+    this._resetQueue();
+    return true;
+  }
+
+  _resetQueue() {
     this.imageQueue = [];
     this.processedImages = [];
     this.currentConfig = null;

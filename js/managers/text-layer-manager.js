@@ -1,5 +1,22 @@
 'use strict';
 
+function cloneTextLayerConfig(layer) {
+  return {
+    ...layer,
+    font: layer.font ? { ...layer.font } : null,
+    position: layer.position ? { ...layer.position } : null,
+    effects: layer.effects ? {
+      ...layer.effects,
+      shadow: layer.effects.shadow ? { ...layer.effects.shadow } : null,
+      stroke: layer.effects.stroke ? { ...layer.effects.stroke } : null,
+      gradient: layer.effects.gradient ? {
+        ...layer.effects.gradient,
+        colors: [...(layer.effects.gradient.colors || [])]
+      } : null
+    } : null
+  };
+}
+
 /**
  * TextLayerManager - Sistema de capas de texto avanzadas
  * Permite múltiples textos con efectos y Google Fonts
@@ -579,7 +596,9 @@ class TextLayerManager {
    */
   exportConfig() {
     return {
-      layers: this.layers.map(l => ({ ...l })),
+      // El drag muta position.x/y in-place. Una copia superficial hacía que
+      // los snapshots de historial anteriores cambiaran retroactivamente.
+      layers: this.layers.map(cloneTextLayerConfig),
       activeLayerId: this.activeLayerId
     };
   }
@@ -587,15 +606,22 @@ class TextLayerManager {
   /**
    * Importar configuración de capas
    */
-  async importConfig(config) {
-    this.layers = [];
-    
-    for (const layerData of config.layers) {
+  async importConfig(config, options) {
+    const importedLayers = [];
+    const isCurrent = options && typeof options.isCurrent === 'function'
+      ? options.isCurrent
+      : function () { return true; };
+
+    for (const layerData of (config.layers || [])) {
       await this.loadFont(layerData.font.family);
-      this.layers.push({ ...layerData });
+      if (!isCurrent()) return false;
+      importedLayers.push(cloneTextLayerConfig(layerData));
     }
-    
+
+    if (!isCurrent()) return false;
+    this.layers = importedLayers;
     this.activeLayerId = config.activeLayerId;
+    return true;
   }
 }
 

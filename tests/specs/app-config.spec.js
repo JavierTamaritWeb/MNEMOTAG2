@@ -46,6 +46,17 @@ describe('AppConfig', function () {
     expect(AppConfig.previewDebounceDelay).toBeGreaterThan(0);
     expect(AppConfig.throttleDelay).toBeGreaterThan(0);
   });
+
+  it('centraliza los límites de memoria de lote y marca de agua', function () {
+    expect(AppConfig.batchMaxPixelsPerImage).toBe(36000000);
+    expect(AppConfig.batchMaxTotalPixels).toBe(80000000);
+    expect(AppConfig.batchWorkingBytesPerPixel).toBeGreaterThan(3);
+    expect(AppConfig.batchWorkingMemoryBudgetBytes).toBeGreaterThan(0);
+    expect(AppConfig.watermarkMaxFileSize).toBe(10 * 1024 * 1024);
+    expect(AppConfig.watermarkMaxDimension).toBe(4096);
+    expect(AppConfig.watermarkMaxPixels).toBe(16000000);
+    expect(AppConfig.historyMaxMemoryBytes).toBe(100 * 1024 * 1024);
+  });
 });
 
 describe('MNEMOTAG_DEBUG', function () {

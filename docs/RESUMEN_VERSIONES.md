@@ -1,7 +1,7 @@
 # 🚀 Resumen Ejecutivo de Versiones - MNEMOTAG
 
 **Documento**: Resumen de evolucion del proyecto
-**Ultima actualizacion**: 13 de julio de 2026 (v3.7.3)
+**Ultima actualizacion**: 13 de julio de 2026 (v3.7.4)
 
 ---
 
@@ -9,7 +9,8 @@
 
 | Version | Fecha | Caracteristicas Principales | Estado |
 |---------|-------|----------------------------|--------|
-| **v3.7.3** | 13 Jul 2026 | Lote contextual dentro del editor, miniaturas JPEG ligeras con Object URLs liberadas y multi-drop conservado | **Actual** |
+| **v3.7.4** | 13 Jul 2026 | Documento canonico y seguridad de entrada: DocumentStateManager con commits atomicos y cola de mutaciones, export atomico con snapshot privado, CSP sin unsafe-inline, template inerte para la vista previa, validacion de nombres hostiles y limites de memoria de watermark/lote/historial | **Actual** |
+| **v3.7.3** | 13 Jul 2026 | Lote contextual dentro del editor, miniaturas JPEG ligeras con Object URLs liberadas y multi-drop conservado | Estable |
 | **v3.7.2** | 13 Jul 2026 | Marcas de agua: imagen visible en preview y lote, casillas de aplicacion efectivas, acceso permanente al lote y E2E de pixeles en 3 motores | Estable |
 | **v3.7.1** | 13 Jul 2026 | Arquitectura: AppState observable, WatermarkManager completo, compositor unico preview/export/batch, managers desacoplados, main menor de 5000 lineas, manifest maskable y release validado en 3 motores | Estable |
 | **v3.7.0** | 13 Jul 2026 | Funcionalidad: estimacion en vivo de export, Web Share API, cola batch sin base64 con concurrencia 2 y cancelacion individual, resumen previo al lote, sesion restaurable con IndexedDB, presets completos, deteccion de capacidades, fix undo de watermark, E2E en 3 motores | Estable |

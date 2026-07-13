@@ -257,6 +257,53 @@ test.describe('v3.7.0 — Pruebas obligatorias', () => {
     }
   });
 
+  test('batch con Metadatos genera JPEG con APP1/EXIF real', async ({ page }) => {
+    await page.goto('/index.html');
+    await page.waitForLoadState('networkidle');
+    await cargarImagen(page);
+    await page.locator('#metaTitle').fill('Titulo batch EXIF');
+    await page.locator('#metaAuthor').fill('Autora batch EXIF');
+    await page.locator('#editor-batch-btn').click();
+    await page.waitForSelector('#batch-modal', { state: 'visible' });
+    await page.setInputFiles('#batch-file-input', FOTO);
+    await expect(page.locator('#batch-count')).toHaveText('1');
+    await page.locator('#batch-apply-metadata').check();
+    await page.locator('#batch-process-btn').click();
+    await page.waitForSelector('#batch-download-btn:visible', { timeout: 30000 });
+
+    const exif = await page.evaluate(async () => {
+      const result = window.batchManager.processedImages.find(item => item.success);
+      if (!result?.blob) return null;
+      const bytes = new Uint8Array(await result.blob.arrayBuffer());
+      let app1 = -1;
+      let exifHeader = -1;
+      for (let i = 0; i < bytes.length - 10; i++) {
+        if (bytes[i] === 0xFF && bytes[i + 1] === 0xE1) app1 = i;
+        if (bytes[i] === 0x45 && bytes[i + 1] === 0x78 &&
+            bytes[i + 2] === 0x69 && bytes[i + 3] === 0x66 &&
+            bytes[i + 4] === 0 && bytes[i + 5] === 0) {
+          exifHeader = i;
+          break;
+        }
+      }
+      const text = new TextDecoder('iso-8859-1').decode(bytes);
+      return {
+        type: result.blob.type,
+        app1,
+        exifHeader,
+        hasTitle: text.includes('Titulo batch EXIF'),
+        hasAuthor: text.includes('Autora batch EXIF')
+      };
+    });
+
+    expect(exif).not.toBeNull();
+    expect(exif.type).toBe('image/jpeg');
+    expect(exif.app1).toBeGreaterThanOrEqual(2);
+    expect(exif.exifHeader).toBe(exif.app1 + 4);
+    expect(exif.hasTitle).toBe(true);
+    expect(exif.hasAuthor).toBe(true);
+  });
+
   test('cancelación a mitad de lote: sin decodificados retenidos en la cola', async ({ page }) => {
     await page.goto('/index.html');
     await page.waitForLoadState('networkidle');

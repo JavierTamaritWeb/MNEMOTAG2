@@ -4,6 +4,36 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.7.4] - 2026-07-13
+
+Fase "documento canónico y seguridad de entrada": el raster de trabajo pasa a tener un propietario único con commits atómicos, y la superficie de entrada (archivos, nombres, CSP) se endurece.
+
+### Added
+- `DocumentStateManager` (nuevo manager): propietario de las transiciones del raster canónico. Cola de mutaciones serializada, tokens de carga y épocas de documento contra condiciones de carrera, commits atómicos en `AppState` (`documentId`/`documentRevision`), `runExclusive`/`waitForIdle` y liberación explícita de backing stores de canvas obsoletos.
+- Exportación atómica en `ExportManager`: `prepareAtomicExport` captura una instantánea privada del documento (capas de texto y marcas clonadas, valores del formulario congelados) y renderiza en un canvas propio que se libera tras el encode.
+- Validación específica de la marca de agua (`SecurityManager.validateWatermarkImageFile`) con límites propios en `AppConfig` (`watermarkMaxFileSize` 10 MB, `watermarkMaxDimension` 4096, `watermarkMaxPixels` 16 MP) porque permanece residente toda la sesión.
+- Límites de memoria del lote expresados en píxeles (`batchMaxPixelsPerImage`, `batchMaxTotalPixels`, `batchWorkingMemoryBudgetBytes`): el coste dominante es el raster decodificado, no el peso del archivo.
+- Nuevos specs: `tests/e2e/document-integrity.spec.js` (integridad del raster ante crop/curvas/rotaciones/undo/export), `tests/e2e/security-ui.spec.js` (nombres hostiles renderizados como texto y CSP sin ejecución de atributos) y `tests/specs/document-state-manager.spec.js`.
+
+### Changed
+- CSP endurecido: `script-src` sin `'unsafe-inline'` y `script-src-attr 'none'`. Toda interacción se registra con `addEventListener`; no quedan scripts inline ni atributos `on*`.
+- La vista previa del archivo se instancia desde un `<template>` inerte (`#file-preview-template`): los datos del archivo se asignan con `textContent`/propiedades DOM, nunca interpolados como HTML.
+- `SecurityManager.validateImageFile` rechaza nombres de archivo con controles ASCII/C1, separadores reservados y controles bidireccionales Unicode (pueden ocultar la extensión real).
+- `HistoryManager`: deduplicación de estados por firma estructural (WeakMap de identidades de objetos), presupuesto de memoria leído de `AppConfig.historyMaxMemoryBytes` y captura/restauración coherente vía `DocumentStateManager`.
+- El dropzone del lote es ahora un `<button>` accesible con input `sr-only`; los límites de redimensión de la UI se alinean con el presupuesto real del canvas (8192 → 2400).
+- `SessionCoordinator` serializa y restaura el documento a través de los snapshots del `DocumentStateManager`.
+
+### Fixed
+- Los E2E nuevos de integridad navegaban a la pestaña Ajustes para pulsar los controles de rotación, que viven en la pestaña Exportar (timeout de 60 s en 2 tests). Corregida la navegación de pestañas en el spec.
+- `embedExifInAvifBlob` recibe el snapshot de metadatos capturado en el momento de la exportación en lugar de leer el formulario en vivo.
+
+### Verification
+- Node **312/312** y validación binaria **95/95**.
+- ESLint sin errores y Stylelint en verde.
+- Playwright Chromium completo en verde (incluidos los 7 casos de `document-integrity`).
+
+---
+
 ## [3.7.3] - 2026-07-13
 
 Corrección de jerarquía UI y revisión visual del procesamiento por lotes.

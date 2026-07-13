@@ -84,6 +84,7 @@
     // Se recalculan cada vez que renderCanvasWithLayers() pinta las capas.
     let textLayerBounds = []; // [{ layerId, x, y, width, height }]
     let activeLayerId = null;
+    let closeActiveFilePreview = null;
 
     // Variables para sistema de Reglas Métricas
     let isRulerMode = false;
@@ -686,7 +687,6 @@
 
     function setupFileNaming() {
       const titleInput = document.getElementById('metaTitle');
-      const fileInput = document.getElementById('file-input');
 
       // Agregar funcionalidad para seleccionar todo el texto al hacer clic
       titleInput.addEventListener('click', function() {
@@ -698,27 +698,9 @@
         this.select();
       });
 
-      // Cuando se selecciona un archivo
-      fileInput.addEventListener('change', function(e) {
-        if (e.target.files.length) {
-          // No mutar currentFile/originalExtension aquí: este listener corre
-          // ANTES de la validación. loadImageWithValidation los asigna cuando
-          // el archivo pasa los checks; asignarlos aquí dejaba estado de un
-          // archivo rechazado mezclado con la imagen anterior.
-          const selectedFile = e.target.files[0];
-
-          // Obtener el nombre del archivo sin extensión
-          const fileNameWithoutExtension = selectedFile.name.replace(/\.[^/.]+$/, "");
-
-          // Actualizar el placeholder del campo título
-          titleInput.placeholder = fileNameWithoutExtension;
-
-          // Establecer el título inicial como el nombre del archivo (sin extensión)
-          if (!titleInput.value.trim()) {
-            titleInput.value = fileNameWithoutExtension;
-          }
-        }
-      });
+      // El título derivado del archivo se asigna únicamente después del
+      // commit atómico de loadImage. Una selección rechazada no debe alterar
+      // el documento que ya estaba abierto.
     }
 
     // Security Manager extraído a js/managers/security-manager.js
@@ -1985,8 +1967,19 @@
 
     // Enhanced file handling with security validation and preview
     async function handleFile(file) {
+      // Una segunda selección invalida también el diálogo anterior. Mantener
+      // dos previews abiertos permitía confirmar después el archivo obsoleto
+      // y dejaba el overlay de carga en un estado contradictorio.
+      if (closeActiveFilePreview) closeActiveFilePreview();
+      const loadToken = DocumentStateManager.beginLoad();
       // Limpiar errores anteriores
       UIManager.hideError();
+
+      if (!file || file.size <= 0 || file.size > AppConfig.maxFileSize) {
+        DocumentStateManager.cancelLoad(loadToken);
+        UIManager.showError('El archivo supera el límite de 25 MB o está vacío.');
+        return;
+      }
 
       // v3.3.15: Soporte HEIC/HEIF (formatos del iPhone). Si la imagen
       // es HEIC/HEIF y la librería heic2any está cargada, convertimos a
@@ -2008,10 +2001,12 @@
             quality: 0.92
           });
           const blob = Array.isArray(converted) ? converted[0] : converted;
+          if (!DocumentStateManager.isCurrentLoad(loadToken)) return;
           const newName = (file.name || 'imagen').replace(/\.heic$|\.heif$/i, '.jpg');
           file = new File([blob], newName, { type: 'image/jpeg' });
           UIManager.showSuccess('✅ HEIC convertido a JPEG correctamente');
         } catch (err) {
+          DocumentStateManager.cancelLoad(loadToken);
           console.error('Error al convertir HEIC:', err);
           UIManager.showError('Error al convertir HEIC: ' + (err.message || err));
           return;
@@ -2022,6 +2017,7 @@
       const validation = SecurityManager.validateImageFile(file);
 
       if (!validation.isValid) {
+        DocumentStateManager.cancelLoad(loadToken);
         // Mostrar errores específicos con detalles
         validation.errors.forEach(error => {
           let errorMessage = error.message;
@@ -2046,7 +2042,9 @@
       UIManager.showLoadingState('Generando preview...');
 
       SecurityManager.generateFilePreview(file, function(previewData, error) {
+        if (!DocumentStateManager.isCurrentLoad(loadToken)) return;
         if (error) {
+          DocumentStateManager.cancelLoad(loadToken);
           UIManager.hideLoadingState();
           UIManager.showError('Error al generar preview: ' + error);
           return;
@@ -2055,257 +2053,50 @@
         // Mostrar preview al usuario
         showFilePreview(previewData, function(userConfirmed) {
           if (!userConfirmed) {
+            DocumentStateManager.cancelLoad(loadToken);
             UIManager.hideLoadingState();
             return;
           }
 
           // Usuario confirmó, proceder con la carga
-          loadImageWithValidation(file, previewData.originalDimensions);
+          loadImageWithValidation(file, previewData.originalDimensions, {
+            token: loadToken,
+            decodedImage: previewData.decodedImage || null,
+            thumbnailSrc: previewData.dataUrl
+          });
         });
       });
     }
 
     // Función para mostrar preview del archivo
     function showFilePreview(previewData, callback) {
-      const previewModal = document.createElement('div');
-      previewModal.className = 'file-preview-modal';
-      previewModal.innerHTML = `
-        <div class="preview-overlay">
-          <div class="preview-container">
-            <div class="preview-header">
-              <h3>Vista previa del archivo</h3>
-              <button class="preview-close" type="button">&times;</button>
-            </div>
-            <div class="preview-content">
-              <div class="preview-image-container">
-                <img src="${previewData.dataUrl}" alt="Preview" class="preview-image">
-              </div>
-              <div class="preview-info">
-                <h4>Información del archivo:</h4>
-                <ul>
-                  <li><strong>Nombre:</strong> ${previewData.fileInfo.name}</li>
-                  <li><strong>Tamaño:</strong> ${previewData.fileInfo.size}</li>
-                  <li><strong>Tipo:</strong> ${previewData.fileInfo.type}</li>
-                  <li><strong>Dimensiones:</strong> ${previewData.originalDimensions.width}x${previewData.originalDimensions.height}px</li>
-                  <li><strong>Modificado:</strong> ${previewData.fileInfo.lastModified}</li>
-                </ul>
-              </div>
-            </div>
-            <div class="preview-actions">
-              <button class="btn btn-secondary preview-cancel" type="button">Cancelar</button>
-              <button class="btn btn-primary preview-confirm" type="button">Cargar imagen</button>
-            </div>
-          </div>
-        </div>
-      `;
-
-      // Agregar estilos CSS para el modal de preview
-      if (!document.getElementById('preview-modal-styles')) {
-        const previewStyles = document.createElement('style');
-        previewStyles.id = 'preview-modal-styles';
-        previewStyles.textContent = `
-          .file-preview-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 10000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-          }
-
-          .preview-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(5px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-          }
-
-          .file-preview-modal .preview-container {
-            position: relative;
-            background: var(--bg-card, #ffffff);
-            border-radius: 12px;
-            width: 90%;
-            max-width: 600px;
-            max-height: 85vh;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            z-index: 10000;
-          }
-
-          .file-preview-modal .preview-header {
-            padding: 20px;
-            border-bottom: 1px solid var(--border-color, #e2e8f0);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: var(--bg-secondary, #f8f9fa);
-          }
-
-          .file-preview-modal .preview-header h3 {
-            margin: 0;
-            color: var(--text-primary, #0f172a);
-            font-size: 1.25rem;
-            font-weight: 600;
-          }
-
-          .file-preview-modal .preview-close {
-            background: none;
-            border: none;
-            font-size: 20px;
-            cursor: pointer;
-            color: var(--text-secondary, #64748b);
-            padding: 4px 8px;
-            line-height: 1;
-            transition: color 0.2s ease;
-            flex-shrink: 0;
-          }
-
-          .file-preview-modal .preview-close:hover {
-            color: var(--text-primary, #0f172a);
-          }
-
-          .file-preview-modal .preview-content {
-            padding: 20px;
-            display: flex;
-            gap: 20px;
-            flex: 1;
-            overflow: auto;
-          }
-
-          .file-preview-modal .preview-image-container {
-            flex: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: var(--bg-tertiary, #f1f5f9);
-            border-radius: 8px;
-            min-height: 200px;
-          }
-
-          .file-preview-modal .preview-image {
-            max-width: 100%;
-            max-height: 300px;
-            border-radius: 4px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-          }
-
-          .file-preview-modal .preview-info {
-            flex: 1;
-            min-width: 250px;
-          }
-
-          .file-preview-modal .preview-info h4 {
-            margin: 0 0 12px 0;
-            color: var(--text-primary, #0f172a);
-            font-size: 1rem;
-            font-weight: 600;
-          }
-
-          .file-preview-modal .preview-info ul {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-          }
-
-          .file-preview-modal .preview-info li {
-            padding: 6px 0;
-            color: var(--text-secondary, #64748b);
-            font-size: 0.875rem;
-            border-bottom: 1px solid var(--border-color, #e2e8f0);
-          }
-
-          .file-preview-modal .preview-info li:last-child {
-            border-bottom: none;
-          }
-
-          .file-preview-modal .preview-info strong {
-            color: var(--text-primary, #0f172a);
-          }
-
-          .file-preview-modal .preview-actions {
-            padding: 20px;
-            border-top: 1px solid var(--border-color, #e2e8f0);
-            display: flex;
-            justify-content: flex-end;
-            gap: 12px;
-            background: var(--bg-secondary, #f8f9fa);
-          }
-
-          @media (max-width: 768px) {
-            .file-preview-modal .preview-container {
-              width: 95%;
-              max-height: 90vh;
-            }
-
-            .file-preview-modal .preview-content {
-              flex-direction: column;
-              padding: 15px;
-            }
-
-            .file-preview-modal .preview-header {
-              padding: 10px 12px;
-            }
-
-            .file-preview-modal .preview-header h3 {
-              font-size: 0.875rem;
-              line-height: 1.2;
-              margin: 0;
-            }
-
-            .file-preview-modal .preview-close {
-              font-size: 14px;
-              padding: 2px 4px;
-              margin-left: 8px;
-              flex-shrink: 0;
-            }
-
-            .file-preview-modal .preview-actions {
-              padding: 12px;
-              flex-direction: column;
-            }
-
-            .file-preview-modal .preview-actions button {
-              width: 100%;
-            }
-
-            .file-preview-modal .preview-info {
-              min-width: auto;
-            }
-
-            .file-preview-modal .preview-info h4 {
-              font-size: 0.875rem;
-            }
-
-            .file-preview-modal .preview-info li {
-              font-size: 0.75rem;
-              padding: 4px 0;
-            }
-          }
-
-          @media (max-width: 480px) {
-            .file-preview-modal .preview-header h3 {
-              font-size: 0.8rem;
-            }
-
-            .file-preview-modal .preview-close {
-              font-size: 12px;
-            }
-          }
-        `;
-        document.head.appendChild(previewStyles);
+      const template = document.getElementById('file-preview-template');
+      if (!template || !template.content) {
+        UIManager.hideLoadingState();
+        UIManager.showError('No se pudo abrir la vista previa del archivo.');
+        callback(false);
+        return;
       }
+
+      const previewModal = template.content.firstElementChild.cloneNode(true);
+      const previewImage = previewModal.querySelector('.preview-image');
+      const fields = {
+        name: previewData.fileInfo.name,
+        size: previewData.fileInfo.size,
+        type: previewData.fileInfo.type,
+        dimensions: previewData.originalDimensions.width + 'x' +
+          previewData.originalDimensions.height + 'px',
+        lastModified: previewData.fileInfo.lastModified
+      };
+
+      // Todo dato procedente del archivo se asigna como texto o propiedad.
+      // Nunca debe interpolarse en innerHTML: el nombre es controlado por el
+      // archivo y puede contener markup o atributos de evento.
+      previewImage.src = String(previewData.dataUrl || '');
+      Object.entries(fields).forEach(([field, value]) => {
+        const target = previewModal.querySelector('[data-preview-field="' + field + '"]');
+        if (target) target.textContent = String(value || '');
+      });
 
       document.body.appendChild(previewModal);
 
@@ -2313,43 +2104,58 @@
       const closeBtn = previewModal.querySelector('.preview-close');
       const cancelBtn = previewModal.querySelector('.preview-cancel');
       const confirmBtn = previewModal.querySelector('.preview-confirm');
-      const overlay = previewModal.querySelector('.preview-overlay');
-
-      // closed evita el doble cierre; el listener de Escape se desregistra
-      // SIEMPRE aquí (antes solo se quitaba si el cierre era vía Escape:
-      // cerrar con botón y pulsar Escape después lanzaba NotFoundError en
-      // removeChild y ejecutaba el callback una segunda vez)
+      let confirmed = false;
       let closed = false;
-      function closePreview(confirmed = false) {
+
+      function finishPreview() {
         if (closed) return;
         closed = true;
-        document.removeEventListener('keydown', escapeHandler);
-        document.body.removeChild(previewModal);
+        if (closeActiveFilePreview === cancelActivePreview) closeActiveFilePreview = null;
+        previewModal.remove();
         callback(confirmed);
       }
+
+      function closePreview(accepted = false) {
+        if (closed) return;
+        confirmed = accepted;
+        _closeAccessibleModal(previewModal);
+      }
+
+      function cancelActivePreview() {
+        closePreview(false);
+      }
+
+      closeActiveFilePreview = cancelActivePreview;
 
       closeBtn.addEventListener('click', () => closePreview(false));
       cancelBtn.addEventListener('click', () => closePreview(false));
       confirmBtn.addEventListener('click', () => closePreview(true));
-
-      overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) {
+      previewModal.addEventListener('click', (event) => {
+        if (event.target === previewModal) {
           closePreview(false);
         }
       });
 
-      // Escape key to close
-      const escapeHandler = (e) => {
-        if (e.key === 'Escape') {
-          closePreview(false);
-        }
-      };
-      document.addEventListener('keydown', escapeHandler);
+      // El controlador común aporta Escape, focus trap y restauración de foco.
+      _openAccessibleModal(previewModal, finishPreview, 'display');
     }
 
     // Función para cargar imagen con validación de dimensiones
-    function loadImageWithValidation(file, knownDimensions = null) {
+    function loadImageWithValidation(file, knownDimensions = null, options = {}) {
+      // SessionCoordinator v1 pasaba las opciones como segundo argumento.
+      // Mantener el contrato público mientras la ruta normal sigue aceptando
+      // dimensiones verificadas por la vista previa.
+      if (knownDimensions &&
+          !Object.prototype.hasOwnProperty.call(knownDimensions, 'width') &&
+          !Object.prototype.hasOwnProperty.call(knownDimensions, 'height')) {
+        options = knownDimensions;
+        knownDimensions = null;
+      }
+      if (options.token && !DocumentStateManager.isCurrentLoad(options.token)) {
+        return Promise.resolve({ committed: false });
+      }
       UIManager.showLoadingState('Validando imagen...');
+      const loadToken = options.token || DocumentStateManager.beginLoad();
 
       const fileExtension = file.name.split('.').pop().toLowerCase();
 
@@ -2363,53 +2169,65 @@
 
       const allowedExtensionsForMime = mimeToExt[file.type];
       if (!allowedExtensionsForMime || !allowedExtensionsForMime.includes(fileExtension)) {
+        DocumentStateManager.cancelLoad(loadToken);
         UIManager.hideLoadingState();
         UIManager.showError('La extensión del archivo no coincide con su tipo');
-        return;
+        return Promise.resolve({ committed: false });
       }
 
-      // Guardar información del archivo SOLO tras pasar la validación
-      // (asignar antes dejaba currentFile apuntando a un archivo rechazado
-      // mientras currentImage seguía siendo la imagen anterior)
-      currentFile = file;
-      originalExtension = fileExtension;
-
-      const objectUrl = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = function() {
+      const objectUrl = options.decodedImage ? null : URL.createObjectURL(file);
+      const img = options.decodedImage || new Image();
+      const validateAndCommit = function() {
+        if (!DocumentStateManager.isCurrentLoad(loadToken)) {
+          if (objectUrl) URL.revokeObjectURL(objectUrl);
+          return { committed: false };
+        }
         const dimensionValidation = SecurityManager.validateImageDimensions(img);
         if (!dimensionValidation.isValid) {
-          URL.revokeObjectURL(objectUrl);
+          if (objectUrl) URL.revokeObjectURL(objectUrl);
+          DocumentStateManager.cancelLoad(loadToken);
           UIManager.hideLoadingState();
           dimensionValidation.errors.forEach(error => {
             UIManager.showError(`${error.message}: ${error.details}`);
           });
-          return;
+          return { committed: false };
+        }
+        if (knownDimensions &&
+            (Number(knownDimensions.width) !== img.width || Number(knownDimensions.height) !== img.height)) {
+          if (objectUrl) URL.revokeObjectURL(objectUrl);
+          DocumentStateManager.cancelLoad(loadToken);
+          UIManager.hideLoadingState();
+          UIManager.showError('La imagen cambió durante la validación. Vuelve a seleccionarla.');
+          return { committed: false };
         }
         dimensionValidation.warnings.forEach(warning => {
           MNEMOTAG_DEBUG && console.warn('Advertencia de dimensiones:', warning.message, warning.details);
         });
 
-        loadImage(objectUrl, file.name, () => URL.revokeObjectURL(objectUrl));
-        setupInitialFileBaseName(file);
-        if (typeof MetadataManager !== 'undefined') MetadataManager.setupCreationDate(file);
+        const thumbnailSrc = options.thumbnailSrc || objectUrl || '';
+        return loadImage(img, file.name, () => {
+          if (objectUrl) URL.revokeObjectURL(objectUrl);
+        }, file, fileExtension, loadToken, thumbnailSrc);
       };
-      img.onerror = function() {
-        URL.revokeObjectURL(objectUrl);
-        UIManager.hideLoadingState();
-        UIManager.showError('Error al cargar la imagen. El archivo podría estar corrupto.');
-      };
-      img.src = objectUrl;
+
+      if (options.decodedImage) {
+        return Promise.resolve(validateAndCommit());
+      }
+
+      return new Promise(resolve => {
+        img.onload = function() { resolve(validateAndCommit()); };
+        img.onerror = function() {
+          URL.revokeObjectURL(objectUrl);
+          DocumentStateManager.cancelLoad(loadToken);
+          UIManager.hideLoadingState();
+          UIManager.showError('Error al cargar la imagen. El archivo podría estar corrupto.');
+          resolve({ committed: false });
+        };
+        img.src = objectUrl;
+      });
     }    // Enhanced image loading with validation
 
-    // Token de generación: si el usuario selecciona otra imagen mientras una
-    // anterior aún decodifica, la carga obsoleta se descarta (sin este token
-    // ganaba la imagen que terminara de decodificar la última, no la elegida).
-    let imageLoadGeneration = 0;
-
-    function loadImage(src, fileName, cleanupSrc) {
-      const img = new Image();
-      const generation = ++imageLoadGeneration;
+    function loadImage(img, fileName, cleanupSrc, file, fileExtension, loadToken, thumbnailSrc) {
       let cleaned = false;
       const cleanup = () => {
         if (!cleaned && typeof cleanupSrc === 'function') cleanupSrc();
@@ -2417,10 +2235,10 @@
       };
 
       img.onload = function() {
-        if (generation !== imageLoadGeneration) {
+        if (!DocumentStateManager.isCurrentLoad(loadToken)) {
           cleanup();
           MNEMOTAG_DEBUG && console.log('Carga de imagen obsoleta descartada:', fileName);
-          return;
+          return { committed: false };
         }
         try {
           // Validar dimensiones de la imagen
@@ -2440,27 +2258,31 @@
             return;
           }
 
-          currentImage = img;
+          const initialBaseName = sanitizeFileBaseName(extractFileBaseName(fileName));
+          const committed = DocumentStateManager.commitNewDocument({
+            sourceImage: img,
+            file,
+            extension: fileExtension,
+            fileBaseName: initialBaseName,
+            saveHistory: false,
+            syncCanvas: false
+          }, loadToken);
+          if (!committed) {
+            cleanup();
+            return { committed: false };
+          }
           ComparisonManager.invalidate();
-
-          // Store original dimensions for resize functionality
-          originalWidth = img.width;
-          originalHeight = img.height;
-
-          // Reset rotation state when loading new image
-          currentRotation = 0;
-          isFlippedHorizontally = false;
-          isFlippedVertically = false;
-          transformResetImage = img;
+          setupInitialFileBaseName(file);
+          if (typeof MetadataManager !== 'undefined') MetadataManager.setupCreationDate(file);
 
 
           // Sanitizar y mostrar información del archivo
-          const sanitizedFileName = SecurityManager.sanitizeText(fileName);
+          const displayFileName = String(fileName || '').trim();
           const fileNameElement = document.getElementById('file-name');
           const fileInfoElement = document.getElementById('file-info');
 
           if (fileNameElement) {
-            fileNameElement.textContent = sanitizedFileName;
+            fileNameElement.textContent = displayFileName;
           }
 
           if (fileInfoElement) {
@@ -2476,7 +2298,7 @@
           // Mostrar miniatura de la imagen
           const thumbnailElement = document.getElementById('file-preview-thumbnail');
           if (thumbnailElement) {
-            thumbnailElement.src = src;
+            thumbnailElement.src = thumbnailSrc || '';
             thumbnailElement.style.display = 'block';
           }
 
@@ -2493,8 +2315,8 @@
           // Establecer título inicial si está vacío
           const titleInput = document.getElementById('metaTitle');
           if (titleInput && !titleInput.value.trim()) {
-            const nameWithoutExt = sanitizedFileName.replace(/\.[^/.]+$/, "");
-            titleInput.value = SecurityManager.sanitizeText(nameWithoutExt);
+            const nameWithoutExt = displayFileName.replace(/\.[^/.]+$/, "");
+            titleInput.value = nameWithoutExt;
             titleInput.placeholder = nameWithoutExt;
           }
 
@@ -2562,50 +2384,29 @@
           // Limpiar estado de carga
           UIManager.hideLoadingState();
 
-          // Inicializar historial con estado inicial
-          setTimeout(() => {
-            historyManager.clear();
-            historyManager.saveState();
-          }, 100);
+          // Inicializar historial después del commit atómico. HistoryManager
+          // serializa internamente los snapshots asíncronos.
+          historyManager.clear();
+          historyManager.saveState();
+          return {
+            committed: true,
+            documentId: AppState.documentId,
+            revision: AppState.documentRevision
+          };
 
         } catch (error) {
           cleanup();
           UIManager.hideLoadingState();
           console.error('Error al configurar la imagen:', error);
           UIManager.showError('Error al configurar la imagen. Por favor, inténtalo de nuevo.');
+          return { committed: false };
         }
       };
 
-      img.onerror = function() {
-        UIManager.hideLoadingState();
-        UIManager.showError('Error al cargar la imagen. El archivo puede estar corrupto.');
-      };
-
-      // Timeout para imágenes que no cargan
-      const timeout = setTimeout(() => {
-        if (!img.complete) {
-          // Invalidar la generación: si la imagen termina de cargar más tarde,
-          // su onload se descarta (antes se cargaba igualmente tras el error)
-          imageLoadGeneration++;
-          cleanup();
-          UIManager.hideLoadingState();
-          UIManager.showError('La carga de la imagen está tomando demasiado tiempo. Por favor, inténtalo de nuevo.');
-        }
-      }, 10000);
-
-      // Limpiar timeout cuando la imagen se carga exitosamente
-      const originalOnload = img.onload;
-      img.onload = function() {
-        clearTimeout(timeout);
-        originalOnload.call(this);
-      };
-
-      img.onerror = function() {
-        cleanup();
-        UIManager.hideLoadingState();
-        UIManager.showError('Error al decodificar la imagen.');
-      };
-      img.src = src;
+      const configureLoadedImage = img.onload;
+      img.onload = null;
+      img.onerror = null;
+      return configureLoadedImage.call(img);
     }
 
     function setupCanvas() {
@@ -2834,7 +2635,7 @@
             showPositionMarker();
           }
 
-          if (!isDragging) {
+          if (!isDragging && !historyManager.isRestoring) {
             if (typeof debouncedSaveHistory === 'undefined') {
               window.debouncedSaveHistory = SmartDebounce.intelligent('save-history', () => {
                 historyManager.saveState();
@@ -2904,12 +2705,14 @@
           AppState.textLayerBounds = result.textLayerBounds || [];
 
           // Save state to history
-          if (typeof debouncedSaveHistory === 'undefined') {
-            window.debouncedSaveHistory = SmartDebounce.intelligent('save-history', () => {
-              historyManager.saveState();
-            }, 1000);
+          if (!historyManager.isRestoring) {
+            if (typeof debouncedSaveHistory === 'undefined') {
+              window.debouncedSaveHistory = SmartDebounce.intelligent('save-history', () => {
+                historyManager.saveState();
+              }, 1000);
+            }
+            debouncedSaveHistory();
           }
-          debouncedSaveHistory();
 
         });
 
@@ -3593,70 +3396,47 @@
     }
 
     // Resize image function
-    function resizeImage(newWidth, newHeight) {
+    async function resizeImage(newWidth, newHeight) {
       if (!currentImage) {
         console.error('No current image available');
         return;
       }
 
       // Validate dimensions
-      if (newWidth <= 0 || newHeight <= 0) {
-        console.error('Invalid dimensions:', newWidth, newHeight);
+      const maxWidth = AppConfig.maxCanvasWidth || 2400;
+      const maxHeight = AppConfig.maxCanvasHeight || 2400;
+      if (!Number.isSafeInteger(newWidth) || !Number.isSafeInteger(newHeight) ||
+          newWidth <= 0 || newHeight <= 0 || newWidth > maxWidth || newHeight > maxHeight) {
+        UIManager.showError(`El tamaño debe estar entre 1×1 y ${maxWidth}×${maxHeight} píxeles.`);
         return;
       }
 
       try {
-        // Create temporary canvas for resizing
-        const tempCanvas = document.createElement('canvas');
-        const tempCtx = tempCanvas.getContext('2d');
-
-        tempCanvas.width = newWidth;
-        tempCanvas.height = newHeight;
-
-        // Draw resized image with high quality
-        tempCtx.imageSmoothingEnabled = true;
-        tempCtx.imageSmoothingQuality = 'high';
-        tempCtx.drawImage(currentImage, 0, 0, newWidth, newHeight);
-
-        // Create new image from the resized canvas
-        const newImage = new Image();
-        newImage.onload = function() {
-          // Update current image
-          currentImage = newImage;
-          // El resize define el nuevo "original" para resetRotation
-          transformResetImage = newImage;
-          ComparisonManager.invalidate();
-
-          // Reacotar posiciones custom de marcas al nuevo tamaño
-          if (customImagePosition) {
-            customImagePosition.x = Math.min(customImagePosition.x, newWidth);
-            customImagePosition.y = Math.min(customImagePosition.y, newHeight);
+        const committed = await DocumentStateManager.enqueueRasterMutation(
+          'resize',
+          async function(source) {
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCanvas.width = newWidth;
+            tempCanvas.height = newHeight;
+            tempCtx.imageSmoothingEnabled = true;
+            tempCtx.imageSmoothingQuality = 'high';
+            tempCtx.drawImage(source, 0, 0, newWidth, newHeight);
+            return tempCanvas;
+          },
+          {
+            takeOwnership: true,
+            updateOriginalDimensions: false,
+            updateResetImage: true,
+            rotation: 0,
+            isFlippedHorizontally: false,
+            isFlippedVertically: false,
+            saveHistory: true
           }
-          if (customTextPosition) {
-            customTextPosition.x = Math.min(customTextPosition.x, newWidth);
-            customTextPosition.y = Math.min(customTextPosition.y, newHeight);
-          }
-
-          // Re-sincronizar dimensiones internas + tamaño CSS del canvas
-          // (cambiar canvas.width sin recalcular el CSS estiraba el preview)
-          setupCanvas();
-          updatePreview();
-
-          // Update image info display
-          updateImageInfo();
-
-          // Show success message
+        );
+        if (committed) {
           showSuccessMessage(`Imagen redimensionada a ${newWidth} × ${newHeight}`);
-
-        };
-
-        newImage.onerror = function() {
-          console.error('Error creating resized image');
-        };
-
-        // Convert canvas to data URL and set as image source
-        newImage.src = tempCanvas.toDataURL('image/png');
-
+        }
       } catch (error) {
         console.error('Error during resize operation:', error);
         showSuccessMessage('Error al redimensionar la imagen');
@@ -3774,70 +3554,65 @@
       }
     }
 
-    function rotateImage(degrees) {
+    async function rotateImage(degrees) {
       if (!currentImage) {
         console.error('No current image available');
         return;
       }
 
       try {
-        // Update rotation state (solo para el display)
-        currentRotation = ((currentRotation + degrees) % 360 + 360) % 360;
-
-        // Aplicar SOLO el delta sobre la imagen actual: currentImage ya
-        // contiene las transformaciones anteriores horneadas, así que aplicar
-        // el ángulo acumulado la transformaba dos veces y distorsionaba.
-        applyImageTransformation(degrees, null);
-
-        // Update rotation display
-        updateRotationDisplay();
-
-        // Show success message
-        showSuccessMessage(`Imagen rotada ${degrees}° (Total: ${currentRotation}°)`);
-
-        // v3.5.9: Guardar estado en el historial tras rotar
-        if (typeof historyManager !== 'undefined') {
-          historyManager.saveState();
+        const mutationOptions = {
+          takeOwnership: true,
+          updateOriginalDimensions: false,
+          saveHistory: true
+        };
+        const committed = await DocumentStateManager.enqueueRasterMutation(
+          'rotate',
+          async function(source) {
+            mutationOptions.rotation = ((AppState.currentRotation + degrees) % 360 + 360) % 360;
+            return applyImageTransformation(source, degrees, null);
+          },
+          mutationOptions
+        );
+        if (committed) {
+          showSuccessMessage(`Imagen rotada ${degrees}° (Total: ${AppState.currentRotation}°)`);
         }
-
       } catch (error) {
         console.error('Error rotating image:', error);
-        showSuccessMessage('Error al rotar la imagen');
+        UIManager.showError('Error al rotar la imagen');
       }
     }
 
-    function flipImage(direction) {
+    async function flipImage(direction) {
       if (!currentImage) {
         console.error('No current image available');
         return;
       }
 
       try {
-        if (direction === 'horizontal') {
-          isFlippedHorizontally = !isFlippedHorizontally;
-        } else if (direction === 'vertical') {
-          isFlippedVertically = !isFlippedVertically;
-        }
-
-        // Aplicar SOLO el volteo pedido sobre la imagen actual (delta).
-        // Un volteo es su propia inversa: voltear dos veces restaura.
-        applyImageTransformation(0, direction);
-
-        // Update rotation display
-        updateRotationDisplay();
-
-        // Show success message
+        const mutationOptions = {
+          takeOwnership: true,
+          updateOriginalDimensions: false,
+          saveHistory: true
+        };
+        const committed = await DocumentStateManager.enqueueRasterMutation(
+          'flip-' + direction,
+          async function(source) {
+            mutationOptions.isFlippedHorizontally = direction === 'horizontal'
+              ? !AppState.isFlippedHorizontally
+              : AppState.isFlippedHorizontally;
+            mutationOptions.isFlippedVertically = direction === 'vertical'
+              ? !AppState.isFlippedVertically
+              : AppState.isFlippedVertically;
+            return applyImageTransformation(source, 0, direction);
+          },
+          mutationOptions
+        );
         const flipText = direction === 'horizontal' ? 'horizontalmente' : 'verticalmente';
-        showSuccessMessage(`Imagen volteada ${flipText}`);
-
-        // v3.5.9: Guardar estado en el historial tras voltear
-        if (typeof historyManager !== 'undefined') {
-          historyManager.saveState();
-        }
-
+        if (committed) showSuccessMessage(`Imagen volteada ${flipText}`);
       } catch (error) {
         console.error('Error flipping image:', error);
-        showSuccessMessage('Error al voltear la imagen');
+        UIManager.showError('Error al voltear la imagen');
       }
     }
 
@@ -3849,88 +3624,53 @@
      * aquí nunca se usa el ángulo acumulado ni las dimensiones originales
      * pre-transformación (eso causaba doble transformación y distorsión).
      */
-    function applyImageTransformation(deltaDegrees = 0, flipAxis = null) {
-      if (!currentImage) return;
-
-      const canvas = document.getElementById('preview-canvas');
-      if (!canvas) return;
-
-      const ctx = canvas.getContext('2d');
-
+    function applyImageTransformation(source, deltaDegrees = 0, flipAxis = null) {
       // Dimensiones reales de la imagen actual (no las originales obsoletas)
-      const srcW = currentImage.naturalWidth || currentImage.width;
-      const srcH = currentImage.naturalHeight || currentImage.height;
+      const srcW = source.naturalWidth || source.width;
+      const srcH = source.naturalHeight || source.height;
 
       const rot = ((deltaDegrees % 360) + 360) % 360;
       const swapDims = rot === 90 || rot === 270;
       const newWidth = swapDims ? srcH : srcW;
       const newHeight = swapDims ? srcW : srcH;
 
-      canvas.width = newWidth;
-      canvas.height = newHeight;
+      const resultCanvas = document.createElement('canvas');
+      resultCanvas.width = newWidth;
+      resultCanvas.height = newHeight;
+      const resultCtx = resultCanvas.getContext('2d');
 
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.clearRect(0, 0, newWidth, newHeight);
-      ctx.save();
-      ctx.translate(newWidth / 2, newHeight / 2);
+      resultCtx.imageSmoothingEnabled = true;
+      resultCtx.imageSmoothingQuality = 'high';
+      resultCtx.translate(newWidth / 2, newHeight / 2);
       if (rot !== 0) {
-        ctx.rotate((rot * Math.PI) / 180);
+        resultCtx.rotate((rot * Math.PI) / 180);
       }
       const scaleX = flipAxis === 'horizontal' ? -1 : 1;
       const scaleY = flipAxis === 'vertical' ? -1 : 1;
-      ctx.scale(scaleX, scaleY);
-      ctx.drawImage(currentImage, -srcW / 2, -srcH / 2, srcW, srcH);
-      ctx.restore();
-
-      // Hornear el resultado como nueva currentImage
-      const newImageData = canvas.toDataURL('image/png');
-      const newImage = new Image();
-      newImage.onload = function() {
-        currentImage = newImage;
-        ComparisonManager.invalidate();
-
-        // Re-sincronizar dimensiones internas + CSS del canvas y redibujar
-        setupCanvas();
-        updateImageInfo();
-        updatePreview();
-      };
-      newImage.src = newImageData;
+      resultCtx.scale(scaleX, scaleY);
+      resultCtx.drawImage(source, -srcW / 2, -srcH / 2, srcW, srcH);
+      return resultCanvas;
     }
 
-    function resetRotation() {
+    async function resetRotation() {
       if (!currentImage) return;
 
       try {
-        // Reset all transformations
-        currentRotation = 0;
-        isFlippedHorizontally = false;
-        isFlippedVertically = false;
-
-        // Restaurar la imagen base (fijada al cargar y actualizada tras
-        // crop/resize). currentImage está horneada, así que sin esta
-        // referencia no habría forma de volver al estado sin transformar.
-        if (transformResetImage) {
-          currentImage = transformResetImage;
-          ComparisonManager.invalidate();
-        }
-
-        setupCanvas();
-
-        // Update displays
-        updateRotationDisplay();
-        updateImageInfo();
-        updatePreview();
-
-        showSuccessMessage('Rotación restablecida al original');
-
-        // v3.5.9: Guardar estado en el historial tras resetear rotación
-        if (typeof historyManager !== 'undefined') {
-          historyManager.saveState();
-        }
+        const committed = await DocumentStateManager.enqueueRasterMutation(
+          'reset-transform',
+          async function() { return AppState.transformResetImage; },
+          {
+            updateOriginalDimensions: false,
+            rotation: 0,
+            isFlippedHorizontally: false,
+            isFlippedVertically: false,
+            saveHistory: true
+          }
+        );
+        if (committed) showSuccessMessage('Rotación restablecida al original');
       } catch (error) {
         console.error('Error resetting rotation:', error);
-        showSuccessMessage('Error al restablecer la rotación');
+        UIManager.showError('Error al restablecer la rotación');
       }
     }
 
@@ -4073,19 +3813,14 @@
       if (typeof SessionManager !== 'undefined') SessionManager.clear();
       // v3.6.1: restaurar la dropzone al quitar la imagen
       document.body.classList.remove('has-image');
-      currentImage = null;
+      DocumentStateManager.clearDocument({ resetCanvasSize: true });
+      historyManager.clear();
       ComparisonManager.invalidate();
-      currentFile = null;
-      originalExtension = 'jpg';
       watermarkImagePreview = null;
       customImagePosition = null;
       isPositioningMode = false;
       customTextPosition = null;
       isTextPositioningMode = false;
-      transformResetImage = null;
-      currentRotation = 0;
-      isFlippedHorizontally = false;
-      isFlippedVertically = false;
       if (canvas) canvas.setAttribute('aria-label', 'Previsualización: sin imagen cargada');
 
       WatermarkManager.clearCache();
@@ -4242,25 +3977,7 @@
     document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
 
     function showError(message) {
-      const notification = document.createElement('div');
-      notification.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-slide-down max-w-sm';
-      notification.innerHTML = `
-        <div class="flex items-center">
-          <i class="fas fa-exclamation-triangle mr-3"></i>
-          <span>${message}</span>
-          <button onclick="this.parentElement.parentElement.remove()" class="ml-3 text-white hover:text-red-200">
-            <i class="fas fa-times"></i>
-          </button>
-        </div>
-      `;
-
-      document.body.appendChild(notification);
-      setTimeout(() => {
-        if (notification.parentNode) {
-          notification.classList.add('animate-fade-out');
-          setTimeout(() => notification.remove(), 300);
-        }
-      }, 5000);
+      UIManager.showError(message);
     }
 
     function hideError() {
@@ -4272,25 +3989,7 @@
     }
 
     function showSuccess(message) {
-      const notification = document.createElement('div');
-      notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-slide-down max-w-sm';
-      notification.innerHTML = `
-        <div class="flex items-center">
-          <i class="fas fa-check-circle mr-3"></i>
-          <span>${message}</span>
-          <button onclick="this.parentElement.parentElement.remove()" class="ml-3 text-white hover:text-green-200">
-            <i class="fas fa-times"></i>
-          </button>
-        </div>
-      `;
-
-      document.body.appendChild(notification);
-      setTimeout(() => {
-        if (notification.parentNode) {
-          notification.classList.add('animate-fade-out');
-          setTimeout(() => notification.remove(), 300);
-        }
-      }, 4000);
+      UIManager.showSuccess(message);
     }
 
     // v3.7.1: downloadImageEnhanced eliminado — era código muerto (la descarga
@@ -4493,6 +4192,45 @@
         // Inicializar Text Layer Manager
         textLayerManager = new TextLayerManager();
 
+        DocumentStateManager.configure({
+          createCanvas: function(width, height) {
+            const owned = document.createElement('canvas');
+            owned.width = width;
+            owned.height = height;
+            return owned;
+          },
+          render: function() {
+            ComparisonManager.invalidate();
+            if (customImagePosition) {
+              customImagePosition.x = Math.min(customImagePosition.x, AppState.currentImage.width);
+              customImagePosition.y = Math.min(customImagePosition.y, AppState.currentImage.height);
+            }
+            if (customTextPosition) {
+              customTextPosition.x = Math.min(customTextPosition.x, AppState.currentImage.width);
+              customTextPosition.y = Math.min(customTextPosition.y, AppState.currentImage.height);
+            }
+            setupCanvas();
+            updateImageInfo();
+            updateRotationDisplay();
+            // El commit no termina hasta que el canvas visible refleja el
+            // nuevo raster. Delegar aquí a updatePreview() dejaba el pintado
+            // pendiente en RAF: export y pruebas podían observar revisión
+            // nueva con píxeles antiguos.
+            renderMainDocument({ cssFilters: 'full' });
+            if (typeof ExportManager !== 'undefined' && ExportManager.scheduleEstimateUpdate) {
+              ExportManager.scheduleEstimateUpdate();
+            }
+            if (typeof SessionManager !== 'undefined' && SessionManager.scheduleAutoSave) {
+              SessionManager.scheduleAutoSave();
+            }
+          },
+          onCommit: function() {
+            if (typeof historyManager !== 'undefined' && !historyManager.isRestoring) {
+              historyManager.saveState();
+            }
+          }
+        });
+
         BatchUIManager.configure({
           batchManager,
           textLayerManager,
@@ -4591,8 +4329,10 @@
      */
 
     let cropActive = false;
+    let cropDocumentId = null;
+    let cropDocumentRevision = null;
 
-    function openCropPanel() {
+    async function openCropPanel() {
       if (!currentImage) {
         UIManager.showError('Carga una imagen primero');
         return;
@@ -4604,6 +4344,9 @@
         return;
       }
 
+      await DocumentStateManager.waitForIdle();
+      if (!AppState.currentImage) return;
+
       const panel = document.getElementById('crop-panel');
       if (panel) {
         // Evitar listeners duplicados si el botón se pulsa repetidamente.
@@ -4613,7 +4356,9 @@
         cropActive = true;
 
         // Inicializar crop mode
-        cropManager.initCropMode(currentImage);
+        cropDocumentId = AppState.documentId;
+        cropDocumentRevision = AppState.documentRevision;
+        cropManager.initCropMode(AppState.currentImage);
 
         // Actualizar info
         updateCropInfo();
@@ -4625,6 +4370,8 @@
       if (panel) {
         panel.classList.remove('active');
         cropActive = false;
+        cropDocumentId = null;
+        cropDocumentRevision = null;
         if (cropManager) {
           cropManager.deactivate();
         }
@@ -4698,47 +4445,34 @@
       }
     }
 
-    function applyCrop() {
+    async function applyCrop() {
       try {
-        const croppedCanvas = cropManager.applyCrop();
-
-        if (croppedCanvas) {
-          // Actualizar canvas principal con la imagen recortada
-          canvas.width = croppedCanvas.width;
-          canvas.height = croppedCanvas.height;
-          ctx.drawImage(croppedCanvas, 0, 0);
-
-          // Crear nueva imagen del resultado
-          const croppedImage = new Image();
-          croppedImage.onload = () => {
-            currentImage = croppedImage;
-            // El recorte define el nuevo "original" para resetRotation
-            transformResetImage = croppedImage;
-            ComparisonManager.invalidate();
-            // Reacotar posiciones custom de marcas al nuevo tamaño
-            if (customImagePosition) {
-              customImagePosition.x = Math.min(customImagePosition.x, croppedImage.width);
-              customImagePosition.y = Math.min(customImagePosition.y, croppedImage.height);
-            }
-            if (customTextPosition) {
-              customTextPosition.x = Math.min(customTextPosition.x, croppedImage.width);
-              customTextPosition.y = Math.min(customTextPosition.y, croppedImage.height);
-            }
-            closeCropPanel();
-            // Re-sincronizar dimensiones internas + tamaño CSS del canvas
-            // (sin esto, el raster recortado se estira en la caja CSS antigua
-            // y el hit-testing de watermarks/regla queda desplazado)
-            setupCanvas();
-            updatePreview();
-            UIManager.showSuccess('✅ Imagen recortada correctamente');
-
-            // v3.5.9: Guardar estado tras recorte
-            if (typeof historyManager !== 'undefined') {
-              historyManager.saveState();
-            }
-          };
-          croppedImage.src = croppedCanvas.toDataURL();
+        await DocumentStateManager.waitForIdle();
+        if (cropDocumentId !== AppState.documentId ||
+            cropDocumentRevision !== AppState.documentRevision) {
+          cropDocumentId = AppState.documentId;
+          cropDocumentRevision = AppState.documentRevision;
+          cropManager.initCropMode(AppState.currentImage);
+          updateCropInfo();
+          UIManager.showInfo('La imagen cambió. Revisa de nuevo el área de recorte.');
+          return;
         }
+        const result = cropManager.applyCrop();
+        const committed = DocumentStateManager.commitRaster(result.canvas, {
+          reason: 'crop',
+          expectedDocumentId: cropDocumentId,
+          expectedRevision: cropDocumentRevision,
+          takeOwnership: true,
+          updateOriginalDimensions: false,
+          updateResetImage: true,
+          rotation: 0,
+          isFlippedHorizontally: false,
+          isFlippedVertically: false,
+          saveHistory: true
+        });
+        if (!committed) throw new Error('El documento cambió durante el recorte');
+        closeCropPanel();
+        UIManager.showSuccess('✅ Imagen recortada correctamente');
       } catch (error) {
         console.error('Error aplicando crop:', error);
         UIManager.showError('Error al recortar la imagen');

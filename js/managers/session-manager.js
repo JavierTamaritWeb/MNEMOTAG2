@@ -1,27 +1,21 @@
 'use strict';
 
-// ===== SESSION MANAGER (v3.7.0) =====
-// Restauración de sesión con IndexedDB: guarda la imagen original (File),
-// el estado del formulario del panel (metadatos, marca de agua, ajustes,
-// exportación), los filtros de FilterManager y las capas de texto. Al abrir
-// la app, si hay una sesión reciente guardada, main.js ofrece restaurarla.
+// ===== SESSION MANAGER =====
+// Persistencia de sesión v2: archivo original más raster canónico, baseline
+// de transformaciones, configuración y recurso de marca de agua.
 //
 // Diseño:
 //   - Un único registro (KEY 'current') en un object store simple. Guardar
 //     sobrescribe; no hay histórico (el histórico de edición ya lo cubre
 //     HistoryManager en memoria).
-//   - El File se guarda tal cual (IndexedDB soporta Blob/File via structured
-//     clone). NO se guarda ningún canvas renderizado: al restaurar, la
-//     imagen se recarga por el flujo normal y los ajustes se reaplican.
+//   - La serialización binaria usa ArrayBuffer para funcionar también en
+//     WebKit y para no inflar memoria con base64.
 //   - Ultra-defensivo: cualquier error (IndexedDB no disponible, cuota,
 //     modo privado…) degrada en silencio. La app funciona igual sin sesión.
-//   - La marca de agua de IMAGEN no se restaura (contiene un Image del DOM);
-//     se restaura su configuración de formulario, pero el usuario debe
-//     volver a elegir el archivo de la marca.
 
 const SessionManager = {
   DB_NAME: 'mnemotag-session',
-  DB_VERSION: 1,
+  DB_VERSION: 2,
   STORE_NAME: 'session',
   KEY: 'current',
   // Sesiones más antiguas se descartan al cargar (evita restaurar trabajo
@@ -34,6 +28,10 @@ const SessionManager = {
   _lastError: null,
   _collector: null,
   _restoring: false,
+  _generation: 0,
+  _saveQueue: Promise.resolve(),
+  _collectionQueue: Promise.resolve(),
+  _collectionSequence: 0,
 
   /**
    * ¿Hay soporte de IndexedDB en este entorno?
@@ -96,17 +94,22 @@ const SessionManager = {
    * @param {Object} data - estado serializable (File incluido)
    * @returns {Promise<boolean>} true si se guardó
    */
-  save: async function (data) {
-    if (!this.isSupported() || !data) return false;
-    try {
-      this._lastError = null;
-      await this._withStore('readwrite', (store) => store.put(data, this.KEY));
-      return true;
-    } catch (err) {
-      this._lastError = (err && (err.name || err.message)) || String(err);
-      MNEMOTAG_DEBUG && console.warn('SessionManager.save: no se pudo guardar la sesión:', err);
-      return false;
-    }
+  save: function (data, requestedGeneration = this._generation) {
+    if (!this.isSupported() || !data) return Promise.resolve(false);
+    const job = this._saveQueue.catch(function () {}).then(async () => {
+      if (requestedGeneration !== this._generation) return false;
+      try {
+        this._lastError = null;
+        await this._withStore('readwrite', (store) => store.put(data, this.KEY));
+        return true;
+      } catch (err) {
+        this._lastError = (err && (err.name || err.message)) || String(err);
+        MNEMOTAG_DEBUG && console.warn('SessionManager.save: no se pudo guardar la sesión:', err);
+        return false;
+      }
+    });
+    this._saveQueue = job.then(function () {}, function () {});
+    return job;
   },
 
   /**
@@ -117,6 +120,7 @@ const SessionManager = {
   load: async function () {
     if (!this.isSupported()) return null;
     try {
+      await this.waitForIdle();
       const data = await this._withStore('readonly', (store) => store.get(this.KEY));
       if (!data || typeof data !== 'object') return null;
       if (!data.savedAt || (Date.now() - data.savedAt) > this.MAX_AGE_MS) {
@@ -133,13 +137,22 @@ const SessionManager = {
   /**
    * Borra la sesión guardada. Nunca lanza.
    */
-  clear: async function () {
-    if (!this.isSupported()) return;
-    try {
-      await this._withStore('readwrite', (store) => store.delete(this.KEY));
-    } catch (err) {
-      MNEMOTAG_DEBUG && console.warn('SessionManager.clear: no se pudo borrar la sesión:', err);
-    }
+  clear: function () {
+    if (!this.isSupported()) return Promise.resolve(false);
+    this.invalidatePendingSave();
+    const generation = this._generation;
+    const job = this._saveQueue.catch(function () {}).then(async () => {
+      if (generation !== this._generation) return false;
+      try {
+        await this._withStore('readwrite', (store) => store.delete(this.KEY));
+        return true;
+      } catch (err) {
+        MNEMOTAG_DEBUG && console.warn('SessionManager.clear: no se pudo borrar la sesión:', err);
+        return false;
+      }
+    });
+    this._saveQueue = job.then(function () {}, function () {});
+    return job;
   },
 
   /**
@@ -151,6 +164,31 @@ const SessionManager = {
     this._collector = (typeof collectFn === 'function') ? collectFn : null;
   },
 
+  _enqueueCollection: function (generation) {
+    const requestSequence = ++this._collectionSequence;
+    const job = this._collectionQueue.catch(function () {}).then(async () => {
+      // Coalescer solicitudes que aún no han empezado. La que ya estaba
+      // serializando termina y se descarta, pero nunca convive otro PNG en
+      // memoria al mismo tiempo.
+      if (requestSequence !== this._collectionSequence ||
+          generation !== this._generation || this._restoring || !this._collector) return false;
+      const data = await this._collector();
+      if (!data || requestSequence !== this._collectionSequence ||
+          generation !== this._generation || this._restoring) return false;
+      return this.save(data, generation);
+    }).catch((err) => {
+      this._lastError = (err && (err.name || err.message)) || String(err);
+      MNEMOTAG_DEBUG && console.warn('SessionManager: autosave falló:', err);
+      return false;
+    });
+    const tracked = job.finally(() => {
+      if (this._pendingSave === tracked) this._pendingSave = null;
+    });
+    this._collectionQueue = tracked.then(function () {}, function () {});
+    this._pendingSave = tracked;
+    return tracked;
+  },
+
   /**
    * Autosave debounced — seguro de llamar en cada re-render del preview.
    * No hace nada durante una restauración en curso (evita re-guardar el
@@ -159,20 +197,10 @@ const SessionManager = {
   scheduleAutoSave: function () {
     if (!this._collector || this._restoring || !this.isSupported()) return;
     if (this._autoSaveTimer) clearTimeout(this._autoSaveTimer);
+    const generation = this._generation;
     this._autoSaveTimer = setTimeout(() => {
       this._autoSaveTimer = null;
-      const pending = Promise.resolve()
-        .then(() => this._collector())
-        .then((data) => data ? this.save(data) : false)
-        .catch((err) => {
-          this._lastError = (err && (err.name || err.message)) || String(err);
-          MNEMOTAG_DEBUG && console.warn('SessionManager: autosave falló:', err);
-          return false;
-        });
-      const tracked = pending.finally(() => {
-        if (this._pendingSave === tracked) this._pendingSave = null;
-      });
-      this._pendingSave = tracked;
+      this._enqueueCollection(generation);
     }, this.AUTOSAVE_DEBOUNCE_MS);
   },
 
@@ -186,29 +214,39 @@ const SessionManager = {
       clearTimeout(this._autoSaveTimer);
       this._autoSaveTimer = null;
       if (!this._collector || this._restoring) return false;
-      try {
-        const data = await this._collector();
-        if (!data) return false;
-        this._pendingSave = this.save(data);
-      } catch (err) {
-        MNEMOTAG_DEBUG && console.warn('SessionManager.flushAutoSave falló:', err);
-        return false;
-      }
+      return this._enqueueCollection(this._generation);
     }
-    if (!this._pendingSave) return true;
-    const pending = this._pendingSave;
-    try {
-      return await pending;
-    } finally {
-      if (this._pendingSave === pending) this._pendingSave = null;
-    }
+    await this.waitForIdle();
+    return true;
   },
 
   /**
    * Marca el inicio/fin de una restauración (pausa el autosave).
    */
   setRestoring: function (flag) {
-    this._restoring = !!flag;
+    const restoring = !!flag;
+    if (restoring && !this._restoring) {
+      this._generation++;
+      this._collectionSequence++;
+      if (this._autoSaveTimer) clearTimeout(this._autoSaveTimer);
+      this._autoSaveTimer = null;
+    }
+    this._restoring = restoring;
+  },
+
+  /** Cancela un autosave recolectado para un documento ya obsoleto. */
+  invalidatePendingSave: function () {
+    this._generation++;
+    this._collectionSequence++;
+    if (this._autoSaveTimer) clearTimeout(this._autoSaveTimer);
+    this._autoSaveTimer = null;
+  },
+
+  waitForIdle: async function () {
+    // La cola incluye la recolección/serialización previa al put(). Esperar
+    // una sola referencia `_pendingSave` no cubría recolectores antiguos.
+    await this._collectionQueue.catch(function () {});
+    await this._saveQueue.catch(function () {});
   },
 
   getLastError: function () {

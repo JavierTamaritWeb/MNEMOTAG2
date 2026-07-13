@@ -150,6 +150,21 @@ describe('v3.7.0 — BatchManager (cola con representación única)', function (
     expect(bm.concurrency).toBeLessThan(3);
   });
 
+  it('addImages aplica el límite agregado sin que la UI pueda saltárselo', async function () {
+    const bm = new BatchManager();
+    bm.validateImage = async function () {
+      return { valid: true, width: 5000, height: 7000, previewBlob: null };
+    };
+    const files = [0, 1, 2].map(function (index) {
+      return { name: 'memoria-' + index + '.jpg', type: 'image/jpeg', size: 1000 };
+    });
+    const result = await bm.addImages(files);
+    expect(result.added.length).toBe(2);
+    expect(result.rejected.length).toBe(1);
+    expect(bm.imageQueue.length).toBe(2);
+    expect(bm.getQueueSummary().totalPixels).toBe(70000000);
+  });
+
   it('cancelImage marca items pendientes y rechaza los ya procesados', function () {
     const bm = new BatchManager();
     bm.imageQueue.push({ id: 'a', processed: false, cancelled: false });
@@ -233,6 +248,104 @@ describe('v3.7.0 — BatchManager (cola con representación única)', function (
     expect(result.processed).toBeLessThan(6);
     expect(bm.isProcessing).toBe(false);
   });
+
+  it('clearQueue durante una ejecución cancela y limpia solo al terminar', async function () {
+    const bm = new BatchManager();
+    bm.processImage = async function (item) {
+      await new Promise(resolve => setTimeout(resolve, 8));
+      return { success: true, name: item.name, blob: null, size: 0, width: 1, height: 1 };
+    };
+    for (let i = 0; i < 5; i++) {
+      bm.imageQueue.push({ id: 'clear' + i, name: 'clear' + i + '.jpg', file: {}, width: 1, height: 1, processed: false, error: null, cancelled: false });
+    }
+    bm.captureCurrentConfig('', null, null, null, null);
+
+    const pending = bm.processQueue();
+    await new Promise(resolve => setTimeout(resolve, 1));
+    expect(bm.clearQueue()).toBe(false);
+    expect(bm.imageQueue.length).toBe(5); // no invalida tareas activas
+    const result = await pending;
+    expect(result.cancelled).toBe(true);
+    expect(bm.imageQueue.length).toBe(0);
+    expect(bm.processedImages.length).toBe(0);
+    expect(bm.currentConfig).toBeNull();
+  });
+
+  it('cancelImage descarta también el resultado de una imagen ya en vuelo', async function () {
+    const bm = new BatchManager();
+    bm.concurrency = 1;
+    let releaseProcessing;
+    let markStarted;
+    const started = new Promise(resolve => { markStarted = resolve; });
+    bm.processImage = async function (item) {
+      markStarted();
+      await new Promise(resolve => { releaseProcessing = resolve; });
+      return { success: true, name: item.name, blob: {}, size: 1, width: 1, height: 1 };
+    };
+    bm.imageQueue.push({
+      id: 'in-flight', name: 'vuelo.jpg', file: {}, width: 1, height: 1,
+      processed: false, error: null, cancelled: false
+    });
+    bm.captureCurrentConfig('', null, null, null, null);
+
+    const pending = bm.processQueue();
+    await started;
+    expect(bm.cancelImage('in-flight')).toBe(true);
+    releaseProcessing();
+    const result = await pending;
+    expect(result.processed).toBe(0);
+    expect(result.failed).toBe(0);
+    expect(result.images[0].cancelledItem).toBe(true);
+  });
+
+  it('reduce la concurrencia cuando dos rasters grandes excederían el presupuesto', async function () {
+    const bm = new BatchManager();
+    let active = 0;
+    let maxActive = 0;
+    bm.processImage = async function (item) {
+      active++;
+      maxActive = Math.max(maxActive, active);
+      await new Promise(resolve => setTimeout(resolve, 2));
+      active--;
+      return { success: true, name: item.name, blob: null, size: 0, width: item.width, height: item.height };
+    };
+    for (let i = 0; i < 2; i++) {
+      bm.imageQueue.push({
+        id: 'large-' + i, name: 'large-' + i + '.jpg', file: {},
+        width: 6000, height: 6000, processed: false, error: null, cancelled: false
+      });
+    }
+    bm.captureCurrentConfig('', null, null, null, null);
+    await bm.processQueue();
+    expect(maxActive).toBe(1);
+  });
+
+  it('embedMetadata usa el snapshot y rechaza una degradación silenciosa', async function () {
+    const bm = new BatchManager();
+    const original = MetadataManager.embedExifInBlob;
+    const input = { type: 'image/jpeg' };
+    const output = { type: 'image/jpeg', enriched: true };
+    const config = { metadata: { author: 'Lote' } };
+    let received = null;
+    MetadataManager.embedExifInBlob = async function (blob, metadata) {
+      received = metadata;
+      return output;
+    };
+    try {
+      expect(await bm.embedMetadata(input, config)).toBe(output);
+      expect(received).toBe(config.metadata);
+      MetadataManager.embedExifInBlob = async function (blob) { return blob; };
+      let rejected = false;
+      try {
+        await bm.embedMetadata(input, config);
+      } catch (error) {
+        rejected = error.message.includes('metadatos');
+      }
+      expect(rejected).toBe(true);
+    } finally {
+      MetadataManager.embedExifInBlob = original;
+    }
+  });
 });
 
 describe('v3.7.0 — Regresión: cola batch sin previews base64 ni Image retenidas', function () {
@@ -242,11 +355,18 @@ describe('v3.7.0 — Regresión: cola batch sin previews base64 ni Image retenid
     expect(src).not.toContain("toDataURL('image/jpeg'");
     expect(src).toContain('createPreviewBlob');
     expect(src).toContain("'image/jpeg', 0.72");
-    expect(ui).toContain('URL.createObjectURL(validation.previewBlob)');
+    expect(ui).toContain('URL.createObjectURL(added.previewBlob)');
     expect(ui).toContain('URL.revokeObjectURL(image.previewUrl)');
     // La cola guarda dimensiones, no imageData decodificado
     expect(src).not.toContain('imageData: imageData');
     expect(src).toContain('width: validation.width');
+  });
+
+  it('la UI entrega archivos al manager y nunca escribe imageQueue directamente', async function () {
+    const ui = await fetchV370Source('../js/managers/batch-ui-manager.js');
+    expect(ui).toContain('await batchManager.addImages(files)');
+    expect(ui).not.toContain('batchManager.imageQueue.push');
+    expect(ui).toContain('MetadataManager.getMetadata()');
   });
 
   it('main.js ya no genera dataURLs por imagen del lote (FileReader)', async function () {
@@ -285,5 +405,32 @@ describe('v3.7.0 — SessionManager (degradación sin IndexedDB)', function () {
   it('las sesiones caducadas se consideran inválidas (MAX_AGE_MS)', function () {
     expect(SessionManager.MAX_AGE_MS).toBeGreaterThan(0);
     expect(typeof SessionManager.setRestoring).toBe('function');
+  });
+
+  it('serializa escrituras para que una sesión antigua no sobrescriba la nueva', async function () {
+    const originalSupported = SessionManager.isSupported;
+    const originalWithStore = SessionManager._withStore;
+    const originalQueue = SessionManager._saveQueue;
+    const events = [];
+    SessionManager.isSupported = function () { return true; };
+    SessionManager._saveQueue = Promise.resolve();
+    SessionManager._withStore = async function (mode, operation) {
+      let value = null;
+      operation({ put: function (data) { value = data; return {}; } });
+      events.push('start-' + value.sequence);
+      await new Promise(resolve => setTimeout(resolve, value.sequence === 1 ? 8 : 0));
+      events.push('end-' + value.sequence);
+    };
+    try {
+      await Promise.all([
+        SessionManager.save({ sequence: 1 }),
+        SessionManager.save({ sequence: 2 })
+      ]);
+      expect(events).toEqual(['start-1', 'end-1', 'start-2', 'end-2']);
+    } finally {
+      SessionManager.isSupported = originalSupported;
+      SessionManager._withStore = originalWithStore;
+      SessionManager._saveQueue = originalQueue;
+    }
   });
 });

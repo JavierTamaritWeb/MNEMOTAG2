@@ -283,8 +283,10 @@ const MetadataManager = {
    * @param {HTMLCanvasElement} canvas - Canvas con la imagen
    * @returns {Object} Datos EXIF simulados
    */
-  applyMetadataToImage: function(canvas) {
-    const metadata = this.getMetadata();
+  applyMetadataToImage: function(canvas, metadataSnapshot) {
+    const metadata = metadataSnapshot === undefined
+      ? this.getMetadata()
+      : metadataSnapshot;
     
     // Crear metadatos EXIF simulados (en un proyecto real usarías una librería como piexifjs)
     const exifData = {
@@ -553,13 +555,15 @@ const MetadataManager = {
    * @param {string} dataUrl - dataURL `data:image/jpeg;base64,...`
    * @returns {string} dataURL con EXIF incrustado, o el original si no aplica.
    */
-  embedExifInJpegDataUrl: function(dataUrl) {
+  embedExifInJpegDataUrl: function(dataUrl, metadataSnapshot) {
     if (typeof piexif === 'undefined') return dataUrl;
     if (typeof dataUrl !== 'string') return dataUrl;
     if (!dataUrl.startsWith('data:image/jpeg')) return dataUrl;
 
     try {
-      const metadata = this.getMetadata();
+      const metadata = metadataSnapshot === undefined
+        ? this.getMetadata()
+        : metadataSnapshot;
       const exifObj = this.buildExifObject(metadata);
       if (!exifObj) return dataUrl;
 
@@ -577,12 +581,14 @@ const MetadataManager = {
    * @returns {Promise<Blob>} Blob nuevo con EXIF incrustado, o el original si
    *                          no aplica (no es JPEG, sin metadatos, sin librería).
    */
-  embedExifInJpegBlob: async function(blob) {
+  embedExifInJpegBlob: async function(blob, metadataSnapshot) {
     if (typeof piexif === 'undefined') return blob;
     if (!blob || blob.type !== 'image/jpeg') return blob;
 
     try {
-      const metadata = this.getMetadata();
+      const metadata = metadataSnapshot === undefined
+        ? this.getMetadata()
+        : metadataSnapshot;
       const exifObj = this.buildExifObject(metadata);
       if (!exifObj) return blob;
 
@@ -629,10 +635,28 @@ const MetadataManager = {
    * @returns {Uint8Array} TIFF data lista para chunk eXIf
    */
   _piexifBinaryToTiffBytes: function(piexifBinary) {
-    // Convertir binary string a Uint8Array
-    const len = piexifBinary.length;
-    const u8 = new Uint8Array(len);
-    for (let i = 0; i < len; i++) u8[i] = piexifBinary.charCodeAt(i) & 0xff;
+    // piexif.dump() devuelve normalmente un binary string, pero algunos
+    // callers ya disponen de Uint8Array/ArrayBuffer. Aceptar ambas formas
+    // evita convertir bytes a texto y volver a bytes (y corrige AVIF).
+    let u8;
+    if (typeof piexifBinary === 'string') {
+      u8 = new Uint8Array(piexifBinary.length);
+      for (let i = 0; i < piexifBinary.length; i++) {
+        u8[i] = piexifBinary.charCodeAt(i) & 0xff;
+      }
+    } else if (piexifBinary instanceof Uint8Array) {
+      u8 = piexifBinary;
+    } else if (ArrayBuffer.isView(piexifBinary)) {
+      u8 = new Uint8Array(
+        piexifBinary.buffer,
+        piexifBinary.byteOffset,
+        piexifBinary.byteLength
+      );
+    } else if (piexifBinary instanceof ArrayBuffer) {
+      u8 = new Uint8Array(piexifBinary);
+    } else {
+      return new Uint8Array(0);
+    }
 
     // Si arranca con FF E1 (APP1 marker JPEG) saltamos APP1+size+"Exif\0\0"
     if (u8.length > 10 && u8[0] === 0xFF && u8[1] === 0xE1) {
@@ -645,6 +669,15 @@ const MetadataManager = {
     }
     // Si arranca directamente con TIFF header (II*\0 o MM\0*) lo devolvemos tal cual
     return u8;
+  },
+
+  _isValidTiffBytes: function(bytes) {
+    if (!(bytes instanceof Uint8Array) || bytes.length < 8) return false;
+    const littleEndian = bytes[0] === 0x49 && bytes[1] === 0x49 &&
+      bytes[2] === 0x2A && bytes[3] === 0x00;
+    const bigEndian = bytes[0] === 0x4D && bytes[1] === 0x4D &&
+      bytes[2] === 0x00 && bytes[3] === 0x2A;
+    return littleEndian || bigEndian;
   },
 
   /**
@@ -757,19 +790,24 @@ const MetadataManager = {
    * @param {Blob} blob - Blob PNG generado por canvas.toBlob()
    * @returns {Promise<Blob>} Blob nuevo con eXIf incrustado, o el original
    */
-  embedExifInPngBlob: async function(blob) {
+  embedExifInPngBlob: async function(blob, metadataSnapshot) {
     if (typeof piexif === 'undefined') return blob;
     if (!blob || blob.type !== 'image/png') return blob;
 
     try {
-      const metadata = this.getMetadata();
+      const metadata = metadataSnapshot === undefined
+        ? this.getMetadata()
+        : metadataSnapshot;
       const exifObj = this.buildExifObject(metadata);
       if (!exifObj) return blob;
 
       // Generar bloque TIFF desde piexif
       const piexifBinary = piexif.dump(exifObj);
       const tiffBytes = this._piexifBinaryToTiffBytes(piexifBinary);
-      if (!tiffBytes || tiffBytes.length === 0) return blob;
+      if (!this._isValidTiffBytes(tiffBytes)) {
+        MNEMOTAG_DEBUG && console.warn('embedExifInPngBlob: piexif no produjo una cabecera TIFF válida');
+        return blob;
+      }
 
       // Leer el blob como ArrayBuffer
       const arrayBuffer = await blob.arrayBuffer();
@@ -798,7 +836,7 @@ const MetadataManager = {
    * @param {string} dataUrl - dataURL `data:image/png;base64,...`
    * @returns {Promise<string>} dataURL con EXIF, o el original
    */
-  embedExifInPngDataUrl: async function(dataUrl) {
+  embedExifInPngDataUrl: async function(dataUrl, metadataSnapshot) {
     if (typeof piexif === 'undefined') return dataUrl;
     if (typeof dataUrl !== 'string') return dataUrl;
     if (!dataUrl.startsWith('data:image/png')) return dataUrl;
@@ -811,7 +849,7 @@ const MetadataManager = {
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
       const blob = new Blob([bytes], { type: 'image/png' });
 
-      const newBlob = await this.embedExifInPngBlob(blob);
+      const newBlob = await this.embedExifInPngBlob(blob, metadataSnapshot);
       if (newBlob === blob) return dataUrl; // Sin cambios
 
       // Blob → dataURL
@@ -1011,18 +1049,23 @@ const MetadataManager = {
    * Defensiva: si algo falla, devuelve el blob original sin tocar.
    * NUNCA produce un WebP corrupto.
    */
-  embedExifInWebpBlob: async function(blob) {
+  embedExifInWebpBlob: async function(blob, metadataSnapshot) {
     if (typeof piexif === 'undefined') return blob;
     if (!blob || blob.type !== 'image/webp') return blob;
 
     try {
-      const metadata = this.getMetadata();
+      const metadata = metadataSnapshot === undefined
+        ? this.getMetadata()
+        : metadataSnapshot;
       const exifObj = this.buildExifObject(metadata);
       if (!exifObj) return blob;
 
       const piexifBinary = piexif.dump(exifObj);
       const tiffBytes = this._piexifBinaryToTiffBytes(piexifBinary);
-      if (!tiffBytes || tiffBytes.length === 0) return blob;
+      if (!this._isValidTiffBytes(tiffBytes)) {
+        MNEMOTAG_DEBUG && console.warn('embedExifInWebpBlob: piexif no produjo una cabecera TIFF válida');
+        return blob;
+      }
 
       const arrayBuffer = await blob.arrayBuffer();
       const webpBytes = new Uint8Array(arrayBuffer);
@@ -1069,7 +1112,7 @@ const MetadataManager = {
   /**
    * Wrapper dataURL para el camino de descarga con `<a download>`.
    */
-  embedExifInWebpDataUrl: async function(dataUrl) {
+  embedExifInWebpDataUrl: async function(dataUrl, metadataSnapshot) {
     if (typeof piexif === 'undefined') return dataUrl;
     if (typeof dataUrl !== 'string') return dataUrl;
     if (!dataUrl.startsWith('data:image/webp')) return dataUrl;
@@ -1081,7 +1124,7 @@ const MetadataManager = {
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
       const blob = new Blob([bytes], { type: 'image/webp' });
 
-      const newBlob = await this.embedExifInWebpBlob(blob);
+      const newBlob = await this.embedExifInWebpBlob(blob, metadataSnapshot);
       if (newBlob === blob) return dataUrl;
 
       return await new Promise((resolve, reject) => {
@@ -2135,31 +2178,33 @@ const MetadataManager = {
    * @param {Blob} blob
    * @returns {Promise<Blob>}
    */
-  embedExifInAvifBlob: async function(blob) {
+  embedExifInAvifBlob: async function(blob, metadataSnapshot) {
     if (typeof piexif === 'undefined') return blob;
     if (!blob || blob.type !== 'image/avif') return blob;
 
     try {
       // Construir el payload EXIF/TIFF desde el formulario
-      const exifObj = this.buildExifObject(this.getMetadata());
+      const metadata = metadataSnapshot === undefined
+        ? this.getMetadata()
+        : metadataSnapshot;
+      const exifObj = this.buildExifObject(metadata);
       if (!exifObj) return blob;
 
       // piexif.dump devuelve un string binario con el APP1 marker
       // para JPEG. Necesitamos solo los bytes TIFF (sin el marcador
       // "Exif\0\0" que piexif añade).
       const exifBinaryString = piexif.dump(exifObj);
-      // Convertir string binario a Uint8Array
-      const exifWithApp1 = new Uint8Array(exifBinaryString.length);
-      for (let i = 0; i < exifBinaryString.length; i++) {
-        exifWithApp1[i] = exifBinaryString.charCodeAt(i) & 0xff;
-      }
       // piexif.dump devuelve: [0xFF 0xE1 size_hi size_lo "Exif\0\0" ...TIFF...]
       // Pero en algunos modos devuelve directamente los bytes TIFF.
       // Reutilizamos la lógica de _piexifBinaryToTiffBytes si existe.
       let tiffBytes;
       if (typeof this._piexifBinaryToTiffBytes === 'function') {
-        tiffBytes = this._piexifBinaryToTiffBytes(exifWithApp1);
+        tiffBytes = this._piexifBinaryToTiffBytes(exifBinaryString);
       } else {
+        const exifWithApp1 = new Uint8Array(exifBinaryString.length);
+        for (let i = 0; i < exifBinaryString.length; i++) {
+          exifWithApp1[i] = exifBinaryString.charCodeAt(i) & 0xff;
+        }
         // Fallback: buscar manualmente "Exif\0\0" y skipear 6 bytes.
         // También skipear el marker APP1 si está.
         let start = 0;
@@ -2172,7 +2217,10 @@ const MetadataManager = {
         }
         tiffBytes = exifWithApp1.subarray(start);
       }
-      if (!tiffBytes || tiffBytes.length === 0) return blob;
+      if (!this._isValidTiffBytes(tiffBytes)) {
+        MNEMOTAG_DEBUG && console.warn('embedExifInAvifBlob: piexif no produjo una cabecera TIFF válida');
+        return blob;
+      }
 
       const buffer = await blob.arrayBuffer();
       const bytes = new Uint8Array(buffer);
@@ -2198,11 +2246,36 @@ const MetadataManager = {
   },
 
   /**
+   * Inserta EXIF usando el MIME real del Blob. El snapshot explícito permite
+   * que tareas asíncronas (como el lote) no lean un formulario que el usuario
+   * podría modificar mientras se procesan las imágenes.
+   *
+   * @param {Blob} blob
+   * @param {Object} metadataSnapshot
+   * @returns {Promise<Blob>}
+   */
+  embedExifInBlob: async function(blob, metadataSnapshot) {
+    if (!blob) return blob;
+    switch ((blob.type || '').toLowerCase()) {
+      case 'image/jpeg':
+        return this.embedExifInJpegBlob(blob, metadataSnapshot);
+      case 'image/png':
+        return this.embedExifInPngBlob(blob, metadataSnapshot);
+      case 'image/webp':
+        return this.embedExifInWebpBlob(blob, metadataSnapshot);
+      case 'image/avif':
+        return this.embedExifInAvifBlob(blob, metadataSnapshot);
+      default:
+        return blob;
+    }
+  },
+
+  /**
    * Wrapper dataURL para el camino de descarga con `<a download>`.
    * @param {string} dataUrl
    * @returns {Promise<string>}
    */
-  embedExifInAvifDataUrl: async function(dataUrl) {
+  embedExifInAvifDataUrl: async function(dataUrl, metadataSnapshot) {
     if (typeof piexif === 'undefined') return dataUrl;
     if (typeof dataUrl !== 'string') return dataUrl;
     if (!dataUrl.startsWith('data:image/avif')) return dataUrl;
@@ -2214,7 +2287,7 @@ const MetadataManager = {
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
       const blob = new Blob([bytes], { type: 'image/avif' });
 
-      const newBlob = await this.embedExifInAvifBlob(blob);
+      const newBlob = await this.embedExifInAvifBlob(blob, metadataSnapshot);
       if (newBlob === blob) return dataUrl;
 
       return await new Promise((resolve, reject) => {

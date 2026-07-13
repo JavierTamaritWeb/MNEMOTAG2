@@ -34,6 +34,8 @@ window.BatchUIManager = (function () {
     images.forEach(releasePreview);
     images = [];
     if (batchManager) batchManager.clearQueue();
+    const downloadButton = document.getElementById('batch-download-btn');
+    if (downloadButton) downloadButton.style.display = 'none';
     updateList();
   }
 
@@ -41,60 +43,73 @@ window.BatchUIManager = (function () {
     const dropzone = document.getElementById('batch-dropzone');
     const input = document.getElementById('batch-file-input');
     if (!dropzone || !input) return;
-    dropzone.onclick = () => input.click();
-    input.onchange = event => {
+    if (dropzone.dataset.initialized === 'true') return;
+    dropzone.dataset.initialized = 'true';
+    dropzone.addEventListener('click', () => input.click());
+    input.addEventListener('change', event => {
       addImages(Array.from(event.target.files));
       input.value = '';
-    };
-    dropzone.ondragover = event => {
+    });
+    dropzone.addEventListener('dragover', event => {
       event.preventDefault();
       dropzone.classList.add('drag-over');
-    };
-    dropzone.ondragleave = event => {
+    });
+    dropzone.addEventListener('dragleave', event => {
       event.preventDefault();
       dropzone.classList.remove('drag-over');
-    };
-    dropzone.ondrop = event => {
+    });
+    dropzone.addEventListener('drop', event => {
       event.preventDefault();
       dropzone.classList.remove('drag-over');
       addImages(Array.from(event.dataTransfer.files).filter(file => file.type.startsWith('image/')));
-    };
+    });
   }
 
   async function addImages(files) {
-    if (images.length + files.length > AppConfig.batchMaxImages) {
-      UIManager.showError('Máximo ' + AppConfig.batchMaxImages + ' imágenes por lote');
+    if (!batchManager) {
+      UIManager.showError('El procesador de lotes no está inicializado');
       return;
     }
-    for (const file of files) {
-      const validation = batchManager
-        ? await batchManager.validateImage(file)
-        : { valid: false, error: 'El procesador de lotes no está inicializado' };
-      if (!validation.valid) {
-        UIManager.showError((file.name || 'Archivo') + ': ' + validation.error);
-        continue;
-      }
+    const result = await batchManager.addImages(files);
+    if (!result.success) {
+      UIManager.showError(result.error);
+      return;
+    }
+    result.rejected.forEach(rejected => {
+      UIManager.showError((rejected.name || 'Archivo') + ': ' + rejected.reason);
+    });
+    for (const added of result.addedItems) {
+      const queueItem = added.item;
       let previewUrl = null;
-      if (validation.previewBlob && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
-        previewUrl = URL.createObjectURL(validation.previewBlob);
+      if (added.previewBlob && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+        previewUrl = URL.createObjectURL(added.previewBlob);
       }
       images.push({
-        id: Date.now() + Math.random(),
-        file,
-        name: file.name,
-        size: file.size,
-        width: validation.width,
-        height: validation.height,
+        id: queueItem.id,
+        file: queueItem.file,
+        name: queueItem.name,
+        size: queueItem.size,
+        width: queueItem.width,
+        height: queueItem.height,
         previewUrl: previewUrl
       });
     }
+    const downloadButton = document.getElementById('batch-download-btn');
+    if (downloadButton) downloadButton.style.display = 'none';
     updateList();
   }
 
   function remove(imageId) {
+    if (processing) {
+      UIManager.showInfo('Cancela el procesamiento antes de quitar imágenes');
+      return;
+    }
+    if (batchManager && !batchManager.removeImage(imageId)) return;
     const image = images.find(item => item.id === imageId);
     if (image) releasePreview(image);
     images = images.filter(image => image.id !== imageId);
+    const downloadButton = document.getElementById('batch-download-btn');
+    if (downloadButton) downloadButton.style.display = 'none';
     updateList();
   }
 
@@ -256,6 +271,7 @@ window.BatchUIManager = (function () {
     const processButton = document.getElementById('batch-process-btn');
     const downloadButton = document.getElementById('batch-download-btn');
     if (processButton) processButton.disabled = true;
+    if (downloadButton) downloadButton.style.display = 'none';
     images.forEach(image => { image.status = 'pendiente'; image.errorMsg = null; });
     processing = true;
     updateList();
@@ -263,19 +279,6 @@ window.BatchUIManager = (function () {
       onCancel: () => batchManager.requestCancel()
     });
     try {
-      batchManager.clearQueue();
-      batchManager.imageQueue.push(...images.map(image => ({
-        id: image.id,
-        file: image.file,
-        name: image.name,
-        size: image.size,
-        type: image.file.type,
-        width: image.width,
-        height: image.height,
-        processed: false,
-        error: null,
-        cancelled: false
-      })));
       const applyOptions = {
         filters: document.getElementById('batch-apply-filters')?.checked !== false,
         watermarks: document.getElementById('batch-apply-watermarks')?.checked !== false,
@@ -287,7 +290,7 @@ window.BatchUIManager = (function () {
         applyOptions.filters ? (FilterManager.getFilterString() || '') : '',
         applyOptions.watermarks ? WatermarkManager.captureConfig() : null,
         applyOptions.textLayers && textLayerManager ? textLayerManager.getAllLayers() : [],
-        applyOptions.metadata && MetadataManager.getFormData ? MetadataManager.getFormData() : null,
+        applyOptions.metadata ? MetadataManager.getMetadata() : null,
         applyOptions
       );
       const result = await batchManager.processQueue(progress => {
@@ -302,7 +305,9 @@ window.BatchUIManager = (function () {
       dependencies.hideProgress();
       if (result.cancelled) UIManager.showInfo('Lote cancelado: ' + result.processed + ' de ' + result.total + ' imágenes procesadas');
       else if (!result.failed) UIManager.showSuccess(result.processed + ' imágenes procesadas correctamente');
-      if (downloadButton && result.processed > 0) downloadButton.style.display = 'flex';
+      if (downloadButton && result.processed > 0 && images.length > 0) {
+        downloadButton.style.display = 'flex';
+      }
     } catch (error) {
       dependencies.hideProgress();
       UIManager.showError('Error al procesar el lote: ' + error.message);

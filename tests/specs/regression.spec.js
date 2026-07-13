@@ -72,9 +72,11 @@ describe('Regresión — Escritura real de EXIF en JPEG (v3.4.10 en export-manag
     expect(src).toContain('MetadataManager.embedExifInJpegBlob');
   });
 
-  it('export-manager.js llama a embedExifInJpegDataUrl en el fallback de descarga', async function () {
+  it('el fallback descarga un Blob con EXIF sin duplicarlo como dataURL', async function () {
     const src = await fetchSource('../js/managers/export-manager.js');
-    expect(src).toContain('MetadataManager.embedExifInJpegDataUrl');
+    expect(src).toContain('MetadataManager.embedExifInBlob(blob, metadata)');
+    expect(src).toContain('URL.createObjectURL(blob)');
+    expect(src).not.toContain('fallbackCanvas.toDataURL');
   });
 
   it('index.html carga piexifjs', async function () {
@@ -125,16 +127,15 @@ describe('Regresión — WebP EXIF real con manipulación RIFF/VP8X (v3.3.7)', f
     expect(src).toContain('no parece WebP válido, devolviendo original');
   });
 
-  it('export-manager.js llama a embedExifInWebpBlob en el flujo de descarga (v3.4.10)', async function () {
+  it('export-manager.js despacha EXIF WebP mediante el inyector común', async function () {
     const src = await fetchSource('../js/managers/export-manager.js');
-    expect(src).toContain('MetadataManager.embedExifInWebpBlob');
-    const matches = src.match(/MetadataManager\.embedExifInWebpBlob/g) || [];
-    expect(matches.length).toBeGreaterThan(1);
+    expect(src).toContain('MetadataManager.embedExifInBlob(blob, metadata)');
   });
 
-  it('export-manager.js llama a embedExifInWebpDataUrl en el camino fallback (v3.4.10)', async function () {
+  it('el fallback WebP usa Blob/Object URL, no dataURL', async function () {
     const src = await fetchSource('../js/managers/export-manager.js');
-    expect(src).toContain('MetadataManager.embedExifInWebpDataUrl');
+    expect(src).toContain('triggerBlobDownload(blob');
+    expect(src).not.toContain('MetadataManager.embedExifInWebpDataUrl');
   });
 });
 
@@ -170,17 +171,15 @@ describe('Regresión — PNG EXIF real con chunks eXIf (v3.3.6)', function () {
     expect(src).toContain('0x89'); // primer byte de la signature PNG
   });
 
-  it('export-manager.js llama a embedExifInPngBlob en el flujo de descarga (v3.4.10)', async function () {
+  it('export-manager.js despacha EXIF PNG mediante el inyector común', async function () {
     const src = await fetchSource('../js/managers/export-manager.js');
-    expect(src).toContain('MetadataManager.embedExifInPngBlob');
-    // Al menos 2 llamadas (downloadImage + downloadImageWithProgress, ramas Blob)
-    const matches = src.match(/MetadataManager\.embedExifInPngBlob/g) || [];
-    expect(matches.length).toBeGreaterThan(1);
+    expect(src).toContain('MetadataManager.embedExifInBlob(blob, metadata)');
   });
 
-  it('export-manager.js llama a embedExifInPngDataUrl en el camino fallback (v3.4.10)', async function () {
+  it('el fallback PNG usa Blob/Object URL, no dataURL', async function () {
     const src = await fetchSource('../js/managers/export-manager.js');
-    expect(src).toContain('MetadataManager.embedExifInPngDataUrl');
+    expect(src).toContain('triggerBlobDownload(blob');
+    expect(src).not.toContain('MetadataManager.embedExifInPngDataUrl');
   });
 });
 
@@ -238,7 +237,7 @@ describe('Regresión — Bugs latentes y limpieza (v3.3.4)', function () {
   it('history-manager.js define el límite de memoria HISTORY_MAX_TOTAL_SIZE', async function () {
     const src = await fetchSource('../js/managers/history-manager.js');
     expect(src).toContain('HISTORY_MAX_TOTAL_SIZE');
-    expect(src).toContain('100 * 1024 * 1024');
+    expect(src).toContain('AppConfig.historyMaxMemoryBytes');
   });
 
   it('text-layer-manager.js envuelve fonts.load en Promise.race con timeout', async function () {
@@ -310,12 +309,11 @@ describe('Regresión — Conversión de formato JPEG con alpha', function () {
     expect(src).toContain('flatCtx.fillStyle');
   });
 
-  it('export-manager.js usa flattenCanvasForJpeg en al menos 4 puntos del flujo de descarga (v3.4.10)', async function () {
+  it('export-manager.js centraliza el aplanado JPEG antes de generar el Blob', async function () {
     const src = await fetchSource('../js/managers/export-manager.js');
-    // 4 puntos: downloadImage (showSaveFilePicker + fallback) y
-    // downloadImageWithProgress (showSaveFilePicker + fallback).
-    const matches = src.match(/flattenCanvasForJpeg\(canvas[,)]/g) || [];
-    expect(matches.length).toBeGreaterThan(3);
+    expect(src).toContain('async function encodeExportBlob');
+    expect(src).toContain('flattenCanvasForJpeg(canvas, flattenColor)');
+    expect(src).toContain('await encodeExportBlob(');
   });
 
   it('export-manager.js condiciona el aplanado a finalMimeType === image/jpeg (v3.4.10)', async function () {
@@ -385,7 +383,8 @@ describe('Regresión — Análisis visual (v3.3.12 → v3.4.7 extraído a Analys
     expect(src).toContain('totalPixels * 0.01');
     expect(src).toContain('totalPixels * 0.99');
     expect(src).toContain('Uint8ClampedArray(256)');
-    expect(src).toContain('historyManager.saveState');
+    expect(src).toContain("DocumentStateManager.enqueueRasterMutation('auto-balance'");
+    expect(src).toContain('saveHistory: true');
   });
 
   it('index.html incluye los botones de histograma, paleta y auto-balance', async function () {
@@ -454,7 +453,8 @@ describe('Regresión — Curvas y niveles (v3.3.13 → v3.4.8 extraído a Curves
     expect(src).toContain('function _applyToImage');
     // Composición: primero la LUT por canal, luego la LUT RGB combinada
     expect(src).toContain('lutRGB[lutR[data[i]]]');
-    expect(src).toContain('historyManager.saveState');
+    expect(src).toContain("DocumentStateManager.enqueueRasterMutation('curves'");
+    expect(src).toContain('saveHistory: true');
   });
 
   it('curves-manager.js define _redrawCanvas con cuadrícula y línea identidad', async function () {
@@ -786,18 +786,15 @@ describe('Regresión — AVIF EXIF (v3.3.17 infra → v3.4.15 inyección real)',
     expect(src).toContain('eo += metaGrowth');
   });
 
-  it('export-manager.js llama a embedExifInAvifBlob en el flujo de descarga (v3.4.10)', async function () {
+  it('export-manager.js despacha EXIF AVIF mediante el inyector común', async function () {
     const src = await fetchSource('../js/managers/export-manager.js');
-    expect(src).toContain('MetadataManager.embedExifInAvifBlob');
-    // ≥3 llamadas (downloadImage + downloadImageWithProgress + downloadMultipleSizes)
-    const matches = src.match(/MetadataManager\.embedExifInAvifBlob/g) || [];
-    expect(matches.length).toBeGreaterThan(2);
+    expect(src).toContain('MetadataManager.embedExifInBlob(blob, metadata)');
   });
 
-  it('export-manager.js llama a embedExifInAvifDataUrl en los caminos fallback (v3.4.10)', async function () {
+  it('el camino fallback AVIF usa el inyector común sobre Blob', async function () {
     const src = await fetchSource('../js/managers/export-manager.js');
-    expect(src).toContain('MetadataManager.embedExifInAvifDataUrl');
-    expect(src).toContain("finalMimeType === 'image/avif'");
+    expect(src).toContain('MetadataManager.embedExifInBlob(blob, metadata)');
+    expect(src).toContain('triggerBlobDownload(blob');
   });
 });
 

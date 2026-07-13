@@ -43,6 +43,19 @@ window.WatermarkManager = (function () {
   let imageLoadSequence = 0;
   let pendingImageLoad = null;
   let pendingImageFileKey = null;
+  let thumbnailObjectUrl = null;
+
+  function releaseWatermarkThumbnail() {
+    if (thumbnailObjectUrl && typeof URL !== 'undefined') {
+      URL.revokeObjectURL(thumbnailObjectUrl);
+    }
+    thumbnailObjectUrl = null;
+    const thumbnail = document.getElementById('watermark-preview-thumb');
+    if (thumbnail) {
+      thumbnail.removeAttribute('src');
+      thumbnail.style.display = 'none';
+    }
+  }
 
   function clearCache() {
     imageLoadSequence++;
@@ -52,14 +65,42 @@ window.WatermarkManager = (function () {
     cache.lastWatermarkConfig = null;
     cache.lastWatermarkFileKey = null;
     AppState.watermarkImagePreview = null;
+    releaseWatermarkThumbnail();
   }
 
   function watermarkFileKey(file) {
     return file ? file.name + '|' + file.size + '|' + file.lastModified : null;
   }
 
+  function normalizeResidentImage(image) {
+    if (!image) return image;
+    const width = image.naturalWidth || image.width || 0;
+    const height = image.naturalHeight || image.height || 0;
+    const maxWidth = (typeof AppConfig !== 'undefined' && AppConfig.maxCanvasWidth) || 2400;
+    const maxHeight = (typeof AppConfig !== 'undefined' && AppConfig.maxCanvasHeight) || 2400;
+    if (!width || !height || (width <= maxWidth && height <= maxHeight)) return image;
+    const scale = Math.min(maxWidth / width, maxHeight / height);
+    const resident = document.createElement('canvas');
+    resident.width = Math.max(1, Math.round(width * scale));
+    resident.height = Math.max(1, Math.round(height * scale));
+    const residentCtx = resident.getContext('2d');
+    if (!residentCtx) return image;
+    residentCtx.imageSmoothingEnabled = true;
+    residentCtx.imageSmoothingQuality = 'high';
+    residentCtx.drawImage(image, 0, 0, resident.width, resident.height);
+    return resident;
+  }
+
   function loadWatermarkImage(file) {
     if (!file) return Promise.resolve(null);
+    if (typeof SecurityManager !== 'undefined' &&
+        typeof SecurityManager.validateWatermarkImageFile === 'function') {
+      const validation = SecurityManager.validateWatermarkImageFile(file);
+      if (!validation.isValid) {
+        const message = validation.errors.map(error => error.message || String(error)).join('. ');
+        return Promise.reject(new Error(message || 'Imagen de marca de agua no válida'));
+      }
+    }
     const fileKey = watermarkFileKey(file);
     if (cache.watermarkImage && cache.lastWatermarkFileKey === fileKey) {
       AppState.watermarkImagePreview = cache.watermarkImage;
@@ -74,11 +115,21 @@ window.WatermarkManager = (function () {
       watermarkImg.onload = function () {
         URL.revokeObjectURL(objectUrl);
         if (sequence !== imageLoadSequence) return resolve(null);
-        AppState.watermarkImagePreview = watermarkImg;
-        cache.watermarkImage = watermarkImg;
+        if (typeof SecurityManager !== 'undefined' &&
+            typeof SecurityManager.validateWatermarkImageDimensions === 'function') {
+          const dimensions = SecurityManager.validateWatermarkImageDimensions(watermarkImg);
+          if (!dimensions.isValid) {
+            watermarkImg.src = '';
+            reject(new Error(dimensions.errors[0] || 'Dimensiones de marca de agua no válidas'));
+            return;
+          }
+        }
+        const residentImage = normalizeResidentImage(watermarkImg);
+        AppState.watermarkImagePreview = residentImage;
+        cache.watermarkImage = residentImage;
         cache.lastWatermarkFileKey = fileKey;
         cache.lastWatermarkConfig = captureConfig();
-        resolve(watermarkImg);
+        resolve(residentImage);
       };
       watermarkImg.onerror = function () {
         URL.revokeObjectURL(objectUrl);
@@ -96,6 +147,33 @@ window.WatermarkManager = (function () {
     pendingImageLoad = trackedLoad;
     pendingImageFileKey = fileKey;
     return trackedLoad;
+  }
+
+  async function updateWatermarkThumbnail(watermarkImg, fileKey) {
+    if (!watermarkImg) return;
+    const maxSide = 160;
+    const ratio = Math.min(1, maxSide / Math.max(watermarkImg.naturalWidth, watermarkImg.naturalHeight));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(watermarkImg.naturalWidth * ratio));
+    canvas.height = Math.max(1, Math.round(watermarkImg.naturalHeight * ratio));
+    canvas.getContext('2d').drawImage(watermarkImg, 0, 0, canvas.width, canvas.height);
+
+    try {
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      const currentFile = document.getElementById('watermark-image')?.files?.[0] || null;
+      if (!blob || watermarkFileKey(currentFile) !== fileKey) return;
+      const url = URL.createObjectURL(blob);
+      releaseWatermarkThumbnail();
+      thumbnailObjectUrl = url;
+      const thumbnail = document.getElementById('watermark-preview-thumb');
+      if (thumbnail) {
+        thumbnail.src = url;
+        thumbnail.style.display = 'block';
+      }
+    } finally {
+      canvas.width = 0;
+      canvas.height = 0;
+    }
   }
 
   function ensureImageReady() {
@@ -205,6 +283,7 @@ window.WatermarkManager = (function () {
     try { localStorage.removeItem(WATERMARK_STORAGE_KEY); } catch (e) { MNEMOTAG_DEBUG && console.warn('localStorage op failed:', e); }
     const form = document.getElementById('watermark-form');
     if (form) form.reset();
+    clearCache();
     const syncPairs = [
       ['watermark-size', 'watermark-size-num'],
       ['watermark-opacity', 'watermark-opacity-num'],
@@ -362,21 +441,18 @@ window.WatermarkManager = (function () {
           uploadLabel.classList.add('watermark-loaded');
         }
 
-        // Mostrar miniatura
-        if (thumbnailElement) {
-          const reader = new FileReader();
-          reader.onload = function(e) {
-            thumbnailElement.src = e.target.result;
-            thumbnailElement.style.display = 'block';
-          };
-          reader.readAsDataURL(watermarkInput.files[0]);
-        }
-
         try {
-          await loadWatermarkImage(watermarkInput.files[0]);
+          const file = watermarkInput.files[0];
+          const watermarkImg = await loadWatermarkImage(file);
+          await updateWatermarkThumbnail(watermarkImg, watermarkFileKey(file));
           updatePreview();
         } catch (error) {
-          UIManager.showError('No se pudo cargar la imagen de la marca de agua. Comprueba que el archivo no esté corrupto.');
+          watermarkInput.value = '';
+          labelSpan.textContent = 'Seleccionar archivo';
+          if (uploadLabel) uploadLabel.classList.remove('watermark-loaded');
+          if (thumbnailElement) thumbnailElement.style.display = 'none';
+          clearCache();
+          UIManager.showError(error.message || 'No se pudo cargar la imagen de la marca de agua');
         }
       } else {
         labelSpan.textContent = 'Seleccionar archivo';
@@ -733,6 +809,7 @@ window.WatermarkManager = (function () {
   }
 
   function drawCachedWatermark(watermarkImg, legacyConfig) {
+    watermarkImg = normalizeResidentImage(watermarkImg);
     AppState.watermarkImagePreview = watermarkImg;
     const config = captureConfig();
     config.text.enabled = false;
@@ -1437,6 +1514,7 @@ window.WatermarkManager = (function () {
     handleTouchMove,
     handleTouchEnd,
     handleWatermarkSubmit,
+    normalizeResidentImage,
     clearCache
   };
 })();

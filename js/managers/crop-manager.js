@@ -545,8 +545,12 @@ class CropManager {
     }
 
     // Calcular proporciones entre canvas y imagen original
-    const scaleX = this.image.naturalWidth / this.canvas.width;
-    const scaleY = this.image.naturalHeight / this.canvas.height;
+    // El raster canónico puede ser HTMLImageElement, canvas o ImageBitmap.
+    // naturalWidth/naturalHeight solo existen en HTMLImageElement.
+    const sourceWidth = this.image.naturalWidth || this.image.width;
+    const sourceHeight = this.image.naturalHeight || this.image.height;
+    const scaleX = sourceWidth / this.canvas.width;
+    const scaleY = sourceHeight / this.canvas.height;
 
     // Coordenadas del crop en la imagen original
     const cropX = this.cropArea.x * scaleX;
@@ -558,8 +562,8 @@ class CropManager {
     const tempCanvas = document.createElement('canvas');
     const tempCtx = tempCanvas.getContext('2d');
     
-    tempCanvas.width = cropWidth;
-    tempCanvas.height = cropHeight;
+    tempCanvas.width = Math.max(1, Math.round(cropWidth));
+    tempCanvas.height = Math.max(1, Math.round(cropHeight));
     
     // Configurar alta calidad
     tempCtx.imageSmoothingEnabled = true;
@@ -569,14 +573,15 @@ class CropManager {
     tempCtx.drawImage(
       this.image,
       cropX, cropY, cropWidth, cropHeight,
-      0, 0, cropWidth, cropHeight
+      0, 0, tempCanvas.width, tempCanvas.height
     );
 
     return {
       canvas: tempCanvas,
-      width: cropWidth,
-      height: cropHeight,
-      dataUrl: tempCanvas.toDataURL('image/png')
+      x: cropX,
+      y: cropY,
+      width: tempCanvas.width,
+      height: tempCanvas.height
     };
   }
 
@@ -689,6 +694,7 @@ class CropManager {
     this.isActive = false;
     this.removeEventListeners();
     this.cropArea = null;
+    this.image = null;
     this.canvas.style.cursor = 'default';
   }
 

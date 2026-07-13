@@ -106,3 +106,68 @@ describe('MetadataManager — escritura EXIF en JPEG', function () {
     expect(await MetadataManager.embedExifInJpegBlob(undefined)).toBeUndefined();
   });
 });
+
+describe('MetadataManager — contrato EXIF común y AVIF', function () {
+  it('_piexifBinaryToTiffBytes acepta Uint8Array sin llamar charCodeAt', function () {
+    const input = new Uint8Array([
+      0xFF, 0xE1, 0x00, 0x0C,
+      0x45, 0x78, 0x69, 0x66, 0x00, 0x00,
+      0x49, 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00
+    ]);
+    const result = MetadataManager._piexifBinaryToTiffBytes(input);
+    expect(Array.from(result)).toEqual([
+      0x49, 0x49, 0x2A, 0x00, 0x08, 0x00, 0x00, 0x00
+    ]);
+  });
+
+  it('embedExifInBlob despacha por MIME y conserva el snapshot explícito', async function () {
+    const original = MetadataManager.embedExifInPngBlob;
+    const input = { type: 'image/png' };
+    const output = { type: 'image/png', enriched: true };
+    const snapshot = { title: 'Capturado' };
+    let received = null;
+    MetadataManager.embedExifInPngBlob = async function (blob, metadata) {
+      received = metadata;
+      expect(blob).toBe(input);
+      return output;
+    };
+    try {
+      expect(await MetadataManager.embedExifInBlob(input, snapshot)).toBe(output);
+      expect(received).toBe(snapshot);
+    } finally {
+      MetadataManager.embedExifInPngBlob = original;
+    }
+  });
+
+  it('el fallback JPEG dataURL usa el snapshot y no relee el formulario', function () {
+    const hadPiexif = Object.prototype.hasOwnProperty.call(window, 'piexif');
+    const originalPiexif = window.piexif;
+    const originalGetMetadata = MetadataManager.getMetadata;
+    const originalBuildExifObject = MetadataManager.buildExifObject;
+    const snapshot = { title: 'Título fijado al iniciar la descarga' };
+    let received = null;
+
+    window.piexif = {
+      dump: function () { return 'exif'; },
+      insert: function (bytes, dataUrl) { return dataUrl + '#exif'; }
+    };
+    MetadataManager.getMetadata = function () {
+      throw new Error('No debe releer el formulario');
+    };
+    MetadataManager.buildExifObject = function (metadata) {
+      received = metadata;
+      return { '0th': {}, 'Exif': {}, 'GPS': {} };
+    };
+
+    try {
+      const input = 'data:image/jpeg;base64,AA==';
+      expect(MetadataManager.embedExifInJpegDataUrl(input, snapshot)).toBe(input + '#exif');
+      expect(received).toBe(snapshot);
+    } finally {
+      MetadataManager.getMetadata = originalGetMetadata;
+      MetadataManager.buildExifObject = originalBuildExifObject;
+      if (hadPiexif) window.piexif = originalPiexif;
+      else delete window.piexif;
+    }
+  });
+});

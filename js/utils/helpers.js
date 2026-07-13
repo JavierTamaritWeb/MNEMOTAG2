@@ -470,21 +470,25 @@ function flattenCanvasForJpeg(canvas, backgroundColor) {
  */
 function hasImageAlphaChannel(canvas) {
   const ctx = canvas.getContext('2d');
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = imageData.data;
-
-  // Verificar canal alpha en una muestra de píxeles
-  const sampleSize = Math.min(1000, data.length / 4);
-  const step = Math.floor((data.length / 4) / sampleSize);
-
-  for (let i = 0; i < sampleSize; i++) {
-    const alphaIndex = (i * step * 4) + 3;
-    if (alphaIndex < data.length && data[alphaIndex] < 255) {
-      return true; // Encontró transparencia
+  if (!ctx || !canvas.width || !canvas.height) return false;
+  // Leer por franjas de ~1 MiB. getImageData() del raster completo añadía
+  // 23 MiB de pico en 2400² justo antes de codificar/exportar.
+  const maxPixelsPerBlock = 256 * 1024;
+  const rowsPerBlock = Math.max(1, Math.floor(maxPixelsPerBlock / canvas.width));
+  try {
+    for (let y = 0; y < canvas.height; y += rowsPerBlock) {
+      const rows = Math.min(rowsPerBlock, canvas.height - y);
+      const data = ctx.getImageData(0, y, canvas.width, rows).data;
+      for (let alphaIndex = 3; alphaIndex < data.length; alphaIndex += 4) {
+        if (data[alphaIndex] < 255) return true;
+      }
+    }
+  } catch (error) {
+    if (typeof MNEMOTAG_DEBUG !== 'undefined' && MNEMOTAG_DEBUG) {
+      console.warn('No se pudo inspeccionar el canal alpha:', error);
     }
   }
-
-  return false; // No hay transparencia
+  return false;
 }
 
 // =============================================================================

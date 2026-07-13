@@ -1,7 +1,7 @@
 'use strict';
 
 // =============================================================================
-// MnemoTag Service Worker — v3.7.3
+// MnemoTag Service Worker — v3.7.4
 // =============================================================================
 //
 // Estrategia de cache:
@@ -27,7 +27,7 @@
 // `js/main.js`.
 // =============================================================================
 
-const CACHE_VERSION = 'mnemotag-v3.7.3';
+const CACHE_VERSION = 'mnemotag-v3.7.4';
 const CACHE_NAME_APP = CACHE_VERSION + '-app';
 const CACHE_NAME_CDN = CACHE_VERSION + '-cdn';
 

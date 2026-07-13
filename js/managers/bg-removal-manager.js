@@ -22,9 +22,16 @@ window.BgRemovalManager = (function () {
   // Cache privado del módulo importado (singleton).
   let _module = null;
   let _loading = false;
+  let _removeBackgroundOverride = null;
   // Guard de reentrada: evita que un doble click lance dos procesados
   // concurrentes sobre el mismo canvas.
   let _processing = false;
+
+  function configure(options) {
+    _removeBackgroundOverride = options && typeof options.removeBackground === 'function'
+      ? options.removeBackground
+      : null;
+  }
 
   async function _loadLib() {
     if (_module) return _module;
@@ -63,20 +70,23 @@ window.BgRemovalManager = (function () {
       return;
     }
 
+    const requestedDocumentId = AppState.documentId;
     _processing = true;
     try {
-      let mod;
-      try {
-        mod = await _loadLib();
-      } catch (err) {
-        console.error('BgRemovalManager: error cargando el modelo de IA:', err);
-        UIManager.showError('No se pudo cargar el modelo de IA: ' + (err.message || err) + '. Comprueba tu conexión y vuelve a intentarlo.');
-        return;
+      let removeFn = _removeBackgroundOverride;
+      if (!removeFn) {
+        let mod;
+        try {
+          mod = await _loadLib();
+        } catch (err) {
+          console.error('BgRemovalManager: error cargando el modelo de IA:', err);
+          UIManager.showError('No se pudo cargar el modelo de IA: ' + (err.message || err) + '. Comprueba tu conexión y vuelve a intentarlo.');
+          return;
+        }
+        // La librería expone su función principal como `removeBackground`
+        // o como default export según la versión. Defensivo.
+        removeFn = (mod && (mod.removeBackground || mod.default)) || null;
       }
-
-      // La librería expone su función principal como `removeBackground`
-      // o como default export según la versión. Defensivo.
-      const removeFn = (mod && (mod.removeBackground || mod.default)) || null;
       if (typeof removeFn !== 'function') {
         UIManager.showError('La librería de IA cargada no expone la función esperada. Versión incompatible.');
         return;
@@ -85,39 +95,58 @@ window.BgRemovalManager = (function () {
       try {
         UIManager.showInfo('🤖 Procesando imagen con IA. Esto puede tardar unos segundos…');
 
-        // Convertimos el canvas actual (con todos los filtros y marcas
-        // aplicados) a un blob PNG para preservar la transparencia.
-        const inputBlob = await new Promise(function (resolve, reject) {
-          canvas.toBlob(function (b) { return b ? resolve(b) : reject(new Error('toBlob falló')); }, 'image/png');
-        });
+        const committed = await DocumentStateManager.enqueueRasterMutation(
+          'background-removal',
+          async function (source) {
+            // Convertir exclusivamente el raster canónico. Filtros, marcas y
+            // capas son composición no destructiva y no deben hornearse.
+            const sourceWidth = source.naturalWidth || source.width;
+            const sourceHeight = source.naturalHeight || source.height;
+            const sourceCanvas = document.createElement('canvas');
+            sourceCanvas.width = sourceWidth;
+            sourceCanvas.height = sourceHeight;
+            sourceCanvas.getContext('2d').drawImage(source, 0, 0, sourceWidth, sourceHeight);
+            const inputBlob = await new Promise(function (resolve, reject) {
+              sourceCanvas.toBlob(function (blob) {
+                if (blob) resolve(blob);
+                else reject(new Error('toBlob falló'));
+              }, 'image/png');
+            });
+            sourceCanvas.width = 0;
+            sourceCanvas.height = 0;
 
-        // Llamada a la librería. Devuelve un Blob con fondo transparente.
-        const resultBlob = await removeFn(inputBlob);
-
-        // Cargar el resultado de vuelta al canvas. Se espera a que la
-        // imagen termine de dibujarse para no liberar el guard antes
-        // de tiempo (el canvas sigue "ocupado" hasta entonces).
-        const url = URL.createObjectURL(resultBlob);
-        await new Promise(function (resolve) {
-          const img = new Image();
-          img.onload = function () {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            URL.revokeObjectURL(url);
-
-            if (typeof historyManager !== 'undefined' && historyManager.saveState) {
-              historyManager.saveState();
-            }
-            UIManager.showSuccess('🪄 Fondo eliminado correctamente');
-            resolve();
-          };
-          img.onerror = function () {
-            URL.revokeObjectURL(url);
-            UIManager.showError('No se pudo cargar el resultado del modelo de IA.');
-            resolve();
-          };
-          img.src = url;
-        });
+            const resultBlob = await removeFn(inputBlob);
+            const url = URL.createObjectURL(resultBlob);
+            return new Promise(function (resolve, reject) {
+              const img = new Image();
+              img.onload = function () {
+                const output = document.createElement('canvas');
+                output.width = img.naturalWidth || img.width;
+                output.height = img.naturalHeight || img.height;
+                output.getContext('2d').drawImage(img, 0, 0);
+                URL.revokeObjectURL(url);
+                resolve(output);
+              };
+              img.onerror = function () {
+                URL.revokeObjectURL(url);
+                reject(new Error('No se pudo cargar el resultado del modelo de IA.'));
+              };
+              img.src = url;
+            });
+          },
+          {
+            expectedDocumentId: requestedDocumentId,
+            takeOwnership: true,
+            updateOriginalDimensions: false,
+            updateResetImage: true,
+            rotation: 0,
+            isFlippedHorizontally: false,
+            isFlippedVertically: false,
+            saveHistory: true
+          }
+        );
+        if (!committed) return;
+        UIManager.showSuccess('🪄 Fondo eliminado correctamente');
       } catch (err) {
         console.error('BgRemovalManager: error procesando con IA:', err);
         UIManager.showError('Error al procesar la imagen: ' + (err.message || err));
@@ -129,6 +158,7 @@ window.BgRemovalManager = (function () {
   }
 
   return {
+    configure: configure,
     removeBackground: removeBackground
   };
 })();

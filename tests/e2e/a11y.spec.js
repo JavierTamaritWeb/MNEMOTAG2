@@ -54,4 +54,20 @@ test.describe('Accesibilidad (axe-core)', () => {
 
     expect(serious, formatViolations(serious)).toEqual([]);
   });
+
+  test('el modal de lote abierto no tiene incidencias serias ni críticas', async ({ page }) => {
+    await page.goto('/index.html');
+    await page.waitForLoadState('networkidle');
+
+    await page.evaluate(() => window.openBatchModal());
+    await expect(page.locator('#batch-modal')).toBeVisible();
+    await page.waitForTimeout(500);
+
+    const results = await new AxeBuilder({ page })
+      .include('#batch-modal')
+      .analyze();
+    const serious = seriousViolations(results);
+
+    expect(serious, formatViolations(serious)).toEqual([]);
+  });
 });

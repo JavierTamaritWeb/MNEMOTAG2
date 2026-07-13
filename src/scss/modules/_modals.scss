@@ -158,20 +158,184 @@
       border-top: 1px solid var(--border-color);
     }
 
+    /* Vista previa segura de archivos. El markup vive en un <template> y el
+       ModalController común controla foco, Escape y restauración de foco. */
+    .file-preview-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 10000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(5px);
+    }
+
+    .file-preview-modal .preview-container {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      max-width: 600px;
+      max-height: calc(100dvh - 2rem);
+      overflow: hidden;
+      background: var(--bg-card);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-xl);
+    }
+
+    .file-preview-modal .preview-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1.25rem;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .file-preview-modal .preview-header h2 {
+      margin: 0;
+      color: var(--text-primary);
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    .file-preview-modal .preview-close {
+      flex: 0 0 2.75rem;
+      width: 2.75rem;
+      height: 2.75rem;
+      padding: 0;
+      color: var(--text-secondary);
+      font-size: 1.5rem;
+      line-height: 1;
+      background: transparent;
+      border: 0;
+      border-radius: var(--radius);
+      cursor: pointer;
+    }
+
+    .file-preview-modal .preview-close:hover {
+      color: var(--text-primary);
+      background: var(--bg-tertiary);
+    }
+
+    .file-preview-modal .preview-close:focus-visible,
+    #batch-dropzone:focus-visible {
+      outline: 2px solid transparent;
+      box-shadow: var(--focus-ring);
+    }
+
+    .file-preview-modal .preview-content {
+      display: flex;
+      flex: 1 1 auto;
+      gap: 1.25rem;
+      min-height: 0;
+      padding: 1.25rem;
+      overflow: auto;
+    }
+
+    .file-preview-modal .preview-image-container {
+      display: flex;
+      flex: 1 1 0;
+      align-items: center;
+      justify-content: center;
+      min-width: 0;
+      min-height: 200px;
+      overflow: hidden;
+      background: var(--bg-tertiary);
+      border-radius: var(--radius);
+    }
+
+    .file-preview-modal .preview-image {
+      display: block;
+      max-width: 100%;
+      max-height: 300px;
+      object-fit: contain;
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
+    }
+
+    .file-preview-modal .preview-info {
+      flex: 1 1 0;
+      min-width: 250px;
+      overflow-wrap: anywhere;
+    }
+
+    .file-preview-modal .preview-info h3 {
+      margin: 0 0 0.75rem;
+      color: var(--text-primary);
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .file-preview-modal .preview-info ul {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .file-preview-modal .preview-info li {
+      padding: 0.375rem 0;
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .file-preview-modal .preview-info li:last-child {
+      border-bottom: 0;
+    }
+
+    .file-preview-modal .preview-info strong {
+      color: var(--text-primary);
+    }
+
+    .file-preview-modal .preview-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+      padding: 1.25rem;
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border-color);
+    }
+
     /* Dropzone */
     .dropzone {
+      display: block;
+      width: 100%;
       border: 2px dashed var(--border-color);
       border-radius: var(--radius-lg);
       padding: 3rem 2rem;
+      color: var(--text-primary);
+      font: inherit;
       text-align: center;
       cursor: pointer;
       transition: var(--transition);
       background: var(--bg-accent);
+      appearance: none;
+    }
+
+    /* El selector legacy global `button` fija 48px de alto y recorta el
+       contenido. El dropzone es un botón por accesibilidad, pero conserva la
+       geometría del panel de carga original. */
+    #batch-dropzone {
+      height: auto;
+      min-height: 0;
+      overflow: visible;
+      line-height: normal;
+      white-space: normal;
     }
 
     .dropzone:hover {
       border-color: var(--accent-primary);
       background: var(--bg-tertiary);
+    }
+
+    .dropzone__title,
+    .dropzone__hint,
+    .dropzone__limit {
+      display: block;
     }
 
     .dropzone.drag-over {
@@ -253,6 +417,12 @@
 
     .batch-item:hover .batch-item-remove {
       opacity: 1;
+    }
+
+    .batch-item-remove:focus-visible {
+      opacity: 1;
+      outline: 2px solid transparent;
+      box-shadow: var(--focus-ring);
     }
 
     .batch-item-remove:hover {
@@ -1576,7 +1746,7 @@
   color: #d1d5db;
 }
 
-[data-theme="dark"] #batch-modal .dropzone p {
+[data-theme="dark"] #batch-modal .dropzone span {
   color: #9ca3af;
 }
 
@@ -2156,13 +2326,15 @@
 }
 
 .progress-card {
+  width: calc(100% - var(--space-8));
   background: #ffffff;
   border-radius: 16px;
   padding: 32px 40px;
-  min-width: 340px;
+  min-width: 0;
   max-width: 420px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   text-align: center;
+  overflow-wrap: anywhere;
 }
 
 .progress-card__title {
@@ -2253,6 +2425,107 @@
 
 [data-theme="dark"] .progress-card__eta {
   color: #6b7280;
+}
+
+@media (max-width: 768px) {
+  .file-preview-modal {
+    padding: var(--space-2);
+  }
+
+  .file-preview-modal .preview-container {
+    max-height: calc(100dvh - var(--space-4));
+  }
+
+  .file-preview-modal .preview-header,
+  .file-preview-modal .preview-content,
+  .file-preview-modal .preview-actions {
+    padding: var(--space-3);
+  }
+
+  .file-preview-modal .preview-header h2 {
+    font-size: var(--font-control-lg);
+  }
+
+  .file-preview-modal .preview-content {
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+
+  .file-preview-modal .preview-image-container {
+    flex: 0 1 auto;
+    min-height: 120px;
+  }
+
+  .file-preview-modal .preview-image {
+    max-height: min(28dvh, 220px);
+  }
+
+  .file-preview-modal .preview-info {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  #batch-modal .modal-header,
+  #batch-modal .modal-body,
+  #batch-modal .modal-footer {
+    padding: var(--space-3);
+  }
+
+  #batch-modal .modal-title {
+    min-width: 0;
+    font-size: var(--font-control-lg);
+  }
+
+  #batch-modal .dropzone {
+    padding: var(--space-5) var(--space-3);
+  }
+
+  #batch-modal .modal-footer {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  #batch-modal .modal-footer button {
+    justify-content: center;
+    width: 100%;
+    min-width: 0;
+    min-height: var(--control-lg);
+    padding: var(--space-3) var(--space-4);
+    white-space: normal;
+  }
+
+  #batch-items {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .batch-item-remove {
+    width: var(--control-sm);
+    height: var(--control-sm);
+    opacity: 1;
+  }
+
+  .batch-summary {
+    align-items: flex-start;
+    overflow-wrap: anywhere;
+  }
+
+  .file-preview-modal .preview-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .file-preview-modal .preview-actions button {
+    width: 100%;
+    min-width: 0;
+    min-height: var(--control-lg);
+    white-space: normal;
+  }
+
+  .progress-card {
+    padding: var(--space-6) var(--space-4);
+  }
 }
 
 /* Advanced tools title — small label style */

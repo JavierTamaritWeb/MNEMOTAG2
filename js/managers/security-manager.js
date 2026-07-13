@@ -96,7 +96,7 @@ const SecurityManager = {
     }
 
     // Validación del nombre del archivo
-    const fileName = file.name;
+    const fileName = String(file.name || '');
     if (fileName.length > 255) {
       validation.isValid = false;
       validation.errors.push({
@@ -106,13 +106,17 @@ const SecurityManager = {
       });
     }
 
-    // Validación de caracteres especiales en el nombre
-    const invalidChars = /[<>:"/\\|?*\x00-\x1f]/g;
-    if (invalidChars.test(fileName)) {
-      validation.warnings.push({
-        type: 'INVALID_FILENAME_CHARS',
-        message: 'El nombre contiene caracteres no recomendados',
-        details: 'Se recomienda usar solo letras, números, guiones y puntos.'
+    // Rechazar controles ASCII/C1, separadores reservados y controles bidi.
+    // Estos últimos pueden ocultar o invertir visualmente la extensión real.
+    // La UI sigue usando textContent: esta validación es defensa en profundidad,
+    // no el mecanismo primario contra XSS.
+    const unsafeFileNameChars = /[<>:"/\\|?*\u0000-\u001f\u007f-\u009f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/;
+    if (unsafeFileNameChars.test(fileName)) {
+      validation.isValid = false;
+      validation.errors.push({
+        type: 'UNSAFE_FILENAME',
+        message: 'El nombre del archivo contiene caracteres no permitidos',
+        details: 'Renombra el archivo usando letras, números, espacios, guiones, guiones bajos y puntos.'
       });
     }
 
@@ -251,6 +255,7 @@ const SecurityManager = {
           
           const previewData = {
             dataUrl: previewCanvas.toDataURL('image/jpeg', 0.8),
+            decodedImage: img,
             originalDimensions: { width: img.width, height: img.height },
             previewDimensions: { width: previewWidth, height: previewHeight },
             fileInfo: {
@@ -364,6 +369,49 @@ const SecurityManager = {
     }
 
     return validation;
+  },
+
+  /**
+   * Valida el archivo usado como marca de agua antes de decodificarlo.
+   * Tiene un límite propio, más estricto que el de la imagen principal,
+   * porque permanece residente durante toda la sesión de edición.
+   */
+  validateWatermarkImageFile: function(file) {
+    const validation = this.validateImageFile(file);
+    if (!file || !validation.isValid) return validation;
+
+    const maxSize = AppConfig.watermarkMaxFileSize;
+    if (file.size > maxSize) {
+      validation.isValid = false;
+      validation.errors.push({
+        type: 'WATERMARK_FILE_TOO_LARGE',
+        message: 'La imagen de marca de agua es demasiado grande',
+        details: `Tamaño actual: ${this.formatFileSize(file.size)}. Tamaño máximo permitido: ${this.formatFileSize(maxSize)}.`
+      });
+    }
+    return validation;
+  },
+
+  /**
+   * Valida el raster de una marca de agua una vez decodificado.
+   */
+  validateWatermarkImageDimensions: function(image) {
+    const width = image?.naturalWidth || image?.width || 0;
+    const height = image?.naturalHeight || image?.height || 0;
+    const maxDimension = AppConfig.watermarkMaxDimension;
+    const maxPixels = AppConfig.watermarkMaxPixels;
+    const errors = [];
+
+    if (width < 1 || height < 1) {
+      errors.push('La imagen de marca de agua no tiene dimensiones válidas');
+    } else if (width > maxDimension || height > maxDimension || width * height > maxPixels) {
+      errors.push(
+        `La marca de agua supera el límite de ${maxDimension}px por lado o ` +
+        `${Math.round(maxPixels / 1000000)} megapíxeles`
+      );
+    }
+
+    return { isValid: errors.length === 0, errors, width, height };
   },
 
   // ===== VALIDACIÓN DE NOMBRES DE ARCHIVO =====

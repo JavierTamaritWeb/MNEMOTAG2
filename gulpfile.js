@@ -36,6 +36,7 @@ const JS_FILES = [
   'js/utils/keyboard-shortcuts.js',
   'js/managers/security-manager.js',
   'js/managers/worker-manager.js',
+  'js/managers/document-state-manager.js',
   'js/managers/history-manager.js',
   'js/managers/metadata-manager.js',
   'js/managers/filter-loading-manager.js',

@@ -38,9 +38,25 @@
 (function () {
   /** Map<clave, Set<fn>> — listeners por clave ('*' = comodín). */
   const listeners = new Map();
+  const documentState = {
+    id: null,
+    revision: 0,
+    busy: false,
+    mutationReason: null
+  };
+  let transactionDepth = 0;
+  const pendingNotifications = new Map();
 
   function notify(key, value, prev) {
     if (value === prev) return;
+    if (transactionDepth > 0) {
+      const pending = pendingNotifications.get(key);
+      pendingNotifications.set(key, {
+        value,
+        prev: pending ? pending.prev : prev
+      });
+      return;
+    }
     const run = (fn) => {
       try {
         fn(value, prev, key);
@@ -54,6 +70,12 @@
     if (exact) exact.forEach(run);
     const wildcard = listeners.get('*');
     if (wildcard) wildcard.forEach(run);
+  }
+
+  function flushNotifications() {
+    const queued = Array.from(pendingNotifications.entries());
+    pendingNotifications.clear();
+    queued.forEach(([key, change]) => notify(key, change.value, change.prev));
   }
 
   window.AppState = Object.freeze({
@@ -92,6 +114,22 @@
       return total;
     },
 
+    /**
+     * Agrupa mutaciones síncronas y notifica únicamente cuando el documento
+     * ya es coherente. Las notificaciones conservan el primer valor anterior
+     * y el último valor escrito para cada clave.
+     */
+    transaction(fn) {
+      if (typeof fn !== 'function') return undefined;
+      transactionDepth++;
+      try {
+        return fn();
+      } finally {
+        transactionDepth--;
+        if (transactionDepth === 0) flushNotifications();
+      }
+    },
+
     // --- Imagen y archivo actuales ---
     get canvas() {
       return typeof canvas !== 'undefined' ? canvas : null;
@@ -102,8 +140,24 @@
     get currentImage() {
       return typeof currentImage !== 'undefined' ? currentImage : null;
     },
+    set currentImage(v) {
+      if (typeof currentImage !== 'undefined') {
+        const prev = currentImage;
+        // eslint-disable-next-line no-global-assign
+        currentImage = v;
+        notify('currentImage', v, prev);
+      }
+    },
     get currentFile() {
       return typeof currentFile !== 'undefined' ? currentFile : null;
+    },
+    set currentFile(v) {
+      if (typeof currentFile !== 'undefined') {
+        const prev = currentFile;
+        // eslint-disable-next-line no-global-assign
+        currentFile = v;
+        notify('currentFile', v, prev);
+      }
     },
     get lastDownloadDirectory() {
       return typeof lastDownloadDirectory !== 'undefined' ? lastDownloadDirectory : null;
@@ -129,11 +183,72 @@
     get originalExtension() {
       return typeof originalExtension !== 'undefined' ? originalExtension : 'jpg';
     },
+    set originalExtension(v) {
+      if (typeof originalExtension !== 'undefined') {
+        const prev = originalExtension;
+        // eslint-disable-next-line no-global-assign
+        originalExtension = v || 'jpg';
+        notify('originalExtension', originalExtension, prev);
+      }
+    },
     get originalWidth() {
       return typeof originalWidth !== 'undefined' ? originalWidth : 0;
     },
+    set originalWidth(v) {
+      if (typeof originalWidth !== 'undefined') {
+        const prev = originalWidth;
+        // eslint-disable-next-line no-global-assign
+        originalWidth = Number.isFinite(v) ? v : 0;
+        notify('originalWidth', originalWidth, prev);
+      }
+    },
     get originalHeight() {
       return typeof originalHeight !== 'undefined' ? originalHeight : 0;
+    },
+    set originalHeight(v) {
+      if (typeof originalHeight !== 'undefined') {
+        const prev = originalHeight;
+        // eslint-disable-next-line no-global-assign
+        originalHeight = Number.isFinite(v) ? v : 0;
+        notify('originalHeight', originalHeight, prev);
+      }
+    },
+    get transformResetImage() {
+      return typeof transformResetImage !== 'undefined' ? transformResetImage : null;
+    },
+    set transformResetImage(v) {
+      if (typeof transformResetImage !== 'undefined') {
+        const prev = transformResetImage;
+        // eslint-disable-next-line no-global-assign
+        transformResetImage = v;
+        notify('transformResetImage', v, prev);
+      }
+    },
+
+    // --- Identidad y revisión del raster canónico ---
+    get documentId() { return documentState.id; },
+    set documentId(v) {
+      const prev = documentState.id;
+      documentState.id = v || null;
+      notify('documentId', documentState.id, prev);
+    },
+    get documentRevision() { return documentState.revision; },
+    set documentRevision(v) {
+      const prev = documentState.revision;
+      documentState.revision = Number.isSafeInteger(v) && v >= 0 ? v : 0;
+      notify('documentRevision', documentState.revision, prev);
+    },
+    get documentBusy() { return documentState.busy; },
+    set documentBusy(v) {
+      const prev = documentState.busy;
+      documentState.busy = Boolean(v);
+      notify('documentBusy', documentState.busy, prev);
+    },
+    get mutationReason() { return documentState.mutationReason; },
+    set mutationReason(v) {
+      const prev = documentState.mutationReason;
+      documentState.mutationReason = v || null;
+      notify('mutationReason', documentState.mutationReason, prev);
     },
 
     // --- Transformaciones ---
@@ -422,6 +537,9 @@
     snapshot() {
       return {
         hasImage: !!this.currentImage,
+        documentId: this.documentId,
+        documentRevision: this.documentRevision,
+        documentBusy: this.documentBusy,
         canvasSize: this.canvas ? { w: this.canvas.width, h: this.canvas.height } : null,
         fileBaseName: this.fileBaseName,
         originalExtension: this.originalExtension,

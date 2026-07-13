@@ -160,6 +160,7 @@ load('js/utils/capabilities.js');
 load('js/utils/app-state.js');
 load('js/managers/security-manager.js');
 load('js/managers/metadata-manager.js');
+load('js/managers/document-state-manager.js');
 load('js/managers/history-manager.js');
 load('js/managers/text-layer-manager.js');
 load('js/managers/text-layer-ui-manager.js');
@@ -224,6 +225,7 @@ const specs = [
   'tests/specs/security-manager.spec.js',
   'tests/specs/metadata-manager.spec.js',
   'tests/specs/history-manager.spec.js',
+  'tests/specs/document-state-manager.spec.js',
   'tests/specs/regression.spec.js',
   'tests/specs/v370.spec.js',
   'tests/specs/v371.spec.js',

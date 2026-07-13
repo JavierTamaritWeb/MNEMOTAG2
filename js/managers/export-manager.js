@@ -41,13 +41,110 @@ window.ExportManager = (function () {
     };
   }
 
-  function renderExportDocument() {
-    const canvas = AppState.canvas;
-    if (!canvas) return false;
-    return DocumentRenderer.renderDocument(
-      DocumentRenderer.snapshot({ showPositioningBorders: AppState.showPositioningBorders }),
-      canvas
-    ).rendered;
+  function cloneTextLayers(layers) {
+    return (layers || []).map(layer => ({
+      ...layer,
+      font: layer.font ? { ...layer.font } : null,
+      position: layer.position ? { ...layer.position } : null,
+      effects: layer.effects ? {
+        ...layer.effects,
+        shadow: layer.effects.shadow ? { ...layer.effects.shadow } : null,
+        stroke: layer.effects.stroke ? { ...layer.effects.stroke } : null,
+        gradient: layer.effects.gradient ? {
+          ...layer.effects.gradient,
+          colors: [...(layer.effects.gradient.colors || [])]
+        } : null
+      } : null
+    }));
+  }
+
+  function cloneWatermarks(config) {
+    if (!config) return null;
+    return {
+      ...config,
+      text: config.text ? {
+        ...config.text,
+        customPosition: config.text.customPosition ? { ...config.text.customPosition } : null
+      } : null,
+      image: config.image ? {
+        ...config.image,
+        // El elemento decodificado es una fuente de imagen estable; el resto
+        // de la configuración sí se copia para aislarla de la interfaz.
+        element: config.image.element,
+        customPosition: config.image.customPosition ? { ...config.image.customPosition } : null
+      } : null
+    };
+  }
+
+  function capturedInputValue(id) {
+    const input = document.getElementById(id);
+    return input && typeof input.value === 'string' ? input.value.trim() : '';
+  }
+
+  /**
+   * Espera todas las mutaciones destructivas y compone una instantánea en un
+   * canvas privado. El canvas visible es únicamente una proyección de UI: no
+   * se lee como fuente ni se modifica durante export, share o multisize.
+   */
+  async function prepareAtomicExport() {
+    const documentStateManager = typeof window !== 'undefined'
+      ? window.DocumentStateManager
+      : null;
+    if (documentStateManager && typeof documentStateManager.waitForIdle === 'function') {
+      await documentStateManager.waitForIdle();
+    }
+
+    const visibleCanvas = AppState.canvas;
+    const sourceImage = AppState.currentImage;
+    const width = visibleCanvas ? visibleCanvas.width : 0;
+    const height = visibleCanvas ? visibleCanvas.height : 0;
+    const state = {
+      canvas: null,
+      currentImage: sourceImage,
+      currentFile: AppState.currentFile,
+      fileBaseName: AppState.fileBaseName,
+      outputFormat: AppState.outputFormat,
+      outputQuality: AppState.outputQuality,
+      lastDownloadDirectory: AppState.lastDownloadDirectory,
+      documentId: AppState.documentId,
+      documentRevision: AppState.documentRevision,
+      metadata: { ...MetadataManager.getMetadata() },
+      customBaseName: capturedInputValue('file-basename'),
+      flattenColor: getFlattenColor()
+    };
+
+    if (!visibleCanvas || !sourceImage || width <= 0 || height <= 0) return state;
+
+    const capturedDocument = DocumentRenderer.snapshot({
+      sourceImage,
+      referenceWidth: width,
+      referenceHeight: height,
+      showPositioningBorders: false
+    });
+    const documentState = {
+      ...capturedDocument,
+      watermarks: cloneWatermarks(capturedDocument.watermarks),
+      textLayers: cloneTextLayers(capturedDocument.textLayers),
+      showPositioningBorders: false
+    };
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = width;
+    exportCanvas.height = height;
+    const renderResult = DocumentRenderer.renderDocument(documentState, exportCanvas);
+    if (!renderResult || !renderResult.rendered) {
+      throw new Error('No se pudo componer la instantánea de exportación');
+    }
+
+    state.canvas = exportCanvas;
+    state.documentState = documentState;
+    return state;
+  }
+
+  function releaseExportCanvas(exportState) {
+    const privateCanvas = exportState && exportState.canvas;
+    if (!privateCanvas || privateCanvas === AppState.canvas) return;
+    privateCanvas.width = 0;
+    privateCanvas.height = 0;
   }
 
   /**
@@ -89,14 +186,30 @@ window.ExportManager = (function () {
     });
   }
 
-  /**
-   * Extrae el MIME real de un dataURL ('data:image/png;base64,…' → 'image/png').
-   * Devuelve null si no es un dataURL reconocible.
-   */
-  function dataUrlMimeType(dataUrl) {
-    if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) return null;
-    const end = dataUrl.indexOf(';');
-    return end > 5 ? dataUrl.slice(5, end) : null;
+  async function encodeExportBlob(canvas, mimeType, quality, flattenColor, metadata) {
+    const sourceCanvas = mimeType === 'image/jpeg'
+      ? flattenCanvasForJpeg(canvas, flattenColor)
+      : canvas;
+    try {
+      const blob = await canvasToBlob(sourceCanvas, mimeType, quality);
+      return await MetadataManager.embedExifInBlob(blob, metadata);
+    } finally {
+      if (sourceCanvas && sourceCanvas !== canvas) {
+        sourceCanvas.width = 0;
+        sourceCanvas.height = 0;
+      }
+    }
+  }
+
+  function triggerBlobDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 0);
   }
 
   /**
@@ -115,49 +228,55 @@ window.ExportManager = (function () {
   }
 
   async function downloadMultipleSizes() {
-    const { canvas, currentImage, fileBaseName, outputFormat, outputQuality } = readExportState();
-    if (!canvas || !currentImage) {
-      showError('No hay imagen para exportar.');
-      return;
-    }
-    // Carga bajo demanda de JSZip (helpers.js): el <script> de CDN ya no
-    // está en index.html. Si falla, el check siguiente informa al usuario.
-    if (typeof ensureJSZip === 'function') {
-      try { await ensureJSZip(); } catch (e) { /* el check siguiente informa */ }
-    }
-    if (typeof JSZip === 'undefined') {
-      showError('JSZip no está cargado. No se puede generar el ZIP.');
-      return;
-    }
-
-    // Recoger los anchos seleccionados
-    const widths = ['multisize-2048', 'multisize-1024', 'multisize-512', 'multisize-256']
-      .map(id => {
-        const el = document.getElementById(id);
-        return el && el.checked ? parseInt(el.value, 10) : null;
-      })
-      .filter(w => w !== null && !isNaN(w));
-
-    if (widths.length === 0) {
-      UIManager.showInfo('Marca al menos un tamaño para exportar.');
-      return;
-    }
-
+    let exportState = null;
     try {
-      AppState.showPositioningBorders = false;
-      renderExportDocument();
+      exportState = await prepareAtomicExport();
+      const {
+        canvas,
+        currentImage,
+        fileBaseName,
+        outputFormat,
+        outputQuality,
+        metadata,
+        customBaseName,
+        flattenColor
+      } = exportState;
+      if (!canvas || !currentImage) {
+        showError('No hay imagen para exportar.');
+        return;
+      }
+
+      // Capturar la selección una sola vez junto al resto de la operación.
+      const widths = ['multisize-2048', 'multisize-1024', 'multisize-512', 'multisize-256']
+        .map(id => {
+          const el = document.getElementById(id);
+          return el && el.checked ? parseInt(el.value, 10) : null;
+        })
+        .filter(w => w !== null && !isNaN(w));
+
+      if (widths.length === 0) {
+        UIManager.showInfo('Marca al menos un tamaño para exportar.');
+        return;
+      }
+
+      // Carga bajo demanda de JSZip después de fijar documento y tamaños.
+      // Los cambios de la UI durante la carga de red no alteran este ZIP.
+      if (typeof ensureJSZip === 'function') {
+        try { await ensureJSZip(); } catch (e) { /* el check siguiente informa */ }
+      }
+      if (typeof JSZip === 'undefined') {
+        showError('JSZip no está cargado. No se puede generar el ZIP.');
+        return;
+      }
 
       const hasAlpha = hasImageAlphaChannel(canvas);
       const requestedMimeType = getMimeType(outputFormat);
       const finalMimeType = await determineFallbackFormat(hasAlpha, requestedMimeType);
       const finalFormat = finalMimeType.split('/')[1];
       const extension = getFileExtension(finalFormat);
-      const flattenColor = getFlattenColor();
 
-      MetadataManager.applyMetadataToImage(canvas);
+      MetadataManager.applyMetadataToImage(canvas, metadata);
 
-      const basenameInput = document.getElementById('file-basename');
-      const customBaseName = basenameInput ? basenameInput.value.trim() : '';
       let baseName = customBaseName || fileBaseName || 'imagen';
       if (!SecurityManager.isValidFileBaseName(baseName)) baseName = 'imagen';
 
@@ -206,14 +325,24 @@ window.ExportManager = (function () {
           }
         }
 
-        blob = await MetadataManager.embedExifInJpegBlob(blob);
-        blob = await MetadataManager.embedExifInPngBlob(blob);
-        blob = await MetadataManager.embedExifInWebpBlob(blob);
-        blob = await MetadataManager.embedExifInAvifBlob(blob); // v3.3.17
+        blob = await MetadataManager.embedExifInJpegBlob(blob, metadata);
+        blob = await MetadataManager.embedExifInPngBlob(blob, metadata);
+        blob = await MetadataManager.embedExifInWebpBlob(blob, metadata);
+        blob = await MetadataManager.embedExifInAvifBlob(blob, metadata); // v3.3.17
 
         zip.file(baseName + '-' + w + 'px.' + fileExtension, blob);
+        tempCanvas.width = 0;
+        tempCanvas.height = 0;
+        if (sourceForExport !== tempCanvas) {
+          sourceForExport.width = 0;
+          sourceForExport.height = 0;
+        }
       }
 
+      // Los blobs ya pertenecen al ZIP; el raster compuesto no participa en
+      // la compresión y puede liberarse antes del pico de generateAsync().
+      releaseExportCanvas(exportState);
+      exportState = null;
       const zipBlob = await zip.generateAsync({ type: 'blob' });
 
       const url = URL.createObjectURL(zipBlob);
@@ -230,33 +359,35 @@ window.ExportManager = (function () {
       console.error('Error en downloadMultipleSizes:', err);
       showError('Error al generar el ZIP de varios tamaños: ' + (err.message || err));
     } finally {
-      AppState.showPositioningBorders = true;
-      renderExportDocument();
+      releaseExportCanvas(exportState);
     }
   }
 
   async function downloadImage() {
-    const {
-      canvas,
-      currentFile,
-      fileBaseName,
-      outputFormat,
-      outputQuality,
-      lastDownloadDirectory
-    } = readExportState();
-    if (!canvas) {
-      showError('No hay imagen para descargar.');
-      return;
-    }
-
-    if (!currentFile) {
-      showError('Por favor, selecciona una imagen primero.');
-      return;
-    }
+    let exportState = null;
 
     try {
-      AppState.showPositioningBorders = false;
-      renderExportDocument();
+      exportState = await prepareAtomicExport();
+      const {
+        canvas,
+        currentFile,
+        fileBaseName,
+        outputFormat,
+        outputQuality,
+        lastDownloadDirectory,
+        metadata,
+        customBaseName,
+        flattenColor
+      } = exportState;
+      if (!canvas) {
+        showError('No hay imagen para descargar.');
+        return;
+      }
+
+      if (!currentFile) {
+        showError('Por favor, selecciona una imagen primero.');
+        return;
+      }
 
       const hasAlpha = hasImageAlphaChannel(canvas);
       const requestedMimeType = getMimeType(outputFormat);
@@ -272,17 +403,12 @@ window.ExportManager = (function () {
         UIManager.showInfo('📄 Exportando en ' + actualFormat + ' para máxima compatibilidad (solicitado: ' + requestedFormat + ')');
       }
 
-      const metadata = MetadataManager.getMetadata();
-      MetadataManager.applyMetadataToImage(canvas);
-
-      const basenameInput = document.getElementById('file-basename');
-      const customBaseName = basenameInput ? basenameInput.value.trim() : '';
-      const titleInput = document.getElementById('metaTitle');
+      MetadataManager.applyMetadataToImage(canvas, metadata);
 
       let filename = customBaseName || fileBaseName;
 
       if (!filename || filename === 'imagen') {
-        filename = metadata.title || (titleInput ? titleInput.value.trim() : '') || 'imagen';
+        filename = metadata.title || 'imagen';
         filename = sanitizeFileBaseName(filename);
       }
 
@@ -293,34 +419,24 @@ window.ExportManager = (function () {
 
       let extension = getFileExtension(finalFormat);
 
+      if (finalMimeType === 'image/jpeg' && hasAlpha) {
+        UIManager.showInfo('🎨 Aplanando transparencia contra ' + flattenColor.toLowerCase() + ' para exportar a JPEG');
+      }
+      const blob = await encodeExportBlob(
+        canvas, finalMimeType, outputQuality, flattenColor, metadata
+      );
+      if (blob && blob.type && blob.type !== finalMimeType) {
+        notifyFormatFallback(finalMimeType, blob.type);
+        finalMimeType = blob.type;
+        finalFormat = finalMimeType.split('/')[1];
+        extension = getFileExtension(finalFormat);
+      }
+      releaseExportCanvas(exportState);
+      exportState = null;
+
       // File System Access API cuando está disponible
       if ('showSaveFilePicker' in window) {
         try {
-          // Generar el blob ANTES de abrir el diálogo: si el navegador no
-          // codifica el formato pedido, canvasToBlob cae a JPEG y el nombre
-          // sugerido y el tipo aceptado deben reflejar el contenido real.
-          const flattenColor = getFlattenColor();
-          if (finalMimeType === 'image/jpeg' && hasAlpha) {
-            UIManager.showInfo('🎨 Aplanando transparencia contra ' + flattenColor.toLowerCase() + ' para exportar a JPEG');
-          }
-          const sourceCanvas = (finalMimeType === 'image/jpeg')
-            ? flattenCanvasForJpeg(canvas, flattenColor)
-            : canvas;
-          let blob = await canvasToBlob(sourceCanvas, finalMimeType, outputQuality);
-
-          // Mismatch extensión/contenido: usar el tipo REAL del blob
-          if (blob && blob.type && blob.type !== finalMimeType) {
-            notifyFormatFallback(finalMimeType, blob.type);
-            finalMimeType = blob.type;
-            finalFormat = finalMimeType.split('/')[1];
-            extension = getFileExtension(finalFormat);
-          }
-
-          blob = await MetadataManager.embedExifInJpegBlob(blob);
-          blob = await MetadataManager.embedExifInPngBlob(blob);
-          blob = await MetadataManager.embedExifInWebpBlob(blob);
-          blob = await MetadataManager.embedExifInAvifBlob(blob);
-
           const options = {
             suggestedName: filename + '.' + extension,
             types: [{
@@ -351,41 +467,8 @@ window.ExportManager = (function () {
         }
       }
 
-      // Fallback <a download>
-      const link = document.createElement('a');
-      const flattenColorFallback = getFlattenColor();
-      if (finalMimeType === 'image/jpeg' && hasAlpha) {
-        UIManager.showInfo('🎨 Aplanando transparencia contra ' + flattenColorFallback.toLowerCase() + ' para exportar a JPEG');
-      }
-      const fallbackCanvas = (finalMimeType === 'image/jpeg')
-        ? flattenCanvasForJpeg(canvas, flattenColorFallback)
-        : canvas;
-      const rawDataUrl = fallbackCanvas.toDataURL(finalMimeType, outputQuality);
-
-      // toDataURL devuelve PNG silenciosamente si el formato no está
-      // soportado: comprobar el MIME real y recalcular la extensión.
-      const actualMime = dataUrlMimeType(rawDataUrl);
-      if (actualMime && actualMime !== finalMimeType) {
-        notifyFormatFallback(finalMimeType, actualMime);
-        finalMimeType = actualMime;
-        finalFormat = finalMimeType.split('/')[1];
-        extension = getFileExtension(finalFormat);
-      }
-      link.download = filename + '.' + extension;
-
-      let fallbackHref = MetadataManager.embedExifInJpegDataUrl(rawDataUrl);
-      if (finalMimeType === 'image/png') {
-        fallbackHref = await MetadataManager.embedExifInPngDataUrl(fallbackHref);
-      } else if (finalMimeType === 'image/webp') {
-        fallbackHref = await MetadataManager.embedExifInWebpDataUrl(fallbackHref);
-      } else if (finalMimeType === 'image/avif') {
-        fallbackHref = await MetadataManager.embedExifInAvifDataUrl(fallbackHref);
-      }
-      link.href = fallbackHref;
-
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // Fallback estándar sin duplicar el archivo en un string base64.
+      triggerBlobDownload(blob, filename + '.' + extension);
 
       const qualityText = finalFormat === 'png' ? '' : ' (calidad: ' + Math.round(outputQuality * 100) + '%)';
       showSuccess('Imagen descargada en formato ' + finalFormat.toUpperCase() + qualityText + '!');
@@ -396,33 +479,35 @@ window.ExportManager = (function () {
       if (error && error.name === 'AbortError') return;
       showDownloadError(error, downloadImage);
     } finally {
-      AppState.showPositioningBorders = true;
-      renderExportDocument();
+      releaseExportCanvas(exportState);
     }
   }
 
   async function downloadImageWithProgress() {
-    const {
-      canvas,
-      currentFile,
-      fileBaseName,
-      outputFormat,
-      outputQuality,
-      lastDownloadDirectory
-    } = readExportState();
-    if (!canvas) {
-      showError('No hay imagen para descargar.');
-      return;
-    }
-
-    if (!currentFile) {
-      showError('Por favor, selecciona una imagen primero.');
-      return;
-    }
+    let exportState = null;
 
     try {
-      AppState.showPositioningBorders = false;
-      renderExportDocument();
+      exportState = await prepareAtomicExport();
+      const {
+        canvas,
+        currentFile,
+        fileBaseName,
+        outputFormat,
+        outputQuality,
+        lastDownloadDirectory,
+        metadata,
+        customBaseName,
+        flattenColor
+      } = exportState;
+      if (!canvas) {
+        showError('No hay imagen para descargar.');
+        return;
+      }
+
+      if (!currentFile) {
+        showError('Por favor, selecciona una imagen primero.');
+        return;
+      }
 
       showProgressBar('Iniciando descarga...');
 
@@ -452,8 +537,7 @@ window.ExportManager = (function () {
         UIManager.showInfo('📄 Exportando en ' + actualFormat + ' para máxima compatibilidad (solicitado: ' + requestedFormat + ')');
       }
 
-      const metadata = MetadataManager.getMetadata();
-      MetadataManager.applyMetadataToImage(canvas);
+      MetadataManager.applyMetadataToImage(canvas, metadata);
 
       await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -463,9 +547,6 @@ window.ExportManager = (function () {
       }
 
       await new Promise(resolve => setTimeout(resolve, 800));
-
-      const basenameInput = document.getElementById('file-basename');
-      const customBaseName = basenameInput ? basenameInput.value.trim() : '';
 
       let filename = customBaseName || fileBaseName;
 
@@ -494,33 +575,23 @@ window.ExportManager = (function () {
       // Ocultar progress ANTES de abrir el diálogo de guardar
       hideProgressBar();
 
+      if (finalMimeType === 'image/jpeg' && hasAlpha) {
+        UIManager.showInfo('🎨 Aplanando transparencia contra ' + flattenColor.toLowerCase() + ' para exportar a JPEG');
+      }
+      const blob = await encodeExportBlob(
+        canvas, finalMimeType, outputQuality, flattenColor, metadata
+      );
+      if (blob && blob.type && blob.type !== finalMimeType) {
+        notifyFormatFallback(finalMimeType, blob.type);
+        finalMimeType = blob.type;
+        finalFormat = finalMimeType.split('/')[1];
+        extension = getFileExtension(finalFormat);
+      }
+      releaseExportCanvas(exportState);
+      exportState = null;
+
       if ('showSaveFilePicker' in window) {
         try {
-          // Generar el blob ANTES de abrir el diálogo: si el navegador no
-          // codifica el formato pedido, canvasToBlob cae a JPEG y el nombre
-          // sugerido y el tipo aceptado deben reflejar el contenido real.
-          const flattenColor = getFlattenColor();
-          if (finalMimeType === 'image/jpeg' && hasAlpha) {
-            UIManager.showInfo('🎨 Aplanando transparencia contra ' + flattenColor.toLowerCase() + ' para exportar a JPEG');
-          }
-          const sourceCanvas = (finalMimeType === 'image/jpeg')
-            ? flattenCanvasForJpeg(canvas, flattenColor)
-            : canvas;
-          let blob = await canvasToBlob(sourceCanvas, finalMimeType, outputQuality);
-
-          // Mismatch extensión/contenido: usar el tipo REAL del blob
-          if (blob && blob.type && blob.type !== finalMimeType) {
-            notifyFormatFallback(finalMimeType, blob.type);
-            finalMimeType = blob.type;
-            finalFormat = finalMimeType.split('/')[1];
-            extension = getFileExtension(finalFormat);
-          }
-
-          blob = await MetadataManager.embedExifInJpegBlob(blob);
-          blob = await MetadataManager.embedExifInPngBlob(blob);
-          blob = await MetadataManager.embedExifInWebpBlob(blob);
-          blob = await MetadataManager.embedExifInAvifBlob(blob);
-
           const options = {
             suggestedName: filename + '.' + extension,
             types: [{
@@ -554,40 +625,7 @@ window.ExportManager = (function () {
         }
       }
 
-      const link = document.createElement('a');
-      const flattenColorFallback = getFlattenColor();
-      if (finalMimeType === 'image/jpeg' && hasAlpha) {
-        UIManager.showInfo('🎨 Aplanando transparencia contra ' + flattenColorFallback.toLowerCase() + ' para exportar a JPEG');
-      }
-      const fallbackCanvas = (finalMimeType === 'image/jpeg')
-        ? flattenCanvasForJpeg(canvas, flattenColorFallback)
-        : canvas;
-      const rawDataUrlP = fallbackCanvas.toDataURL(finalMimeType, outputQuality);
-
-      // toDataURL devuelve PNG silenciosamente si el formato no está
-      // soportado: comprobar el MIME real y recalcular la extensión.
-      const actualMimeP = dataUrlMimeType(rawDataUrlP);
-      if (actualMimeP && actualMimeP !== finalMimeType) {
-        notifyFormatFallback(finalMimeType, actualMimeP);
-        finalMimeType = actualMimeP;
-        finalFormat = finalMimeType.split('/')[1];
-        extension = getFileExtension(finalFormat);
-      }
-      link.download = filename + '.' + extension;
-
-      let fallbackHrefP = MetadataManager.embedExifInJpegDataUrl(rawDataUrlP);
-      if (finalMimeType === 'image/png') {
-        fallbackHrefP = await MetadataManager.embedExifInPngDataUrl(fallbackHrefP);
-      } else if (finalMimeType === 'image/webp') {
-        fallbackHrefP = await MetadataManager.embedExifInWebpDataUrl(fallbackHrefP);
-      } else if (finalMimeType === 'image/avif') {
-        fallbackHrefP = await MetadataManager.embedExifInAvifDataUrl(fallbackHrefP);
-      }
-      link.href = fallbackHrefP;
-
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      triggerBlobDownload(blob, filename + '.' + extension);
 
       hideProgressBar();
 
@@ -601,8 +639,7 @@ window.ExportManager = (function () {
       if (error && error.name === 'AbortError') return;
       showDownloadError(error, downloadImageWithProgress);
     } finally {
-      AppState.showPositioningBorders = true;
-      renderExportDocument();
+      releaseExportCanvas(exportState);
     }
   }
 
@@ -711,43 +748,51 @@ window.ExportManager = (function () {
   // falta de soporte real, cae a la descarga normal.
 
   async function shareImage() {
-    const { canvas, currentFile, fileBaseName, outputFormat, outputQuality } = readExportState();
-    if (!canvas || !currentFile) {
-      showError('No hay imagen para compartir.');
-      return;
-    }
+    let exportState = null;
+    let preparedFallback = null;
 
     try {
-      AppState.showPositioningBorders = false;
-      renderExportDocument();
+      exportState = await prepareAtomicExport();
+      const {
+        canvas,
+        currentFile,
+        fileBaseName,
+        outputFormat,
+        outputQuality,
+        metadata,
+        customBaseName,
+        flattenColor
+      } = exportState;
+      if (!canvas || !currentFile) {
+        showError('No hay imagen para compartir.');
+        return;
+      }
 
       const hasAlpha = hasImageAlphaChannel(canvas);
       const requestedMimeType = getMimeType(outputFormat);
       let finalMimeType = await determineFallbackFormat(hasAlpha, requestedMimeType);
       let finalFormat = finalMimeType.split('/')[1];
 
-      const sourceCanvas = (finalMimeType === 'image/jpeg')
-        ? flattenCanvasForJpeg(canvas, getFlattenColor())
-        : canvas;
-      let blob = await canvasToBlob(sourceCanvas, finalMimeType, outputQuality);
+      const blob = await encodeExportBlob(canvas, finalMimeType, outputQuality, flattenColor, metadata);
       if (blob && blob.type && blob.type !== finalMimeType) {
         finalMimeType = blob.type;
         finalFormat = finalMimeType.split('/')[1];
       }
 
-      MetadataManager.applyMetadataToImage(canvas);
-      blob = await MetadataManager.embedExifInJpegBlob(blob);
-      blob = await MetadataManager.embedExifInPngBlob(blob);
-      blob = await MetadataManager.embedExifInWebpBlob(blob);
-      blob = await MetadataManager.embedExifInAvifBlob(blob);
+      MetadataManager.applyMetadataToImage(canvas, metadata);
 
-      const basenameInput = document.getElementById('file-basename');
-      const customBaseName = basenameInput ? basenameInput.value.trim() : '';
       let filename = customBaseName || fileBaseName || 'imagen';
       if (!SecurityManager.isValidFileBaseName(filename)) filename = 'imagen';
       const extension = getFileExtension(finalFormat);
 
       const shareFile = new File([blob], filename + '.' + extension, { type: finalMimeType });
+      preparedFallback = { blob, filename: filename + '.' + extension };
+
+      // A partir de aquí solo se usa File/Blob. Liberar el canvas antes de
+      // abrir el share sheet o iniciar el fallback evita dos documentos
+      // privados simultáneos.
+      releaseExportCanvas(exportState);
+      exportState = null;
 
       if (typeof navigator !== 'undefined' && typeof navigator.canShare === 'function' &&
           navigator.canShare({ files: [shareFile] })) {
@@ -761,19 +806,24 @@ window.ExportManager = (function () {
 
       // Sin soporte real de share con archivos: fallback a descarga.
       UIManager.showInfo('Este navegador no permite compartir archivos; descargando en su lugar');
-      await downloadImage();
+      triggerBlobDownload(preparedFallback.blob, preparedFallback.filename);
+      showSuccess('Imagen descargada correctamente');
     } catch (error) {
       // AbortError = el usuario cerró el share sheet — silencioso.
       if (error && error.name === 'AbortError') return;
       MNEMOTAG_DEBUG && console.warn('Web Share falló, cayendo a descarga:', error);
       try {
-        await downloadImage();
+        if (preparedFallback) {
+          triggerBlobDownload(preparedFallback.blob, preparedFallback.filename);
+          showSuccess('Imagen descargada correctamente');
+        } else {
+          await downloadImage();
+        }
       } catch (downloadError) {
         showError('No se pudo compartir ni descargar la imagen.');
       }
     } finally {
-      AppState.showPositioningBorders = true;
-      renderExportDocument();
+      releaseExportCanvas(exportState);
     }
   }
 

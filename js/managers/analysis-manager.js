@@ -100,6 +100,25 @@ window.AnalysisManager = (function () {
     }
   }
 
+  function _getCanonicalImageData(sourceOverride) {
+    const source = sourceOverride || (typeof AppState !== 'undefined' ? AppState.currentImage : null);
+    if (!source) return null;
+    const width = source.naturalWidth || source.width;
+    const height = source.naturalHeight || source.height;
+    if (!width || !height) return null;
+    try {
+      const scratch = document.createElement('canvas');
+      scratch.width = width;
+      scratch.height = height;
+      const scratchCtx = scratch.getContext('2d', { willReadFrequently: true });
+      scratchCtx.drawImage(source, 0, 0, width, height);
+      return scratchCtx.getImageData(0, 0, width, height);
+    } catch (err) {
+      console.error('AnalysisManager: no se pudo leer el raster canónico:', err);
+      return null;
+    }
+  }
+
   function showHistogram() {
     const imageData = _getCanvasImageData();
     if (!imageData) {
@@ -319,56 +338,74 @@ window.AnalysisManager = (function () {
   // bloqueaban antes). Con fallback al main-thread si el worker no
   // está disponible.
   async function autoBalanceImage() {
-    const imageData = _getCanvasImageData();
-    if (!imageData) {
+    if (!AppState.currentImage) {
       UIManager.showError('Carga una imagen primero para auto-mejorarla.');
       return;
     }
 
-    let result;
-    // Intentar en el worker primero (no bloquea UI)
-    if (_workerAvailable) {
-      try {
-        result = await _runInWorker('autoBalance', imageData);
-      } catch (err) {
-        MNEMOTAG_DEBUG && console.warn('AnalysisManager: worker autoBalance falló, fallback main-thread:', err);
-        // Nota: si postMessage transfirió el buffer, el imageData
-        // original en main-thread queda detached. Hacemos una nueva
-        // lectura del canvas para el fallback.
-        const freshData = _getCanvasImageData();
-        if (!freshData) {
-          UIManager.showError('No se pudo leer el canvas para el fallback.');
-          return;
-        }
-        result = _autoBalanceMainThread(freshData);
-      }
-    } else {
-      result = _autoBalanceMainThread(imageData);
-    }
-
-    if (!result || result.empty) {
-      UIManager.showError('La imagen no tiene píxeles visibles para analizar.');
-      return;
-    }
-    if (result.noRange) {
-      UIManager.showInfo('La imagen no tiene rango dinámico suficiente para auto-mejorar.');
-      return;
-    }
-
-    // Pintar el imageData transformado de vuelta al canvas
+    let balanceResult = null;
     try {
-      ctx.putImageData(result.imageData, 0, 0);
+      const committed = await DocumentStateManager.enqueueRasterMutation('auto-balance', async function (source) {
+        const imageData = _getCanonicalImageData(source);
+        if (!imageData) {
+          const readError = new Error('No se pudo leer el raster canónico.');
+          readError.code = 'READ_FAILED';
+          throw readError;
+        }
+
+        if (_workerAvailable) {
+          try {
+            balanceResult = await _runInWorker('autoBalance', imageData);
+          } catch (err) {
+            MNEMOTAG_DEBUG && console.warn('AnalysisManager: worker autoBalance falló, fallback main-thread:', err);
+            const freshData = _getCanonicalImageData(source);
+            balanceResult = freshData ? _autoBalanceMainThread(freshData) : null;
+          }
+        } else {
+          balanceResult = _autoBalanceMainThread(imageData);
+        }
+
+        if (!balanceResult || balanceResult.empty) {
+          const emptyError = new Error('La imagen no tiene píxeles visibles para analizar.');
+          emptyError.code = 'EMPTY_IMAGE';
+          throw emptyError;
+        }
+        if (balanceResult.noRange) {
+          const rangeError = new Error('La imagen no tiene rango dinámico suficiente para auto-mejorar.');
+          rangeError.code = 'NO_RANGE';
+          throw rangeError;
+        }
+
+        const resultCanvas = document.createElement('canvas');
+        resultCanvas.width = balanceResult.imageData.width;
+        resultCanvas.height = balanceResult.imageData.height;
+        resultCanvas.getContext('2d').putImageData(balanceResult.imageData, 0, 0);
+        return resultCanvas;
+      }, {
+        takeOwnership: true,
+        updateOriginalDimensions: false,
+        updateResetImage: true,
+        rotation: 0,
+        isFlippedHorizontally: false,
+        isFlippedVertically: false,
+        saveHistory: true
+      });
+      if (!committed) return;
     } catch (err) {
-      console.error('AnalysisManager: error pintando resultado de autoBalance:', err);
-      UIManager.showError('Error al aplicar auto-balance al canvas.');
+      if (err && err.code === 'EMPTY_IMAGE') {
+        UIManager.showError(err.message);
+        return;
+      }
+      if (err && err.code === 'NO_RANGE') {
+        UIManager.showInfo(err.message);
+        return;
+      }
+      console.error('AnalysisManager: error confirmando resultado de autoBalance:', err);
+      UIManager.showError('Error al aplicar auto-balance a la imagen.');
       return;
     }
 
-    if (typeof historyManager !== 'undefined' && historyManager.saveState) {
-      historyManager.saveState();
-    }
-
-    UIManager.showSuccess('✨ Imagen auto-mejorada (rango lo=' + result.lo + ', hi=' + result.hi + ')');
+    UIManager.showSuccess('✨ Imagen auto-mejorada (rango lo=' + balanceResult.lo + ', hi=' + balanceResult.hi + ')');
   }
 
   return {
@@ -376,7 +413,8 @@ window.AnalysisManager = (function () {
     showPalette: showPalette,
     autoBalanceImage: autoBalanceImage,
     _extractDominantColors: _extractDominantColors,
-    _getCanvasImageData: _getCanvasImageData
+    _getCanvasImageData: _getCanvasImageData,
+    _getCanonicalImageData: _getCanonicalImageData
   };
 })();
 
