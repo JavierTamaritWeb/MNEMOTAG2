@@ -222,7 +222,6 @@ const FilterCache = {
   
   // Buscar estados similares
   findSimilarStates: function(targetState, tolerance = 0.1) {
-    const targetHash = this.generateHash(targetState);
     const similar = [];
     
     for (const [key, state] of this.states.entries()) {
@@ -341,7 +340,6 @@ const FilterCache = {
   
   // Limpiar todo el cache
   clear: function() {
-    const oldSize = this.states.size;
     this.states.clear();
     this.lastApplied = null;
     this.isDirty = false;

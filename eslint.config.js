@@ -84,6 +84,10 @@ const BROWSER_GLOBALS = {
   confirm: 'readonly',
   prompt: 'readonly',
   getComputedStyle: 'readonly',
+  // Flag de debug definido en app-config.js (primer archivo del bundle).
+  // ESLint analiza cada archivo por separado, pero en runtime comparten
+  // ámbito: sin este global cada uso daba un no-undef falso.
+  MNEMOTAG_DEBUG: 'readonly',
   // App managers globales
   AppConfig: 'readonly',
   SecurityManager: 'readonly',
@@ -105,6 +109,7 @@ const BROWSER_GLOBALS = {
   AppState: 'readonly',
   WatermarkManager: 'readonly',
   DocumentRenderer: 'readonly',
+  DocumentStateManager: 'readonly',
   RulerManager: 'readonly',
   ComparisonManager: 'readonly',
   MobileManager: 'readonly',
@@ -308,6 +313,25 @@ export default [
       ecmaVersion: 2022,
       sourceType: 'script',
       globals: BROWSER_GLOBALS
+    },
+    rules: BASE_RULES
+  },
+  // Web Workers (ámbito DedicatedWorkerGlobalScope, no window)
+  {
+    files: ['js/workers/**/*.js', 'js/image-processor.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'script',
+      globals: {
+        ...COMMON_GLOBALS,
+        self: 'readonly',
+        postMessage: 'readonly',
+        importScripts: 'readonly',
+        OffscreenCanvas: 'readonly',
+        createImageBitmap: 'readonly',
+        ImageData: 'readonly',
+        performance: 'readonly'
+      }
     },
     rules: BASE_RULES
   },
