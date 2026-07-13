@@ -383,7 +383,7 @@ const WorkerManager = {
   
   // Cancelar todos los jobs activos
   cancelAllJobs: function() {
-    for (const [jobId, job] of this.activeJobs.entries()) {
+    for (const [, job] of this.activeJobs.entries()) {
       if (job.timeoutId) {
         clearTimeout(job.timeoutId);
       }
@@ -433,7 +433,7 @@ const WorkerManager = {
     this.cancelAllJobs();
     
     // Terminar workers
-    for (const [id, workerInfo] of this.workers.entries()) {
+    for (const [, workerInfo] of this.workers.entries()) {
       workerInfo.worker.terminate();
     }
     

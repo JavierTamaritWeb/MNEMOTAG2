@@ -492,7 +492,7 @@ const UIManager = {
     forms.forEach(form => {
       if (!form) return;
       
-      let selectors = ['input', 'textarea', 'select'];
+      const selectors = ['input', 'textarea', 'select'];
       if (config.includeButtons) {
         selectors.push('button');
       }

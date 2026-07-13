@@ -19,7 +19,24 @@
       });
     }
 
-    // Variables globales optimizadas
+    // Variables globales optimizadas.
+    // Este bloque es el estado compartido del bundle: otros archivos
+    // concatenados (app-state.js, watermark-manager.js, zoom-pan-manager.js,
+    // export-manager.js…) leen y REASIGNAN estas variables en runtime.
+    // ESLint analiza por archivo y no puede verlo: prefer-const rompería la
+    // app (una const no puede reasignarse desde AppState) y no-unused-vars
+    // son falsos positivos. No convertir a const ni eliminar sin comprobar
+    // el uso en todo js/**.
+    /* exported getImageWatermarkPosition, getTextWatermarkPosition,
+       applyWatermarkOptimized, applyTextWatermarkOptimized,
+       applyImageWatermarkOptimized, drawCachedWatermark,
+       calculateWatermarkImageSize, getWatermarkPosition,
+       updatePositioningClasses, isPointInText, isPointInImage,
+       isPointInTextLayer, getCanvasContentRect, getFlattenColor,
+       hideError, showSuccess, showLoadingState, hideLoadingState,
+       applyCanvasFilters, applyCanvasFiltersLight, updateTextLayersList,
+       immediatePreviewUpdate */
+    /* eslint-disable prefer-const, no-unused-vars */
     let currentImage = null;
     let canvas = null;
     let ctx = null;
@@ -29,7 +46,6 @@
     let fileBaseName = 'imagen'; // Nombre base del archivo (sin extensión)
 
     // Variables para redimensionado
-    let originalImageDimensions = { width: 0, height: 0 };
     let originalWidth = 0;
     let originalHeight = 0;
     let isResizing = false;
@@ -53,8 +69,6 @@
     let panX = 0; // Posición X del pan
     let panY = 0; // Posición Y del pan
     let isPanning = false; // Estado de arrastre
-    let startPanX = 0; // Posición inicial X del mouse
-    let startPanY = 0; // Posición inicial Y del mouse
     let startOffsetX = 0; // Offset inicial X
     let startOffsetY = 0; // Offset inicial Y
 
@@ -94,6 +108,7 @@
     let batchManager = null;
     let textLayerManager = null;
     let cropManager = null;
+    /* eslint-enable prefer-const, no-unused-vars */
 
     // HistoryManager extraído a js/managers/history-manager.js
 
@@ -641,9 +656,6 @@
 
     // Funciones del tema oscuro
     function initializeTheme() {
-      const themeToggle = document.getElementById('theme-toggle');
-      const themeIcon = document.getElementById('theme-icon');
-
       // Cargar tema guardado o usar preferencia del sistema
       const savedTheme = localStorage.getItem('theme');
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -845,7 +857,6 @@
         const licenseSelect = document.getElementById('metaLicense');
         if (licenseSelect) {
           licenseSelect.addEventListener('change', () => {
-            const copyrightInput = document.getElementById('metaCopyright');
             const authorInput = document.getElementById('metaAuthor');
             if (authorInput && authorInput.value) {
               // Regenerar copyright con la nueva licencia
@@ -1100,7 +1111,6 @@
         const zoomInBtn = document.getElementById('zoom-in-btn');
         const zoomOutBtn = document.getElementById('zoom-out-btn');
         const zoomResetBtn = document.getElementById('zoom-reset-btn');
-        const zoomLevel = document.getElementById('zoom-level');
         const rulerToggleBtn = document.getElementById('ruler-toggle-btn');
 
         if (zoomInBtn && zoomOutBtn && zoomResetBtn) {
@@ -2419,16 +2429,11 @@
 
       let { width, height } = currentImage;
 
-      // Guardar dimensiones originales
-      originalImageDimensions = { width: currentImage.width, height: currentImage.height };
-
       // Solo redimensionar si la imagen es extremadamente grande
       // Esto mantiene la calidad original en la mayoría de casos
-      let needsResize = false;
       let ratio = 1;
 
       if (width > maxWidth || height > maxHeight) {
-        needsResize = true;
         ratio = Math.min(maxWidth / width, maxHeight / height);
         width = Math.round(width * ratio);
         height = Math.round(height * ratio);
@@ -4328,7 +4333,7 @@
      * ====================================
      */
 
-    let cropActive = false;
+    let cropActive = false; // eslint-disable-line no-unused-vars -- estado informativo del panel, se conserva para depuración
     let cropDocumentId = null;
     let cropDocumentRevision = null;
 

@@ -1547,13 +1547,14 @@ const MetadataManager = {
 
     // Acotar las lecturas contra el final del propio box: un entry_count
     // corrupto no debe leer basura de los boxes siguientes en silencio.
-    let entry_count;
+    // El valor en sí no se usa — los infe se parsean por rango — pero hay
+    // que saltar el campo para posicionar p al inicio de los boxes hijos.
     if (fb.version === 0) {
       if (p + 2 > iinfBox.end) throw new Error('iinf corrupto: lectura fuera del box');
-      entry_count = view.getUint16(p); p += 2;
+      p += 2;
     } else {
       if (p + 4 > iinfBox.end) throw new Error('iinf corrupto: lectura fuera del box');
-      entry_count = view.getUint32(p); p += 4;
+      p += 4;
     }
 
     const infeBoxes = this._parseIsobmffBoxesInRange(bytes, p, iinfBox.end);
@@ -1625,7 +1626,7 @@ const MetadataManager = {
   _buildIinfWithExtra: function(bytes, existingIinf, newInfeBytes) {
     const fb = this._readFullBoxHeader(bytes, existingIinf);
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-    let p = fb.bodyStart;
+    const p = fb.bodyStart;
     // Leer y reescribir el entry_count incrementado
     let entry_count, ecSize;
     if (fb.version === 0) {

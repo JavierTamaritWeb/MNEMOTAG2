@@ -143,7 +143,6 @@
     set currentImage(v) {
       if (typeof currentImage !== 'undefined') {
         const prev = currentImage;
-        // eslint-disable-next-line no-global-assign
         currentImage = v;
         notify('currentImage', v, prev);
       }
@@ -154,7 +153,6 @@
     set currentFile(v) {
       if (typeof currentFile !== 'undefined') {
         const prev = currentFile;
-        // eslint-disable-next-line no-global-assign
         currentFile = v;
         notify('currentFile', v, prev);
       }
@@ -175,7 +173,6 @@
     set fileBaseName(v) {
       if (typeof fileBaseName !== 'undefined') {
         const prev = fileBaseName;
-        // eslint-disable-next-line no-global-assign
         fileBaseName = v;
         notify('fileBaseName', v, prev);
       }
@@ -186,7 +183,6 @@
     set originalExtension(v) {
       if (typeof originalExtension !== 'undefined') {
         const prev = originalExtension;
-        // eslint-disable-next-line no-global-assign
         originalExtension = v || 'jpg';
         notify('originalExtension', originalExtension, prev);
       }
@@ -197,7 +193,6 @@
     set originalWidth(v) {
       if (typeof originalWidth !== 'undefined') {
         const prev = originalWidth;
-        // eslint-disable-next-line no-global-assign
         originalWidth = Number.isFinite(v) ? v : 0;
         notify('originalWidth', originalWidth, prev);
       }
@@ -208,7 +203,6 @@
     set originalHeight(v) {
       if (typeof originalHeight !== 'undefined') {
         const prev = originalHeight;
-        // eslint-disable-next-line no-global-assign
         originalHeight = Number.isFinite(v) ? v : 0;
         notify('originalHeight', originalHeight, prev);
       }
@@ -219,7 +213,6 @@
     set transformResetImage(v) {
       if (typeof transformResetImage !== 'undefined') {
         const prev = transformResetImage;
-        // eslint-disable-next-line no-global-assign
         transformResetImage = v;
         notify('transformResetImage', v, prev);
       }
@@ -258,7 +251,6 @@
     set currentRotation(v) {
       if (typeof currentRotation !== 'undefined') {
         const prev = currentRotation;
-        // eslint-disable-next-line no-global-assign
         currentRotation = v;
         notify('currentRotation', v, prev);
       }
@@ -343,7 +335,6 @@
     set customImagePosition(v) {
       if (typeof customImagePosition !== 'undefined') {
         const prev = customImagePosition;
-        // eslint-disable-next-line no-global-assign
         customImagePosition = v;
         notify('customImagePosition', v, prev);
       }
@@ -354,7 +345,6 @@
     set customTextPosition(v) {
       if (typeof customTextPosition !== 'undefined') {
         const prev = customTextPosition;
-        // eslint-disable-next-line no-global-assign
         customTextPosition = v;
         notify('customTextPosition', v, prev);
       }
@@ -365,7 +355,6 @@
     set isPositioningMode(v) {
       if (typeof isPositioningMode !== 'undefined') {
         const prev = isPositioningMode;
-        // eslint-disable-next-line no-global-assign
         isPositioningMode = v;
         notify('isPositioningMode', v, prev);
       }
@@ -376,7 +365,6 @@
     set isTextPositioningMode(v) {
       if (typeof isTextPositioningMode !== 'undefined') {
         const prev = isTextPositioningMode;
-        // eslint-disable-next-line no-global-assign
         isTextPositioningMode = v;
         notify('isTextPositioningMode', v, prev);
       }
@@ -387,7 +375,6 @@
     set lastPositioningModeActivated(v) {
       if (typeof lastPositioningModeActivated !== 'undefined') {
         const prev = lastPositioningModeActivated;
-        // eslint-disable-next-line no-global-assign
         lastPositioningModeActivated = v;
         notify('lastPositioningModeActivated', v, prev);
       }
@@ -398,7 +385,6 @@
     set showPositioningBorders(v) {
       if (typeof showPositioningBorders !== 'undefined') {
         const prev = showPositioningBorders;
-        // eslint-disable-next-line no-global-assign
         showPositioningBorders = v;
         notify('showPositioningBorders', v, prev);
       }
@@ -411,7 +397,6 @@
     set isDragging(v) {
       if (typeof isDragging !== 'undefined') {
         const prev = isDragging;
-        // eslint-disable-next-line no-global-assign
         isDragging = v;
         notify('isDragging', v, prev);
       }
@@ -422,7 +407,6 @@
     set dragTarget(v) {
       if (typeof dragTarget !== 'undefined') {
         const prev = dragTarget;
-        // eslint-disable-next-line no-global-assign
         dragTarget = v;
         notify('dragTarget', v, prev);
       }
@@ -433,7 +417,6 @@
     set textWatermarkBounds(v) {
       if (typeof textWatermarkBounds !== 'undefined') {
         const prev = textWatermarkBounds;
-        // eslint-disable-next-line no-global-assign
         textWatermarkBounds = v;
         notify('textWatermarkBounds', v, prev);
       }
@@ -444,7 +427,6 @@
     set imageWatermarkBounds(v) {
       if (typeof imageWatermarkBounds !== 'undefined') {
         const prev = imageWatermarkBounds;
-        // eslint-disable-next-line no-global-assign
         imageWatermarkBounds = v;
         notify('imageWatermarkBounds', v, prev);
       }
@@ -455,7 +437,6 @@
     set hoveredWatermark(v) {
       if (typeof hoveredWatermark !== 'undefined') {
         const prev = hoveredWatermark;
-        // eslint-disable-next-line no-global-assign
         hoveredWatermark = v;
         notify('hoveredWatermark', v, prev);
       }
@@ -466,7 +447,6 @@
     set watermarkImagePreview(v) {
       if (typeof watermarkImagePreview !== 'undefined') {
         const prev = watermarkImagePreview;
-        // eslint-disable-next-line no-global-assign
         watermarkImagePreview = v;
         notify('watermarkImagePreview', v, prev);
       }
@@ -477,7 +457,6 @@
     set textLayerBounds(v) {
       if (typeof textLayerBounds !== 'undefined') {
         const prev = textLayerBounds;
-        // eslint-disable-next-line no-global-assign
         textLayerBounds = v;
         notify('textLayerBounds', v, prev);
       }
@@ -500,7 +479,6 @@
     set outputFormat(v) {
       if (typeof outputFormat !== 'undefined') {
         const prev = outputFormat;
-        // eslint-disable-next-line no-global-assign
         outputFormat = v;
         notify('outputFormat', v, prev);
       }
@@ -511,7 +489,6 @@
     set outputQuality(v) {
       if (typeof outputQuality !== 'undefined') {
         const prev = outputQuality;
-        // eslint-disable-next-line no-global-assign
         outputQuality = v;
         notify('outputQuality', v, prev);
       }

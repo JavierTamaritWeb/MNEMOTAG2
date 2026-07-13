@@ -388,7 +388,7 @@ window.WatermarkManager = (function () {
             parseFloat(slider.step || 1)
           );
 
-          if (validatedValue !== null && validatedValue != value) {
+          if (validatedValue !== null && validatedValue !== parseFloat(value)) {
             e.target.value = validatedValue;
             slider.value = validatedValue;
             updatePreview();
@@ -572,7 +572,6 @@ window.WatermarkManager = (function () {
 
   function calculateWatermarkImageSize(img, sizeOption) {
     const canvasWidth = canvas.width;
-    const canvasHeight = canvas.height;
 
     let width, height;
 

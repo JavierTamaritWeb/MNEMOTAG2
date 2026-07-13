@@ -713,7 +713,7 @@ class BatchManager {
     // Decodificar bajo demanda desde el File original
     const img = await this.loadImageElement(imageItem.file);
     const canvas = document.createElement('canvas');
-    let exportCanvas = canvas;
+    const exportCanvas = canvas;
 
     try {
       const ctx = canvas.getContext('2d');

@@ -1,5 +1,9 @@
 'use strict';
 
+/* exported extractFileBaseName, ensureJSZip, ensureHeic2any */
+// Estas funciones se consumen desde otros archivos del bundle concatenado
+// (main.js, export-manager.js, batch-manager.js); ESLint analiza por archivo.
+
 // ===== HELPERS =====
 // Funciones utilitarias para MnemoTag v3.0
 
