@@ -1,7 +1,7 @@
 # MNEMOTAG - DOCUMENTACION TECNICA
 
-**Version:** 3.7.0
-**Ultima actualizacion:** 12 de julio de 2026
+**Version:** 3.7.1
+**Ultima actualizacion:** 13 de julio de 2026
 
 ---
 
@@ -25,6 +25,8 @@
 
 - [**AUDITORIA_V3_5_11_SOLUCIONES.md**](AUDITORIA_V3_5_11_SOLUCIONES.md) — Postmortem completo de auditoria y reauditoria, con barreras de no regresion
 - [**REGISTRO_ERRORES_V3_5_13.md**](REGISTRO_ERRORES_V3_5_13.md) — Errores de integracion de quick wins y barreras para que no se repitan
+- [**ARQUITECTURA_V3_7_1.md**](ARQUITECTURA_V3_7_1.md) — Estado observable, compositor unico y propietarios de subsistema
+- [**POSTMORTEM_V3_7_1.md**](POSTMORTEM_V3_7_1.md) — Fallos encontrados, causas raiz, metricas y checklist de release
 - [**DRAG_DROP_SYSTEM.md**](DRAG_DROP_SYSTEM.md) — Implementacion tecnica del sistema de arrastre
 - [**ZOOM_OPTIMIZADO.md**](ZOOM_OPTIMIZADO.md) — Sistema de zoom diferenciado por dispositivo
 
@@ -50,16 +52,16 @@ MNEMOTAG2/
 │   ├── index.html              # Minificado (-36%), rutas relativas
 │   ├── service-worker.js       # Rutas ajustadas a dist/
 │   ├── css/styles.css          # SCSS compilado + minificado
-│   ├── js/app.min.js           # Bundle 24 archivos + terser
+│   ├── js/app.min.js           # Bundle 36 archivos + terser
 │   ├── js/image-processor.js   # Worker copiado
 │   ├── js/workers/             # analysis-worker.js copiado
 │   └── images/                 # Originales + WebP + AVIF
 ├── js/                         # Fuentes JS (editables)
-│   ├── main.js                 # Orquestador (~7000 lineas)
-│   ├── utils/                  # 7 utilidades
-│   └── managers/               # 14 managers (IIFE)
+│   ├── main.js                 # Orquestador (menos de 5000 lineas)
+│   ├── utils/                  # Utilidades y AppState observable
+│   └── managers/               # 27 managers (IIFE)
 ├── images/                     # Imagenes fuente
-├── tests/                      # 248 Node + 92 binarias + Playwright E2E
+├── tests/                      # 283 Node + 92 binarias + Playwright en 3 motores
 └── docs/                       # Esta documentacion
 ```
 
@@ -67,13 +69,13 @@ MNEMOTAG2/
 
 ## Estadisticas
 
-- **Version:** 3.7.0
-- **Archivos JS:** 24 (bundled en app.min.js)
-- **Managers:** 14 modulos especializados
-- **Tests:** 248 Node + 92 binarias + 7 E2E en desarrollo y 7 en dist
+- **Version:** 3.7.1
+- **Archivos JS:** 36 (bundled en app.min.js)
+- **Managers:** 27 modulos especializados
+- **Tests:** 283 Node + 92 binarias + 99 casos E2E (81 ejecutados, 18 omisiones deliberadas)
 - **Build:** Gulp 5 (SCSS + JS concat + terser)
 
 ---
 
 **Autor:** Javier Tamarit
-**Ultima actualizacion:** 12 de julio de 2026
+**Ultima actualizacion:** 13 de julio de 2026

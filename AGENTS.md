@@ -11,25 +11,25 @@ MnemoTag is a **client-side, single-page** image editor (vanilla JS, no framewor
 The app is a static site with a Gulp-based build system:
 
 - **Setup:** `npm install` (one-time, installs Gulp + SCSS compiler + browser-sync).
-- **Build:** `npm run build` compiles SCSS → `dist/css/styles.css` and bundles 26 JS files → `dist/js/app.min.js`.
+- **Build:** `npm run build` compiles SCSS → `dist/css/styles.css` and bundles 36 JS files → `dist/js/app.min.js`.
 - **Dev:** `npm run dev` runs build + watch + browser-sync on port 5507 (no auto-reload).
 - **Run locally:** open `index.html` in a browser, or use `npm run serve` (browser-sync on port 5507).
 - Tests live in `tests/` and combine Node, binary, browser and Playwright runners:
   - **Browser runner (authoritative).** `tests/index.html` + `tests/test-runner.js` (~250-line custom mini-framework, zero dependencies). Serve the project root with Live Server and open `http://localhost:5505/tests/index.html`. This is the source of truth — it executes against a real DOM, real Canvas, real `fetch()`. Use it before any release.
   - **Node runner (fast / CI / agent-friendly).** `tests/run-in-node.js` runs the same `tests/specs/*.spec.js` files inside a `vm.createContext` with minimal polyfills (`document`, `localStorage`, `performance`, and `fetch` aliased to `fs.readFileSync`). Command: `node tests/run-in-node.js`. Finishes in ~80 ms. No npm, no `package.json`, no `node_modules` — uses only Node's built-in `fs`/`path`/`vm`. Use it as a smoke check before committing, or from any agent that doesn't have a browser. **Caveat:** because the DOM is stubbed, any future test that touches a real `Canvas` 2D context, real layout, or live event dispatch will pass in Node but only the browser runner can truly verify it.
-  - **Binary validation runner (low-level).** `tests/binary-validation.js` carga `helpers.js` y `metadata-manager.js` en un VM context con polyfills mínimos, sintetiza un PNG mínimo (1×1 rojo), tres WebP (VP8 lossy, VP8L lossless, VP8X extended) y un AVIF sintético (164 bytes con meta+mdat) **a mano byte por byte**, y verifica que las funciones de manipulación binaria producen output correcto. Comando: `node tests/binary-validation.js`. **86 aserciones**, ~100 ms. Importante: el orden de carga importa — `helpers.js` debe ir antes que `metadata-manager.js` porque `_buildPngExifChunk` usa `crc32`.
+  - **Binary validation runner (low-level).** `tests/binary-validation.js` carga `helpers.js` y `metadata-manager.js` en un VM context con polyfills mínimos, sintetiza un PNG mínimo (1×1 rojo), tres WebP (VP8 lossy, VP8L lossless, VP8X extended) y un AVIF sintético (164 bytes con meta+mdat) **a mano byte por byte**, y verifica que las funciones de manipulación binaria producen output correcto. Comando: `node tests/binary-validation.js`. **92 aserciones**, ~100 ms. Importante: el orden de carga importa — `helpers.js` debe ir antes que `metadata-manager.js` porque `_buildPngExifChunk` usa `crc32`.
 - **Playwright E2E:** `npm run test:e2e` prueba desarrollo y `npm run test:e2e:dist` sirve exclusivamente `dist/`. Ambos deben pasar antes de release.
 - **Linting:** `npm run lint:js` and `npm run lint:css`. ESLint 9 y Stylelint estan fijados en `devDependencies`.
 - **CI/deploy:** los workflows separados de test/lint se eliminaron en v3.5.7; `.github/workflows/deploy.yml` ejecuta checkout limpio, build, tests, lint y publica `dist/` en GitHub Pages.
-- **External deps:** Tailwind, Font Awesome, JSZip, heic2any y Google Fonts se cargan externamente. `piexifjs 1.0.6` se sirve localmente desde `js/vendor/` porque el minificado dinamico de jsDelivr no admite SRI estable.
+- **External deps:** Tailwind purgado, Font Awesome subset y `piexifjs 1.0.6` se sirven localmente. JSZip, heic2any y Google Fonts se cargan bajo demanda o desde red.
 
 ## Architecture
 
-The app is partway through a long-running modularization effort: logic is being extracted from a single monolithic `js/main.js` (~7k lines) into focused manager modules. **`main.js` is still the orchestrator** — it owns the global mutable state (current image, canvas, rotation, drag state, ruler state, etc.) and wires everything together. New managers are added to the `JS_FILES` array in `gulpfile.js` in dependency order.
+The app uses `js/main.js` (4,877 lines) as an orchestrator while focused managers own each subsystem. Shared state is accessed through observable `AppState`; preview, export and batch share `DocumentRenderer.renderDocument`. New managers are added to `JS_FILES` in dependency order. See `docs/ARQUITECTURA_V3_7_1.md`.
 
 ### Build system (v3.5.0+)
 
-- **Gulp 5** compiles SCSS → `dist/css/styles.css` and bundles 26 JS files → `dist/js/app.min.js`.
+- **Gulp 5** compiles SCSS → `dist/css/styles.css` and bundles 36 JS files → `dist/js/app.min.js`.
 - **`src/scss/`** organized in subfolders: `abstracts/_variables`, `base/_base`, `layout/_layout`, `components/_components`, `pages/_preview`, `pages/_hero`, `modules/_modals`. Edit these, NOT `dist/css/styles.css`.
 - **`gulpfile.js`** tasks: `jsBundle`, `scssCompile`, `images` (copy + WebP/AVIF via sharp), `html` (minify for production), `copyAssets` (workers + service-worker), `clean`.
 - **`dist/`** is the self-contained production directory: `npm run build` generates it. Deploy `dist/` to any static host.
@@ -53,7 +53,7 @@ js/
 │   ├── app-config.js       # AppConfig + MNEMOTAG_DEBUG flag
 │   ├── helpers.js          # debounce/throttle, formatFileSize, canvasToBlob, crc32
 │   ├── capabilities.js     # Detección de capacidades (WebP/AVIF encode, clipboard, share) — v3.7.0
-│   ├── app-state.js        # AppState singleton (getters/setters to main.js vars)
+│   ├── app-state.js        # AppState observable (getters/setters + eventos)
 │   ├── smart-debounce.js   # Adaptive debouncing for filter previews
 │   ├── filter-cache.js     # LRU cache for processed filter results
 │   ├── fallback-processor.js  # Main-thread fallback when workers unavailable
@@ -69,15 +69,24 @@ js/
     ├── filter-manager.js       # Filter pipeline + presets
     ├── ui-manager.js           # Toasts, modals, collapsible sections, hero
     ├── batch-manager.js        # Multi-image processing → ZIP export (JSZip)
+    ├── batch-ui-manager.js     # Modal, cola visual, progreso y ZIP
     ├── text-layer-manager.js   # Multi-layer text rendering with Google Fonts
+    ├── text-layer-ui-manager.js # Panel y controles de capas
+    ├── watermark-manager.js    # Config, render, bounds, drag, cache y persistencia
+    ├── document-renderer.js    # Compositor único preview/export/batch
     ├── crop-manager.js         # Aspect-ratio cropping with presets
     ├── preset-manager.js       # Filter presets in localStorage
     ├── analysis-manager.js     # Histogram, palette, auto-balance (delegates to Worker)
     ├── curves-manager.js       # Curves/levels editor with live preview
     ├── bg-removal-manager.js   # AI background removal (lazy model load)
-    ├── session-manager.js      # Restauración de sesión con IndexedDB (v3.7.0)
+    ├── session-manager.js      # Persistencia de sesión con IndexedDB
+    ├── session-coordinator.js  # Serialización/restauración de documento y formulario
     ├── export-manager.js       # Download/share with EXIF embed chain + live export estimate
-    └── zoom-pan-manager.js     # Zoom buttons/keyboard/wheel + pan navigation
+    ├── zoom-pan-manager.js     # Zoom buttons/keyboard/wheel + pan navigation
+    ├── ruler-manager.js        # Reglas métricas
+    ├── comparison-manager.js   # Comparación antes/después
+    ├── mobile-manager.js       # Pinch y adaptación móvil
+    └── editor-shortcut-manager.js # Atajos y modal generado
 ```
 
 ### Key cross-cutting state (in `main.js`)
@@ -203,7 +212,7 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 
 ## Versioning and commits
 
-**Current version: v3.7.0**.
+**Current version: v3.7.1**.
 - **v3.5.0**: Gulp 5 build system (SCSS + JS bundle + minification + browser-sync), zoom-pan-manager extracted.
 - **v3.5.1–v3.5.2**: Code audit — 4 critical + 14 moderate fixes (onclick→data-action, console guards, var→const/let, null guards).
 - **v3.5.3**: Output movido a `dist/`, SCSS reorganizado en subcarpetas (`abstracts/`, `base/`, `layout/`, `components/`, `pages/`, `modules/`).
@@ -220,8 +229,9 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 - **v3.6.1**: Fase "area de trabajo" — layout de dos columnas tras cargar (panel 380px con pestañas Metadatos/Marca/Ajustes/Exportar + canvas sticky con toolbar), indicadores de seccion modificada con restauracion por seccion (workspace-manager.js), bottom-sheet movil con barra fija Controles/Descargar, hero compacto, herramientas avanzadas en details, y criterios de aceptacion automatizados en tests/e2e/workspace.spec.js.
 - **v3.6.2**: Fix de contenido entrecortado en el panel de pestañas — las rejillas legadas (config-grid/metadata-grid/geo-grid y Tailwind md:/sm:) usan breakpoints de viewport y forzaban multicolumna dentro del panel de 380px; colapsadas a una columna, compactacion del panel/toolbar con !important para ganar a los overrides legacy por ID, fix del selector .btn:has(i:only-child) que aplastaba botones icono+texto a 48px (icon-only reales marcados con .btn-icon), presets de tamaño en columna, y barrera de regresion anti-desborde en workspace.spec.js.
 - **v3.7.0**: Fase "funcionalidad" — estimación en vivo de export (ExportManager.updateExportEstimate, sonda 480px extrapolada), Web Share API con fallback a descarga (#mobile-share-btn gateado por Capabilities), cola batch reescrita (File+dimensiones, sin base64, decodificación bajo demanda, concurrencia 2, cancelación individual), resumen previo al lote, restauración de sesión con IndexedDB (session-manager.js, autosave debounced + toast con acción Restaurar), presets completos v2 (estado íntegro de FilterManager, retrocompatible v1), detección de capacidades (capabilities.js), fix de historial (customTextPosition no se capturaba y las posiciones custom se guardaban por referencia viva), y pruebas obligatorias: EXIF byte a byte, undo tras crop/watermark, batch mixto, cancelación sin memoria retenida, fallback AVIF/WebP en Chromium+Firefox+WebKit (proyectos nuevos de Playwright).
+- **v3.7.1**: Fase "arquitectura" — WatermarkManager completo, AppState observable, compositor único DocumentRenderer para preview/export/batch, managers compartidos desacoplados de globals, main.js en 4.877 líneas, manifest único con maskable, sesión compatible con WebKit y release validado con Lighthouse/Axe/visual/memoria/E2E en tres motores.
 - **v3.4.x** (15 releases): CSP/SRI, ESLint/Stylelint CI, accessibility, curves live preview, filter presets, ImageBitmap undo/redo, 5 managers extracted, Web Worker for autoBalance, Playwright E2E, AVIF EXIF injection.
 
-**Tests**: 267/267 Node + 92/92 binarios + 35/35 E2E en desarrollo + 35/35 E2E en `dist` (smoke + axe + capturas de regresión visual + pruebas v3.7.0; el spec `format-fallback` corre además en Firefox y WebKit). Quick smoke check: `npm test`; release check: build + lint + ambos E2E. `git log` remains the authoritative source for the actual commit version.
+**Tests**: 283/283 Node + 92/92 binarios + 99 casos E2E (81 ejecutados, 18 omisiones deliberadas) en desarrollo y `dist`, con Chromium, Firefox y WebKit. Quick smoke check: `npm test`; release check: build + lint + ambos E2E. `git log` remains the authoritative source for the actual commit version.
 
 Commit messages follow `Versión X.Y.Z - <descripción>` in Spanish — match this style. `CHANGELOG.md` and the docs under `docs/` are kept hand-updated per release.

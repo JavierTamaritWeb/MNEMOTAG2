@@ -30,6 +30,8 @@ const SessionManager = {
   AUTOSAVE_DEBOUNCE_MS: 2500,
 
   _autoSaveTimer: null,
+  _pendingSave: null,
+  _lastError: null,
   _collector: null,
   _restoring: false,
 
@@ -75,8 +77,14 @@ const SessionManager = {
       return await new Promise((resolve, reject) => {
         const tx = db.transaction(this.STORE_NAME, mode);
         const request = operation(tx.objectStore(this.STORE_NAME));
-        request.onsuccess = () => resolve(request.result);
+        let result;
+        request.onsuccess = () => { result = request.result; };
         request.onerror = () => reject(request.error || new Error('Operación IndexedDB fallida'));
+        // WebKit puede disparar request.onsuccess antes de haber confirmado
+        // la transacción. Cerrar o recargar en esa ventana perdía la sesión.
+        tx.oncomplete = () => resolve(result);
+        tx.onerror = () => reject(tx.error || new Error('Transacción IndexedDB fallida'));
+        tx.onabort = () => reject(tx.error || new Error('Transacción IndexedDB abortada'));
       });
     } finally {
       try { db.close(); } catch (closeErr) { /* conexión ya cerrada */ }
@@ -91,9 +99,11 @@ const SessionManager = {
   save: async function (data) {
     if (!this.isSupported() || !data) return false;
     try {
+      this._lastError = null;
       await this._withStore('readwrite', (store) => store.put(data, this.KEY));
       return true;
     } catch (err) {
+      this._lastError = (err && (err.name || err.message)) || String(err);
       MNEMOTAG_DEBUG && console.warn('SessionManager.save: no se pudo guardar la sesión:', err);
       return false;
     }
@@ -151,13 +161,47 @@ const SessionManager = {
     if (this._autoSaveTimer) clearTimeout(this._autoSaveTimer);
     this._autoSaveTimer = setTimeout(() => {
       this._autoSaveTimer = null;
-      try {
-        const data = this._collector();
-        if (data) this.save(data);
-      } catch (err) {
-        MNEMOTAG_DEBUG && console.warn('SessionManager: autosave falló:', err);
-      }
+      const pending = Promise.resolve()
+        .then(() => this._collector())
+        .then((data) => data ? this.save(data) : false)
+        .catch((err) => {
+          this._lastError = (err && (err.name || err.message)) || String(err);
+          MNEMOTAG_DEBUG && console.warn('SessionManager: autosave falló:', err);
+          return false;
+        });
+      const tracked = pending.finally(() => {
+        if (this._pendingSave === tracked) this._pendingSave = null;
+      });
+      this._pendingSave = tracked;
     }, this.AUTOSAVE_DEBOUNCE_MS);
+  },
+
+  /**
+   * Ejecuta inmediatamente el autosave pendiente y espera al commit real de
+   * IndexedDB. Útil antes de una recarga controlada o al cerrar una tarea.
+   * @returns {Promise<boolean>}
+   */
+  flushAutoSave: async function () {
+    if (this._autoSaveTimer) {
+      clearTimeout(this._autoSaveTimer);
+      this._autoSaveTimer = null;
+      if (!this._collector || this._restoring) return false;
+      try {
+        const data = await this._collector();
+        if (!data) return false;
+        this._pendingSave = this.save(data);
+      } catch (err) {
+        MNEMOTAG_DEBUG && console.warn('SessionManager.flushAutoSave falló:', err);
+        return false;
+      }
+    }
+    if (!this._pendingSave) return true;
+    const pending = this._pendingSave;
+    try {
+      return await pending;
+    } finally {
+      if (this._pendingSave === pending) this._pendingSave = null;
+    }
   },
 
   /**
@@ -165,8 +209,21 @@ const SessionManager = {
    */
   setRestoring: function (flag) {
     this._restoring = !!flag;
+  },
+
+  getLastError: function () {
+    return this._lastError;
   }
 };
+
+// v3.7.1: SessionManager consume el AppState observable — cualquier mutación
+// de estado compartido que pase por AppState (posiciones de watermark,
+// formato/calidad, rotación...) reprograma el autosave debounced. Es un
+// complemento de los listeners DOM del panel: cubre las mutaciones
+// programáticas que no disparan eventos input/change.
+if (typeof AppState !== 'undefined' && AppState && typeof AppState.subscribe === 'function') {
+  AppState.subscribe('*', function () { SessionManager.scheduleAutoSave(); });
+}
 
 // Export para uso modular (test runner Node)
 if (typeof module !== 'undefined' && module.exports) {

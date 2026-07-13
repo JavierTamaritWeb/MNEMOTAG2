@@ -2312,3 +2312,104 @@
 [data-theme="dark"] .preview-section-fullwidth #shortcuts-help-btn {
   background: linear-gradient(135deg, #b45309 0%, #92400e 100%) !important;
 }
+
+/* Upload inicial: una fila estable en escritorio y columna fluida en móvil. */
+.upload__dropzone .text-center {
+  width: 100%;
+  min-width: 0;
+}
+
+.upload__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.upload__actions .upload__button,
+.upload__actions #open-batch-btn,
+[data-theme="dark"] .upload__actions .upload__button,
+[data-theme="dark"] .upload__actions #open-batch-btn {
+  flex: 0 1 240px;
+  width: auto;
+  min-width: 0;
+  min-height: 56px;
+  margin: 0;
+  padding: 14px 20px;
+  border-radius: 8px;
+  background: #2563eb;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+}
+
+.upload__actions .upload__button:hover,
+.upload__actions #open-batch-btn:hover,
+[data-theme="dark"] .upload__actions .upload__button:hover,
+[data-theme="dark"] .upload__actions #open-batch-btn:hover {
+  background: #1d4ed8;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
+}
+
+@media (max-width: 480px) {
+  .hero-compact {
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .hero-compact__logo {
+    width: 36px;
+    height: 36px;
+  }
+
+  .hero-compact__title {
+    font-size: 1rem;
+  }
+
+  .hero-compact #clear-all-btn {
+    justify-content: center;
+    width: 36px;
+    min-width: 36px;
+    min-height: 36px;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    font-size: 0;
+  }
+
+  .hero-compact #clear-all-btn i {
+    font-size: 0.8rem;
+  }
+
+  .upload__dropzone {
+    min-height: 0;
+    padding: 12px;
+  }
+
+  .upload__dropzone .text-center {
+    padding: 8px !important;
+  }
+
+  .upload__actions {
+    flex-direction: column;
+  }
+
+  .upload__actions .upload__button,
+  .upload__actions #open-batch-btn {
+    flex: none;
+    width: 100%;
+    min-width: 0;
+    height: 48px !important;
+    min-height: 48px;
+    max-height: 48px;
+    aspect-ratio: auto;
+    padding: 10px 12px;
+    white-space: normal;
+  }
+
+  .upload-text,
+  .upload-info {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    font-size: 0.75rem;
+  }
+}

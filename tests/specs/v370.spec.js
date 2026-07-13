@@ -246,10 +246,11 @@ describe('v3.7.0 — Regresión: cola batch sin previews base64 ni Image retenid
   });
 
   it('main.js ya no genera dataURLs por imagen del lote (FileReader)', async function () {
-    const src = await fetchV370Source('../js/main.js');
-    expect(src).not.toContain('reader.readAsDataURL(file)');
-    expect(src).toContain('addBatchImages(files)');
-    expect(src).toContain('updateBatchSummary');
+    const main = await fetchV370Source('../js/main.js');
+    const src = await fetchV370Source('../js/managers/batch-ui-manager.js');
+    expect(main).not.toContain('reader.readAsDataURL(file)');
+    expect(main).toContain('addBatchImages(files)');
+    expect(src).toContain('updateSummary');
   });
 
   it('processImage decodifica bajo demanda y libera canvas e imagen', async function () {

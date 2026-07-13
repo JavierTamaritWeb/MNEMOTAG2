@@ -1,7 +1,7 @@
 'use strict';
 
 // =============================================================================
-// MnemoTag Service Worker — v3.7.0
+// MnemoTag Service Worker — v3.7.1
 // =============================================================================
 //
 // Estrategia de cache:
@@ -27,7 +27,7 @@
 // `js/main.js`.
 // =============================================================================
 
-const CACHE_VERSION = 'mnemotag-v3.7.0';
+const CACHE_VERSION = 'mnemotag-v3.7.1';
 const CACHE_NAME_APP = CACHE_VERSION + '-app';
 const CACHE_NAME_CDN = CACHE_VERSION + '-cdn';
 
@@ -48,7 +48,9 @@ const PRECACHE_URLS = [
   './js/workers/analysis-worker.js',
   './images/favicon.svg',
   './images/favicon_io/favicon.ico',
-  './images/favicon_io/site.webmanifest',
+  './images/site.webmanifest',
+  './images/maskable-192x192.png',
+  './images/maskable-512x512.png',
   './images/applicacion.png',
   './images/applicacion.webp',
   './images/applicacion.avif'

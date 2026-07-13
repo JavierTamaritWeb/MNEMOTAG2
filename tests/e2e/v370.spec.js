@@ -173,12 +173,38 @@ test.describe('v3.7.0 — Pruebas obligatorias', () => {
     // posición (20px sobre el centro exacto, tapa el mousedown del canvas)
     // y se sitúa DENTRO del texto: a la derecha del centro y sobre la línea
     // base (el texto se dibuja hacia arriba desde la baseline del centro).
-    const box = await page.locator('#preview-canvas').boundingBox();
-    const gx = box.x + box.width * 0.65;
-    const gy = box.y + box.height / 2 - box.height * 0.08;
+    const grab = await page.evaluate(() => {
+      const canvas = document.getElementById('preview-canvas');
+      const rect = getCanvasContentRect();
+      const bounds = AppState.textWatermarkBounds || WatermarkManager.measureCurrentTextBounds();
+      return {
+        x: rect.left + (bounds.x + bounds.width * 0.5) * (rect.width / canvas.width),
+        y: rect.top + (bounds.y + bounds.height * 0.5) * (rect.height / canvas.height)
+      };
+    });
+    const gx = grab.x;
+    const gy = grab.y;
     await page.mouse.move(gx, gy);
     await page.mouse.down();
+    const dragStarted = await page.evaluate(({ clientX, clientY }) => {
+      const rect = getCanvasContentRect();
+      const canvas = document.getElementById('preview-canvas');
+      const x = (clientX - rect.left) * (canvas.width / rect.width);
+      const y = (clientY - rect.top) * (canvas.height / rect.height);
+      return { isDragging, dragTarget, hit: WatermarkManager.isPointInText(x, y), x, y };
+    }, { clientX: gx, clientY: gy });
+    expect(dragStarted, 'mousedown no inició el drag de watermark').toMatchObject({
+      isDragging: true,
+      dragTarget: 'text',
+      hit: true
+    });
     await page.mouse.move(gx + 60, gy + 60, { steps: 8 });
+    const dragMoved = await page.evaluate(() => ({
+      isDragging,
+      dragTarget,
+      position: { ...customTextPosition }
+    }));
+    expect(dragMoved.position, 'mousemove no actualizó la posición del watermark').not.toEqual(posA);
     await page.mouse.up();
     // Render final del drag + saveState debounced del nuevo estado
     await page.waitForTimeout(2000);
@@ -307,7 +333,11 @@ test.describe('v3.7.0 — Pruebas obligatorias', () => {
 
     // Editar algo identificable y dejar que el autosave (2.5s) persista
     await page.locator('#metaAuthor').fill('Sesión Persistente 370');
-    await page.waitForTimeout(4500);
+    const sessionResult = await page.evaluate(async () => ({
+      saved: await SessionManager.flushAutoSave(),
+      error: SessionManager.getLastError()
+    }));
+    expect(sessionResult, 'IndexedDB rechazó el autosave: ' + sessionResult.error).toEqual({ saved: true, error: null });
 
     // Recargar: la app ofrece restaurar la sesión guardada
     await page.reload();

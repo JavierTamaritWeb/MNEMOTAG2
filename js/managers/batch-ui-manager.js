@@ -1,0 +1,314 @@
+'use strict';
+
+window.BatchUIManager = (function () {
+  let images = [];
+  let processing = false;
+  let batchManager = null;
+  let textLayerManager = null;
+  let dependencies = {};
+
+  function configure(options) {
+    dependencies = options || {};
+    batchManager = dependencies.batchManager || batchManager;
+    textLayerManager = dependencies.textLayerManager || textLayerManager;
+  }
+
+  function open() {
+    const modal = document.getElementById('batch-modal');
+    if (!modal) return;
+    const limitInfo = document.getElementById('batch-limit-info');
+    if (limitInfo) {
+      limitInfo.textContent = 'Hasta ' + AppConfig.batchMaxImages + ' imágenes · Máx ' +
+        Math.round(AppConfig.maxFileSize / 1048576) + ' MB cada una';
+    }
+    dependencies.openModal(modal, clear, 'display');
+    setupDropzone();
+  }
+
+  function close() {
+    const modal = document.getElementById('batch-modal');
+    if (modal) dependencies.closeModal(modal);
+  }
+
+  function clear() {
+    images = [];
+    if (batchManager) batchManager.clearQueue();
+    updateList();
+  }
+
+  function setupDropzone() {
+    const dropzone = document.getElementById('batch-dropzone');
+    const input = document.getElementById('batch-file-input');
+    if (!dropzone || !input) return;
+    dropzone.onclick = () => input.click();
+    input.onchange = event => {
+      addImages(Array.from(event.target.files));
+      input.value = '';
+    };
+    dropzone.ondragover = event => {
+      event.preventDefault();
+      dropzone.classList.add('drag-over');
+    };
+    dropzone.ondragleave = event => {
+      event.preventDefault();
+      dropzone.classList.remove('drag-over');
+    };
+    dropzone.ondrop = event => {
+      event.preventDefault();
+      dropzone.classList.remove('drag-over');
+      addImages(Array.from(event.dataTransfer.files).filter(file => file.type.startsWith('image/')));
+    };
+  }
+
+  async function addImages(files) {
+    if (images.length + files.length > AppConfig.batchMaxImages) {
+      UIManager.showError('Máximo ' + AppConfig.batchMaxImages + ' imágenes por lote');
+      return;
+    }
+    for (const file of files) {
+      const validation = batchManager
+        ? await batchManager.validateImage(file)
+        : { valid: false, error: 'El procesador de lotes no está inicializado' };
+      if (!validation.valid) {
+        UIManager.showError((file.name || 'Archivo') + ': ' + validation.error);
+        continue;
+      }
+      images.push({
+        id: Date.now() + Math.random(),
+        file,
+        name: file.name,
+        size: file.size,
+        width: validation.width,
+        height: validation.height
+      });
+    }
+    updateList();
+  }
+
+  function remove(imageId) {
+    images = images.filter(image => image.id !== imageId);
+    updateList();
+  }
+
+  function appendStatus(info, image) {
+    if (!image.status) return;
+    const status = document.createElement('div');
+    status.className = 'batch-item-status batch-item-status--' + image.status;
+    status.textContent = {
+      pendiente: 'Pendiente',
+      procesando: 'Procesando…',
+      ok: 'Procesada',
+      error: 'Error',
+      cancelada: 'Cancelada'
+    }[image.status] || image.status;
+    if (image.errorMsg) status.title = image.errorMsg;
+    info.appendChild(status);
+  }
+
+  function actionButton(label, className, ariaLabel, handler) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = className;
+    button.textContent = label;
+    button.setAttribute('aria-label', ariaLabel);
+    button.addEventListener('click', handler);
+    return button;
+  }
+
+  function createItem(image) {
+    const item = document.createElement('div');
+    item.className = 'batch-item';
+    const thumbnail = document.createElement('div');
+    thumbnail.className = 'batch-item-icon';
+    const imageIcon = document.createElement('i');
+    imageIcon.className = 'fas fa-file-image';
+    imageIcon.setAttribute('aria-hidden', 'true');
+    thumbnail.appendChild(imageIcon);
+    item.appendChild(thumbnail);
+
+    const info = document.createElement('div');
+    info.className = 'batch-item-info';
+    const name = document.createElement('div');
+    name.className = 'batch-item-name';
+    name.textContent = image.name;
+    const size = document.createElement('div');
+    size.className = 'batch-item-size';
+    size.textContent = (image.width && image.height ? image.width + '×' + image.height + ' · ' : '') + formatFileSize(image.size);
+    info.append(name, size);
+    appendStatus(info, image);
+    item.appendChild(info);
+
+    if (image.status === 'error' || image.status === 'cancelada') {
+      item.appendChild(actionButton(
+        image.status === 'cancelada' ? 'Procesar' : 'Reintentar',
+        'batch-item-retry',
+        'Reintentar ' + image.name,
+        () => retry(image.id)
+      ));
+    }
+    if (image.status === 'pendiente' && processing) {
+      item.appendChild(actionButton('Cancelar', 'batch-item-retry batch-item-cancel', 'Cancelar ' + image.name, () => cancel(image.id)));
+    }
+
+    const removeButton = actionButton('', 'batch-item-remove', 'Quitar ' + image.name + ' del lote', () => remove(image.id));
+    const closeIcon = document.createElement('i');
+    closeIcon.className = 'fas fa-times';
+    closeIcon.setAttribute('aria-hidden', 'true');
+    removeButton.appendChild(closeIcon);
+    item.appendChild(removeButton);
+    return item;
+  }
+
+  function updateList() {
+    const list = document.getElementById('batch-images-list');
+    const grid = document.getElementById('batch-items');
+    if (!list || !grid) return;
+    const config = document.getElementById('batch-config');
+    const count = document.getElementById('batch-count');
+    const processButton = document.getElementById('batch-process-btn');
+    grid.replaceChildren(...images.map(createItem));
+    if (processButton) processButton.disabled = images.length === 0;
+    list.style.display = images.length ? 'block' : 'none';
+    if (config) config.style.display = images.length ? 'block' : 'none';
+    if (count) count.textContent = String(images.length);
+    updateSummary();
+  }
+
+  function updateSummary() {
+    const container = document.getElementById('batch-summary');
+    const text = document.getElementById('batch-summary-text');
+    if (!container || !text) return;
+    if (!images.length || !batchManager) {
+      container.style.display = 'none';
+      return;
+    }
+    const summary = batchManager.summarizeItems(images);
+    text.textContent = summary.count + (summary.count === 1 ? ' archivo' : ' archivos') +
+      ' · ' + summary.megapixels.toFixed(1) + ' MP totales · ~' +
+      formatFileSize(summary.estimatedDecodedBytes) + ' de memoria al decodificar · se procesarán de ' +
+      (AppConfig.batchConcurrency || 2) + ' en ' + (AppConfig.batchConcurrency || 2);
+    container.style.display = 'flex';
+  }
+
+  function cancel(imageId) {
+    if (!batchManager || !batchManager.cancelImage(imageId)) return;
+    const image = images.find(item => item.id === imageId);
+    if (image?.status === 'pendiente') image.status = 'cancelada';
+    updateList();
+  }
+
+  async function retry(imageId) {
+    const image = images.find(item => item.id === imageId);
+    if (!image || !batchManager) return;
+    image.status = 'procesando';
+    updateList();
+    try {
+      await batchManager.retryImage(imageId);
+      image.status = 'ok';
+      image.errorMsg = null;
+      UIManager.showSuccess(image.name + ' procesada correctamente');
+    } catch (error) {
+      image.status = 'error';
+      image.errorMsg = error.message;
+      UIManager.showError('No se pudo procesar ' + image.name + ': ' + error.message, {
+        action: { label: 'Reintentar', handler: () => retry(imageId) }
+      });
+    }
+    updateList();
+  }
+
+  async function process() {
+    if (!images.length) return UIManager.showError('Agrega imágenes al lote primero');
+    const processButton = document.getElementById('batch-process-btn');
+    const downloadButton = document.getElementById('batch-download-btn');
+    if (processButton) processButton.disabled = true;
+    images.forEach(image => { image.status = 'pendiente'; image.errorMsg = null; });
+    processing = true;
+    updateList();
+    dependencies.showProgress('Procesando lote (' + images.length + ' imágenes)...', {
+      onCancel: () => batchManager.requestCancel()
+    });
+    try {
+      batchManager.clearQueue();
+      batchManager.imageQueue.push(...images.map(image => ({
+        id: image.id,
+        file: image.file,
+        name: image.name,
+        size: image.size,
+        type: image.file.type,
+        width: image.width,
+        height: image.height,
+        processed: false,
+        error: null,
+        cancelled: false
+      })));
+      batchManager.captureCurrentConfig(
+        FilterManager.getFilterString() || '',
+        WatermarkManager.captureConfig(),
+        textLayerManager ? textLayerManager.getAllLayers() : [],
+        MetadataManager.getFormData ? MetadataManager.getFormData() : null
+      );
+      const result = await batchManager.processQueue(progress => {
+        dependencies.updateProgress(progress.percentage, 'Procesando imagen ' + progress.current + ' de ' + progress.total + '...');
+        const image = images.find(item => item.id === progress.id);
+        if (image) {
+          image.status = progress.lastSuccess ? 'ok' : (progress.lastCancelled ? 'cancelada' : 'error');
+          image.errorMsg = progress.lastSuccess || progress.lastCancelled ? null : progress.lastError;
+        }
+        updateList();
+      });
+      dependencies.hideProgress();
+      if (result.cancelled) UIManager.showInfo('Lote cancelado: ' + result.processed + ' de ' + result.total + ' imágenes procesadas');
+      else if (!result.failed) UIManager.showSuccess(result.processed + ' imágenes procesadas correctamente');
+      if (downloadButton && result.processed > 0) downloadButton.style.display = 'flex';
+    } catch (error) {
+      dependencies.hideProgress();
+      UIManager.showError('Error al procesar el lote: ' + error.message);
+    } finally {
+      processing = false;
+      if (processButton) processButton.disabled = false;
+      updateList();
+    }
+  }
+
+  async function downloadZip() {
+    try {
+      dependencies.showProgress('Generando ZIP...');
+      const steps = [
+        { message: 'Recopilando imágenes procesadas...', duration: 600 },
+        { message: 'Comprimiendo imágenes...', duration: 900 },
+        { message: 'Generando archivo ZIP...', duration: 900 }
+      ];
+      const [, result] = await Promise.all([
+        dependencies.simulateProgress(steps, 2400),
+        batchManager.exportToZip(null, { skipDownload: true })
+      ]);
+      dependencies.hideProgress();
+      if ('showSaveFilePicker' in window) {
+        try {
+          const handle = await window.showSaveFilePicker({
+            suggestedName: result.fileName,
+            startIn: 'desktop',
+            types: [{ description: 'Archivo ZIP', accept: { 'application/zip': ['.zip'] } }]
+          });
+          const writable = await handle.createWritable();
+          await writable.write(result.blob);
+          await writable.close();
+        } catch (error) {
+          if (error.name !== 'AbortError') throw error;
+          return;
+        }
+      } else {
+        batchManager.downloadBlob(result.blob, result.fileName);
+      }
+      UIManager.showSuccess('ZIP guardado correctamente (' + result.imageCount + ' imágenes)');
+    } catch (error) {
+      dependencies.hideProgress();
+      UIManager.showError('Error al descargar el archivo ZIP');
+    }
+  }
+
+  return { configure, open, close, clear, addImages, remove, updateList, process, downloadZip, retry, cancel };
+})();
+
+if (typeof module !== 'undefined' && module.exports) module.exports = window.BatchUIManager;

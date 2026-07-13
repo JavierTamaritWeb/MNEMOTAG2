@@ -8,21 +8,16 @@
 //   - ExportManager.downloadImageWithProgress() — igual pero con progress bar
 //   - ExportManager.downloadMultipleSizes()    — ZIP con varios tamaños
 //
-// Todas estas funciones referencian helpers y estado que siguen
-// viviendo en main.js por nombre global (mismo patrón que los otros
-// managers extraídos en v3.4.7-v3.4.9):
-//
-//   Variables let de main.js:
-//     canvas, ctx, currentImage, currentFile, fileBaseName,
-//     outputFormat, outputQuality, showPositioningBorders,
-//     lastDownloadDirectory
+// Desde v3.7.1 el estado compartido se captura exclusivamente mediante
+// AppState. Cada operación usa un snapshot coherente para no mezclar cambios
+// de formato, calidad o nombre mientras el navegador codifica el archivo.
 //
 //   Helpers de main.js / helpers.js:
 //     showError, showSuccess, showProgressBar, updateProgress,
 //     hideProgressBar, simulateProgressSteps, getMimeType,
 //     determineFallbackFormat, getFileExtension, getFlattenColor,
 //     flattenCanvasForJpeg, canvasToBlob, hasImageAlphaChannel,
-//     redrawCompleteCanvas, sanitizeFileBaseName
+//     sanitizeFileBaseName
 //
 //   Managers globales:
 //     MetadataManager, SecurityManager, UIManager
@@ -33,6 +28,27 @@
 window.ExportManager = (function () {
 
   // ── Helpers internos ──────────────────────────────────────────────────
+
+  function readExportState() {
+    return {
+      canvas: AppState.canvas,
+      currentImage: AppState.currentImage,
+      currentFile: AppState.currentFile,
+      fileBaseName: AppState.fileBaseName,
+      outputFormat: AppState.outputFormat,
+      outputQuality: AppState.outputQuality,
+      lastDownloadDirectory: AppState.lastDownloadDirectory
+    };
+  }
+
+  function renderExportDocument() {
+    const canvas = AppState.canvas;
+    if (!canvas) return false;
+    return DocumentRenderer.renderDocument(
+      DocumentRenderer.snapshot({ showPositioningBorders: AppState.showPositioningBorders }),
+      canvas
+    ).rendered;
+  }
 
   /**
    * Avisa al usuario de que el navegador no pudo codificar el formato
@@ -91,7 +107,7 @@ window.ExportManager = (function () {
    */
   function rememberDownloadLocation(handle) {
     try {
-      lastDownloadDirectory = handle;
+      AppState.lastDownloadDirectory = handle;
     } catch (err) {
       // La variable vive en main.js; en entornos de test puede no existir.
       MNEMOTAG_DEBUG && console.warn('No se pudo recordar la ubicación de descarga:', err);
@@ -99,7 +115,8 @@ window.ExportManager = (function () {
   }
 
   async function downloadMultipleSizes() {
-    if (typeof canvas === 'undefined' || !canvas || !currentImage) {
+    const { canvas, currentImage, fileBaseName, outputFormat, outputQuality } = readExportState();
+    if (!canvas || !currentImage) {
       showError('No hay imagen para exportar.');
       return;
     }
@@ -127,8 +144,8 @@ window.ExportManager = (function () {
     }
 
     try {
-      showPositioningBorders = false;
-      redrawCompleteCanvas();
+      AppState.showPositioningBorders = false;
+      renderExportDocument();
 
       const hasAlpha = hasImageAlphaChannel(canvas);
       const requestedMimeType = getMimeType(outputFormat);
@@ -213,13 +230,21 @@ window.ExportManager = (function () {
       console.error('Error en downloadMultipleSizes:', err);
       showError('Error al generar el ZIP de varios tamaños: ' + (err.message || err));
     } finally {
-      showPositioningBorders = true;
-      redrawCompleteCanvas();
+      AppState.showPositioningBorders = true;
+      renderExportDocument();
     }
   }
 
   async function downloadImage() {
-    if (typeof canvas === 'undefined' || !canvas) {
+    const {
+      canvas,
+      currentFile,
+      fileBaseName,
+      outputFormat,
+      outputQuality,
+      lastDownloadDirectory
+    } = readExportState();
+    if (!canvas) {
       showError('No hay imagen para descargar.');
       return;
     }
@@ -230,8 +255,8 @@ window.ExportManager = (function () {
     }
 
     try {
-      showPositioningBorders = false;
-      redrawCompleteCanvas();
+      AppState.showPositioningBorders = false;
+      renderExportDocument();
 
       const hasAlpha = hasImageAlphaChannel(canvas);
       const requestedMimeType = getMimeType(outputFormat);
@@ -371,13 +396,21 @@ window.ExportManager = (function () {
       if (error && error.name === 'AbortError') return;
       showDownloadError(error, downloadImage);
     } finally {
-      showPositioningBorders = true;
-      redrawCompleteCanvas();
+      AppState.showPositioningBorders = true;
+      renderExportDocument();
     }
   }
 
   async function downloadImageWithProgress() {
-    if (typeof canvas === 'undefined' || !canvas) {
+    const {
+      canvas,
+      currentFile,
+      fileBaseName,
+      outputFormat,
+      outputQuality,
+      lastDownloadDirectory
+    } = readExportState();
+    if (!canvas) {
       showError('No hay imagen para descargar.');
       return;
     }
@@ -388,8 +421,8 @@ window.ExportManager = (function () {
     }
 
     try {
-      showPositioningBorders = false;
-      redrawCompleteCanvas();
+      AppState.showPositioningBorders = false;
+      renderExportDocument();
 
       showProgressBar('Iniciando descarga...');
 
@@ -568,8 +601,8 @@ window.ExportManager = (function () {
       if (error && error.name === 'AbortError') return;
       showDownloadError(error, downloadImageWithProgress);
     } finally {
-      showPositioningBorders = true;
-      redrawCompleteCanvas();
+      AppState.showPositioningBorders = true;
+      renderExportDocument();
     }
   }
 
@@ -594,11 +627,12 @@ window.ExportManager = (function () {
   }
 
   async function updateExportEstimate() {
+    const { canvas, currentImage, outputFormat, outputQuality } = readExportState();
     const container = document.getElementById('export-estimate');
     const textEl = document.getElementById('export-estimate-text');
     if (!container || !textEl) return;
 
-    if (typeof canvas === 'undefined' || !canvas || !currentImage ||
+    if (!canvas || !currentImage ||
         canvas.width === 0 || canvas.height === 0) {
       container.hidden = true;
       return;
@@ -677,14 +711,15 @@ window.ExportManager = (function () {
   // falta de soporte real, cae a la descarga normal.
 
   async function shareImage() {
-    if (typeof canvas === 'undefined' || !canvas || !currentFile) {
+    const { canvas, currentFile, fileBaseName, outputFormat, outputQuality } = readExportState();
+    if (!canvas || !currentFile) {
       showError('No hay imagen para compartir.');
       return;
     }
 
     try {
-      showPositioningBorders = false;
-      redrawCompleteCanvas();
+      AppState.showPositioningBorders = false;
+      renderExportDocument();
 
       const hasAlpha = hasImageAlphaChannel(canvas);
       const requestedMimeType = getMimeType(outputFormat);
@@ -737,9 +772,18 @@ window.ExportManager = (function () {
         showError('No se pudo compartir ni descargar la imagen.');
       }
     } finally {
-      showPositioningBorders = true;
-      redrawCompleteCanvas();
+      AppState.showPositioningBorders = true;
+      renderExportDocument();
     }
+  }
+
+  // v3.7.1: ExportManager consume el AppState observable — cualquier cambio
+  // de formato/calidad de salida (venga del DOM, de resetOutputControls o de
+  // una restauración de sesión) reprograma la estimación en vivo sin depender
+  // de listeners DOM duplicados.
+  if (typeof AppState !== 'undefined' && AppState && typeof AppState.subscribe === 'function') {
+    AppState.subscribe('outputFormat', function () { scheduleEstimateUpdate(); });
+    AppState.subscribe('outputQuality', function () { scheduleEstimateUpdate(); });
   }
 
   return {

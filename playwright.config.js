@@ -10,8 +10,10 @@ module.exports = {
   testMatch: /.*\.spec\.js/,
   timeout: 60000,
   expect: {
-    timeout: 10000
+    timeout: 10000,
+    toHaveScreenshot: { maxDiffPixelRatio: 0.03 }
   },
+  snapshotPathTemplate: '{testDir}/{testFilePath}-snapshots/{arg}{ext}',
   use: {
     baseURL: 'http://localhost:8080',
     headless: true,
@@ -31,20 +33,18 @@ module.exports = {
   projects: [
     {
       name: 'chromium',
-      use: { browserName: 'chromium' }
+      use: {
+        browserName: 'chromium',
+        launchOptions: { args: ['--enable-precise-memory-info'] }
+      }
     },
-    // v3.7.0: el fallback de codificación AVIF/WebP difiere por motor
-    // (Chromium/Firefox/WebKit). Solo el spec de fallback corre en los
-    // tres; el resto de la suite sigue siendo Chromium-only.
     {
       name: 'firefox',
-      use: { browserName: 'firefox' },
-      testMatch: /format-fallback\.spec\.js/
+      use: { browserName: 'firefox' }
     },
     {
       name: 'webkit',
-      use: { browserName: 'webkit' },
-      testMatch: /format-fallback\.spec\.js/
+      use: { browserName: 'webkit' }
     }
   ]
 };

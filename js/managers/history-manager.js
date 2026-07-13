@@ -44,6 +44,8 @@ const historyManager = {
       if (MNEMOTAG_DEBUG) console.warn('historyManager: saveState bloqueado por isRestoring (evitando bucles)');
       return;
     }
+    const canvas = AppState.canvas;
+    const currentImage = AppState.currentImage;
     if (!canvas || !currentImage) {
       if (MNEMOTAG_DEBUG) console.warn('historyManager: No se guarda estado (canvas o imagen no cargada)');
       return;
@@ -66,10 +68,10 @@ const historyManager = {
       watermarkConfig: this.getCurrentWatermarkConfig(),
       filterState: this.getCurrentFilterState(),
       canvasFilter: canvas.style.filter || '',
-      fileBaseName: fileBaseName || 'imagen',
-      rotation: typeof currentRotation !== 'undefined' ? currentRotation : 0,
-      isFlippedHorizontally: typeof isFlippedHorizontally !== 'undefined' ? isFlippedHorizontally : false,
-      isFlippedVertically: typeof isFlippedVertically !== 'undefined' ? isFlippedVertically : false,
+      fileBaseName: AppState.fileBaseName || 'imagen',
+      rotation: AppState.currentRotation,
+      isFlippedHorizontally: AppState.isFlippedHorizontally,
+      isFlippedVertically: AppState.isFlippedVertically,
       timestamp: Date.now()
     };
 
@@ -266,11 +268,12 @@ const historyManager = {
       // drags mutan el objeto en sitio y corrompían los estados guardados.
       // Antes solo se capturaba la de imagen; la de texto no se restauraba
       // nunca (undo tras mover el texto dejaba la posición movida).
-      customPosition: (typeof customImagePosition !== 'undefined' && customImagePosition)
-        ? { x: customImagePosition.x, y: customImagePosition.y }
+      // v3.7.1: leídas vía AppState (fachada observable del estado global).
+      customPosition: (typeof AppState !== 'undefined' && AppState.customImagePosition)
+        ? { x: AppState.customImagePosition.x, y: AppState.customImagePosition.y }
         : null,
-      customTextPosition: (typeof customTextPosition !== 'undefined' && customTextPosition)
-        ? { x: customTextPosition.x, y: customTextPosition.y }
+      customTextPosition: (typeof AppState !== 'undefined' && AppState.customTextPosition)
+        ? { x: AppState.customTextPosition.x, y: AppState.customTextPosition.y }
         : null
     };
   },
@@ -280,6 +283,8 @@ const historyManager = {
    * @param {Object} state - Estado a restaurar
    */
   restoreState: function(state) {
+    const canvas = AppState.canvas;
+    const ctx = AppState.ctx;
     if (!state || !canvas) return;
 
     this.isRestoring = true;
@@ -329,11 +334,13 @@ const historyManager = {
           // v3.7.0: restaurar AMBAS posiciones custom como copias. Los
           // estados antiguos no traían customTextPosition (undefined):
           // en ese caso se deja la actual (retrocompatibilidad).
-          if (config.customPosition && typeof customImagePosition !== 'undefined') {
-            customImagePosition = { x: config.customPosition.x, y: config.customPosition.y };
+          // v3.7.1: escritas vía AppState — los setters notifican a los
+          // suscriptores (autosave de sesión, estimación de export...).
+          if (config.customPosition && typeof AppState !== 'undefined') {
+            AppState.customImagePosition = { x: config.customPosition.x, y: config.customPosition.y };
           }
-          if (config.customTextPosition !== undefined && typeof customTextPosition !== 'undefined') {
-            customTextPosition = config.customTextPosition
+          if (config.customTextPosition !== undefined && typeof AppState !== 'undefined') {
+            AppState.customTextPosition = config.customTextPosition
               ? { x: config.customTextPosition.x, y: config.customTextPosition.y }
               : null;
           }
@@ -341,9 +348,7 @@ const historyManager = {
 
         // 3. Restaurar nombre de archivo
         if (state.fileBaseName) {
-          if (typeof fileBaseName !== 'undefined') {
-            fileBaseName = state.fileBaseName;
-          }
+          AppState.fileBaseName = state.fileBaseName;
           const basenameInput = document.getElementById('file-basename');
           if (basenameInput) {
             basenameInput.value = state.fileBaseName;
@@ -373,9 +378,9 @@ const historyManager = {
 
         // 5. Restaurar rotación (v3.5.9)
         if (typeof state.rotation !== 'undefined') {
-          if (typeof currentRotation !== 'undefined') currentRotation = state.rotation;
-          if (typeof isFlippedHorizontally !== 'undefined') isFlippedHorizontally = state.isFlippedHorizontally || false;
-          if (typeof isFlippedVertically !== 'undefined') isFlippedVertically = state.isFlippedVertically || false;
+          AppState.currentRotation = state.rotation;
+          AppState.isFlippedHorizontally = state.isFlippedHorizontally || false;
+          AppState.isFlippedVertically = state.isFlippedVertically || false;
           
           if (typeof updateRotationDisplay === 'function') {
             updateRotationDisplay();

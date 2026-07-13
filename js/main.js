@@ -27,13 +27,13 @@
     let originalExtension = 'jpg';
     let lastDownloadDirectory = null;
     let fileBaseName = 'imagen'; // Nombre base del archivo (sin extensión)
-    
+
     // Variables para redimensionado
     let originalImageDimensions = { width: 0, height: 0 };
     let originalWidth = 0;
     let originalHeight = 0;
     let isResizing = false;
-    
+
     // Variables para rotación
     let currentRotation = 0; // Degrees: 0, 90, 180, 270 (solo informativo: cada op se hornea)
     // Imagen base para "restablecer rotación": se fija al cargar imagen y se
@@ -41,14 +41,14 @@
     let transformResetImage = null;
     let isFlippedHorizontally = false;
     let isFlippedVertically = false;
-    
+
     // Variables para zoom (límites en AppConfig)
     let currentZoom = 1.0;
     let minZoom = AppConfig.minZoom;
     let maxZoom = AppConfig.maxZoom;
     let zoomStep = AppConfig.zoomStep;
     let isZoomed = false;
-    
+
     // Variables para pan (navegación con zoom)
     let panX = 0; // Posición X del pan
     let panY = 0; // Posición Y del pan
@@ -57,11 +57,11 @@
     let startPanY = 0; // Posición inicial Y del mouse
     let startOffsetX = 0; // Offset inicial X
     let startOffsetY = 0; // Offset inicial Y
-    
+
     // Variables para configuración de salida
     let outputQuality = 0.8; // Valor por defecto (80%)
     let outputFormat = 'jpeg'; // Formato por defecto
-    
+
     // Variables para posicionamiento interactivo de imagen y texto
     let customImagePosition = null;
     let customTextPosition = null;
@@ -69,7 +69,7 @@
     let isTextPositioningMode = false;
     let watermarkImagePreview = null;
     let lastPositioningModeActivated = null; // 'image' o 'text' - rastrea cuál se activó último
-    
+
     // Variables para sistema Drag & Drop
     let isDragging = false;
     let dragTarget = null; // 'text' o 'image'
@@ -83,131 +83,18 @@
     // Bounds de las capas de texto para hit-testing del drag en el canvas.
     // Se recalculan cada vez que renderCanvasWithLayers() pinta las capas.
     let textLayerBounds = []; // [{ layerId, x, y, width, height }]
-    
+    let activeLayerId = null;
+
     // Variables para sistema de Reglas Métricas
     let isRulerMode = false;
-    let currentMouseX = 0;
-    let currentMouseY = 0;
-    let rulerElements = {
-      horizontalRuler: null,
-      verticalRuler: null,
-      horizontalLine: null,
-      verticalLine: null,
-      coordinateDisplay: null,
-      container: null
-    };
-    
+
     // Managers Avanzados (Nuevos)
     let keyboardShortcuts = null;
     let batchManager = null;
     let textLayerManager = null;
     let cropManager = null;
-    
+
     // HistoryManager extraído a js/managers/history-manager.js
-    
-    // Cache para optimización de rendimiento - MEJORADO
-    const cache = {
-      watermarkImage: null,
-      lastWatermarkConfig: null,
-      lastWatermarkFileKey: null,
-      processedImages: new Map(),
-      thumbnails: new Map(),
-      
-      // Configuración del cache
-      maxSize: 50, // Máximo 50 imágenes en cache
-      maxAge: 30 * 60 * 1000, // 30 minutos
-
-      // Contadores para getStats (sin inicializarlos, hitRate era siempre 0)
-      hitCount: 0,
-      missCount: 0,
-
-      // Generar clave única para cache
-      generateKey: function(config) {
-        return JSON.stringify(config);
-      },
-
-      // Obtener del cache
-      get: function(key) {
-        const item = this.processedImages.get(key);
-        if (!item) {
-          this.missCount++;
-          return null;
-        }
-
-        // Verificar si ha expirado
-        if (Date.now() - item.timestamp > this.maxAge) {
-          this.processedImages.delete(key);
-          this.missCount++;
-          return null;
-        }
-
-        // Actualizar timestamp (LRU)
-        item.timestamp = Date.now();
-        this.hitCount++;
-        return item.data;
-      },
-      
-      // Guardar en cache
-      set: function(key, data) {
-        // Limpiar cache si está lleno
-        if (this.processedImages.size >= this.maxSize) {
-          this.cleanOldest();
-        }
-        
-        this.processedImages.set(key, {
-          data: data,
-          timestamp: Date.now(),
-          size: this.estimateSize(data)
-        });
-      },
-      
-      // Limpiar entradas más antiguas
-      cleanOldest: function() {
-        let oldest = null;
-        let oldestTime = Date.now();
-        
-        for (const [key, item] of this.processedImages.entries()) {
-          if (item.timestamp < oldestTime) {
-            oldestTime = item.timestamp;
-            oldest = key;
-          }
-        }
-        
-        if (oldest) {
-          this.processedImages.delete(oldest);
-        }
-      },
-      
-      // Estimar tamaño de datos
-      estimateSize: function(data) {
-        if (typeof data === 'string') {
-          return data.length * 2; // UTF-16
-        }
-        return 1000; // Estimación por defecto
-      },
-      
-      // Limpiar cache completo
-      clear: function() {
-        this.processedImages.clear();
-        this.thumbnails.clear();
-        this.watermarkImage = null;
-        this.lastWatermarkConfig = null;
-        this.lastWatermarkFileKey = null;
-      },
-      
-      // Obtener estadísticas del cache
-      getStats: function() {
-        const totalSize = Array.from(this.processedImages.values())
-          .reduce((sum, item) => sum + (item.size || 0), 0);
-          
-        return {
-          entries: this.processedImages.size,
-          totalSize: totalSize,
-          maxSize: this.maxSize,
-          hitRate: this.hitCount / (this.hitCount + this.missCount) || 0
-        };
-      }
-    };
 
     // WorkerManager extraído a js/managers/worker-manager.js
 
@@ -224,39 +111,6 @@
     // Optimized preview update with intelligent debouncing
     const debouncedUpdatePreview = SmartDebounce.intelligent('preview-update', updatePreview, 150);
     const immediatePreviewUpdate = SmartDebounce.immediate('preview-immediate', updatePreview, 50);
-
-    // Utility functions
-    const utils = {
-      showLoading: (element) => {
-        element.classList.add('loading');
-      },
-      
-      hideLoading: (element) => {
-        element.classList.remove('loading');
-      },
-      
-      createProgressBar: (container) => {
-        const progressBar = document.createElement('div');
-        progressBar.className = 'progress-bar';
-        const progressFill = document.createElement('div');
-        progressFill.className = 'progress-fill';
-        progressFill.style.width = '0%';
-        progressBar.appendChild(progressFill);
-        container.appendChild(progressBar);
-        return progressFill;
-      },
-      
-      updateProgress: (progressElement, percentage) => {
-        progressElement.style.width = `${percentage}%`;
-      },
-      
-      removeProgress: (container) => {
-        const progressBar = container.querySelector('.progress-bar');
-        if (progressBar) {
-          progressBar.remove();
-        }
-      }
-    };
 
     document.addEventListener('DOMContentLoaded', function() {
       initializeApp();
@@ -282,119 +136,14 @@
     // UIManager extraído a js/managers/ui-manager.js
 
     // ================================================================
-    // Persistencia del formulario de watermark en localStorage.
-    // Los datos se mantienen entre reloads y sesiones hasta que el
-    // usuario pulse el botón "Limpiar" explícitamente.
+    // Persistencia y formulario de watermark: extraídos a
+    // js/managers/watermark-manager.js (v3.7.1). Delegados finos para
+    // conservar los call sites históricos de main.js.
     // ================================================================
 
-    const WATERMARK_STORAGE_KEY = 'mnemotag-watermark-state';
-    const WATERMARK_PERSIST_FIELDS = [
-      'watermark-text-enabled',
-      'watermark-image-enabled',
-      'watermark-auto-scale',
-      'watermark-text',
-      'watermark-font',
-      'watermark-color',
-      'watermark-position',
-      'watermark-size',
-      'watermark-opacity',
-      'watermark-image-size',
-      'watermark-image-opacity',
-      'watermark-image-position',
-      'watermark-image-width',
-      'watermark-image-height'
-    ];
-
-    function setupWatermarkPersistence() {
-      let saveTimer = null;
-      const handler = function () {
-        if (saveTimer) clearTimeout(saveTimer);
-        saveTimer = setTimeout(function () {
-          saveTimer = null;
-          const state = {};
-          WATERMARK_PERSIST_FIELDS.forEach(function (id) {
-            const el = document.getElementById(id);
-            if (!el) return;
-            if (el.type === 'checkbox') {
-              state[id] = el.checked;
-            } else {
-              state[id] = el.value;
-            }
-          });
-          try {
-            localStorage.setItem(WATERMARK_STORAGE_KEY, JSON.stringify(state));
-          } catch (e) { /* localStorage lleno o no disponible */ }
-        }, 500);
-      };
-
-      WATERMARK_PERSIST_FIELDS.forEach(function (id) {
-        const el = document.getElementById(id);
-        if (el) {
-          el.addEventListener('input', handler);
-          el.addEventListener('change', handler);
-        }
-      });
-    }
-
-    function restoreWatermarkState() {
-      try {
-        const raw = localStorage.getItem(WATERMARK_STORAGE_KEY);
-        if (!raw) return;
-        const state = JSON.parse(raw);
-        if (!state || typeof state !== 'object') return;
-
-        WATERMARK_PERSIST_FIELDS.forEach(function (id) {
-          if (state[id] === undefined) return;
-          const el = document.getElementById(id);
-          if (!el) return;
-          if (el.type === 'checkbox') {
-            el.checked = !!state[id];
-          } else {
-            el.value = state[id];
-          }
-        });
-
-        // Sincronizar los campos numéricos espejo (range ↔ number).
-        const syncPairs = [
-          ['watermark-size', 'watermark-size-num'],
-          ['watermark-opacity', 'watermark-opacity-num'],
-          ['watermark-image-opacity', 'watermark-image-opacity-num']
-        ];
-        syncPairs.forEach(function (pair) {
-          const slider = document.getElementById(pair[0]);
-          const num = document.getElementById(pair[1]);
-          if (slider && num) num.value = slider.value;
-        });
-
-        // Disparar los toggles de visibilidad del form para que la UI
-        // refleje el estado restaurado (ej: mostrar/ocultar los campos
-        // de texto o imagen según los checkboxes).
-        if (typeof toggleWatermarkType === 'function') {
-          toggleWatermarkType();
-        }
-      } catch (e) {
-        MNEMOTAG_DEBUG && console.warn('restoreWatermarkState: error restaurando:', e);
-      }
-    }
-
-    function clearWatermarkState() {
-      try { localStorage.removeItem(WATERMARK_STORAGE_KEY); } catch (e) { MNEMOTAG_DEBUG && console.warn('localStorage op failed:', e); }
-      const form = document.getElementById('watermark-form');
-      if (form) form.reset();
-      const syncPairs = [
-        ['watermark-size', 'watermark-size-num'],
-        ['watermark-opacity', 'watermark-opacity-num'],
-        ['watermark-image-opacity', 'watermark-image-opacity-num']
-      ];
-      syncPairs.forEach(function (pair) {
-        const slider = document.getElementById(pair[0]);
-        const num = document.getElementById(pair[1]);
-        if (slider && num) num.value = slider.value;
-      });
-      if (typeof toggleWatermarkType === 'function') {
-        toggleWatermarkType();
-      }
-    }
+    function setupWatermarkPersistence() { WatermarkManager.setupWatermarkPersistence(); }
+    function restoreWatermarkState() { WatermarkManager.restoreWatermarkState(); }
+    function clearWatermarkState() { WatermarkManager.clearWatermarkState(); }
 
     /**
      * Limpia ABSOLUTAMENTE TODOS los datos de la app:
@@ -516,8 +265,8 @@
       });
 
       // 9. Limpiar caché LRU local (processedImages, thumbnails, watermarkImage)
-      safe('cache.clear', function () {
-        if (cache && typeof cache.clear === 'function') cache.clear();
+      safe('WatermarkManager.clearCache', function () {
+        WatermarkManager.clearCache();
       });
 
       // 10. Limpiar FilterCache (LRU de estados de filtros)
@@ -625,46 +374,46 @@
     })();
 
     function initializeApp() {
-      
+
       try {
         // Inicializar UI dinámica desde AppConfig
         initializeUIFromConfig();
-        
+
         // Obtener elementos del DOM
         canvas = document.getElementById('preview-canvas');
         if (!canvas) {
           throw new Error('Canvas element not found');
         }
-        
-        ctx = canvas.getContext('2d', { 
+
+        ctx = canvas.getContext('2d', {
           alpha: true,
           willReadFrequently: false // Optimizar para escritura, no lectura frecuente
         });
         if (!ctx) {
           throw new Error('Canvas context not available');
         }
-        
+
         // Configurar renderizado de alta calidad
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
-        
+
         // Configurar event listeners
         setupEventListeners();
-        
+
         // Configurar event listeners de filtros con delay para asegurar DOM
         setTimeout(() => {
           setupFilterListeners();
         }, 500);
-        
+
         // Configurar collapsibles
         setupCollapsibles();
-        
+
         // Configurar validación en tiempo real
         setupFormValidation();
-        
+
         // Configurar interceptores de errores globales
         setupGlobalErrorHandling();
-        
+
         // Cargar metadatos guardados (v3.3.5: ahora restaura todos los
         // campos textuales, no solo el autor)
         MetadataManager.loadSavedMetadata();
@@ -679,22 +428,22 @@
 
         // Initialize character counters
         initCharacterCounters();
-        
+
         // Initialize rotation functionality
         initRotation();
-        
+
         // Initialize zoom keyboard shortcuts
         initZoomKeyboardShortcuts();
-        
+
         // Initialize mouse wheel zoom
         initMouseWheelZoom();
-        
+
         // Initialize pan navigation
         initPanNavigation();
-        
+
         // Initialize mobile responsive features
         initMobileFeatures();
-        
+
         // Inicializar estado de marcas de agua
         setTimeout(() => {
           toggleWatermarkType();
@@ -705,7 +454,7 @@
           // Inicializar controles de salida
           initializeOutputControls();
         }, 100);
-        
+
         // Inicializar managers avanzados
         initializeAdvancedManagers();
 
@@ -824,14 +573,14 @@
         // Initialize quality control
         const qualitySelect = document.getElementById('output-quality');
         const qualityNumber = document.getElementById('quality-number');
-        
+
         if (qualitySelect && qualityNumber) {
           // Set default value
           qualitySelect.value = '80';
           qualityNumber.value = '80';
           handleQualityChange();
         }
-        
+
         // Initialize format control
         const formatSelect = document.getElementById('output-format');
         if (formatSelect) {
@@ -849,10 +598,10 @@
           }
           handleFormatChange();
         }
-        
+
         // Check format support and disable unsupported formats
         checkAndUpdateFormatSupport();
-        
+
       } catch (error) {
         console.error('Error initializing output controls:', error);
       }
@@ -862,16 +611,16 @@
     async function checkAndUpdateFormatSupport() {
       const formatSelect = document.getElementById('output-format');
       if (!formatSelect) return;
-      
+
       const formats = [
         { value: 'webp', mimeType: 'image/webp' },
         { value: 'avif', mimeType: 'image/avif' }
       ];
-      
+
       for (const format of formats) {
         const isEncodeSupported = await supportsEncode(format.mimeType);
         const option = formatSelect.querySelector(`option[value="${format.value}"]`);
-        
+
         if (option) {
           if (!isEncodeSupported) {
             // NO deshabilitar la opción, solo agregar información
@@ -886,21 +635,21 @@
           }
         }
       }
-      
+
     }
 
     // Funciones del tema oscuro
     function initializeTheme() {
       const themeToggle = document.getElementById('theme-toggle');
       const themeIcon = document.getElementById('theme-icon');
-      
+
       // Cargar tema guardado o usar preferencia del sistema
       const savedTheme = localStorage.getItem('theme');
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
       const currentTheme = savedTheme || (prefersDark ? 'dark' : 'light');
-      
+
       setTheme(currentTheme);
-      
+
       // Escuchar cambios en las preferencias del sistema
       window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
         if (!localStorage.getItem('theme')) {
@@ -912,7 +661,7 @@
     function setTheme(theme) {
       const themeIcon = document.getElementById('theme-icon');
       const html = document.documentElement;
-      
+
       if (theme === 'dark') {
         html.setAttribute('data-theme', 'dark');
         if (themeIcon) {
@@ -924,7 +673,7 @@
           themeIcon.className = 'fas fa-moon';
         }
       }
-      
+
       localStorage.setItem('theme', theme);
     }
 
@@ -963,7 +712,7 @@
 
           // Actualizar el placeholder del campo título
           titleInput.placeholder = fileNameWithoutExtension;
-          
+
           // Establecer el título inicial como el nombre del archivo (sin extensión)
           if (!titleInput.value.trim()) {
             titleInput.value = fileNameWithoutExtension;
@@ -973,7 +722,7 @@
     }
 
     // Security Manager extraído a js/managers/security-manager.js
-    
+
     // Form Validation Manager
     const FormValidator = {
       // Mostrar errores de validación
@@ -992,7 +741,7 @@
 
         // Insertar después del campo
         field.parentNode.insertBefore(errorElement, field.nextSibling);
-        
+
         // Agregar clase de error al campo
         field.classList.add('field-invalid');
       },
@@ -1001,11 +750,11 @@
       clearFieldError: function(fieldId) {
         const field = document.getElementById(fieldId);
         const errorElement = document.getElementById(`${fieldId}-error`);
-        
+
         if (field) {
           field.classList.remove('field-invalid');
         }
-        
+
         if (errorElement) {
           errorElement.remove();
         }
@@ -1044,7 +793,7 @@
 
     function setupEventListeners() {
       try {
-        
+
         // Configurar listeners para controles de filtros
         ['brightness', 'contrast', 'saturation', 'blur'].forEach(filter => {
           const slider = document.getElementById(filter);
@@ -1060,7 +809,7 @@
             });
           }
         });
-        
+
         // Configurar presets de filtros
         const presetButtons = document.querySelectorAll('.filter-preset');
         presetButtons.forEach(btn => {
@@ -1072,7 +821,7 @@
             }
           });
         });
-        
+
         // Listener para reset de filtros
         const resetFiltersBtn = document.getElementById('resetFilters');
         if (resetFiltersBtn) {
@@ -1084,20 +833,20 @@
             }
           });
         }
-        
+
         // Listeners para metadatos y geolocalización
         const autocopyrightBtn = document.getElementById('autoCopyright');
         if (autocopyrightBtn) {
           autocopyrightBtn.addEventListener('click', generateAutoCopyright);
         }
-        
+
         const getCurrentLocationBtn = document.getElementById('getCurrentLocation');
         if (getCurrentLocationBtn) {
           getCurrentLocationBtn.addEventListener('click', () => {
             MetadataManager.getCurrentLocation();
           });
         }
-        
+
         // Auto-actualizar copyright cuando cambia el autor
         const authorInput = document.getElementById('metaAuthor');
         if (authorInput) {
@@ -1109,7 +858,7 @@
             }
           });
         }
-        
+
         // Auto-actualizar copyright cuando cambia la licencia
         const licenseSelect = document.getElementById('metaLicense');
         if (licenseSelect) {
@@ -1122,13 +871,13 @@
             }
           });
         }
-        
+
         // Upload de archivos con optimización
         const dropArea = document.getElementById('drop-area');
         const fileInput = document.getElementById('file-input');
         const fileSelector = document.getElementById('file-selector');
         const removeFile = document.getElementById('remove-file');
-        
+
         // Solo configurar si los elementos existen
         if (dropArea && fileInput && fileSelector && removeFile) {
           // Simplified drag and drop without throttling for testing
@@ -1363,11 +1112,11 @@
         // Form submissions with loading states
         const metadataForm = document.getElementById('metadata-form');
         const watermarkForm = document.getElementById('watermark-form');
-        
+
         if (metadataForm) {
           metadataForm.addEventListener('submit', handleMetadataSubmit);
         }
-        
+
         if (watermarkForm) {
           watermarkForm.addEventListener('submit', handleWatermarkSubmit);
         }
@@ -1384,29 +1133,29 @@
           zoomOutBtn.addEventListener('click', zoomOut);
           zoomResetBtn.addEventListener('click', resetZoom);
         }
-        
+
         if (rulerToggleBtn) {
           rulerToggleBtn.addEventListener('click', toggleRulerMode);
         }
-        
+
         // Watermark type toggle
         const textEnabledCheckbox = document.getElementById('watermark-text-enabled');
         const imageEnabledCheckbox = document.getElementById('watermark-image-enabled');
-        
+
         if (textEnabledCheckbox) {
           textEnabledCheckbox.addEventListener('change', toggleWatermarkType);
         }
-        
+
         if (imageEnabledCheckbox) {
           imageEnabledCheckbox.addEventListener('change', toggleWatermarkType);
         }
-        
+
         // Custom image size toggle
         const watermarkImageSize = document.getElementById('watermark-image-size');
         if (watermarkImageSize) {
           watermarkImageSize.addEventListener('change', toggleCustomImageSize);
         }
-        
+
         // Real-time controls with debouncing for better performance - con verificación de existencia
         const controls = [
           { id: 'watermark-text-enabled', event: 'change' },
@@ -1424,7 +1173,7 @@
           { id: 'watermark-image-width', event: 'input' },
           { id: 'watermark-image-height', event: 'input' }
         ];
-        
+
         controls.forEach(({ id, event }) => {
           const element = document.getElementById(id);
           if (element) {
@@ -1446,12 +1195,12 @@
               element.addEventListener(event, async (e) => {
                 const fontFamily = e.target.value;
                 const googleFonts = ['Roboto', 'Montserrat', 'Montserrat Alternates', 'Open Sans', 'Lato', 'Poppins', 'Inter', 'Playfair Display', 'Bebas Neue', 'Dancing Script', 'Lobster'];
-                
+
                 if (googleFonts.includes(fontFamily)) {
                   try {
                     const fontUrl = `https://fonts.googleapis.com/css2?family=${fontFamily.replace(/ /g, '+')}:wght@300;400;600;700&display=swap`;
                     const existingLink = document.querySelector(`link[href*="${fontFamily.replace(/ /g, '+')}"]`);
-                    
+
                     if (!existingLink) {
                       const link = document.createElement('link');
                       link.rel = 'stylesheet';
@@ -1471,77 +1220,77 @@
             }
           }
         });
-        
+
         // Posicionamiento personalizado para imagen
         const watermarkImagePosition = document.getElementById('watermark-image-position');
         if (watermarkImagePosition) {
           watermarkImagePosition.addEventListener('change', togglePositioningMode);
         }
-        
+
         // Posicionamiento personalizado para texto
         const watermarkTextPosition = document.getElementById('watermark-position');
         if (watermarkTextPosition) {
           watermarkTextPosition.addEventListener('change', toggleTextPositioningMode);
         }
-        
+
         // Event listener para el canvas en modo posicionamiento
         if (canvas) {
           canvas.addEventListener('click', handleCanvasClick);
-          
+
           // Event listeners para sistema Drag & Drop (Mouse)
           canvas.addEventListener('mousedown', handleDragStart);
           canvas.addEventListener('mousemove', handleDragMove);
           canvas.addEventListener('mouseup', handleDragEnd);
           canvas.addEventListener('mouseleave', handleDragEnd); // Finalizar drag si sale del canvas
-          
+
           // Event listeners para sistema Drag & Drop (Touch)
           canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
           canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
           canvas.addEventListener('touchend', handleTouchEnd);
           canvas.addEventListener('touchcancel', handleTouchEnd);
         }
-        
+
         // Image watermark controls
         const watermarkImage = document.getElementById('watermark-image');
         if (watermarkImage) {
           watermarkImage.addEventListener('change', handleWatermarkImageChange);
         }
-        
+
         // Action buttons
         const resetChangesBtn = document.getElementById('reset-changes');
         const downloadImageBtn = document.getElementById('download-image');
         const undoBtn = document.getElementById('undo-btn');
         const redoBtn = document.getElementById('redo-btn');
-        
+
         if (resetChangesBtn) {
           resetChangesBtn.addEventListener('click', resetChanges);
         }
-        
+
         if (downloadImageBtn) {
           // v3.4.10: delegado a ExportManager
           downloadImageBtn.addEventListener('click', function () { ExportManager.downloadImageWithProgress(); });
         }
-        
+
         if (undoBtn) {
           undoBtn.addEventListener('click', () => historyManager.undo());
         }
-        
+
         if (redoBtn) {
           redoBtn.addEventListener('click', () => historyManager.redo());
         }
-        
+
         // Advanced Tools buttons (v3.1)
         const batchModeBtn = document.getElementById('batch-mode-btn');
         const textLayersBtn = document.getElementById('text-layers-btn');
         const cropModeBtn = document.getElementById('crop-mode-btn');
         const shortcutsHelpBtn = document.getElementById('shortcuts-help-btn');
-        
+
         if (batchModeBtn) {
           // v3.4.20: llamada directa en lugar de via window.openBatchModal
           // para evitar timing issue si initializeAdvancedUI() aún no se ejecutó.
           batchModeBtn.addEventListener('click', () => openBatchModal());
         }
-        
+
         if (textLayersBtn) {
           textLayersBtn.addEventListener('click', () => openTextLayersPanel());
         }
@@ -1553,15 +1302,15 @@
         if (shortcutsHelpBtn) {
           shortcutsHelpBtn.addEventListener('click', () => openShortcutsModal());
         }
-        
+
         // Compare and fullscreen buttons
         const fullscreenBtn = document.getElementById('fullscreen-btn');
-        
-        
+
+
         if (fullscreenBtn) {
           fullscreenBtn.addEventListener('click', toggleFullscreen);
         }
-        
+
         // Theme toggle button - CRÍTICO PARA EL MODO OSCURO
         const themeToggle = document.getElementById('theme-toggle');
         if (themeToggle) {
@@ -1569,7 +1318,7 @@
         } else {
           console.error('Botón de tema no encontrado');
         }
-        
+
         // Output configuration controls
         const outputQualitySelect = document.getElementById('output-quality');
         const outputQualityNumber = document.getElementById('quality-number');
@@ -1579,7 +1328,7 @@
           outputQualitySelect.addEventListener('input', handleQualityChange);
           outputQualitySelect.addEventListener('change', handleQualityChange);
         }
-        
+
         if (outputQualityNumber) {
           outputQualityNumber.addEventListener('input', handleQualityNumberChange);
           outputQualityNumber.addEventListener('change', handleQualityNumberChange);
@@ -1591,7 +1340,7 @@
             }
           });
         }
-        
+
         if (outputFormatSelect) {
           outputFormatSelect.addEventListener('change', handleFormatChange);
         }
@@ -1606,14 +1355,14 @@
         if (outputQualitySelect) outputQualitySelect.addEventListener('input', scheduleEstimate);
         if (outputQualityNumber) outputQualityNumber.addEventListener('input', scheduleEstimate);
         if (outputFormatSelect) outputFormatSelect.addEventListener('change', scheduleEstimate);
-        
+
         // File basename editor
         const fileBasenameInput = document.getElementById('file-basename');
         if (fileBasenameInput) {
           fileBasenameInput.addEventListener('input', handleFileBaseNameInput);
           fileBasenameInput.addEventListener('blur', handleFileBaseNameBlur);
         }
-        
+
         // Nota: el header "output" ya queda cableado por setupCollapsibles()
         // (click delegado + keydown); cablearlo aquí duplicaba el toggle y
         // Enter/Espacio abría y cerraba la sección en el mismo evento.
@@ -1625,7 +1374,7 @@
 
         // Setup bidirectional sync for watermark sliders
         setupWatermarkSliderSync();
-        
+
       } catch (error) {
         console.error('Error configurando event listeners:', error);
       }
@@ -1642,130 +1391,22 @@
     }
 
     // Configurar sincronización bidireccional para sliders de marca de agua
-    function setupWatermarkSliderSync() {
-      
-      // Definir los sliders que necesitan sincronización
-      const sliderConfigs = [
-        { sliderId: 'watermark-size', numberId: 'watermark-size-num' },
-        { sliderId: 'watermark-opacity', numberId: 'watermark-opacity-num' },
-        { sliderId: 'watermark-image-opacity', numberId: 'watermark-image-opacity-num' }
-      ];
-      
-      sliderConfigs.forEach(({ sliderId, numberId }) => {
-        const slider = document.getElementById(sliderId);
-        const numberInput = document.getElementById(numberId);
-        
-        if (slider && numberInput) {
-          
-          // Copiar atributos del slider al input numérico
-          numberInput.min = slider.min;
-          numberInput.max = slider.max;
-          numberInput.step = slider.step || 1;
-          
-          // Sincronizar valores iniciales
-          numberInput.value = slider.value;
-          
-          // Función para validar y clamp valores
-          const validateAndClamp = (value, min, max, step = 1) => {
-            const numValue = parseFloat(value);
-            if (isNaN(numValue)) return null;
-            
-            // Clamp al rango
-            const clampedValue = Math.max(min, Math.min(max, numValue));
-            
-            // Redondear al step más cercano
-            const stepValue = Math.round(clampedValue / step) * step;
-            
-            return Math.max(min, Math.min(max, stepValue));
-          };
-          
-          // Crear debounced update function para el input numérico
-          const debouncedNumberUpdate = SmartDebounce.intelligent(`${sliderId}-number-update`, () => {
-            updatePreview();
-          }, 150);
-          
-          // Slider → Number input
-          slider.addEventListener('input', (e) => {
-            numberInput.value = e.target.value;
-          });
-          
-          // Number input → Slider
-          numberInput.addEventListener('input', (e) => {
-            const value = e.target.value;
-            
-            // Si el campo está vacío, no hacer nada hasta que sea válido
-            if (value === '') return;
-            
-            const validatedValue = validateAndClamp(
-              value,
-              parseFloat(slider.min),
-              parseFloat(slider.max),
-              parseFloat(slider.step || 1)
-            );
-            
-            if (validatedValue !== null) {
-              slider.value = validatedValue;
-              e.target.value = validatedValue;
-              
-              // Aplicar cambios con debounce
-              debouncedNumberUpdate();
-            }
-          });
-          
-          // Validación en blur para corregir valores inválidos
-          numberInput.addEventListener('blur', (e) => {
-            const value = e.target.value;
-            
-            if (value === '' || isNaN(parseFloat(value))) {
-              // Si está vacío o inválido, restaurar al valor del slider
-              e.target.value = slider.value;
-              return;
-            }
-            
-            const validatedValue = validateAndClamp(
-              value,
-              parseFloat(slider.min),
-              parseFloat(slider.max),
-              parseFloat(slider.step || 1)
-            );
-            
-            if (validatedValue !== null && validatedValue != value) {
-              e.target.value = validatedValue;
-              slider.value = validatedValue;
-              updatePreview();
-            }
-          });
-          
-          // Manejar Enter key
-          numberInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-              e.target.blur();
-            }
-          });
-          
-        } else {
-          MNEMOTAG_DEBUG && console.warn(`❌ No se pudo configurar sincronización para ${sliderId}:`, {
-            slider: !!slider,
-            numberInput: !!numberInput
-          });
-        }
-      });
-    }
+    function setupWatermarkSliderSync() { WatermarkManager.setupWatermarkSliderSync(); }
 
     // Configurar listeners de filtros con retraso para asegurar que el DOM esté listo
     function setupFilterListeners() {
-      
+
       // Listeners para los sliders de filtros
       const filterSliders = ['brightness', 'contrast', 'saturation', 'blur'];
       filterSliders.forEach(filterId => {
         const slider = document.getElementById(filterId);
         const valueDisplay = document.getElementById(filterId + '-value');
-        
+
         if (slider && valueDisplay) {
           slider.addEventListener('input', (e) => {
             const value = e.target.value;
             valueDisplay.textContent = value;
-            
+
             if (typeof FilterManager !== 'undefined' && FilterManager.applyFilter) {
               FilterManager.applyFilter();
             } else {
@@ -1778,14 +1419,14 @@
           MNEMOTAG_DEBUG && console.warn(`    - ValueDisplay encontrado: ${!!valueDisplay}`);
         }
       });
-      
+
       // Listeners para los botones de presets
       const presetButtons = document.querySelectorAll('.preset-btn');
-      
+
       presetButtons.forEach(btn => {
         btn.addEventListener('click', (e) => {
           const preset = e.target.dataset.preset;
-          
+
           if (typeof FilterManager !== 'undefined' && FilterManager.applyPreset) {
             FilterManager.applyPreset(preset);
           } else {
@@ -1793,7 +1434,7 @@
           }
         });
       });
-      
+
       // Listener para el botón de reset
       const resetBtn = document.getElementById('resetFilters');
       if (resetBtn) {
@@ -1807,56 +1448,7 @@
       }
     }
 
-    function handleWatermarkImageChange() {
-      // Clear cache when new image is selected
-      cache.watermarkImage = null;
-      cache.lastWatermarkConfig = null;
-      cache.lastWatermarkFileKey = null;
-      
-      // Update button label with filename
-      const watermarkInput = document.getElementById('watermark-image');
-      const labelSpan = document.getElementById('watermark-file-label');
-      const uploadLabel = document.getElementById('watermark-upload-label');
-      const thumbnailElement = document.getElementById('watermark-preview-thumb');
-      
-      if (watermarkInput && labelSpan) {
-        if (watermarkInput.files && watermarkInput.files[0]) {
-          const fileName = watermarkInput.files[0].name;
-          const shortName = fileName.length > 25 ? fileName.substring(0, 22) + '...' : fileName;
-          labelSpan.textContent = shortName;
-          
-          // Cambiar botón a verde
-          if (uploadLabel) {
-            uploadLabel.classList.add('watermark-loaded');
-          }
-          
-          // Mostrar miniatura
-          if (thumbnailElement) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-              thumbnailElement.src = e.target.result;
-              thumbnailElement.style.display = 'block';
-            };
-            reader.readAsDataURL(watermarkInput.files[0]);
-          }
-        } else {
-          labelSpan.textContent = 'Seleccionar archivo';
-          
-          // Restaurar botón a rojo
-          if (uploadLabel) {
-            uploadLabel.classList.remove('watermark-loaded');
-          }
-          
-          // Ocultar miniatura
-          if (thumbnailElement) {
-            thumbnailElement.style.display = 'none';
-            thumbnailElement.src = '';
-          }
-        }
-      }
-      
-      debouncedUpdatePreview();
-    }
+    function handleWatermarkImageChange() { WatermarkManager.handleWatermarkImageChange(); }
 
     // Output configuration handlers
     function handleQualityChange() {
@@ -1864,21 +1456,21 @@
       const qualityNumber = document.getElementById('quality-number');
       const qualityPercentage = document.getElementById('quality-percentage');
       const qualityBar = document.getElementById('quality-bar');
-      
+
       if (!qualitySelect || !qualityNumber || !qualityPercentage || !qualityBar) return;
-      
+
       const qualityValue = parseInt(qualitySelect.value);
-      outputQuality = qualityValue / 100;
-      
+      AppState.outputQuality = qualityValue / 100;
+
       // Sync the number input with slider
       qualityNumber.value = qualityValue;
-      
+
       // Update percentage display
       qualityPercentage.textContent = qualityValue + '%';
-      
+
       // Update progress bar with smooth animation
       qualityBar.style.width = qualityValue + '%';
-      
+
       // Update color based on quality with more nuanced ranges
       if (qualityValue <= 30) {
         qualityPercentage.className = 'text-sm font-bold text-red-600';
@@ -1891,31 +1483,31 @@
       } else {
         qualityPercentage.className = 'text-sm font-bold text-green-600';
       }
-      
+
       // Update the slider track color dynamically
       updateSliderBackground(qualityValue);
-      
+
     }
 
     function handleQualityNumberChange() {
       const qualitySelect = document.getElementById('output-quality');
       const qualityNumber = document.getElementById('quality-number');
-      
+
       if (!qualitySelect || !qualityNumber) return;
-      
+
       let qualityValue = parseInt(qualityNumber.value);
-      
+
       // Validate and constrain the value
       if (isNaN(qualityValue) || qualityValue < 1) {
         qualityValue = 1;
       } else if (qualityValue > 100) {
         qualityValue = 100;
       }
-      
+
       // Update both inputs
       qualityNumber.value = qualityValue;
       qualitySelect.value = qualityValue;
-      
+
       // Trigger the main quality change handler
       handleQualityChange();
     }
@@ -1923,13 +1515,13 @@
     function updateSliderBackground(value) {
       const slider = document.getElementById('output-quality');
       if (!slider) return;
-      
+
       // Create a dynamic gradient based on the current value
       const percentage = value / 100;
       const hue1 = 0;   // Red
-      const hue2 = 45;  // Orange/Yellow  
+      const hue2 = 45;  // Orange/Yellow
       const hue3 = 120; // Green
-      
+
       let currentHue;
       if (percentage <= 0.5) {
         // Interpolate between red and yellow
@@ -1938,10 +1530,10 @@
         // Interpolate between yellow and green
         currentHue = hue2 + (hue3 - hue2) * ((percentage - 0.5) * 2);
       }
-      
+
       const saturation = 70;
       const lightness = 55;
-      
+
       // Update CSS custom property for dynamic coloring
       slider.style.setProperty('--slider-color', `hsl(${currentHue}, ${saturation}%, ${lightness}%)`);
     }
@@ -1953,22 +1545,22 @@
       const formatDescription = document.getElementById('format-description');
       const formatCompatibility = document.getElementById('format-compatibility');
       const formatFallback = document.getElementById('format-fallback');
-      
+
       if (!formatSelect || !formatInfo || !formatTitle || !formatDescription || !formatCompatibility) return;
-      
-      outputFormat = formatSelect.value;
-      
+
+      AppState.outputFormat = formatSelect.value;
+
       // Remove previous format classes
       formatInfo.className = formatInfo.className.replace(/format-\w+/g, '');
       formatInfo.classList.add('p-3', 'border', 'rounded-md', `format-${outputFormat}`);
-      
+
       // Update format information
       const formatData = await getFormatInfo(outputFormat);
       formatTitle.textContent = formatData.title;
       formatDescription.textContent = formatData.description;
       formatCompatibility.textContent = formatData.compatibility;
       formatCompatibility.className = `text-xs mt-1 font-medium ${formatData.compatibilityClass}`;
-      
+
       // Show fallback information if applicable
       if (formatFallback) {
         if (formatData.fallbackMessage) {
@@ -1978,7 +1570,7 @@
           formatFallback.style.display = 'none';
         }
       }
-      
+
     }
 
     async function getFormatInfo(format) {
@@ -2012,9 +1604,9 @@
           fallbackMessage: null
         }
       };
-      
+
       const formatData = baseFormatInfo[format] || baseFormatInfo.jpeg;
-      
+
       // Check actual browser support for modern formats
       if (format === 'webp') {
         const isSupported = await supportsEncode('image/webp');
@@ -2031,7 +1623,7 @@
           formatData.fallbackMessage = 'ℹ️ Se exportará automáticamente en WebP, PNG o JPEG según disponibilidad';
         }
       }
-      
+
       return formatData;
     }
 
@@ -2044,21 +1636,21 @@
     function handleFileBaseNameInput(event) {
       const rawValue = event.target.value;
       const sanitized = sanitizeFileBaseName(rawValue);
-      
+
       // Actualizar valor si fue sanitizado
       if (sanitized !== rawValue) {
         event.target.value = sanitized;
       }
-      
+
       // Actualizar variable global inmediatamente
       fileBaseName = sanitized || 'imagen';
-      
+
       // Validar y actualizar estado
       validateAndUpdateFileBaseName(sanitized);
-      
+
       // Actualizar preview del nombre final
       updateFilenamePreview();
-      
+
     }
 
     /**
@@ -2067,7 +1659,7 @@
      */
     function handleFileBaseNameBlur(event) {
       const value = event.target.value.trim();
-      
+
       if (!value) {
         // Si está vacío, usar fallback
         event.target.value = 'imagen';
@@ -2083,9 +1675,9 @@
     function validateAndUpdateFileBaseName(basename) {
       const errorElement = document.getElementById('file-basename-error');
       const downloadBtn = document.getElementById('download-image');
-      
+
       const isValid = SecurityManager.isValidFileBaseName(basename);
-      
+
       if (isValid) {
         // Nombre válido
         fileBaseName = basename;
@@ -2093,12 +1685,12 @@
           errorElement.classList.add('hidden');
           errorElement.textContent = '';
         }
-        
+
         // Habilitar descarga si hay imagen
         if (downloadBtn && currentImage) {
           downloadBtn.disabled = false;
         }
-        
+
       } else {
         // Nombre inválido
         const errorMsg = SecurityManager.getFileBaseNameError(basename);
@@ -2106,11 +1698,11 @@
           errorElement.textContent = errorMsg;
           errorElement.classList.remove('hidden');
         }
-        
+
         // Usar fallback para evitar bloquear completamente
         fileBaseName = 'imagen';
       }
-      
+
       // Actualizar preview del nombre final
       updateFilenamePreview();
     }
@@ -2121,13 +1713,13 @@
     function updateFilenamePreview() {
       const previewElement = document.getElementById('filename-preview');
       const previewTextElement = document.getElementById('filename-preview-text');
-      
+
       if (!previewElement || !previewTextElement) return;
-      
+
       if (currentImage) {
         const extension = getFileExtension(outputFormat);
         const finalName = `${fileBaseName}.${extension}`;
-        
+
         previewTextElement.textContent = finalName;
         previewElement.classList.remove('hidden');
       } else {
@@ -2141,19 +1733,19 @@
      */
     function setupInitialFileBaseName(file) {
       if (!file || !file.name) return;
-      
+
       const originalBaseName = extractFileBaseName(file.name);
       const sanitizedBaseName = sanitizeFileBaseName(originalBaseName);
-      
+
       fileBaseName = sanitizedBaseName;
-      
+
       // Actualizar input del nombre
       const basenameInput = document.getElementById('file-basename');
       if (basenameInput) {
         basenameInput.value = sanitizedBaseName;
         basenameInput.placeholder = sanitizedBaseName;
       }
-      
+
       // Validar el nombre inicial
       validateAndUpdateFileBaseName(sanitizedBaseName);
     }
@@ -2165,17 +1757,17 @@
 
     function setupCollapsibles() {
       const sections = ['metadata', 'watermark', 'filters', 'output'];
-      
+
       // Usar delegación de eventos en el documento para capturar TODOS los clicks
       document.addEventListener('click', (e) => {
         // Buscar si el click fue en un header o dentro de uno
         const header = e.target.closest('.section__header');
         if (!header) return;
-        
+
         // Obtener el ID del header y extraer el nombre de la sección
         const headerId = header.id;
         if (!headerId || !headerId.endsWith('-header')) return;
-        
+
         const section = headerId.replace('-header', '');
         if (sections.includes(section)) {
           e.preventDefault();
@@ -2183,21 +1775,21 @@
           toggleCollapsible(section);
         }
       }, true);
-      
+
       // Configurar estilos y estado inicial de cada sección
       sections.forEach(section => {
         const header = document.getElementById(`${section}-header`);
         const content = document.getElementById(`${section}-content`);
-        
+
         if (!header || !content) {
           MNEMOTAG_DEBUG && console.warn(`No se encontró header o content para sección: ${section}`);
           return;
         }
-        
+
         // Verificar estado inicial y sincronizar
         const isOpen = content.classList.contains('section__content--open');
         const icon = header.querySelector('.section__icon');
-        
+
         // Sincronizar ícono con estado inicial
         if (icon) {
           if (isOpen) {
@@ -2206,12 +1798,12 @@
             icon.classList.add('section__icon--collapsed');
           }
         }
-        
+
         // Hacer que el header sea más interactivo
         header.style.cursor = 'pointer';
         header.style.position = 'relative';
         header.style.zIndex = '100';
-        
+
         // Keyboard support directo en el header
         header.addEventListener('keydown', (e) => {
           if (e.key === 'Enter' || e.key === ' ') {
@@ -2225,15 +1817,15 @@
     function toggleCollapsible(section) {
       const header = document.getElementById(`${section}-header`);
       const content = document.getElementById(`${section}-content`);
-      
+
       if (!header || !content) {
         return;
       }
-      
+
       const icon = header.querySelector('.section__icon');
       const card = header.closest('.card');
       const isOpen = content.classList.contains('section__content--open');
-      
+
       if (isOpen) {
         content.classList.remove('section__content--open');
         if (icon) icon.classList.add('section__icon--collapsed');
@@ -2262,7 +1854,7 @@
     function handleDrop(e) {
       e.preventDefault();
       document.getElementById('drop-area')?.classList.remove('upload__dropzone--active');
-      
+
       const files = e.dataTransfer.files;
       if (files.length > 0) {
         handleFile(files[0]);
@@ -2430,7 +2022,7 @@
 
       // Validación completa del archivo
       const validation = SecurityManager.validateImageFile(file);
-      
+
       if (!validation.isValid) {
         // Mostrar errores específicos con detalles
         validation.errors.forEach(error => {
@@ -2454,7 +2046,7 @@
 
       // Mostrar preview del archivo antes de cargar
       UIManager.showLoadingState('Generando preview...');
-      
+
       SecurityManager.generateFilePreview(file, function(previewData, error) {
         if (error) {
           UIManager.hideLoadingState();
@@ -2525,7 +2117,7 @@
             align-items: center;
             justify-content: center;
           }
-          
+
           .preview-overlay {
             position: fixed;
             top: 0;
@@ -2539,7 +2131,7 @@
             justify-content: center;
             z-index: 9999;
           }
-          
+
           .file-preview-modal .preview-container {
             position: relative;
             background: var(--bg-card, #ffffff);
@@ -2553,7 +2145,7 @@
             flex-direction: column;
             z-index: 10000;
           }
-          
+
           .file-preview-modal .preview-header {
             padding: 20px;
             border-bottom: 1px solid var(--border-color, #e2e8f0);
@@ -2562,14 +2154,14 @@
             align-items: center;
             background: var(--bg-secondary, #f8f9fa);
           }
-          
+
           .file-preview-modal .preview-header h3 {
             margin: 0;
             color: var(--text-primary, #0f172a);
             font-size: 1.25rem;
             font-weight: 600;
           }
-          
+
           .file-preview-modal .preview-close {
             background: none;
             border: none;
@@ -2581,11 +2173,11 @@
             transition: color 0.2s ease;
             flex-shrink: 0;
           }
-          
+
           .file-preview-modal .preview-close:hover {
             color: var(--text-primary, #0f172a);
           }
-          
+
           .file-preview-modal .preview-content {
             padding: 20px;
             display: flex;
@@ -2593,7 +2185,7 @@
             flex: 1;
             overflow: auto;
           }
-          
+
           .file-preview-modal .preview-image-container {
             flex: 1;
             display: flex;
@@ -2603,47 +2195,47 @@
             border-radius: 8px;
             min-height: 200px;
           }
-          
+
           .file-preview-modal .preview-image {
             max-width: 100%;
             max-height: 300px;
             border-radius: 4px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
           }
-          
+
           .file-preview-modal .preview-info {
             flex: 1;
             min-width: 250px;
           }
-          
+
           .file-preview-modal .preview-info h4 {
             margin: 0 0 12px 0;
             color: var(--text-primary, #0f172a);
             font-size: 1rem;
             font-weight: 600;
           }
-          
+
           .file-preview-modal .preview-info ul {
             list-style: none;
             padding: 0;
             margin: 0;
           }
-          
+
           .file-preview-modal .preview-info li {
             padding: 6px 0;
             color: var(--text-secondary, #64748b);
             font-size: 0.875rem;
             border-bottom: 1px solid var(--border-color, #e2e8f0);
           }
-          
+
           .file-preview-modal .preview-info li:last-child {
             border-bottom: none;
           }
-          
+
           .file-preview-modal .preview-info strong {
             color: var(--text-primary, #0f172a);
           }
-          
+
           .file-preview-modal .preview-actions {
             padding: 20px;
             border-top: 1px solid var(--border-color, #e2e8f0);
@@ -2652,63 +2244,63 @@
             gap: 12px;
             background: var(--bg-secondary, #f8f9fa);
           }
-          
+
           @media (max-width: 768px) {
             .file-preview-modal .preview-container {
               width: 95%;
               max-height: 90vh;
             }
-            
+
             .file-preview-modal .preview-content {
               flex-direction: column;
               padding: 15px;
             }
-            
+
             .file-preview-modal .preview-header {
               padding: 10px 12px;
             }
-            
+
             .file-preview-modal .preview-header h3 {
               font-size: 0.875rem;
               line-height: 1.2;
               margin: 0;
             }
-            
+
             .file-preview-modal .preview-close {
               font-size: 14px;
               padding: 2px 4px;
               margin-left: 8px;
               flex-shrink: 0;
             }
-            
+
             .file-preview-modal .preview-actions {
               padding: 12px;
               flex-direction: column;
             }
-            
+
             .file-preview-modal .preview-actions button {
               width: 100%;
             }
-            
+
             .file-preview-modal .preview-info {
               min-width: auto;
             }
-            
+
             .file-preview-modal .preview-info h4 {
               font-size: 0.875rem;
             }
-            
+
             .file-preview-modal .preview-info li {
               font-size: 0.75rem;
               padding: 4px 0;
             }
           }
-          
+
           @media (max-width: 480px) {
             .file-preview-modal .preview-header h3 {
               font-size: 0.8rem;
             }
-            
+
             .file-preview-modal .preview-close {
               font-size: 12px;
             }
@@ -2851,12 +2443,12 @@
           }
 
           currentImage = img;
-          comparisonNeedsUpdate = true;
-          
+          ComparisonManager.invalidate();
+
           // Store original dimensions for resize functionality
           originalWidth = img.width;
           originalHeight = img.height;
-          
+
           // Reset rotation state when loading new image
           currentRotation = 0;
           isFlippedHorizontally = false;
@@ -2868,21 +2460,21 @@
           const sanitizedFileName = SecurityManager.sanitizeText(fileName);
           const fileNameElement = document.getElementById('file-name');
           const fileInfoElement = document.getElementById('file-info');
-          
+
           if (fileNameElement) {
             fileNameElement.textContent = sanitizedFileName;
           }
-          
+
           if (fileInfoElement) {
             fileInfoElement.classList.remove('file-info--hidden');
           }
-          
+
           // Cambiar botón a verde y mostrar miniatura
           const uploadButton = document.getElementById('file-selector');
           if (uploadButton) {
             uploadButton.classList.add('image-loaded');
           }
-          
+
           // Mostrar miniatura de la imagen
           const thumbnailElement = document.getElementById('file-preview-thumbnail');
           if (thumbnailElement) {
@@ -2899,7 +2491,7 @@
           } else {
             cleanup();
           }
-          
+
           // Establecer título inicial si está vacío
           const titleInput = document.getElementById('metaTitle');
           if (titleInput && !titleInput.value.trim()) {
@@ -2907,7 +2499,7 @@
             titleInput.value = SecurityManager.sanitizeText(nameWithoutExt);
             titleInput.placeholder = nameWithoutExt;
           }
-          
+
           // Mostrar editor
           const editorContainer = document.getElementById('editor-container');
           if (editorContainer) {
@@ -2921,13 +2513,13 @@
           if (typeof WorkspaceManager !== 'undefined') {
             setTimeout(() => WorkspaceManager.captureBaselines(), 150);
           }
-          
+
           // Mostrar controles de zoom
           const zoomControls = document.getElementById('zoom-controls');
           if (zoomControls) {
             zoomControls.classList.remove('hidden');
           }
-          
+
           // Configurar canvas
           setupCanvas();
 
@@ -2953,31 +2545,31 @@
 
           // Mostrar información de la imagen
           updateImageInfo();
-          
+
           // Initialize resize functionality
           initResize();
-          
+
           // Update resize inputs with original dimensions
           const widthInput = document.getElementById('resize-width');
           const heightInput = document.getElementById('resize-height');
           if (widthInput) widthInput.value = originalWidth;
           if (heightInput) heightInput.value = originalHeight;
-          
+
           // Update rotation display
           updateRotationDisplay();
-          
+
           // Actualizar vista previa
           updatePreview();
-          
+
           // Limpiar estado de carga
           UIManager.hideLoadingState();
-          
+
           // Inicializar historial con estado inicial
           setTimeout(() => {
             historyManager.clear();
             historyManager.saveState();
           }, 100);
-          
+
         } catch (error) {
           cleanup();
           UIManager.hideLoadingState();
@@ -2985,12 +2577,12 @@
           UIManager.showError('Error al configurar la imagen. Por favor, inténtalo de nuevo.');
         }
       };
-      
+
       img.onerror = function() {
         UIManager.hideLoadingState();
         UIManager.showError('Error al cargar la imagen. El archivo puede estar corrupto.');
       };
-      
+
       // Timeout para imágenes que no cargan
       const timeout = setTimeout(() => {
         if (!img.complete) {
@@ -3002,7 +2594,7 @@
           UIManager.showError('La carga de la imagen está tomando demasiado tiempo. Por favor, inténtalo de nuevo.');
         }
       }, 10000);
-      
+
       // Limpiar timeout cuando la imagen se carga exitosamente
       const originalOnload = img.onload;
       img.onload = function() {
@@ -3020,33 +2612,33 @@
 
     function setupCanvas() {
       if (!currentImage) return;
-      
+
       // Usar dimensiones originales de la imagen para mantener calidad máxima
       // Solo limitar en casos extremos (imágenes muy grandes)
       const maxWidth = AppConfig.maxCanvasWidth || 2400;
       const maxHeight = AppConfig.maxCanvasHeight || 2400;
-      
+
       let { width, height } = currentImage;
-      
+
       // Guardar dimensiones originales
       originalImageDimensions = { width: currentImage.width, height: currentImage.height };
-      
+
       // Solo redimensionar si la imagen es extremadamente grande
       // Esto mantiene la calidad original en la mayoría de casos
       let needsResize = false;
       let ratio = 1;
-      
+
       if (width > maxWidth || height > maxHeight) {
         needsResize = true;
         ratio = Math.min(maxWidth / width, maxHeight / height);
         width = Math.round(width * ratio);
         height = Math.round(height * ratio);
       }
-      
+
       // Configurar canvas con dimensiones calculadas
       canvas.width = width;
       canvas.height = height;
-      
+
       // Para pantallas pequeñas, ajustar solo la visualización CSS, no el canvas interno
       // Esto mantiene la calidad mientras se adapta a la pantalla
       if (window.innerWidth <= 768) {
@@ -3088,12 +2680,12 @@
       }
 
       canvas.style.maxWidth = '100%';
-      
+
       // Mejorar calidad de renderizado del canvas
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = 'high';
-      
-      
+
+
     }
 
     /**
@@ -3167,6 +2759,56 @@
       }
     }
 
+    /**
+     * v3.7.1: COMPOSITOR ÚNICO del documento.
+     *
+     * Todos los caminos de render que parten de la imagen base decodificada
+     * (preview estándar, redibujado para export, render con capas de texto,
+     * render ligero durante drag de capas) pasan por aquí. Antes cada camino
+     * duplicaba la secuencia clear → drawImage → watermarks → filtros y las
+     * variantes divergían con el tiempo.
+     *
+     * NO cubre el camino con worker (updatePreviewWithWorker): ese parte de
+     * píxeles ya horneados (putImageData), no de la imagen base.
+     *
+     * @param {Object} [state] - Qué pasadas aplicar:
+     *   - watermarks:  bool ('true' por defecto) — marcas de agua de texto/imagen.
+     *   - cssFilters:  'full' | 'light' | 'none' ('full' por defecto) — filtros
+     *                  CSS sobre el canvas visible ('light' = solo los que el
+     *                  worker no hornea).
+     *   - textLayers:  'none' | 'full' | 'light' ('none' por defecto) — capas
+     *                  de texto ('light' = sin efectos, para drag a 60 fps).
+     * @param {HTMLCanvasElement} [targetCanvas] - Canvas destino (por defecto
+     *   el canvas principal).
+     * @returns {boolean} true si se pintó, false si faltaba imagen/canvas.
+     */
+    function renderMainDocument(state = {}, targetCanvas = canvas) {
+      const options = Object.assign({
+        watermarks: true,
+        cssFilters: 'full',
+        textLayers: 'full'
+      }, state);
+      const result = DocumentRenderer.renderDocument({
+        sourceImage: currentImage,
+        referenceWidth: canvas ? canvas.width : 0,
+        referenceHeight: canvas ? canvas.height : 0,
+        filterString: options.cssFilters === 'none' ? '' : FilterManager.getFilterString(),
+        watermarks: WatermarkManager.captureConfig(),
+        watermarkMode: options.watermarks ? 'full' : 'none',
+        textLayers: textLayerManager ? textLayerManager.getAllLayers() : [],
+        textLayerMode: options.textLayers,
+        showPositioningBorders: AppState.showPositioningBorders
+      }, targetCanvas);
+
+      if (targetCanvas === canvas) {
+        canvas.style.filter = '';
+        AppState.textWatermarkBounds = result.watermarkBounds?.text || null;
+        AppState.imageWatermarkBounds = result.watermarkBounds?.image || null;
+        AppState.textLayerBounds = result.textLayerBounds || [];
+      }
+      return result.rendered;
+    }
+
     // Actualización estándar del preview (sin worker)
     function updatePreviewStandard() {
       // Coalescing: si ya hay un RAF en vuelo, no encolamos otro.
@@ -3176,16 +2818,11 @@
       requestAnimationFrame(() => {
         pendingPreviewRender = false;
         try {
-          // Clear canvas with optimized method
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-          // Draw image with better quality
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
-          ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
-
-          // Apply watermark with caching
-          applyWatermarkOptimized();
+          // Composición única: imagen base + watermarks. Durante un drag
+          // activo se saltan los filtros CSS y el saveState (P2): son los
+          // dos puntos calientes. Al soltar, handleDragEnd dispara un
+          // updatePreview() final completo.
+          renderMainDocument({ cssFilters: isDragging ? 'none' : 'full' });
 
           // Sincronizar overlays DOM con la posición actual cuando estamos
           // en modo personalizado (S1). Antes solo se actualizaban durante el
@@ -3199,13 +2836,7 @@
             showPositionMarker();
           }
 
-          // Saltar trabajo costoso durante un drag activo (P2):
-          // los filtros CSS y el saveState con canvas.toDataURL() son los
-          // dos puntos calientes. Al soltar el drag, handleDragEnd dispara
-          // un updatePreview() final completo.
           if (!isDragging) {
-            applyCanvasFilters();
-
             if (typeof debouncedSaveHistory === 'undefined') {
               window.debouncedSaveHistory = SmartDebounce.intelligent('save-history', () => {
                 historyManager.saveState();
@@ -3219,7 +2850,7 @@
         }
       });
     }
-    
+
     // Contador de secuencia para descartar resultados obsoletos del worker
     let updatePreviewWithWorkerSeq = 0;
 
@@ -3231,7 +2862,7 @@
         tempCanvas.width = canvas.width;
         tempCanvas.height = canvas.height;
         const tempCtx = tempCanvas.getContext('2d');
-        
+
         // Dibujar imagen base
         tempCtx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
         const imageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
@@ -3251,18 +2882,29 @@
           return;
         }
 
-        // Aplicar resultado en el canvas principal
+        // Aplicar resultado mediante el compositor único. El worker entrega
+        // la imagen base con los filtros pesados ya horneados; renderDocument
+        // añade los filtros ligeros restantes, watermarks y capas de texto.
         requestAnimationFrame(() => {
           if (seq !== updatePreviewWithWorkerSeq) return;
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.putImageData(processedImageData, 0, 0);
-          
-          // Aplicar marcas de agua después del procesamiento
-          applyWatermarkOptimized();
-          
-          // Aplicar filtros CSS restantes (no pesados)
-          applyCanvasFiltersLight();
-          
+          const processedCanvas = document.createElement('canvas');
+          processedCanvas.width = canvas.width;
+          processedCanvas.height = canvas.height;
+          processedCanvas.getContext('2d').putImageData(processedImageData, 0, 0);
+          const result = DocumentRenderer.renderDocument({
+            sourceImage: processedCanvas,
+            referenceWidth: canvas.width,
+            referenceHeight: canvas.height,
+            filterString: getCanvasFiltersLight(),
+            watermarks: WatermarkManager.captureConfig(),
+            textLayers: textLayerManager ? textLayerManager.getAllLayers() : [],
+            showPositioningBorders: AppState.showPositioningBorders
+          }, canvas);
+          canvas.style.filter = '';
+          AppState.textWatermarkBounds = result.watermarkBounds?.text || null;
+          AppState.imageWatermarkBounds = result.watermarkBounds?.image || null;
+          AppState.textLayerBounds = result.textLayerBounds || [];
+
           // Save state to history
           if (typeof debouncedSaveHistory === 'undefined') {
             window.debouncedSaveHistory = SmartDebounce.intelligent('save-history', () => {
@@ -3270,9 +2912,9 @@
             }, 1000);
           }
           debouncedSaveHistory();
-          
+
         });
-        
+
       } catch (error) {
         MNEMOTAG_DEBUG && console.warn('⚠️ Worker falló, usando fallback:', error);
         updatePreviewStandard();
@@ -3280,561 +2922,22 @@
     }
 
     // Funciones de posicionamiento personalizado (deben estar antes de apply)
-    function getImageWatermarkPosition(position, width, height) {
-      // Si es posición personalizada, usar las coordenadas del clic
-      if (position === 'custom' && customImagePosition) {
-        return {
-          x: customImagePosition.x - width / 2,
-          y: customImagePosition.y - height / 2
-        };
-      }
+    // Posicionamiento y render de watermarks: extraídos a
+    // js/managers/watermark-manager.js (v3.7.1).
+    function getImageWatermarkPosition(position, width, height) { return WatermarkManager.getImageWatermarkPosition(position, width, height); }
+    function getTextWatermarkPosition(position, width, height) { return WatermarkManager.getTextWatermarkPosition(position, width, height); }
+    function applyWatermarkOptimized() { WatermarkManager.applyWatermarkOptimized(); }
 
-      // Posicionamiento propio para imágenes (top-left origin, no baseline).
-      // getWatermarkPosition usa fórmulas de baseline de texto (y = margin + height)
-      // que hacen que las imágenes se desborden del canvas en posiciones bottom-*.
-      const cw = canvas.width;
-      const ch = canvas.height;
-      const m = 20;
-      switch (position) {
-        case 'top-left':      return { x: m, y: m };
-        case 'top-center':    return { x: (cw - width) / 2, y: m };
-        case 'top-right':     return { x: cw - width - m, y: m };
-        case 'center-left':   return { x: m, y: (ch - height) / 2 };
-        case 'center':        return { x: (cw - width) / 2, y: (ch - height) / 2 };
-        case 'center-right':  return { x: cw - width - m, y: (ch - height) / 2 };
-        case 'bottom-left':   return { x: m, y: ch - height - m };
-        case 'bottom-center': return { x: (cw - width) / 2, y: ch - height - m };
-        case 'bottom-right':  return { x: cw - width - m, y: ch - height - m };
-        default:              return { x: (cw - width) / 2, y: (ch - height) / 2 };
-      }
-    }
-
-    function getTextWatermarkPosition(position, width, height) {
-      // Si es posición personalizada, usar las coordenadas del clic
-      if (position === 'custom' && customTextPosition) {
-        return {
-          x: customTextPosition.x - width / 2,
-          y: customTextPosition.y
-        };
-      }
-      
-      // Si no, usar la función estándar
-      return getWatermarkPosition(position, width, height);
-    }
-
-    function applyWatermarkOptimized() {
-      const textEnabled = document.getElementById('watermark-text-enabled')?.checked;
-      const imageEnabled = document.getElementById('watermark-image-enabled')?.checked;
-      
-      // Aplicar marca de agua de texto si está habilitada
-      if (textEnabled) {
-        applyTextWatermarkOptimized();
-      }
-      
-      // Aplicar marca de agua de imagen si está habilitada
-      if (imageEnabled) {
-        applyImageWatermarkOptimized();
-      }
-    }
-    
-    // Función auxiliar para redibujar el canvas completo desde cero
-    function redrawCompleteCanvas() {
-      if (!canvas || !ctx || !currentImage) {
-        MNEMOTAG_DEBUG && console.warn('⚠️ No se puede redibujar: canvas, ctx o currentImage no disponibles');
-        return;
-      }
-      
-      // 1. Limpiar canvas completamente
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      // 2. Redibujar imagen base con alta calidad
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
-      
-      // 3. Aplicar marcas de agua (respetará showPositioningBorders)
-      applyWatermarkOptimized();
-      
-      // 4. Aplicar filtros CSS si existen
-      applyCanvasFilters();
-    }
-
-    function applyTextWatermarkOptimized() {
-      const text = document.getElementById('watermark-text')?.value.trim();
-      if (!text) {
-        textWatermarkBounds = null; // No hay texto, limpiar bounds
-        return;
-      }
-
-      const font = document.getElementById('watermark-font')?.value;
-      const color = document.getElementById('watermark-color')?.value;
-      let size = parseInt(document.getElementById('watermark-size')?.value, 10);
-      const opacity = parseInt(document.getElementById('watermark-opacity')?.value) / 100;
-      const position = document.getElementById('watermark-position')?.value;
-
-      // v3.3.5: Auto-escala del texto según el tamaño de la imagen.
-      // Sin esto, size=24 se ve enorme en imágenes 800×600 y diminuto en 4K.
-      // Referencia: 1000 px de ancho = factor 1 (sin cambios). El tamaño
-      // mínimo aplicado es 8 px para que nunca sea ilegible.
-      const autoScaleEl = document.getElementById('watermark-auto-scale');
-      if (autoScaleEl && autoScaleEl.checked && canvas && canvas.width > 0) {
-        const factor = canvas.width / 1000;
-        size = Math.max(8, Math.round(size * factor));
-      }
-
-      // Cache font configuration for better performance
-      const fontConfig = `${size}px ${font}`;
-      ctx.font = fontConfig;
-      ctx.fillStyle = color;
-      ctx.globalAlpha = opacity;
-      
-      // Add text shadow for better visibility
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-      ctx.shadowBlur = 2;
-      ctx.shadowOffsetX = 1;
-      ctx.shadowOffsetY = 1;
-      
-      // Calculate position with better precision
-      const textMetrics = ctx.measureText(text);
-      const textWidth = textMetrics.width;
-      const textHeight = size;
-      
-      // Usar función específica para texto que soporta posición personalizada
-      const positions = getTextWatermarkPosition(position, textWidth, textHeight);
-      
-      // Guardar bounds para detección de drag & drop
-      textWatermarkBounds = {
-        x: positions.x,
-        y: positions.y - textHeight, // Ajuste porque fillText dibuja desde la baseline
-        width: textWidth,
-        height: textHeight
-      };
-      
-      // Draw text with enhanced quality
-      ctx.fillText(text, positions.x, positions.y);
-      
-      // Si está en modo personalizado Y showPositioningBorders es true, dibujar borde indicador.
-      // v3.3.5: si el ratón está sobre el texto (hoveredWatermark === 'text'),
-      // el borde se pinta más intenso para feedback visual.
-      if (position === 'custom' && showPositioningBorders) {
-        const isHover = hoveredWatermark === 'text';
-        ctx.save();
-        ctx.strokeStyle = isHover
-          ? 'rgba(59, 130, 246, 0.95)'  // Azul intenso al hover
-          : 'rgba(59, 130, 246, 0.5)';   // Azul semi-transparente normal
-        ctx.lineWidth = isHover ? 3 : 2;
-        ctx.setLineDash([5, 5]); // Línea punteada
-        ctx.strokeRect(
-          textWatermarkBounds.x - 5,
-          textWatermarkBounds.y - 5,
-          textWatermarkBounds.width + 10,
-          textWatermarkBounds.height + 10
-        );
-        ctx.restore();
-      }
-      
-      // Reset shadow and opacity
-      ctx.shadowColor = 'transparent';
-      ctx.shadowBlur = 0;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 0;
-      ctx.globalAlpha = 1;
-    }
-
-    function applyImageWatermarkOptimized() {
-      const watermarkImageInput = document.getElementById('watermark-image');
-      if (!watermarkImageInput.files[0]) return;
-      
-      const wmFile = watermarkImageInput.files[0];
-      const currentConfig = {
-        file: wmFile,
-        opacity: document.getElementById('watermark-image-opacity')?.value,
-        size: document.getElementById('watermark-image-size')?.value,
-        position: document.getElementById('watermark-image-position')?.value,
-        width: document.getElementById('watermark-image-width')?.value,
-        height: document.getElementById('watermark-image-height')?.value,
-        customPosition: customImagePosition ? JSON.stringify(customImagePosition) : null
-      };
-
-      // La imagen decodificada se cachea por IDENTIDAD DEL ARCHIVO, no por la
-      // config completa: los cambios de opacidad/tamaño/posición (incluido el
-      // drag, que cambia customPosition en cada mousemove) solo requieren
-      // redibujar, no releer el File con FileReader + decode por frame.
-      const fileKey = `${wmFile.name}|${wmFile.size}|${wmFile.lastModified}`;
-
-      if (cache.watermarkImage && cache.lastWatermarkFileKey === fileKey) {
-        cache.lastWatermarkConfig = currentConfig;
-        drawCachedWatermark(cache.watermarkImage, currentConfig);
-        return;
-      }
-      
-      // Load new watermark image
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const watermarkImg = new Image();
-        watermarkImg.onload = function() {
-          // Guardar imagen para referencia en el posicionamiento
-          watermarkImagePreview = watermarkImg;
-          cache.watermarkImage = watermarkImg;
-          cache.lastWatermarkFileKey = fileKey;
-          cache.lastWatermarkConfig = currentConfig;
-          drawCachedWatermark(watermarkImg, currentConfig);
-        };
-        watermarkImg.onerror = function() {
-          // R1: la decodificación de la imagen falló (archivo corrupto, formato
-          // no soportado, etc.). Antes esto era silencioso.
-          MNEMOTAG_DEBUG && console.warn('No se pudo decodificar la imagen de la marca de agua');
-          if (typeof UIManager !== 'undefined' && UIManager.showError) {
-            UIManager.showError('No se pudo cargar la imagen de la marca de agua. Comprueba que el archivo no esté corrupto.');
-          }
-        };
-        watermarkImg.src = e.target.result;
-      };
-      reader.onerror = function() {
-        // R1: el FileReader falló al leer el archivo (permiso denegado, I/O,
-        // archivo eliminado mientras se leía, etc.). Antes esto era silencioso.
-        MNEMOTAG_DEBUG && console.warn('FileReader falló al leer la imagen de la marca de agua');
-        if (typeof UIManager !== 'undefined' && UIManager.showError) {
-          UIManager.showError('No se pudo leer el archivo de la marca de agua. Inténtalo de nuevo.');
-        }
-      };
-      reader.readAsDataURL(watermarkImageInput.files[0]);
-    }
-
-    function drawCachedWatermark(watermarkImg, config) {
-      const opacity = parseInt(config.opacity) / 100;
-      const sizeOption = config.size;
-      const position = config.position;
-      
-      // Calculate size with caching
-      let { width, height } = calculateWatermarkImageSize(watermarkImg, sizeOption);
-      
-      // Calculate position usando la función específica para imagen
-      const positions = getImageWatermarkPosition(position, width, height);
-      
-      // Guardar bounds para detección de drag & drop
-      imageWatermarkBounds = {
-        x: positions.x,
-        y: positions.y,
-        width: width,
-        height: height
-      };
-      
-      // Draw image with enhanced quality and shadow
-      ctx.globalAlpha = opacity;
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-      ctx.shadowBlur = 4;
-      ctx.shadowOffsetX = 2;
-      ctx.shadowOffsetY = 2;
-      
-      ctx.drawImage(watermarkImg, positions.x, positions.y, width, height);
-      
-      // Si está en modo personalizado Y showPositioningBorders es true, dibujar borde indicador.
-      // v3.3.5: si el ratón está sobre la imagen del watermark, intensificar
-      // el borde para feedback visual.
-      if (position === 'custom' && showPositioningBorders) {
-        const isHover = hoveredWatermark === 'image';
-        ctx.save();
-        ctx.globalAlpha = 1; // Opacidad completa para el borde
-        ctx.strokeStyle = isHover
-          ? 'rgba(245, 158, 11, 1)'    // Naranja intenso al hover
-          : 'rgba(245, 158, 11, 0.7)'; // Naranja semi-transparente normal
-        ctx.lineWidth = isHover ? 4 : 3;
-        ctx.setLineDash([8, 4]); // Línea punteada
-        ctx.strokeRect(
-          imageWatermarkBounds.x - 5,
-          imageWatermarkBounds.y - 5,
-          imageWatermarkBounds.width + 10,
-          imageWatermarkBounds.height + 10
-        );
-        ctx.restore();
-      }
-      
-      // Reset effects
-      ctx.shadowColor = 'transparent';
-      ctx.shadowBlur = 0;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 0;
-      ctx.globalAlpha = 1;
-    }
-
-    function calculateWatermarkImageSize(img, sizeOption) {
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-      
-      let width, height;
-      
-      switch (sizeOption) {
-        case 'small':
-          width = Math.min(img.width, canvasWidth * 0.15);
-          height = (width / img.width) * img.height;
-          break;
-        case 'medium':
-          width = Math.min(img.width, canvasWidth * 0.25);
-          height = (width / img.width) * img.height;
-          break;
-        case 'large':
-          width = Math.min(img.width, canvasWidth * 0.4);
-          height = (width / img.width) * img.height;
-          break;
-        case 'custom':
-          width = parseInt(document.getElementById('watermark-image-width')?.value) || 100;
-          height = parseInt(document.getElementById('watermark-image-height')?.value) || 100;
-          break;
-        default:
-          width = img.width;
-          height = img.height;
-      }
-      
-      return { width, height };
-    }
-
-    function getWatermarkPosition(position, width, height) {
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-      const margin = 20;
-      
-      let x, y;
-      
-      switch (position) {
-        case 'top-left':
-          x = margin;
-          y = margin + height;
-          break;
-        case 'top-center':
-          x = (canvasWidth - width) / 2;
-          y = margin + height;
-          break;
-        case 'top-right':
-          x = canvasWidth - width - margin;
-          y = margin + height;
-          break;
-        case 'center-left':
-          x = margin;
-          y = (canvasHeight + height) / 2;
-          break;
-        case 'center':
-          x = (canvasWidth - width) / 2;
-          y = (canvasHeight + height) / 2;
-          break;
-        case 'center-right':
-          x = canvasWidth - width - margin;
-          y = (canvasHeight + height) / 2;
-          break;
-        case 'bottom-left':
-          x = margin;
-          y = canvasHeight - margin;
-          break;
-        case 'bottom-center':
-          x = (canvasWidth - width) / 2;
-          y = canvasHeight - margin;
-          break;
-        case 'bottom-right':
-          x = canvasWidth - width - margin;
-          y = canvasHeight - margin;
-          break;
-        default:
-          x = margin;
-          y = margin + height;
-      }
-      
-      return { x, y };
-    }
-
-    function toggleWatermarkType() {
-      const textOptions = document.getElementById('text-watermark-options');
-      const imageOptions = document.getElementById('image-watermark-options');
-      const textEnabled = document.getElementById('watermark-text-enabled')?.checked;
-      const imageEnabled = document.getElementById('watermark-image-enabled')?.checked;
-      
-      // Mostrar/ocultar opciones de texto
-      if (textEnabled) {
-        textOptions.classList.remove('watermark-options__text--hidden');
-        textOptions.classList.add('watermark-options__text');
-      } else {
-        textOptions.classList.remove('watermark-options__text');
-        textOptions.classList.add('watermark-options__text--hidden');
-      }
-      
-      // Mostrar/ocultar opciones de imagen
-      if (imageEnabled) {
-        imageOptions.classList.remove('watermark-options__image');
-        imageOptions.classList.add('watermark-options__image--visible');
-      } else {
-        imageOptions.classList.remove('watermark-options__image--visible');
-        imageOptions.classList.add('watermark-options__image');
-      }
-      
-      updatePreview();
-    }
-
-    function toggleCustomImageSize() {
-      const sizeSelect = document.getElementById('watermark-image-size');
-      const customSizeDiv = document.getElementById('watermark-image-custom-size');
-      
-      if (sizeSelect.value === 'custom') {
-        customSizeDiv.classList.add('watermark-options__custom-size--visible');
-        customSizeDiv.classList.remove('watermark-options__custom-size');
-      } else {
-        customSizeDiv.classList.remove('watermark-options__custom-size--visible');
-        customSizeDiv.classList.add('watermark-options__custom-size');
-      }
-      
-      updatePreview();
-    }
-
-    // Funciones para posicionamiento personalizado de imagen
-    function togglePositioningMode() {
-      const positionSelect = document.getElementById('watermark-image-position');
-      const customInfo = document.getElementById('custom-position-info');
-      
-      if (positionSelect.value === 'custom') {
-        isPositioningMode = true;
-        lastPositioningModeActivated = 'image'; // Registrar que imagen fue la última activada
-        customInfo.style.display = 'block';
-        
-        // Agregar clase al canvas para el cursor
-        if (canvas) {
-          canvas.classList.add('positioning-mode');
-          canvas.style.cursor = 'crosshair';
-          
-          // Actualizar clases según qué modos están activos
-          updatePositioningClasses();
-        }
-        
-        // Si no hay posición inicial, calcular el centro del canvas para empezar
-        if (!customImagePosition && typeof imageWatermarkBounds !== 'undefined' && imageWatermarkBounds) {
-          customImagePosition = {
-            x: imageWatermarkBounds.x + imageWatermarkBounds.width / 2,
-            y: imageWatermarkBounds.y + imageWatermarkBounds.height / 2
-          };
-        } else if (!customImagePosition && canvas) {
-          customImagePosition = {
-            x: canvas.width / 2,
-            y: canvas.height / 2
-          };
-        }
-
-        // Mostrar el marcador
-        if (customImagePosition) {
-          showPositionMarker();
-        }
-        
-        // Hacer scroll suave hacia el canvas para que el usuario vea el área de trabajo
-        setTimeout(() => {
-          const previewContainer = document.querySelector('.preview-container');
-          if (previewContainer) {
-            previewContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-        }, 100);
-      } else {
-        isPositioningMode = false;
-        // Si este era el modo activo, limpiarlo
-        if (lastPositioningModeActivated === 'image') {
-          lastPositioningModeActivated = isTextPositioningMode ? 'text' : null;
-        }
-        customInfo.style.display = 'none';
-        customImagePosition = null;
-        
-        // Quitar clase del canvas si no hay modo de texto activo
-        if (canvas && !isTextPositioningMode) {
-          canvas.classList.remove('positioning-mode', 'positioning-image', 'positioning-text', 'positioning-both');
-          canvas.style.cursor = 'default';
-        } else if (canvas) {
-          updatePositioningClasses();
-        }
-        
-        // Quitar marcador si existe
-        removePositionMarker();
-      }
-      
-      debouncedUpdatePreview();
-    }
-
-    // Función para posicionamiento personalizado de texto
-    function toggleTextPositioningMode() {
-      const positionSelect = document.getElementById('watermark-position');
-      const customInfo = document.getElementById('custom-text-position-info');
-      
-      if (positionSelect.value === 'custom') {
-        isTextPositioningMode = true;
-        lastPositioningModeActivated = 'text'; // Registrar que texto fue el último activado
-        customInfo.style.display = 'block';
-        
-        // Agregar clase al canvas para el cursor
-        if (canvas) {
-          canvas.classList.add('positioning-mode');
-          canvas.style.cursor = 'crosshair';
-          
-          // Actualizar clases según qué modos están activos
-          updatePositioningClasses();
-        }
-        
-        // Si no hay posición inicial, calcular el centro del canvas para empezar
-        if (!customTextPosition && typeof textWatermarkBounds !== 'undefined' && textWatermarkBounds) {
-          customTextPosition = {
-            x: textWatermarkBounds.x + textWatermarkBounds.width / 2,
-            y: textWatermarkBounds.y + textWatermarkBounds.height / 2
-          };
-        } else if (!customTextPosition && canvas) {
-          customTextPosition = {
-            x: canvas.width / 2,
-            y: canvas.height / 2
-          };
-        }
-
-        // Mostrar el marcador
-        if (customTextPosition) {
-          showTextPositionMarker();
-        }
-        
-        // Hacer scroll suave hacia el canvas para que el usuario vea el área de trabajo
-        setTimeout(() => {
-          const previewContainer = document.querySelector('.preview-container');
-          if (previewContainer) {
-            previewContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
-        }, 100);
-      } else {
-        isTextPositioningMode = false;
-        // Si este era el modo activo, limpiarlo
-        if (lastPositioningModeActivated === 'text') {
-          lastPositioningModeActivated = isPositioningMode ? 'image' : null;
-        }
-        customInfo.style.display = 'none';
-        customTextPosition = null;
-        
-        // Quitar clase del canvas si no hay modo de imagen activo
-        if (canvas && !isPositioningMode) {
-          canvas.classList.remove('positioning-mode', 'positioning-image', 'positioning-text', 'positioning-both');
-          canvas.style.cursor = 'default';
-        } else if (canvas) {
-          updatePositioningClasses();
-        }
-        
-        // Quitar marcador si existe
-        removeTextPositionMarker();
-      }
-      
-      debouncedUpdatePreview();
-    }
-
-    // Función auxiliar para actualizar las clases del canvas según los modos activos
-    function updatePositioningClasses() {
-      if (!canvas) return;
-      
-      // Limpiar clases previas
-      canvas.classList.remove('positioning-image', 'positioning-text', 'positioning-both');
-      
-      // Añadir clase según el estado actual
-      if (isPositioningMode && isTextPositioningMode) {
-        canvas.classList.add('positioning-both');
-      } else if (isPositioningMode) {
-        canvas.classList.add('positioning-image');
-      } else if (isTextPositioningMode) {
-        canvas.classList.add('positioning-text');
-      }
-    }
+    function applyTextWatermarkOptimized() { WatermarkManager.applyTextWatermarkOptimized(); }
+    function applyImageWatermarkOptimized() { WatermarkManager.applyImageWatermarkOptimized(); }
+    function drawCachedWatermark(watermarkImg, config) { WatermarkManager.drawCachedWatermark(watermarkImg, config); }
+    function calculateWatermarkImageSize(img, sizeOption) { return WatermarkManager.calculateWatermarkImageSize(img, sizeOption); }
+    function getWatermarkPosition(position, width, height) { return WatermarkManager.getWatermarkPosition(position, width, height); }
+    function toggleWatermarkType() { WatermarkManager.toggleWatermarkType(); }
+    function toggleCustomImageSize() { WatermarkManager.toggleCustomImageSize(); }
+    function togglePositioningMode() { WatermarkManager.togglePositioningMode(); }
+    function toggleTextPositioningMode() { WatermarkManager.toggleTextPositioningMode(); }
+    function updatePositioningClasses() { WatermarkManager.updatePositioningClasses(); }
 
     function handleCanvasClick(_event) {
       // DESACTIVADO: El sistema drag & drop maneja todo automáticamente
@@ -3843,718 +2946,46 @@
       // registrado en setupEventListeners → `canvas.addEventListener('click', handleCanvasClick)`.
       // v3.4.2: código muerto eliminado para satisfacer a eslint no-unreachable.
     }
-    
+
     // ========================================================================
-    // SISTEMA DRAG & DROP para marcas de agua
+    // SISTEMA DRAG & DROP para marcas de agua — extraído a
+    // js/managers/watermark-manager.js (v3.7.1). Delegados finos.
     // ========================================================================
-    
-    /**
-     * Detecta si un punto está dentro del texto de marca de agua
-     */
-    function isPointInText(x, y) {
-      if (!textWatermarkBounds) return false;
-      const bounds = textWatermarkBounds;
-      return x >= bounds.x && x <= bounds.x + bounds.width &&
-             y >= bounds.y && y <= bounds.y + bounds.height;
-    }
-    
-    /**
-     * Detecta si un punto está dentro de la imagen de marca de agua
-     */
-    function isPointInImage(x, y) {
-      if (!imageWatermarkBounds) return false;
-      const bounds = imageWatermarkBounds;
-      return x >= bounds.x && x <= bounds.x + bounds.width &&
-             y >= bounds.y && y <= bounds.y + bounds.height;
-    }
 
-    /**
-     * Detecta si un punto está dentro de alguna capa de texto visible.
-     * Recorre textLayerBounds en orden inverso (la capa pintada encima
-     * tiene prioridad). Devuelve {layerId, bounds} o null.
-     */
-    function isPointInTextLayer(x, y) {
-      for (let i = textLayerBounds.length - 1; i >= 0; i--) {
-        const b = textLayerBounds[i];
-        if (x >= b.x && x <= b.x + b.width &&
-            y >= b.y && y <= b.y + b.height) {
-          return b;
-        }
-      }
-      return null;
-    }
+    function isPointInText(x, y) { return WatermarkManager.isPointInText(x, y); }
+    function isPointInImage(x, y) { return WatermarkManager.isPointInImage(x, y); }
+    function isPointInTextLayer(x, y) { return WatermarkManager.isPointInTextLayer(x, y); }
+    function handleDragStart(event) { WatermarkManager.handleDragStart(event); }
+    function handleDragMove(event) { WatermarkManager.handleDragMove(event); }
+    function handleDragEnd(event) { WatermarkManager.handleDragEnd(event); }
+    function handleTouchStart(event) { WatermarkManager.handleTouchStart(event); }
+    function handleTouchMove(event) { WatermarkManager.handleTouchMove(event); }
+    function handleTouchEnd(event) { WatermarkManager.handleTouchEnd(event); }
 
-    /**
-     * Maneja el inicio del arrastre (mousedown)
-     */
-    function handleDragStart(event) {
-      // No interferir con el pan del zoom
-      if (isZoomed) return;
+    // Reglas métricas extraídas a RulerManager (v3.7.1).
+    function toggleRulerMode() { RulerManager.toggle(); }
 
-      const rect = getCanvasContentRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      const x = (event.clientX - rect.left) * scaleX;
-      const y = (event.clientY - rect.top) * scaleY;
-
-      // 1) Prioridad máxima: capas de texto (siempre arrastrables)
-      const hitLayer = isPointInTextLayer(x, y);
-      if (hitLayer) {
-        isDragging = true;
-        dragTarget = hitLayer; // { layerId, x, y, width, height }
-        dragOffsetX = x - hitLayer.x;
-        dragOffsetY = y - hitLayer.y;
-        canvas.style.cursor = 'grabbing';
-        event.preventDefault();
-        event.stopPropagation();
-        return;
-      }
-
-      // 2) Watermarks en modo custom (lógica original)
-      const textPosition = document.getElementById('watermark-position')?.value;
-      const imagePosition = document.getElementById('watermark-image-position')?.value;
-      const textInCustomMode = textPosition === 'custom';
-      const imageInCustomMode = imagePosition === 'custom';
-
-      if (!textInCustomMode && !imageInCustomMode) return;
-
-      if (textInCustomMode && !customTextPosition && textWatermarkBounds) {
-        customTextPosition = {
-          x: textWatermarkBounds.x + textWatermarkBounds.width / 2,
-          y: textWatermarkBounds.y + textWatermarkBounds.height
-        };
-      }
-      if (imageInCustomMode && !customImagePosition && imageWatermarkBounds) {
-        customImagePosition = {
-          x: imageWatermarkBounds.x + imageWatermarkBounds.width / 2,
-          y: imageWatermarkBounds.y + imageWatermarkBounds.height / 2
-        };
-      }
-
-      if (textInCustomMode && isPointInText(x, y)) {
-        isDragging = true;
-        dragTarget = 'text';
-        dragOffsetX = x - customTextPosition.x;
-        dragOffsetY = y - customTextPosition.y;
-        canvas.style.cursor = 'grabbing';
-        event.preventDefault();
-        event.stopPropagation();
-      } else if (imageInCustomMode && isPointInImage(x, y)) {
-        isDragging = true;
-        dragTarget = 'image';
-        dragOffsetX = x - customImagePosition.x;
-        dragOffsetY = y - customImagePosition.y;
-        canvas.style.cursor = 'grabbing';
-        event.preventDefault();
-        event.stopPropagation();
-      }
-    }
-    
-    /**
-     * Maneja el movimiento del arrastre (mousemove)
-     */
-    function handleDragMove(event) {
-      const rect = getCanvasContentRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      const x = (event.clientX - rect.left) * scaleX;
-      const y = (event.clientY - rect.top) * scaleY;
-
-      if (!isDragging) {
-        // Hover cursor: capas de texto o watermarks
-        let cursorSet = false;
-        if (isPointInTextLayer(x, y)) {
-          canvas.style.cursor = 'grab';
-          cursorSet = true;
-        }
-        if (!cursorSet) {
-          const textPosition = document.getElementById('watermark-position')?.value;
-          const imagePosition = document.getElementById('watermark-image-position')?.value;
-          let newHover = null;
-          if (textPosition === 'custom' && isPointInText(x, y)) {
-            newHover = 'text';
-            canvas.style.cursor = 'grab';
-          } else if (imagePosition === 'custom' && isPointInImage(x, y)) {
-            newHover = 'image';
-            canvas.style.cursor = 'grab';
-          } else if (!cursorSet) {
-            canvas.style.cursor = 'default';
-          }
-          if (newHover !== hoveredWatermark) {
-            hoveredWatermark = newHover;
-            updatePreview();
-          }
-        }
-        return;
-      }
-
-      // Drag activo
-      if (dragTarget && dragTarget.layerId) {
-        // Arrastrando una capa de texto — render ligero (sin watermarks
-        // ni filters) para evitar interferencias async y mantener 60 fps.
-        const newX = x - dragOffsetX;
-        const newY = y - dragOffsetY;
-        const layer = textLayerManager.getLayer(dragTarget.layerId);
-        if (layer) {
-          layer.position.x = Math.round(newX);
-          layer.position.y = Math.round(newY);
-          renderCanvasWithLayersLightweight();
-        }
-      } else if (dragTarget === 'text') {
-        customTextPosition = { x: x - dragOffsetX, y: y - dragOffsetY };
-        showTextPositionMarker();
-        updatePreview();
-      } else if (dragTarget === 'image') {
-        customImagePosition = { x: x - dragOffsetX, y: y - dragOffsetY };
-        showPositionMarker();
-        updatePreview();
-      }
-
-      event.preventDefault();
-    }
-    
-    /**
-     * Maneja el fin del arrastre (mouseup)
-     */
-    function handleDragEnd(event) {
-      if (isDragging) {
-        isDragging = false;
-        if (dragTarget && dragTarget.layerId) {
-          // Era una capa de texto — render completo CON capas al soltar.
-          // NO llamar a updatePreview() después porque sobreescribiría
-          // el canvas sin las capas de texto (updatePreview no las pinta).
-          renderCanvasWithLayers();
-          UIManager.showSuccess('📝 Capa de texto reposicionada');
-          if (activeLayerId === dragTarget.layerId) {
-            selectTextLayer(dragTarget.layerId);
-          }
-          updateTextLayersList();
-        } else {
-          // Era un watermark — updatePreview incluye watermarks pero no capas.
-          const elementType = dragTarget === 'text' ? 'TEXTO' : 'IMAGEN';
-          const emoji = dragTarget === 'text' ? '📝' : '🖼️';
-          UIManager.showSuccess(emoji + ' ' + elementType + ' reposicionado correctamente');
-          updatePreview();
-        }
-        dragTarget = null;
-        canvas.style.cursor = 'default';
-      }
-    }
-    
-    /**
-     * Maneja el inicio del arrastre táctil (touchstart)
-     */
-    function handleTouchStart(event) {
-      // No interferir con el pan del zoom
-      if (isZoomed && isPanning) return;
-      
-      // Solo si está en modo personalizado
-      const textPosition = document.getElementById('watermark-position')?.value;
-      const imagePosition = document.getElementById('watermark-image-position')?.value;
-      
-      const textInCustomMode = textPosition === 'custom';
-      const imageInCustomMode = imagePosition === 'custom';
-      
-      if (!textInCustomMode && !imageInCustomMode) return;
-
-      const touch = event.touches[0];
-      const rect = getCanvasContentRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      
-      const x = (touch.clientX - rect.left) * scaleX;
-      const y = (touch.clientY - rect.top) * scaleY;
-      
-      // Prioridad: primero verificar texto, luego imagen
-      if (textInCustomMode && isPointInText(x, y)) {
-        isDragging = true;
-        dragTarget = 'text';
-        dragOffsetX = x - (customTextPosition?.x || textWatermarkBounds.x + textWatermarkBounds.width / 2);
-        dragOffsetY = y - (customTextPosition?.y || textWatermarkBounds.y + textWatermarkBounds.height);
-        event.preventDefault();
-        event.stopPropagation();
-      } else if (imageInCustomMode && isPointInImage(x, y)) {
-        isDragging = true;
-        dragTarget = 'image';
-        dragOffsetX = x - (customImagePosition?.x || imageWatermarkBounds.x + imageWatermarkBounds.width / 2);
-        dragOffsetY = y - (customImagePosition?.y || imageWatermarkBounds.y + imageWatermarkBounds.height / 2);
-        event.preventDefault();
-        event.stopPropagation();
-      }
-    }
-    
-    /**
-     * Maneja el movimiento del arrastre táctil (touchmove)
-     */
-    function handleTouchMove(event) {
-      if (!isDragging) return;
-
-      const touch = event.touches[0];
-      const rect = getCanvasContentRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      
-      const x = (touch.clientX - rect.left) * scaleX;
-      const y = (touch.clientY - rect.top) * scaleY;
-      
-      if (dragTarget === 'text') {
-        customTextPosition = {
-          x: x - dragOffsetX,
-          y: y - dragOffsetY
-        };
-        showTextPositionMarker();
-        updatePreview();
-      } else if (dragTarget === 'image') {
-        customImagePosition = {
-          x: x - dragOffsetX,
-          y: y - dragOffsetY
-        };
-        showPositionMarker();
-        updatePreview();
-      }
-      
-      event.preventDefault();
-    }
-    
-    /**
-     * Maneja el fin del arrastre táctil (touchend)
-     */
-    function handleTouchEnd(event) {
-      if (isDragging) {
-        isDragging = false;
-        const elementType = dragTarget === 'text' ? 'TEXTO' : 'IMAGEN';
-        const emoji = dragTarget === 'text' ? '📝' : '🖼️';
-        UIManager.showSuccess(`${emoji} ${elementType} reposicionado correctamente`);
-        dragTarget = null;
-
-        // Render completo final tras el drag táctil (P2): aplica filtros y
-        // saveState que se saltaron durante el arrastre.
-        updatePreview();
-      }
-    }
-    
-    // ========================================================================
-    // SISTEMA DE REGLAS MÉTRICAS Y COORDENADAS
-    // ========================================================================
-    
-    /**
-     * Toggle del sistema de reglas métricas
-     */
-    function toggleRulerMode() {
-      isRulerMode = !isRulerMode;
-      
-      if (isRulerMode) {
-        createRulers();
-        UIManager.showSuccess('📐 Reglas métricas activadas');
-      } else {
-        removeRulers();
-        UIManager.showSuccess('📐 Reglas métricas desactivadas');
-      }
-      
-      // Actualizar el botón
-      const rulerBtn = document.getElementById('ruler-toggle-btn');
-      if (rulerBtn) {
-        rulerBtn.classList.toggle('active', isRulerMode);
-      }
-    }
-    
-    /**
-     * Crear reglas métricas y elementos visuales
-     */
-    function createRulers() {
-      if (!canvas) return;
-      
-      const previewContainer = canvas.parentElement;
-      if (!previewContainer) return;
-      
-      // Asegurar que el contenedor tenga position relative
-      previewContainer.style.position = 'relative';
-      
-      // Crear contenedor para las reglas
-      const container = document.createElement('div');
-      container.id = 'ruler-system-container';
-      container.style.cssText = `
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-        z-index: 100;
-      `;
-      
-      // Crear regla horizontal (superior)
-      const horizontalRuler = document.createElement('div');
-      horizontalRuler.id = 'ruler-horizontal';
-      horizontalRuler.style.cssText = `
-        position: absolute;
-        top: 0;
-        left: 30px;
-        right: 0;
-        height: 30px;
-        background: rgba(0, 0, 0, 0.8);
-        color: white;
-        font-size: 10px;
-        font-family: monospace;
-        display: flex;
-        align-items: flex-end;
-        padding: 0 5px 2px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-      `;
-      
-      // Crear regla vertical (izquierda)
-      const verticalRuler = document.createElement('div');
-      verticalRuler.id = 'ruler-vertical';
-      verticalRuler.style.cssText = `
-        position: absolute;
-        top: 30px;
-        left: 0;
-        bottom: 0;
-        width: 30px;
-        background: rgba(0, 0, 0, 0.8);
-        color: white;
-        font-size: 10px;
-        font-family: monospace;
-        box-shadow: 2px 0 5px rgba(0,0,0,0.3);
-      `;
-      
-      // Crear línea horizontal (sigue el cursor)
-      const horizontalLine = document.createElement('div');
-      horizontalLine.id = 'ruler-line-horizontal';
-      horizontalLine.style.cssText = `
-        position: absolute;
-        left: 30px;
-        right: 0;
-        height: 1px;
-        background: #FFFFFF;
-        opacity: 0.7;
-        pointer-events: none;
-        display: none;
-      `;
-      
-      // Crear línea vertical (sigue el cursor)
-      const verticalLine = document.createElement('div');
-      verticalLine.id = 'ruler-line-vertical';
-      verticalLine.style.cssText = `
-        position: absolute;
-        top: 30px;
-        bottom: 0;
-        width: 1px;
-        background: #FFFFFF;
-        opacity: 0.7;
-        pointer-events: none;
-        display: none;
-      `;
-      
-      // Crear display de coordenadas
-      const coordinateDisplay = document.createElement('div');
-      coordinateDisplay.id = 'ruler-coordinates';
-      coordinateDisplay.style.cssText = `
-        position: absolute;
-        background: rgba(0, 0, 0, 0.9);
-        color: white;
-        padding: 5px 10px;
-        border-radius: 5px;
-        font-family: monospace;
-        font-size: 12px;
-        font-weight: bold;
-        pointer-events: none;
-        display: none;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.4);
-        white-space: nowrap;
-      `;
-      
-      // Agregar elementos al contenedor
-      container.appendChild(horizontalRuler);
-      container.appendChild(verticalRuler);
-      container.appendChild(horizontalLine);
-      container.appendChild(verticalLine);
-      container.appendChild(coordinateDisplay);
-      
-      // Agregar contenedor al preview
-      previewContainer.appendChild(container);
-      
-      // Guardar referencias
-      rulerElements.container = container;
-      rulerElements.horizontalRuler = horizontalRuler;
-      rulerElements.verticalRuler = verticalRuler;
-      rulerElements.horizontalLine = horizontalLine;
-      rulerElements.verticalLine = verticalLine;
-      rulerElements.coordinateDisplay = coordinateDisplay;
-      
-      // Dibujar marcas en las reglas
-      drawRulerMarks();
-      
-      // Agregar event listeners
-      canvas.addEventListener('mousemove', handleRulerMouseMove);
-      canvas.addEventListener('mouseenter', showRulerGuides);
-      canvas.addEventListener('mouseleave', hideRulerGuides);
-    }
-    
-    /**
-     * Dibujar marcas de medición en las reglas
-     */
-    function drawRulerMarks() {
-      if (!canvas || !rulerElements.horizontalRuler || !rulerElements.verticalRuler) return;
-      
-      // Usar dimensiones REALES del canvas (no las visuales)
-      const canvasWidth = canvas.width;
-      const canvasHeight = canvas.height;
-      
-      // Calcular escala de visualización
-      const rect = getCanvasContentRect();
-      const scaleX = rect.width / canvasWidth;
-      const scaleY = rect.height / canvasHeight;
-      
-      const step = 50; // Marca cada 50 píxeles en coordenadas reales
-      
-      // Marcas horizontales - escalar posición visual pero mostrar valor real
-      let htmlH = '';
-      for (let x = 0; x <= canvasWidth; x += step) {
-        const visualX = x * scaleX; // Posición en pantalla
-        htmlH += `<span style="position: absolute; left: ${visualX}px; bottom: 2px; font-size: 10px;">${x}</span>`;
-      }
-      rulerElements.horizontalRuler.innerHTML = htmlH;
-      
-      // Marcas verticales - escalar posición visual pero mostrar valor real
-      let htmlV = '';
-      for (let y = 0; y <= canvasHeight; y += step) {
-        const visualY = y * scaleY; // Posición en pantalla
-        htmlV += `<span style="position: absolute; left: 2px; top: ${visualY}px; font-size: 10px;">${y}</span>`;
-      }
-      rulerElements.verticalRuler.innerHTML = htmlV;
-    }
-    
-    /**
-     * Manejar movimiento del mouse sobre el canvas
-     */
-    function handleRulerMouseMove(event) {
-      if (!isRulerMode) return;
-
-      const rect = getCanvasContentRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      
-      currentMouseX = Math.round((event.clientX - rect.left) * scaleX);
-      currentMouseY = Math.round((event.clientY - rect.top) * scaleY);
-      
-      // Limitar a los bordes del canvas
-      currentMouseX = Math.max(0, Math.min(currentMouseX, canvas.width));
-      currentMouseY = Math.max(0, Math.min(currentMouseY, canvas.height));
-      
-      updateCrosshair();
-      updateCoordinates();
-    }
-    
-    /**
-     * Actualizar líneas guía (crosshair)
-     */
-    function updateCrosshair() {
-      if (!rulerElements.horizontalLine || !rulerElements.verticalLine) return;
-
-      const rect = getCanvasContentRect();
-      const displayX = (currentMouseX / canvas.width) * rect.width;
-      const displayY = (currentMouseY / canvas.height) * rect.height;
-      
-      // Detectar brillo del fondo y ajustar color de líneas
-      const lineColor = detectBackgroundBrightness(currentMouseX, currentMouseY);
-      
-      rulerElements.horizontalLine.style.top = (displayY + 30) + 'px';
-      rulerElements.horizontalLine.style.background = lineColor;
-      
-      rulerElements.verticalLine.style.left = (displayX + 30) + 'px';
-      rulerElements.verticalLine.style.background = lineColor;
-    }
-    
-    /**
-     * Actualizar display de coordenadas
-     */
-    function updateCoordinates() {
-      if (!rulerElements.coordinateDisplay) return;
-
-      const rect = getCanvasContentRect();
-      const displayX = (currentMouseX / canvas.width) * rect.width;
-      const displayY = (currentMouseY / canvas.height) * rect.height;
-      
-      rulerElements.coordinateDisplay.textContent = `X: ${currentMouseX}px, Y: ${currentMouseY}px`;
-      
-      // Posicionar el display cerca del cursor, ajustando para no salir del canvas
-      let coordX = displayX + 30 + 15; // 30 de la regla + 15 de offset
-      let coordY = displayY + 30 - 30; // 30 de la regla - 30 para estar arriba del cursor
-      
-      // Ajustar si se sale por la derecha
-      if (coordX + 150 > rect.width) {
-        coordX = displayX + 30 - 160;
-      }
-      
-      // Ajustar si se sale por arriba
-      if (coordY < 35) {
-        coordY = displayY + 30 + 15;
-      }
-      
-      rulerElements.coordinateDisplay.style.left = coordX + 'px';
-      rulerElements.coordinateDisplay.style.top = coordY + 'px';
-    }
-    
-    /**
-     * Detectar brillo del fondo para color adaptativo
-     */
-    function detectBackgroundBrightness(x, y) {
-      if (!ctx || !currentImage) return '#FFFFFF';
-      
-      try {
-        // Limitar coordenadas al canvas
-        x = Math.max(0, Math.min(x, canvas.width - 1));
-        y = Math.max(0, Math.min(y, canvas.height - 1));
-        
-        const imageData = ctx.getImageData(x, y, 1, 1).data;
-        const brightness = (imageData[0] + imageData[1] + imageData[2]) / 3;
-        
-        // Si el fondo es claro (>128), usar negro; si es oscuro, usar blanco
-        return brightness > 128 ? '#000000' : '#FFFFFF';
-      } catch (error) {
-        // Si hay error al leer el píxel, usar blanco por defecto
-        return '#FFFFFF';
-      }
-    }
-    
-    /**
-     * Mostrar guías al entrar al canvas
-     */
-    function showRulerGuides() {
-      if (!isRulerMode) return;
-      
-      if (rulerElements.horizontalLine) rulerElements.horizontalLine.style.display = 'block';
-      if (rulerElements.verticalLine) rulerElements.verticalLine.style.display = 'block';
-      if (rulerElements.coordinateDisplay) rulerElements.coordinateDisplay.style.display = 'block';
-    }
-    
-    /**
-     * Ocultar guías al salir del canvas
-     */
-    function hideRulerGuides() {
-      if (!isRulerMode) return;
-      
-      if (rulerElements.horizontalLine) rulerElements.horizontalLine.style.display = 'none';
-      if (rulerElements.verticalLine) rulerElements.verticalLine.style.display = 'none';
-      if (rulerElements.coordinateDisplay) rulerElements.coordinateDisplay.style.display = 'none';
-    }
-    
-    /**
-     * Eliminar reglas métricas y limpiar
-     */
-    function removeRulers() {
-      // Remover event listeners
-      if (canvas) {
-        canvas.removeEventListener('mousemove', handleRulerMouseMove);
-        canvas.removeEventListener('mouseenter', showRulerGuides);
-        canvas.removeEventListener('mouseleave', hideRulerGuides);
-      }
-      
-      // Eliminar contenedor y todos sus elementos
-      if (rulerElements.container && rulerElements.container.parentElement) {
-        rulerElements.container.parentElement.removeChild(rulerElements.container);
-      }
-      
-      // Reset de referencias
-      rulerElements.horizontalRuler = null;
-      rulerElements.verticalRuler = null;
-      rulerElements.horizontalLine = null;
-      rulerElements.verticalLine = null;
-      rulerElements.coordinateDisplay = null;
-      rulerElements.container = null;
-    }
-
-    function showPositionMarker() {
-      if (!customImagePosition || !canvas) return;
-
-      // Quitar marcador anterior si existe
-      removePositionMarker();
-
-      const contentRect = getCanvasContentRect();
-      const container = canvas.parentElement;
-      if (!container) return;
-      const containerRect = container.getBoundingClientRect();
-      const offsetLeft = contentRect.left - containerRect.left;
-      const offsetTop = contentRect.top - containerRect.top;
-      const scaleX = contentRect.width / canvas.width;
-      const scaleY = contentRect.height / canvas.height;
-
-      const marker = document.createElement('div');
-      marker.className = 'custom-position-marker';
-      marker.id = 'position-marker';
-
-      const displayX = offsetLeft + customImagePosition.x * scaleX;
-      const displayY = offsetTop + customImagePosition.y * scaleY;
-
-      marker.style.left = displayX + 'px';
-      marker.style.top = displayY + 'px';
-
-      // Agregar al contenedor del canvas
-      container.style.position = 'relative';
-      container.appendChild(marker);
-    }
-
-    function removePositionMarker() {
-      const marker = document.getElementById('position-marker');
-      if (marker) {
-        marker.remove();
-      }
-    }
-
-    // Funciones para marcadores de posición de texto
-    function showTextPositionMarker() {
-      if (!customTextPosition || !canvas) return;
-
-      // Quitar marcador anterior si existe
-      removeTextPositionMarker();
-
-      const contentRect = getCanvasContentRect();
-      const container = canvas.parentElement;
-      if (!container) return;
-      const containerRect = container.getBoundingClientRect();
-      const offsetLeft = contentRect.left - containerRect.left;
-      const offsetTop = contentRect.top - containerRect.top;
-      const scaleX = contentRect.width / canvas.width;
-      const scaleY = contentRect.height / canvas.height;
-
-      const marker = document.createElement('div');
-      marker.className = 'custom-position-marker text-marker';
-      marker.id = 'text-position-marker';
-      marker.style.borderColor = '#3b82f6'; // Color azul para diferenciar del marcador de imagen
-
-      const displayX = offsetLeft + customTextPosition.x * scaleX;
-      const displayY = offsetTop + customTextPosition.y * scaleY;
-
-      marker.style.left = displayX + 'px';
-      marker.style.top = displayY + 'px';
-
-      // Agregar al contenedor del canvas
-      container.style.position = 'relative';
-      container.appendChild(marker);
-    }
-
-    function removeTextPositionMarker() {
-      const marker = document.getElementById('text-position-marker');
-      if (marker) {
-        marker.remove();
-      }
-    }
+    // Marcadores DOM de posición personalizada: extraídos a
+    // js/managers/watermark-manager.js (v3.7.1).
+    function showPositionMarker() { WatermarkManager.showPositionMarker(); }
+    function removePositionMarker() { WatermarkManager.removePositionMarker(); }
+    function showTextPositionMarker() { WatermarkManager.showTextPositionMarker(); }
+    function removeTextPositionMarker() { WatermarkManager.removeTextPositionMarker(); }
 
     // Enhanced metadata form handler with validation
     function handleMetadataSubmit(e) {
       e.preventDefault();
-      
+
       if (!currentImage) {
         showError('Por favor, selecciona una imagen primero.');
         return;
       }
 
       const form = e.target;
-      
+
       // Limpiar errores anteriores
       FormValidator.clearFormErrors('metadata-form');
-      
+
       // Mostrar estado de carga
       form.classList.add('form-loading');
 
@@ -4562,10 +2993,10 @@
         // Recopilar datos del formulario
         const formData = new FormData(form);
         const metadata = Object.fromEntries(formData);
-        
+
         // Validar metadatos
         const validation = SecurityManager.validateMetadata(metadata);
-        
+
         if (!validation.isValid) {
           // Mostrar errores específicos por campo
           for (const [field, error] of Object.entries(validation.errors)) {
@@ -4577,25 +3008,25 @@
 
         // Usar metadatos sanitizados
         const sanitizedMetadata = validation.sanitized;
-        
+
         // Aquí podrías implementar la lógica para aplicar metadatos a la imagen
         // Por ejemplo, usando ExifWriter.js o similar para escribir metadatos EXIF
-        
-        
+
+
         // Mostrar previsualización de metadatos
         showMetadataPreview(sanitizedMetadata);
-        
+
         // Simular procesamiento
         setTimeout(() => {
           form.classList.remove('form-loading');
           UIManager.showSuccess('Metadatos guardados correctamente.');
-          
+
           // v3.5.9: Guardar estado en el historial tras actualizar metadatos
           if (typeof historyManager !== 'undefined') {
             historyManager.saveState();
           }
         }, 500);
-        
+
       } catch (error) {
         form.classList.remove('form-loading');
         console.error('Error al procesar metadatos:', error);
@@ -4606,7 +3037,7 @@
     // Función para mostrar la previsualización de metadatos
     function showMetadataPreview(metadata) {
       const previewContainer = document.getElementById('metadata-preview');
-      
+
       // Campos a mostrar
       const fields = [
         { key: 'title', label: 'Título' },
@@ -4615,15 +3046,15 @@
         { key: 'keywords', label: 'Palabras clave' },
         { key: 'copyright', label: 'Copyright' }
       ];
-      
+
       let hasContent = false;
-      
+
       // Mostrar cada campo si tiene contenido
       fields.forEach(field => {
         const value = metadata[field.key];
         const fieldElement = document.getElementById(`preview-${field.key}`);
         const valueElement = document.getElementById(`preview-${field.key}-value`);
-        
+
         if (value && value.trim()) {
           fieldElement.classList.remove('preview-field--hidden');
           valueElement.textContent = value;
@@ -4632,17 +3063,17 @@
           fieldElement.classList.add('preview-field--hidden');
         }
       });
-      
+
       // Mostrar/ocultar el contenedor principal
       if (hasContent) {
         previewContainer.classList.remove('metadata-preview--hidden');
         previewContainer.classList.add('metadata-preview');
-        
+
         // Scroll suave hacia la previsualización
         setTimeout(() => {
-          previewContainer.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'nearest' 
+          previewContainer.scrollIntoView({
+            behavior: 'smooth',
+            block: 'nearest'
           });
         }, 100);
       } else {
@@ -4660,86 +3091,22 @@
     }
 
     // Enhanced watermark form handler with validation
-    function handleWatermarkSubmit(e) {
-      e.preventDefault();
-      
-      if (!currentImage) {
-        showError('Por favor, selecciona una imagen primero.');
-        return;
-      }
-
-      const form = e.target;
-      const textEnabled = document.getElementById('watermark-text-enabled')?.checked;
-      const imageEnabled = document.getElementById('watermark-image-enabled')?.checked;
-      
-      // Verificar que al menos una opción esté habilitada
-      if (!textEnabled && !imageEnabled) {
-        UIManager.showError('Debe habilitar al menos un tipo de marca de agua');
-        return;
-      }
-      
-      // Limpiar errores anteriores
-      FormValidator.clearFormErrors('watermark-form');
-      form.classList.add('form-loading');
-
-      try {
-        // Validar marca de agua de texto si está habilitada
-        if (textEnabled) {
-          const text = document.getElementById('watermark-text')?.value;
-          const size = document.getElementById('watermark-size')?.value;
-          const opacity = document.getElementById('watermark-opacity')?.value;
-          
-          // Validar marca de agua de texto
-          const validation = SecurityManager.validateWatermarkText(text, size, opacity);
-          
-          if (!validation.isValid) {
-            validation.errors.forEach(error => UIManager.showError(error));
-            form.classList.remove('form-loading');
-            return;
-          }
-        }
-        
-        // Validar marca de agua de imagen si está habilitada
-        if (imageEnabled) {
-          const watermarkImageInput = document.getElementById('watermark-image');
-          if (!watermarkImageInput || !watermarkImageInput.files[0]) {
-            UIManager.showWarning('No hay imagen de marca de agua seleccionada. Se aplicará solo el texto.');
-          }
-        }
-        
-        // Aplicar marca de agua
-        updatePreview();
-        
-        setTimeout(() => {
-          form.classList.remove('form-loading');
-          UIManager.showSuccess('Marca de agua aplicada correctamente.');
-          
-          // v3.5.9: Guardar estado en el historial tras aplicar marca de agua
-          if (typeof historyManager !== 'undefined') {
-            historyManager.saveState();
-          }
-        }, 300);
-      } catch (error) {
-        form.classList.remove('form-loading');
-        console.error('Error al aplicar marca de agua:', error);
-        showError('Error al aplicar la marca de agua. Por favor, inténtalo de nuevo.');
-      }
-    }
+    function handleWatermarkSubmit(e) { WatermarkManager.handleWatermarkSubmit(e); }
 
     function resetChanges() {
       if (!currentImage) return;
-      
+
       // Limpiar formularios
       document.getElementById('metadata-form').reset();
       document.getElementById('watermark-form').reset();
-      
+
       // Sincronizar campos numéricos con valores por defecto de los sliders
       const sliderConfigs = [
         { sliderId: 'watermark-size', numberId: 'watermark-size-num' },
         { sliderId: 'watermark-opacity', numberId: 'watermark-opacity-num' },
         { sliderId: 'watermark-image-opacity', numberId: 'watermark-image-opacity-num' }
       ];
-      
+
       sliderConfigs.forEach(({ sliderId, numberId }) => {
         const slider = document.getElementById(sliderId);
         const numberInput = document.getElementById(numberId);
@@ -4747,66 +3114,66 @@
           numberInput.value = slider.value;
         }
       });
-      
+
       // Resetear tipo de marca de agua
       const wtEnabled = document.getElementById('watermark-text-enabled');
       const wiEnabled = document.getElementById('watermark-image-enabled');
       if (wtEnabled) wtEnabled.checked = true;
       if (wiEnabled) wiEnabled.checked = false;
       toggleWatermarkType();
-      
+
       // Restaurar botón de marca de agua a rojo y ocultar miniatura
       const watermarkUploadLabel = document.getElementById('watermark-upload-label');
       const watermarkThumbnail = document.getElementById('watermark-preview-thumb');
       const watermarkFileLabel = document.getElementById('watermark-file-label');
-      
+
       if (watermarkUploadLabel) {
         watermarkUploadLabel.classList.remove('watermark-loaded');
       }
-      
+
       if (watermarkThumbnail) {
         watermarkThumbnail.style.display = 'none';
         watermarkThumbnail.src = '';
       }
-      
+
       if (watermarkFileLabel) {
         watermarkFileLabel.textContent = 'Seleccionar archivo';
       }
-      
+
       // Limpiar posicionamiento personalizado
       customImagePosition = null;
       isPositioningMode = false;
       watermarkImagePreview = null;
       removePositionMarker();
-      
+
       const customInfo = document.getElementById('custom-position-info');
       if (customInfo) {
         customInfo.style.display = 'none';
       }
-      
+
       if (canvas) {
         canvas.classList.remove('positioning-mode');
       }
-      
+
       // Ocultar previsualización de metadatos
       const metadataPreview = document.getElementById('metadata-preview');
       if (metadataPreview) {
         metadataPreview.classList.add('metadata-preview--hidden');
         metadataPreview.classList.remove('metadata-preview');
       }
-      
+
       // Resetear controles de salida
       resetOutputControls();
-      
+
       // Limpiar historial
       historyManager.clear();
-      
+
       // Resetear zoom al 100%
       resetZoom();
-      
+
       // Actualizar vista previa
       updatePreview();
-      
+
       // Guardar estado inicial
       setTimeout(() => {
         historyManager.saveState();
@@ -4817,14 +3184,14 @@
       // Reset quality to default (80%)
       const qualitySelect = document.getElementById('output-quality');
       const qualityNumber = document.getElementById('quality-number');
-      
+
       if (qualitySelect && qualityNumber) {
         qualitySelect.value = '80';
         qualityNumber.value = '80';
-        outputQuality = 0.8;
+        AppState.outputQuality = 0.8;
         handleQualityChange();
       }
-      
+
       // Reset format to JPEG (or original extension if available)
       const formatSelect = document.getElementById('output-format');
       if (formatSelect && originalExtension) {
@@ -4839,7 +3206,7 @@
         } else {
           formatSelect.value = 'jpeg';
         }
-        outputFormat = formatSelect.value;
+        AppState.outputFormat = formatSelect.value;
         handleFormatChange();
       }
     }
@@ -5097,7 +3464,7 @@
       const pixelsElement = document.getElementById('image-pixels');
       const currentDimensionsElement = document.getElementById('current-dimensions');
       const currentSizeDisplay = document.getElementById('current-size-display');
-      
+
       if (!currentImage || !imageInfoElement) return;
 
       if (canvas) {
@@ -5107,28 +3474,28 @@
           `Previsualización de ${name}, ${currentImage.width} por ${currentImage.height} píxeles`
         );
       }
-      
+
       // Show image info panel
       imageInfoElement.classList.remove('hidden');
-      
+
       // Update dimensions
       if (dimensionsElement) {
         dimensionsElement.textContent = `${currentImage.width} × ${currentImage.height}`;
       }
-      
+
       // Update current size display in resize section
       if (currentDimensionsElement && currentSizeDisplay) {
         currentDimensionsElement.textContent = `${currentImage.width} × ${currentImage.height}`;
         currentSizeDisplay.classList.remove('hidden');
       }
-      
+
       // Update file size
       if (sizeElement && currentFile) {
         sizeElement.textContent = formatFileSize(currentFile.size);
       } else if (sizeElement) {
         sizeElement.textContent = 'Calculando...';
       }
-      
+
       // Update format
       if (formatElement && currentFile) {
         const fileType = currentFile.type.split('/')[1].toUpperCase();
@@ -5136,14 +3503,14 @@
       } else if (formatElement) {
         formatElement.textContent = originalExtension.toUpperCase();
       }
-      
+
       // Update total pixels
       if (pixelsElement) {
         const totalPixels = currentImage.width * currentImage.height;
         pixelsElement.textContent = formatNumber(totalPixels);
       }
     }
-    
+
     // Funciones de formato extraídas a js/utils/helpers.js
 
     // Initialize resize functionality
@@ -5161,10 +3528,10 @@
       const aspectRatioCheckbox = document.getElementById('maintain-aspect-ratio');
       const applyResizeBtn = document.getElementById('apply-resize');
       const resetResizeBtn = document.getElementById('reset-original-size');
-      
+
       // Preset buttons
       const presetButtons = document.querySelectorAll('.preset-btn');
-      
+
       // Add event listeners to dimension inputs
       if (widthInput) {
         widthInput.addEventListener('input', function() {
@@ -5174,7 +3541,7 @@
           }
         });
       }
-      
+
       if (heightInput) {
         heightInput.addEventListener('input', function() {
           if (aspectRatioCheckbox && aspectRatioCheckbox.checked && originalWidth && originalHeight) {
@@ -5183,34 +3550,34 @@
           }
         });
       }
-      
+
       // Preset buttons functionality
       presetButtons.forEach(button => {
         button.addEventListener('click', function() {
           const width = this.getAttribute('data-width');
           const height = this.getAttribute('data-height');
-          
+
           if (widthInput) widthInput.value = width;
           if (heightInput) heightInput.value = height;
-          
+
           // Update button visual state
           presetButtons.forEach(btn => btn.classList.remove('ring-2', 'ring-blue-500'));
           this.classList.add('ring-2', 'ring-blue-500');
         });
       });
-      
+
       // Apply resize functionality
       if (applyResizeBtn) {
         applyResizeBtn.addEventListener('click', function() {
           const newWidth = parseInt(widthInput.value);
           const newHeight = parseInt(heightInput.value);
-          
+
           if (newWidth > 0 && newHeight > 0 && currentImage) {
             resizeImage(newWidth, newHeight);
           }
         });
       }
-      
+
       // Reset resize functionality
       if (resetResizeBtn) {
         resetResizeBtn.addEventListener('click', function() {
@@ -5218,7 +3585,7 @@
             if (widthInput) widthInput.value = originalWidth;
             if (heightInput) heightInput.value = originalHeight;
             presetButtons.forEach(btn => btn.classList.remove('ring-2', 'ring-blue-500'));
-            
+
             if (currentImage) {
               resizeImage(originalWidth, originalHeight);
             }
@@ -5233,26 +3600,26 @@
         console.error('No current image available');
         return;
       }
-      
+
       // Validate dimensions
       if (newWidth <= 0 || newHeight <= 0) {
         console.error('Invalid dimensions:', newWidth, newHeight);
         return;
       }
-      
+
       try {
         // Create temporary canvas for resizing
         const tempCanvas = document.createElement('canvas');
         const tempCtx = tempCanvas.getContext('2d');
-        
+
         tempCanvas.width = newWidth;
         tempCanvas.height = newHeight;
-        
+
         // Draw resized image with high quality
         tempCtx.imageSmoothingEnabled = true;
         tempCtx.imageSmoothingQuality = 'high';
         tempCtx.drawImage(currentImage, 0, 0, newWidth, newHeight);
-        
+
         // Create new image from the resized canvas
         const newImage = new Image();
         newImage.onload = function() {
@@ -5260,7 +3627,7 @@
           currentImage = newImage;
           // El resize define el nuevo "original" para resetRotation
           transformResetImage = newImage;
-          comparisonNeedsUpdate = true;
+          ComparisonManager.invalidate();
 
           // Reacotar posiciones custom de marcas al nuevo tamaño
           if (customImagePosition) {
@@ -5284,14 +3651,14 @@
           showSuccessMessage(`Imagen redimensionada a ${newWidth} × ${newHeight}`);
 
         };
-        
+
         newImage.onerror = function() {
           console.error('Error creating resized image');
         };
-        
+
         // Convert canvas to data URL and set as image source
         newImage.src = tempCanvas.toDataURL('image/png');
-        
+
       } catch (error) {
         console.error('Error during resize operation:', error);
         showSuccessMessage('Error al redimensionar la imagen');
@@ -5308,10 +3675,10 @@
         successElement.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg z-50 transition-opacity duration-300';
         document.body.appendChild(successElement);
       }
-      
+
       successElement.textContent = message;
       successElement.style.opacity = '1';
-      
+
       // Hide after 3 seconds
       setTimeout(() => {
         successElement.style.opacity = '0';
@@ -5322,7 +3689,7 @@
         }, 300);
       }, 3000);
     }
-    
+
     // Character counter functionality
     function initCharacterCounters() {
       const fields = [
@@ -5334,13 +3701,13 @@
       fields.forEach(field => {
         const input = document.getElementById(field.id);
         const counter = document.getElementById(field.counter);
-        
+
         if (input && counter) {
           // Update counter on input
           input.addEventListener('input', function() {
             updateCharacterCount(this, counter, field.limit);
           });
-          
+
           // Initial count
           updateCharacterCount(input, counter, field.limit);
         }
@@ -5350,13 +3717,13 @@
     function updateCharacterCount(input, counter, limit) {
       const length = input.value.length;
       const remaining = limit - length;
-      
+
       // Update counter text
       counter.textContent = `${length}/${limit} caracteres`;
-      
+
       // Update color based on usage
       counter.classList.remove('good', 'warning', 'danger');
-      
+
       if (length <= limit * 0.7) {
         counter.classList.add('good');
       } else if (length <= limit * 0.9) {
@@ -5364,7 +3731,7 @@
       } else {
         counter.classList.add('danger');
       }
-      
+
       // Show remaining characters if close to limit
       if (remaining <= 10 && remaining >= 0) {
         counter.textContent = `${length}/${limit} (${remaining} restantes)`;
@@ -5372,7 +3739,7 @@
         counter.textContent = `${length}/${limit} (${Math.abs(remaining)} sobre el límite)`;
       }
     }
-    
+
     // Image rotation functionality
     function initRotation() {
       const rotate90Btn = document.getElementById('rotate-90');
@@ -5381,29 +3748,29 @@
       const resetRotationBtn = document.getElementById('reset-rotation');
       const flipHorizontalBtn = document.getElementById('flip-horizontal');
       const flipVerticalBtn = document.getElementById('flip-vertical');
-      
+
       // Rotation buttons
       if (rotate90Btn) {
         rotate90Btn.addEventListener('click', () => rotateImage(90));
       }
-      
+
       if (rotate180Btn) {
         rotate180Btn.addEventListener('click', () => rotateImage(180));
       }
-      
+
       if (rotate270Btn) {
         rotate270Btn.addEventListener('click', () => rotateImage(270));
       }
-      
+
       if (resetRotationBtn) {
         resetRotationBtn.addEventListener('click', resetRotation);
       }
-      
+
       // Flip buttons
       if (flipHorizontalBtn) {
         flipHorizontalBtn.addEventListener('click', () => flipImage('horizontal'));
       }
-      
+
       if (flipVerticalBtn) {
         flipVerticalBtn.addEventListener('click', () => flipImage('vertical'));
       }
@@ -5414,7 +3781,7 @@
         console.error('No current image available');
         return;
       }
-      
+
       try {
         // Update rotation state (solo para el display)
         currentRotation = ((currentRotation + degrees) % 360 + 360) % 360;
@@ -5426,15 +3793,15 @@
 
         // Update rotation display
         updateRotationDisplay();
-        
+
         // Show success message
         showSuccessMessage(`Imagen rotada ${degrees}° (Total: ${currentRotation}°)`);
-        
+
         // v3.5.9: Guardar estado en el historial tras rotar
         if (typeof historyManager !== 'undefined') {
           historyManager.saveState();
         }
-        
+
       } catch (error) {
         console.error('Error rotating image:', error);
         showSuccessMessage('Error al rotar la imagen');
@@ -5446,7 +3813,7 @@
         console.error('No current image available');
         return;
       }
-      
+
       try {
         if (direction === 'horizontal') {
           isFlippedHorizontally = !isFlippedHorizontally;
@@ -5460,16 +3827,16 @@
 
         // Update rotation display
         updateRotationDisplay();
-        
+
         // Show success message
         const flipText = direction === 'horizontal' ? 'horizontalmente' : 'verticalmente';
         showSuccessMessage(`Imagen volteada ${flipText}`);
-        
+
         // v3.5.9: Guardar estado en el historial tras voltear
         if (typeof historyManager !== 'undefined') {
           historyManager.saveState();
         }
-        
+
       } catch (error) {
         console.error('Error flipping image:', error);
         showSuccessMessage('Error al voltear la imagen');
@@ -5523,7 +3890,7 @@
       const newImage = new Image();
       newImage.onload = function() {
         currentImage = newImage;
-        comparisonNeedsUpdate = true;
+        ComparisonManager.invalidate();
 
         // Re-sincronizar dimensiones internas + CSS del canvas y redibujar
         setupCanvas();
@@ -5547,7 +3914,7 @@
         // referencia no habría forma de volver al estado sin transformar.
         if (transformResetImage) {
           currentImage = transformResetImage;
-          comparisonNeedsUpdate = true;
+          ComparisonManager.invalidate();
         }
 
         setupCanvas();
@@ -5572,10 +3939,10 @@
     function updateRotationDisplay() {
       const currentRotationElement = document.getElementById('current-rotation');
       const currentRotationDisplay = document.getElementById('current-rotation-display');
-      
+
       if (currentRotationElement && currentRotationDisplay) {
         let displayText = `${currentRotation}°`;
-        
+
         // Add flip indicators
         if (isFlippedHorizontally || isFlippedVertically) {
           const flips = [];
@@ -5583,9 +3950,9 @@
           if (isFlippedVertically) flips.push('V');
           displayText += ` (${flips.join(', ')})`;
         }
-        
+
         currentRotationElement.textContent = displayText;
-        
+
         // Show/hide display based on transformations
         if (currentRotation !== 0 || isFlippedHorizontally || isFlippedVertically) {
           currentRotationDisplay.classList.remove('hidden');
@@ -5594,7 +3961,7 @@
         }
       }
     }
-    
+
     // Progress bar functionality
     /**
      * @param {string} title
@@ -5636,13 +4003,13 @@
         overlay.classList.add('show');
       }
     }
-    
+
     function updateProgress(percentage, message = '', eta = '') {
       const progressBar = document.getElementById('progress-bar');
       const progressText = document.getElementById('progress-text');
       const progressEta = document.getElementById('progress-eta');
       const progressTrack = document.getElementById('progress-track');
-      
+
       if (progressBar && progressText) {
         progressBar.style.width = `${percentage}%`;
         progressText.textContent = `${Math.round(percentage)}%`;
@@ -5650,51 +4017,51 @@
           const clamped = Math.max(0, Math.min(100, Math.round(percentage)));
           progressTrack.setAttribute('aria-valuenow', String(clamped));
         }
-        
+
         if (message) {
           const titleElement = document.getElementById('progress-title');
           if (titleElement) titleElement.textContent = message;
         }
-        
+
         if (eta && progressEta) {
           progressEta.textContent = eta;
         }
       }
     }
-    
+
     function hideProgressBar() {
       const overlay = document.getElementById('progress-overlay');
       if (overlay) {
         overlay.classList.remove('show');
       }
     }
-    
+
     // Enhanced progress simulation for download operations
     async function simulateProgressSteps(steps, totalDuration = 3000) {
       const stepDuration = totalDuration / steps.length;
       const startTime = Date.now();
-      
+
       for (let i = 0; i < steps.length; i++) {
         const step = steps[i];
         const progress = ((i + 1) / steps.length) * 100;
         const elapsed = Date.now() - startTime;
         const estimatedTotal = (elapsed / (i + 1)) * steps.length;
         const remaining = Math.max(0, estimatedTotal - elapsed);
-        
-        const eta = remaining > 1000 
+
+        const eta = remaining > 1000
           ? `${Math.ceil(remaining / 1000)}s restantes`
           : `${Math.ceil(remaining)}ms restantes`;
-        
+
         updateProgress(progress, step.message, eta);
-        
+
         // Simulate processing time
         await new Promise(resolve => setTimeout(resolve, step.duration || stepDuration));
       }
     }
-    
+
     // Enhanced download function with progress bar
-    
-    
+
+
     // Hide image info when no image is loaded
     function hideImageInfo() {
       const imageInfoElement = document.getElementById('image-info');
@@ -5709,7 +4076,7 @@
       // v3.6.1: restaurar la dropzone al quitar la imagen
       document.body.classList.remove('has-image');
       currentImage = null;
-      comparisonNeedsUpdate = true;
+      ComparisonManager.invalidate();
       currentFile = null;
       originalExtension = 'jpg';
       watermarkImagePreview = null;
@@ -5723,65 +4090,62 @@
       isFlippedVertically = false;
       if (canvas) canvas.setAttribute('aria-label', 'Previsualización: sin imagen cargada');
 
-      // Limpiar cache
-      cache.watermarkImage = null;
-      cache.lastWatermarkConfig = null;
-      cache.lastWatermarkFileKey = null;
-      
+      WatermarkManager.clearCache();
+
       // Limpiar formularios
       const fileInput = document.getElementById('file-input');
       if (fileInput) fileInput.value = '';
       document.getElementById('metadata-form').reset();
       document.getElementById('watermark-form').reset();
-      
+
       // Restaurar botón de marca de agua a rojo y ocultar miniatura
       const watermarkUploadLabel = document.getElementById('watermark-upload-label');
       const watermarkThumbnail = document.getElementById('watermark-preview-thumb');
       const watermarkFileLabel = document.getElementById('watermark-file-label');
-      
+
       if (watermarkUploadLabel) {
         watermarkUploadLabel.classList.remove('watermark-loaded');
       }
-      
+
       if (watermarkThumbnail) {
         watermarkThumbnail.style.display = 'none';
         watermarkThumbnail.src = '';
       }
-      
+
       if (watermarkFileLabel) {
         watermarkFileLabel.textContent = 'Seleccionar archivo';
       }
-      
+
       // Ocultar elementos
       document.getElementById('file-info')?.classList.add('file-info--hidden');
       document.getElementById('editor-container')?.classList.add('editor-container--hidden');
-      
+
       // Restaurar botón a rojo y ocultar miniatura
       const uploadButton = document.getElementById('file-selector');
       if (uploadButton) {
         uploadButton.classList.remove('image-loaded');
       }
-      
+
       // Ocultar miniatura
       const thumbnailElement = document.getElementById('file-preview-thumbnail');
       if (thumbnailElement) {
         thumbnailElement.style.display = 'none';
         thumbnailElement.src = '';
       }
-      
+
       // Ocultar controles de zoom
       const zoomControls = document.getElementById('zoom-controls');
       if (zoomControls) {
         zoomControls.classList.add('hidden');
       }
-      
+
       hideImageInfo(); // Ocultar información de imagen
-      
+
       // Limpiar canvas
       if (ctx) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
       }
-      
+
       // Limpiar marcadores de posición si existen (imagen Y texto)
       removePositionMarker();
       removeTextPositionMarker();
@@ -5800,13 +4164,13 @@
       if (canvas) {
         canvas.classList.remove('positioning-mode', 'positioning-image', 'positioning-text', 'positioning-both');
       }
-      
+
       // Ocultar preview de metadatos si está visible
       hideMetadataPreview();
-      
+
       // Resetear controles de salida
       resetOutputControls();
-      
+
       UIManager.hideError();
       UIManager.showSuccess('Archivo removido correctamente');
     }
@@ -5815,7 +4179,7 @@
     function toggleFullscreen() {
       const canvas = document.getElementById('preview-canvas');
       const container = canvas.parentElement;
-      
+
       if (!document.fullscreenElement) {
         // Entrar en pantalla completa
         if (container.requestFullscreen) {
@@ -5825,13 +4189,13 @@
         } else if (container.msRequestFullscreen) {
           container.msRequestFullscreen();
         }
-        
+
         // Agregar clase para estilos de pantalla completa
         container.classList.add('fullscreen-mode');
         canvas.style.maxWidth = '100vw';
         canvas.style.maxHeight = '100vh';
         canvas.style.objectFit = 'contain';
-        
+
       } else {
         // Salir de pantalla completa
         if (document.exitFullscreen) {
@@ -5848,7 +4212,7 @@
       const canvas = document.getElementById('preview-canvas');
       const container = canvas.parentElement;
       const fullscreenBtn = document.getElementById('fullscreen-btn');
-      
+
       if (!document.fullscreenElement) {
         // Saliendo de pantalla completa
         container.classList.remove('fullscreen-mode');
@@ -5891,7 +4255,7 @@
           </button>
         </div>
       `;
-      
+
       document.body.appendChild(notification);
       setTimeout(() => {
         if (notification.parentNode) {
@@ -5921,7 +4285,7 @@
           </button>
         </div>
       `;
-      
+
       document.body.appendChild(notification);
       setTimeout(() => {
         if (notification.parentNode) {
@@ -5931,58 +4295,15 @@
       }, 4000);
     }
 
-    // Enhanced download function with progress
-    async function downloadImageEnhanced() {
-      if (!canvas || !currentImage) {
-        showError('No hay imagen para descargar');
-        return;
-      }
-      
-      try {
-        // IMPORTANTE: Desactivar bordes de guía antes de descargar
-        showPositioningBorders = false;
-        
-        // Redibujar canvas completo sin los bordes
-        redrawCompleteCanvas();
-        
-        showLoadingState('Preparando descarga...');
-        
-        // Generate filename with timestamp
-        const timestamp = new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-');
-        const filename = `imagen-editada-${timestamp}.png`;
-        
-        // Create download with enhanced quality
-        const dataUrl = canvas.toDataURL('image/png', 1.0);
-        const link = document.createElement('a');
-        link.download = filename;
-        link.href = dataUrl;
-        
-        // Trigger download with smooth animation
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-        hideLoadingState();
-        
-      } catch (error) {
-        console.error('Error downloading image:', error);
-        hideLoadingState();
-        showError('Error al descargar la imagen');
-      } finally {
-        // IMPORTANTE: Reactivar bordes de guía después de descargar
-        showPositioningBorders = true;
-        
-        // Redibujar canvas completo CON los bordes para la vista previa
-        redrawCompleteCanvas();
-      }
-    }
+    // v3.7.1: downloadImageEnhanced eliminado — era código muerto (la descarga
+    // real vive en export-manager.js: downloadImage / downloadImageWithProgress).
 
     // Loading state management
     function showLoadingState(message = 'Procesando...') {
       const overlay = document.createElement('div');
       overlay.id = 'loading-overlay';
       overlay.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 animate-fade-in';
-      
+
       overlay.innerHTML = `
         <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm mx-4 text-center animate-slide-up">
           <div class="animate-pulse mb-4">
@@ -5996,7 +4317,7 @@
           </div>
         </div>
       `;
-      
+
       document.body.appendChild(overlay);
     }
 
@@ -6006,27 +4327,6 @@
         overlay.classList.add('animate-fade-out');
         setTimeout(() => overlay.remove(), 300);
       }
-    }
-
-    // Enhanced clear metadata function
-    function clearMetadata() {
-      const form = document.getElementById('metadata-form');
-      if (form) {
-        form.reset();
-        showSuccess('Metadatos limpiados');
-      }
-    }
-
-    // Performance monitoring
-    function measurePerformance(operation, fn) {
-      const start = performance.now();
-      const result = fn();
-      const end = performance.now();
-      
-      if (end - start > 100) { // Log operations taking more than 100ms
-      }
-      
-      return result;
     }
 
     // MetadataManager extraído a js/managers/metadata-manager.js
@@ -6045,42 +4345,40 @@
         FilterLoadingManager.hideFilterLoading();
         return;
       }
-      
+
       // Verificar si necesita actualización usando cache
       if (!FilterCache.hasChanged(FilterManager.filters)) {
         FilterLoadingManager.hideFilterLoading();
         return;
       }
-      
+
       // Usar requestAnimationFrame para mejor performance
       requestAnimationFrame(() => {
         try {
           const filterString = FilterManager.getFilterString();
-          
+
           // Aplicar filtros con transición suave
           canvas.style.transition = 'filter 0.2s ease';
           canvas.style.filter = filterString;
-          
+
           // Ocultar loading states después de aplicar
           setTimeout(() => {
             FilterLoadingManager.hideFilterLoading();
           }, 200);
-          
+
         } catch (error) {
           console.error('❌ Error al aplicar filtros:', error);
           FilterLoadingManager.hideFilterLoading();
         }
       });
     }
-    
+
     // Aplica vía CSS SOLO los filtros que el worker NO horneó en píxeles.
     // Se llama después del camino worker. La versión anterior leía claves
     // inexistentes (filters.hue/.grayscale/.invert) y generaba un string CSS
     // inválido que el CSSOM rechazaba, dejando el filter completo anterior
     // aplicado ENCIMA de los píxeles ya procesados (filtros dobles).
-    function applyCanvasFiltersLight() {
-      if (!canvas) return;
-
+    function getCanvasFiltersLight() {
       // Claves que el worker hornea (contrato con filter-manager.js).
       const baked = Array.isArray(FilterManager.workerBakedFilters)
         ? FilterManager.workerBakedFilters
@@ -6110,14 +4408,19 @@
 
       // String vacío es válido: limpia el filter CSS completo anterior para
       // que no se acumule sobre los píxeles ya horneados.
-      const filterString = filterParts.join(' ');
+      return filterParts.join(' ');
+    }
+
+    function applyCanvasFiltersLight() {
+      if (!canvas) return;
+      const filterString = getCanvasFiltersLight();
 
       requestAnimationFrame(() => {
         canvas.style.transition = 'filter 0.2s ease';
         canvas.style.filter = filterString;
       });
     }
-    
+
     // ===== ZOOM FUNCTIONALITY — extraído a js/managers/zoom-pan-manager.js (v3.5.0) =====
     // Shims locales para que las llamadas existentes en main.js
     // (zoomIn(), resetZoom(), etc.) sigan funcionando sin cambiar cada callsite.
@@ -6131,319 +4434,24 @@
     function initMouseWheelZoom() { ZoomPanManager.initMouseWheelZoom(); }
     function initPanNavigation() { ZoomPanManager.initPanNavigation(); }
 
-    // ===== MOBILE RESPONSIVE FEATURES =====
-    
+    // Interacciones responsive/táctiles extraídas a MobileManager (v3.7.1).
     function initMobileFeatures() {
-      if (!isMobileDevice()) return;
-      
-      // Initialize touch gestures
-      initTouchGestures();
-      
-      // Initialize mobile navigation
-      initMobileNavigation();
-      
-      // Initialize mobile canvas interactions
-      initMobileCanvasInteraction();
-      
-      // Initialize keyboard handling for mobile
-      initMobileKeyboard();
-      
-      // Initialize orientation change handling
-      initOrientationHandling();
-      
+      MobileManager.initialize({ setupCanvas, updatePreview });
     }
-    
-    function isMobileDevice() {
-      return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-             window.innerWidth <= 768 ||
-             ('ontouchstart' in window) ||
-             (navigator.maxTouchPoints > 0);
-    }
-    
-    function initTouchGestures() {
-      let startY = 0;
-      let isScrolling = false;
-      
-      // Smooth scrolling for mobile
-      document.addEventListener('touchstart', function(e) {
-        startY = e.touches[0].clientY;
-        isScrolling = false;
-      }, { passive: true });
-      
-      document.addEventListener('touchmove', function(e) {
-        if (!isScrolling) {
-          const currentY = e.touches[0].clientY;
-          const diffY = Math.abs(currentY - startY);
-          
-          if (diffY > 10) {
-            isScrolling = true;
-          }
-        }
-      }, { passive: true });
-      
-      // Double tap to reset zoom on canvas
-      let lastTap = 0;
-      const canvas = document.getElementById('preview-canvas');
-      
-      if (canvas) {
-        canvas.addEventListener('touchend', function(e) {
-          const currentTime = new Date().getTime();
-          const tapLength = currentTime - lastTap;
-          
-          if (tapLength < 500 && tapLength > 0) {
-            // Double tap detected - reset canvas view
-            resetCanvasView();
-            e.preventDefault();
-          }
-          lastTap = currentTime;
-        });
-      }
-    }
-    
-    function initMobileNavigation() {
-      // Auto-collapse sections on mobile after interaction
-      const collapsibleHeaders = document.querySelectorAll('.collapsible-header');
-      
-      collapsibleHeaders.forEach(header => {
-        header.addEventListener('touchend', function() {
-          // Small delay to ensure smooth animation
-          setTimeout(() => {
-            // Auto-scroll to the opened section
-            if (!header.closest('.collapsible').classList.contains('collapsed')) {
-              header.scrollIntoView({ 
-                behavior: 'smooth', 
-                block: 'start',
-                inline: 'nearest' 
-              });
-            }
-          }, 100);
-        });
-      });
-      
-      // Mobile sticky navigation helper
-      const actionButtons = document.querySelector('.action-buttons');
-      if (actionButtons && window.innerWidth <= 767) {
-        // Make action buttons sticky on mobile
-        const observer = new IntersectionObserver((entries) => {
-          entries.forEach(entry => {
-            if (entry.isIntersecting) {
-              actionButtons.classList.remove('fixed-bottom');
-            } else {
-              actionButtons.classList.add('fixed-bottom');
-            }
-          });
-        });
-        
-        // Observe the last section
-        const lastSection = document.querySelector('section:last-of-type');
-        if (lastSection) {
-          observer.observe(lastSection);
-        }
-      }
-    }
-    
-    function initMobileCanvasInteraction() {
-      const canvas = document.getElementById('preview-canvas');
-      if (!canvas) return;
-      
-      let startX = 0;
-      let startY = 0;
-      let initialDistance = 0;
-
-      // Pinch to zoom — actualiza el estado global (currentZoom/isZoomed) y
-      // aplica el transform vía ZoomPanManager. Escribir canvas.style.transform
-      // directamente desincronizaba el pinch del resto del sistema de zoom
-      // (botones, indicador de %, drag de watermarks).
-      canvas.addEventListener('touchstart', function(e) {
-        if (e.touches.length === 2) {
-          // Two finger touch - prepare for zoom
-          initialDistance = getDistance(e.touches[0], e.touches[1]);
-          e.preventDefault();
-        } else if (e.touches.length === 1) {
-          // Single touch - prepare for pan
-          startX = e.touches[0].clientX;
-          startY = e.touches[0].clientY;
-        }
-      }, { passive: false });
-
-      canvas.addEventListener('touchmove', function(e) {
-        if (e.touches.length === 2) {
-          // Pinch zoom
-          const currentDistance = getDistance(e.touches[0], e.touches[1]);
-          const scaleChange = currentDistance / initialDistance;
-          currentZoom = Math.min(Math.max(minZoom, currentZoom * scaleChange), maxZoom);
-
-          ZoomPanManager.applyZoom();
-          ZoomPanManager.updateZoomLevel();
-          initialDistance = currentDistance;
-          e.preventDefault();
-        }
-      }, { passive: false });
-
-      canvas.addEventListener('touchend', function(e) {
-        if (e.touches.length === 0) {
-          // Volver a 100% si quedó casi sin zoom
-          if (currentZoom < 1.05 && currentZoom !== 1.0) {
-            currentZoom = 1.0;
-            ZoomPanManager.applyZoom();
-            ZoomPanManager.updateZoomLevel();
-          }
-        }
-      });
-    }
-    
-    function initMobileKeyboard() {
-      // Handle virtual keyboard appearance
-      let initialViewportHeight = window.innerHeight;
-      
-      window.addEventListener('resize', function() {
-        const currentHeight = window.innerHeight;
-        const heightDifference = initialViewportHeight - currentHeight;
-        
-        // If height decreased significantly, keyboard is likely open
-        if (heightDifference > 150) {
-          document.body.classList.add('keyboard-open');
-          
-          // Scroll focused element into view
-          const focusedElement = document.activeElement;
-          if (focusedElement && focusedElement.tagName !== 'BODY') {
-            setTimeout(() => {
-              focusedElement.scrollIntoView({ 
-                behavior: 'smooth', 
-                block: 'center' 
-              });
-            }, 100);
-          }
-        } else {
-          document.body.classList.remove('keyboard-open');
-        }
-      });
-      
-      // Prevent zoom on input focus for iOS
-      const inputs = document.querySelectorAll('input, textarea, select');
-      inputs.forEach(input => {
-        input.addEventListener('focus', function() {
-          if (this.style.fontSize !== '16px') {
-            this.style.fontSize = '16px';
-          }
-        });
-      });
-    }
-    
-    function initOrientationHandling() {
-      // Handle orientation changes
-      window.addEventListener('orientationchange', function() {
-        setTimeout(() => {
-          // Recalculate layout after orientation change
-          if (canvas && currentImage) {
-            updatePreview();
-          }
-          
-          // Resetear el zoom por el sistema global para no desincronizar
-          // currentZoom/isZoomed del transform aplicado
-          currentZoom = 1.0;
-          isZoomed = false;
-          ZoomPanManager.resetPan();
-          ZoomPanManager.applyZoom();
-          ZoomPanManager.updateZoomLevel();
-
-          // Update container widths
-          updateMobileLayout();
-        }, 100);
-      });
-    }
-    
-    function getDistance(touch1, touch2) {
-      const dx = touch1.clientX - touch2.clientX;
-      const dy = touch1.clientY - touch2.clientY;
-      return Math.sqrt(dx * dx + dy * dy);
-    }
-    
-    function resetCanvasView() {
-      // Resetear vía el sistema global de zoom (escribir el transform
-      // directamente dejaba currentZoom/isZoomed desincronizados)
-      currentZoom = 1.0;
-      isZoomed = false;
-      ZoomPanManager.resetPan();
-      ZoomPanManager.applyZoom();
-      ZoomPanManager.updateZoomLevel();
-    }
-    
-    function updateMobileLayout() {
-      if (!isMobileDevice()) return;
-      
-      // Update grid layouts for current screen size
-      const grids = document.querySelectorAll('.grid');
-      grids.forEach(grid => {
-        if (window.innerWidth <= 480) {
-          // Extra small screens - single column
-          grid.style.gridTemplateColumns = '1fr';
-        } else if (window.innerWidth <= 768) {
-          // Small screens - adjust based on content
-          if (grid.classList.contains('grid-cols-2')) {
-            grid.style.gridTemplateColumns = 'repeat(2, 1fr)';
-          }
-        }
-      });
-      
-      // Update button groups
-      const buttonGroups = document.querySelectorAll('.button-group');
-      buttonGroups.forEach(group => {
-        if (window.innerWidth <= 480) {
-          group.style.flexDirection = 'column';
-        } else {
-          group.style.flexDirection = 'row';
-        }
-      });
-      
-      // Reajustar canvas si hay una imagen cargada
-      if (currentImage && canvas) {
-        setupCanvas();
-        updatePreview();
-      }
-    }
-    
-    // Add mobile-specific CSS class to body
-    if (isMobileDevice()) {
-      document.body.classList.add('mobile-device');
-    }
-    
-    // Initialize on window load
-    window.addEventListener('load', function() {
-      if (isMobileDevice()) {
-        updateMobileLayout();
-      }
-    });
-    
-    // Add resize event listener for responsive canvas
-    window.addEventListener('resize', function() {
-      // Debounce the resize event
-      clearTimeout(window.resizeTimer);
-      window.resizeTimer = setTimeout(function() {
-        if (isMobileDevice()) {
-          updateMobileLayout();
-        }
-        // Recalcular dimensiones del canvas en cualquier dispositivo
-        if (currentImage) {
-          setupCanvas();
-          updatePreview();
-        }
-      }, 250);
-    });
 
     // ===== FILTER OPTIMIZATION & CLEANUP =====
-    
+
     // Limpieza automática de cache cada 5 minutos
     setInterval(() => {
       FilterCache.cleanup();
     }, 5 * 60 * 1000);
-    
+
     // Cleanup al cerrar/recargar página
     window.addEventListener('beforeunload', () => {
       SmartDebounce.clear();
       FilterLoadingManager.activeLoadings.clear();
     });
-    
+
     // Función para mostrar métricas de rendimiento (solo en modo debug)
     if (MNEMOTAG_DEBUG) {
       window.getFilterPerformanceMetrics = function() {
@@ -6460,7 +4468,7 @@
     }
 
     // ===== ADVANCED MANAGERS INITIALIZATION =====
-    
+
     /**
      * Inicializar managers avanzados
      */
@@ -6468,13 +4476,46 @@
       try {
         // Inicializar Keyboard Shortcuts
         keyboardShortcuts = new KeyboardShortcutManager();
-        
+        EditorShortcutManager.configure({
+          keyboardShortcuts,
+          handleFile,
+          getCropManager: () => cropManager,
+          closeCropPanel,
+          updatePreview,
+          resetFilters,
+          resetChanges,
+          toggleComparisonMode,
+          openModal: _openAccessibleModal,
+          closeModal: _closeAccessibleModal
+        });
+
         // Inicializar Batch Manager
         batchManager = new BatchManager();
-        
+
         // Inicializar Text Layer Manager
         textLayerManager = new TextLayerManager();
-        
+
+        BatchUIManager.configure({
+          batchManager,
+          textLayerManager,
+          openModal: _openAccessibleModal,
+          closeModal: _closeAccessibleModal,
+          showProgress: showProgressBar,
+          updateProgress,
+          hideProgress: hideProgressBar,
+          simulateProgress: simulateProgressSteps
+        });
+        TextLayerUIManager.configure({
+          textLayerManager,
+          render: renderCanvasWithLayers,
+          renderLightweight: renderCanvasWithLayersLightweight
+        });
+        SessionCoordinator.configure({
+          textLayerManager,
+          loadImage: loadImageWithValidation,
+          updatePreview
+        });
+
         // Inicializar Crop Manager con el canvas
         if (canvas) {
           cropManager = new CropManager(canvas);
@@ -6496,1441 +4537,53 @@
           Capabilities.applyToUI();
         }
         if (typeof SessionManager !== 'undefined') {
-          initSessionRestore();
+          SessionCoordinator.initialize();
         }
 
       } catch (error) {
         console.error('Error inicializando managers avanzados:', error);
       }
     }
-    
-    /**
-     * Configurar atajos de teclado
-     */
-    function setupKeyboardShortcuts() {
-      if (!keyboardShortcuts) return;
-      
-      try {
-        // Ctrl/Cmd + Z: Deshacer
-        keyboardShortcuts.register('z', ['ctrl'], () => {
-          if (historyManager && historyManager.canUndo()) {
-            historyManager.undo();
-            UIManager.showSuccess('Deshecho');
-          }
-        }, { description: 'Deshacer última acción', category: 'Edición' });
-        
-        // Ctrl/Cmd + Shift + Z o Ctrl/Cmd + Y: Rehacer
-        keyboardShortcuts.register('z', ['ctrl', 'shift'], () => {
-          if (historyManager && historyManager.canRedo()) {
-            historyManager.redo();
-            UIManager.showSuccess('Rehecho');
-          }
-        }, { description: 'Rehacer acción', category: 'Edición' });
-        
-        // Ctrl+Y eliminado (Y está en la mano derecha). Usar Ctrl+Shift+Z.
-        
-        // Ctrl/Cmd + S: Guardar/Exportar con barra de progreso
-        keyboardShortcuts.register('s', ['ctrl'], async () => {
-          if (currentImage) {
-            await ExportManager.downloadImageWithProgress();
-          }
-        }, { description: 'Guardar imagen', category: 'Archivo' });
-        
-        // Ctrl/Cmd + Shift + C: Copiar imagen al portapapeles
-        keyboardShortcuts.register('c', ['ctrl', 'shift'], async () => {
-          if (canvas && currentImage) {
-            try {
-              await copyCanvasToClipboard();
-              UIManager.showSuccess('✅ Imagen copiada al portapapeles');
-            } catch (err) {
-              UIManager.showError('❌ Error al copiar imagen');
-            }
-          } else {
-            UIManager.showInfo('ℹ️ Carga una imagen primero');
-          }
-        }, { description: 'Copiar imagen al portapapeles', category: 'Archivo' });
-        
-        // Ctrl/Cmd + Shift + V: Pegar imagen desde portapapeles
-        keyboardShortcuts.register('v', ['ctrl', 'shift'], async () => {
-          try {
-            const items = await navigator.clipboard.read();
-            for (const item of items) {
-              for (const type of item.types) {
-                if (type.startsWith('image/')) {
-                  const blob = await item.getType(type);
-                  const file = new File([blob], 'pasted-image.png', { type });
-                  // Cargar por el flujo completo (validación + editor).
-                  // loadImageFromFile solo decodificaba un <img> que se
-                  // descartaba: el toast decía "pegada" pero nada cambiaba.
-                  await handleFile(file);
-                  UIManager.showSuccess('✅ Imagen pegada desde portapapeles');
-                  return;
-                }
-              }
-            }
-            UIManager.showInfo('ℹ️ No hay imagen en el portapapeles');
-          } catch (err) {
-            UIManager.showError('❌ Error al pegar imagen. Usa Cmd+V nativo en un campo de carga.');
-          }
-        }, { description: 'Pegar imagen desde portapapeles', category: 'Archivo' });
-        
-        // Ctrl/Cmd + Shift + X: Exportar con ajustes actuales
-        keyboardShortcuts.register('x', ['ctrl', 'shift'], async () => {
-          if (currentImage) {
-            await ExportManager.downloadImageWithProgress();
-          } else {
-            UIManager.showInfo('Carga una imagen primero');
-          }
-        }, { description: 'Exportar imagen con ajustes', category: 'Archivo' });
-        
-        // Espacio: Vista antes/después (mantener presionado)
-        let spaceHeld = false;
-        keyboardShortcuts.register(' ', [], () => {
-          if (!currentImage || !canvas || spaceHeld) return;
-          spaceHeld = true;
-          showOriginalImage();
-          UIManager.showInfo('Mostrando imagen original');
-        }, { description: 'Ver imagen original (mantener presionado)', category: 'Vista', preventDefault: false });
 
-        document.addEventListener('keyup', (e) => {
-          if (e.key === ' ' && spaceHeld) {
-            spaceHeld = false;
-            // showOriginalImage limpió el filter CSS; forzar su re-aplicación
-            // (sin markDirty, el gate de FilterCache haría early-return)
-            if (typeof FilterCache !== 'undefined') {
-              FilterCache.markDirty();
-            }
-            updatePreview();
-          }
-        });
-        
-        // Esc: Cancelar operación actual
-        keyboardShortcuts.register('escape', [], () => {
-          if (cropManager && cropManager.isActive) {
-            closeCropPanel();
-            updatePreview();
-            UIManager.showInfo('❌ Modo recorte cancelado');
-          }
-        }, { description: 'Cancelar operación actual', category: 'Herramientas', preventDefault: false });
-        
-        // Backspace: Eliminar capa seleccionada (solo cuando NO estés en un input)
-        keyboardShortcuts.register('backspace', [], () => {
-          if (textLayerManager && activeLayerId) {
-            const layer = textLayerManager.getLayer(activeLayerId);
-            if (layer && confirm(`¿Eliminar capa "${layer.text}"?`)) {
-              textLayerManager.removeLayer(activeLayerId);
-              activeLayerId = textLayerManager.activeLayerId;
-              updateTextLayersList();
-              updatePreview();
-              UIManager.showSuccess('🗑️ Capa eliminada');
-            }
-          }
-        }, { description: 'Eliminar capa seleccionada', category: 'Edición', preventDefault: false });
-        
-        // Ctrl/Cmd + D: Duplicar capa
-        keyboardShortcuts.register('d', ['ctrl'], async () => {
-          if (textLayerManager && activeLayerId) {
-            const duplicate = await textLayerManager.duplicateLayer(activeLayerId);
-            selectTextLayer(duplicate.id);
-            updatePreview();
-            UIManager.showSuccess(`📋 Capa duplicada: ${duplicate.text}`);
-          } else {
-            UIManager.showInfo('ℹ️ Selecciona una capa de texto primero');
-          }
-        }, { description: 'Duplicar capa de texto actual', category: 'Edición' });
-        
-        // Ctrl/Cmd + Shift + R: Reiniciar todos los ajustes
-        keyboardShortcuts.register('r', ['ctrl', 'shift'], () => {
-          if (confirm('¿Reiniciar todos los filtros y ajustes?')) {
-            resetFilters();
-            UIManager.showSuccess('🔄 Ajustes reiniciados');
-          }
-        }, { description: 'Reiniciar filtros y ajustes', category: 'Edición' });
-
-        // Ctrl/Cmd + R: Descartar cambios (migrado del handler legacy;
-        // solo intercepta la recarga del navegador si hay imagen cargada)
-        keyboardShortcuts.register('r', ['ctrl'], () => {
-          if (currentImage) {
-            resetChanges();
-          }
-        }, { description: 'Descartar cambios de la imagen', category: 'Edición' });
-        
-        // Ctrl/Cmd + B: Abrir procesamiento por lotes
-        keyboardShortcuts.register('b', ['ctrl'], () => {
-          if (typeof window.openBatchModal === 'function') {
-            window.openBatchModal();
-            UIManager.showInfo('📦 Modo lote activado');
-          }
-        }, { description: 'Abrir procesamiento por lotes', category: 'Herramientas' });
-        
-        // Ctrl/Cmd + Shift + T: Abrir panel de capas de texto
-        // (Ctrl+T abre pestaña nueva en Chrome — usar Shift)
-        keyboardShortcuts.register('t', ['ctrl', 'shift'], () => {
-          if (typeof window.openTextLayersPanel === 'function') {
-            window.openTextLayersPanel();
-          }
-        }, { description: 'Abrir panel de capas de texto', category: 'Herramientas' });
-
-        // Ctrl/Cmd + Shift + C ya usado para copiar. Usar Alt+C para recorte.
-        keyboardShortcuts.register('c', ['alt'], () => {
-          if (typeof window.openCropPanel === 'function') {
-            window.openCropPanel();
-          }
-        }, { description: 'Abrir modo recorte', category: 'Herramientas' });
-        
-        // Ctrl+Shift+A: Ver atajos de teclado
-        keyboardShortcuts.register('a', ['ctrl', 'shift'], () => {
-          if (typeof window.openShortcutsModal === 'function') {
-            window.openShortcutsModal();
-          }
-        }, { description: 'Ver atajos de teclado', category: 'Vista' });
-
-        // Zoom por teclado (Ctrl/Cmd +, -, 0): gestionado exclusivamente por
-        // ZoomPanManager.initZoomKeyboardShortcuts(). Registrar '=' también
-        // aquí duplicaba el listener y cada pulsación hacía zoom doble.
-
-        // Ctrl+E: Toggle modo comparación
-        keyboardShortcuts.register('e', ['ctrl'], () => {
-          toggleComparisonMode();
-        }, { description: 'Activar/desactivar modo comparación', category: 'Vista' });
-        
-        
-      } catch (error) {
-        console.error('Error configurando atajos de teclado:', error);
-      }
-    }
-    
-    /**
-     * Copiar canvas al portapapeles
-     */
-    async function copyCanvasToClipboard() {
-      try {
-        if (!navigator.clipboard || !navigator.clipboard.write) {
-          throw new Error('API de portapapeles no disponible');
-        }
-        
-        // Convertir canvas a blob
-        const blob = await new Promise(resolve => {
-          canvas.toBlob(resolve, 'image/png');
-        });
-        
-        // Escribir al portapapeles
-        await navigator.clipboard.write([
-          new ClipboardItem({ 'image/png': blob })
-        ]);
-        
-        UIManager.showSuccess('✅ Imagen copiada al portapapeles');
-        
-      } catch (error) {
-        console.error('Error copiando al portapapeles:', error);
-        UIManager.showError('No se pudo copiar al portapapeles. Intenta usar la función de descarga.');
-      }
-    }
-    
-    /**
-     * Mostrar imagen original (sin filtros)
-     */
-    function showOriginalImage() {
-      if (!currentImage || !canvas || !ctx) return;
-
-      // Quitar también el filter CSS del elemento canvas: sin esto el "antes"
-      // seguía mostrando brillo/contraste/etc. aplicados vía CSS
-      canvas.style.transition = 'none';
-      canvas.style.filter = '';
-
-      // Limpiar canvas
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Configurar alta calidad
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-
-      // Dibujar imagen original sin filtros
-      ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
-    }
-
-    // Nota: las referencias de debugging (window.keyboardShortcuts, etc.) se
-    // exponen al final de initializeAdvancedManagers(); aquí en tiempo de
-    // evaluación los managers aún valían null y quedaban congeladas a null.
+    function setupKeyboardShortcuts() { EditorShortcutManager.setup(); }
 
     // ============================================
     // FUNCIONES DE INTEGRACIÓN UI v3.1
     // ============================================
 
-    /**
-     * ====================================
-     * RESTAURACIÓN DE SESIÓN (v3.7.0)
-     * ====================================
-     * El estado se guarda en IndexedDB vía SessionManager (autosave debounced
-     * desde updatePreview). Al arrancar, initSessionRestore ofrece recuperar
-     * la última sesión: imagen original + formulario del panel + filtros +
-     * capas de texto. La marca de agua de imagen NO se restaura (requiere el
-     * archivo de la marca); su configuración de formulario sí.
-     */
-
-    const SESSION_STATE_VERSION = 1;
-
-    function collectSessionState() {
-      if (!currentFile || !currentImage) return null;
-
-      // Estado de TODOS los controles con id del panel (metadatos, marca,
-      // ajustes y exportación). Los type=file no son serializables.
-      const formState = {};
-      document.querySelectorAll('#workspace-panel input[id], #workspace-panel select[id], #workspace-panel textarea[id]')
-        .forEach((el) => {
-          const type = (el.type || '').toLowerCase();
-          if (type === 'file') return;
-          if (type === 'checkbox' || type === 'radio') {
-            formState[el.id] = { checked: el.checked };
-          } else {
-            formState[el.id] = { value: el.value };
-          }
-        });
-
-      return {
-        version: SESSION_STATE_VERSION,
-        savedAt: Date.now(),
-        file: currentFile,
-        fileName: currentFile.name || 'imagen',
-        formState: formState,
-        filters: (typeof FilterManager !== 'undefined') ? { ...FilterManager.filters } : null,
-        textLayers: textLayerManager ? textLayerManager.exportConfig() : null
-      };
-    }
-
-    function applySessionFormState(formState) {
-      if (!formState) return;
-      Object.keys(formState).forEach((id) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        const saved = formState[id];
-        try {
-          if (saved && typeof saved.checked === 'boolean') {
-            if (el.checked !== saved.checked) {
-              el.checked = saved.checked;
-              el.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-          } else if (saved && typeof saved.value === 'string') {
-            if (el.value !== saved.value) {
-              el.value = saved.value;
-              el.dispatchEvent(new Event('input', { bubbles: true }));
-              el.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-          }
-        } catch (err) {
-          MNEMOTAG_DEBUG && console.warn('applySessionFormState: campo ' + id + ' falló:', err);
-        }
-      });
-    }
-
-    async function restoreSavedSession(saved) {
-      if (!saved || !saved.file) return;
-      try {
-        SessionManager.setRestoring(true);
-        loadImageWithValidation(saved.file);
-
-        // Esperar a que el flujo de carga asigne currentImage (decodifica
-        // en un onload asíncrono; no hay promesa que encadenar).
-        const deadline = Date.now() + 10000;
-        while (!currentImage && Date.now() < deadline) {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-        if (!currentImage) throw new Error('La imagen de la sesión no terminó de cargar');
-
-        // Margen para que setupCanvas y el updatePreview inicial terminen.
-        await new Promise((resolve) => setTimeout(resolve, 300));
-
-        applySessionFormState(saved.formState);
-
-        // Filtros completos (incluye sepia/hueRotate, que no tienen slider).
-        if (saved.filters && typeof FilterManager !== 'undefined') {
-          Object.keys(FilterManager.filters).forEach((key) => {
-            if (saved.filters[key] !== undefined) {
-              FilterManager.filters[key] = saved.filters[key];
-              FilterManager.updateFilterDisplay(key, saved.filters[key]);
-              const slider = document.getElementById(key);
-              if (slider) slider.value = saved.filters[key];
-            }
-          });
-          FilterManager.applyFiltersImmediate();
-        }
-
-        // Capas de texto (exportConfig/importConfig de TextLayerManager)
-        if (saved.textLayers && textLayerManager) {
-          await textLayerManager.importConfig(saved.textLayers);
-        }
-
-        updatePreview();
-        UIManager.showSuccess('✅ Sesión anterior restaurada');
-      } catch (err) {
-        console.error('No se pudo restaurar la sesión:', err);
-        UIManager.showError('No se pudo restaurar la sesión anterior');
-      } finally {
-        SessionManager.setRestoring(false);
-      }
-    }
-
-    async function initSessionRestore() {
-      if (!SessionManager.isSupported()) return;
-      SessionManager.configureAutoSave(collectSessionState);
-
-      // El autosave se dispara desde updatePreview (cambios de canvas), pero
-      // los campos que no re-renderizan (metadatos, nombre de archivo…)
-      // también deben persistirse: escuchar input/change del panel.
-      const scheduleFromForm = (e) => {
-        if (!currentImage || !e.target || typeof e.target.closest !== 'function') return;
-        if (e.target.closest('#workspace-panel')) {
-          SessionManager.scheduleAutoSave();
-        }
-      };
-      document.addEventListener('input', scheduleFromForm, true);
-      document.addEventListener('change', scheduleFromForm, true);
-
-      const saved = await SessionManager.load();
-      if (!saved || !saved.file || currentImage) return;
-
-      const savedDate = new Date(saved.savedAt);
-      const hh = String(savedDate.getHours()).padStart(2, '0');
-      const mm = String(savedDate.getMinutes()).padStart(2, '0');
-      UIManager.showInfo(
-        'Hay una sesión guardada de "' + (saved.fileName || 'imagen') + '" (' + hh + ':' + mm + ').',
-        {
-          duration: 15000,
-          action: { label: 'Restaurar', handler: () => restoreSavedSession(saved) }
-        }
-      );
-    }
-
-    /**
-     * ====================================
-     * BATCH PROCESSING UI
-     * ====================================
-     */
-
-    let batchImages = [];
-    // v3.7.0: true mientras el lote se procesa — habilita los botones de
-    // cancelación individual en la lista (batchManager.isProcessing aún es
-    // false cuando se pinta la lista justo antes de arrancar processQueue).
-    let batchUIProcessing = false;
-
-    function openBatchModal() {
-      const modal = document.getElementById('batch-modal');
-      if (modal) {
-        // Copy de límites desde AppConfig — única fuente de verdad
-        const limitInfo = document.getElementById('batch-limit-info');
-        if (limitInfo) {
-          const maxMB = Math.round(AppConfig.maxFileSize / (1024 * 1024));
-          limitInfo.textContent = `Hasta ${AppConfig.batchMaxImages} imágenes • Máx ${maxMB} MB cada una`;
-        }
-
-        // ModalController: focus trap + Escape + restauración de foco
-        _openAccessibleModal(modal, () => {
-          batchImages = [];
-          updateBatchImagesList();
-        }, 'display');
-        setupBatchDropzone();
-      }
-    }
-
-    function closeBatchModal() {
-      const modal = document.getElementById('batch-modal');
-      if (modal) {
-        // _closeAccessibleModal dispara el onClose (limpia la cola)
-        _closeAccessibleModal(modal);
-      }
-    }
-
-    // Fix: el botón "Limpiar todo" del batch modal usaba
-    // onclick="clearBatchQueue()" pero la función no existía.
+    /** UI de lote delegada; estos wrappers conservan el contrato público. */
+    function openBatchModal() { BatchUIManager.open(); }
+    function closeBatchModal() { BatchUIManager.close(); }
     function clearBatchQueue() {
-      batchImages = [];
-      updateBatchImagesList();
-      UIManager.showSuccess('🗑️ Cola de imágenes vaciada');
+      BatchUIManager.clear();
+      UIManager.showSuccess('Cola de imágenes vaciada');
     }
-
-    function setupBatchDropzone() {
-      const dropzone = document.getElementById('batch-dropzone');
-      const fileInput = document.getElementById('batch-file-input');
-      
-      if (!dropzone || !fileInput) return;
-
-      // Click en cualquier parte del dropzone abre el selector de archivos
-      dropzone.onclick = () => {
-        fileInput.click();
-      };
-
-      // File input change
-      fileInput.onchange = (e) => {
-        const files = Array.from(e.target.files);
-        addBatchImages(files);
-        fileInput.value = ''; // Reset input
-      };
-
-      // Drag and drop
-      dropzone.ondragover = (e) => {
-        e.preventDefault();
-        dropzone.classList.add('drag-over');
-      };
-
-      dropzone.ondragleave = (e) => {
-        e.preventDefault();
-        dropzone.classList.remove('drag-over');
-      };
-
-      dropzone.ondrop = (e) => {
-        e.preventDefault();
-        dropzone.classList.remove('drag-over');
-        const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-        addBatchImages(files);
-      };
-    }
-
-    async function addBatchImages(files) {
-      // Validar límite de imágenes — única fuente: AppConfig.batchMaxImages
-      // (antes había tres valores contradictorios: 50 aquí, 20 en el manager
-      // y "50 imágenes / 50MB" en el copy del modal)
-      const maxBatch = AppConfig.batchMaxImages;
-      if (batchImages.length + files.length > maxBatch) {
-        UIManager.showError(`Máximo ${maxBatch} imágenes por lote`);
-        return;
-      }
-
-      // v3.7.0: única representación por imagen — File + dimensiones. La
-      // validación de BatchManager decodifica una vez (detecta archivos
-      // corruptos al añadir, no al procesar) y descarta la decodificación.
-      // Nada de previews base64: la lista muestra icono + nombre + datos.
-      for (const file of files) {
-        const validation = batchManager
-          ? await batchManager.validateImage(file)
-          : { valid: false, error: 'El procesador de lotes no está inicializado' };
-        if (validation.valid) {
-          batchImages.push({
-            id: Date.now() + Math.random(),
-            file: file,
-            name: file.name,
-            size: file.size,
-            width: validation.width,
-            height: validation.height
-          });
-        } else {
-          UIManager.showError(`${file.name || 'Archivo'}: ${validation.error}`);
-        }
-      }
-      updateBatchImagesList();
-    }
-
-    function removeBatchImage(imageId) {
-      batchImages = batchImages.filter(img => img.id !== imageId);
-      updateBatchImagesList();
-    }
-
-    function updateBatchImagesList() {
-      // v3.4.20 fix: los items van en #batch-items (el grid interior),
-      // NO en #batch-images-list (el contenedor padre que tiene el header
-      // "N imágenes cargadas" y el botón "Limpiar todo"). Antes,
-      // replaceChildren() destruía ese header.
-      const listContainer = document.getElementById('batch-images-list');
-      const itemsGrid = document.getElementById('batch-items');
-      const configSection = document.getElementById('batch-config');
-      const countSpan = document.getElementById('batch-count');
-
-      if (!listContainer || !itemsGrid) return;
-
-      // Limpiar solo el grid de items (sin tocar el header)
-      itemsGrid.replaceChildren();
-
-      // Habilitar/deshabilitar el botón Procesar según haya imágenes
-      const processBtn = document.getElementById('batch-process-btn');
-      if (processBtn) processBtn.disabled = batchImages.length === 0;
-
-      if (batchImages.length === 0) {
-        // Ocultar la lista y la configuración
-        listContainer.style.display = 'none';
-        if (configSection) configSection.style.display = 'none';
-        if (countSpan) countSpan.textContent = '0';
-        return;
-      }
-
-      // Mostrar la lista y la configuración
-      listContainer.style.display = 'block';
-      if (configSection) configSection.style.display = 'block';
-      if (countSpan) countSpan.textContent = String(batchImages.length);
-
-      // Construir cada item con DOM API: img.name es dato controlado por el
-      // usuario y NUNCA debe interpolarse en HTML.
-      // v3.7.0: sin previews base64 — icono + nombre + dimensiones + peso.
-      batchImages.forEach(img => {
-        const item = document.createElement('div');
-        item.className = 'batch-item';
-
-        const thumb = document.createElement('div');
-        thumb.className = 'batch-item-icon';
-        const thumbIcon = document.createElement('i');
-        thumbIcon.className = 'fas fa-file-image';
-        thumbIcon.setAttribute('aria-hidden', 'true');
-        thumb.appendChild(thumbIcon);
-        item.appendChild(thumb);
-
-        const info = document.createElement('div');
-        info.className = 'batch-item-info';
-
-        const name = document.createElement('div');
-        name.className = 'batch-item-name';
-        name.textContent = img.name;
-        info.appendChild(name);
-
-        const size = document.createElement('div');
-        size.className = 'batch-item-size';
-        const dims = (img.width && img.height) ? img.width + '×' + img.height + ' · ' : '';
-        size.textContent = dims + formatFileSize(img.size);
-        info.appendChild(size);
-
-        // v3.5.14: estado visible por archivo (pendiente/procesando/ok/error)
-        if (img.status) {
-          const status = document.createElement('div');
-          status.className = 'batch-item-status batch-item-status--' + img.status;
-          const statusLabels = {
-            pendiente: '⏳ Pendiente',
-            procesando: '⚙️ Procesando…',
-            ok: '✅ Procesada',
-            error: '❌ Error',
-            cancelada: '⏹️ Cancelada'
-          };
-          status.textContent = statusLabels[img.status] || img.status;
-          if (img.status === 'error' && img.errorMsg) {
-            status.title = img.errorMsg;
-          }
-          info.appendChild(status);
-        }
-
-        item.appendChild(info);
-
-        // v3.5.14: reintento por archivo fallido (v3.7.0: también canceladas)
-        if (img.status === 'error' || img.status === 'cancelada') {
-          const retryBtn = document.createElement('button');
-          retryBtn.type = 'button';
-          retryBtn.className = 'batch-item-retry';
-          retryBtn.textContent = img.status === 'cancelada' ? 'Procesar' : 'Reintentar';
-          retryBtn.setAttribute('aria-label', 'Reintentar ' + img.name);
-          retryBtn.addEventListener('click', () => retryBatchImage(img.id));
-          item.appendChild(retryBtn);
-        }
-
-        // v3.7.0: cancelación individual mientras el lote está en curso
-        if (img.status === 'pendiente' && batchUIProcessing) {
-          const cancelBtn = document.createElement('button');
-          cancelBtn.type = 'button';
-          cancelBtn.className = 'batch-item-retry batch-item-cancel';
-          cancelBtn.textContent = 'Cancelar';
-          cancelBtn.setAttribute('aria-label', 'Cancelar ' + img.name);
-          cancelBtn.addEventListener('click', () => cancelBatchImage(img.id));
-          item.appendChild(cancelBtn);
-        }
-
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'batch-item-remove';
-        removeBtn.setAttribute('aria-label', 'Quitar ' + img.name + ' del lote');
-        removeBtn.addEventListener('click', () => removeBatchImage(img.id));
-
-        const icon = document.createElement('i');
-        icon.className = 'fas fa-times';
-        icon.setAttribute('aria-hidden', 'true');
-        removeBtn.appendChild(icon);
-
-        item.appendChild(removeBtn);
-        itemsGrid.appendChild(item);
-      });
-
-      // v3.7.0: resumen previo al lote (archivos, megapíxeles, memoria)
-      updateBatchSummary();
-    }
-
-    /**
-     * Resumen previo al procesamiento del lote (v3.7.0): número de archivos,
-     * megapíxeles totales y memoria decodificada estimada (w×h×4 bytes).
-     */
-    function updateBatchSummary() {
-      const summaryEl = document.getElementById('batch-summary');
-      const textEl = document.getElementById('batch-summary-text');
-      if (!summaryEl || !textEl) return;
-
-      if (batchImages.length === 0 || !batchManager) {
-        summaryEl.style.display = 'none';
-        return;
-      }
-
-      const summary = batchManager.summarizeItems(batchImages);
-      textEl.textContent =
-        summary.count + (summary.count === 1 ? ' archivo' : ' archivos') +
-        ' · ' + summary.megapixels.toFixed(1) + ' MP totales' +
-        ' · ~' + formatFileSize(summary.estimatedDecodedBytes) + ' de memoria al decodificar' +
-        ' · se procesarán de ' + (AppConfig.batchConcurrency || 2) + ' en ' + (AppConfig.batchConcurrency || 2);
-      summaryEl.style.display = 'flex';
-    }
-
-    /**
-     * Cancela una imagen individual del lote en curso (v3.7.0).
-     */
-    function cancelBatchImage(imageId) {
-      if (!batchManager) return;
-      if (batchManager.cancelImage(imageId)) {
-        const img = batchImages.find(i => i.id === imageId);
-        if (img && img.status === 'pendiente') {
-          img.status = 'cancelada';
-        }
-        updateBatchImagesList();
-      }
-    }
-
-    /**
-     * Reintenta el procesamiento de UNA imagen fallida del lote (v3.5.14).
-     * Si tiene éxito, BatchManager reemplaza la entrada fallida y el ZIP
-     * pasa a incluirla.
-     */
-    async function retryBatchImage(imageId) {
-      const img = batchImages.find(i => i.id === imageId);
-      if (!img || !batchManager) return;
-
-      img.status = 'procesando';
-      updateBatchImagesList();
-
-      try {
-        await batchManager.retryImage(imageId);
-        img.status = 'ok';
-        img.errorMsg = null;
-        UIManager.showSuccess('✅ ' + img.name + ' procesada correctamente');
-      } catch (error) {
-        img.status = 'error';
-        img.errorMsg = error.message;
-        UIManager.showError('No se pudo procesar ' + img.name + ': ' + error.message, {
-          action: { label: 'Reintentar', handler: () => retryBatchImage(imageId) }
-        });
-      }
-      updateBatchImagesList();
-    }
-
-    function getCurrentFilters() {
-      // Capturar el filter string CSS exacto que se ve en la previsualización
-      return FilterManager.getFilterString() || '';
-    }
-
-    function getCurrentWatermarks() {
-      const textEnabled = document.getElementById('watermark-text-enabled')?.checked;
-      const imageEnabled = document.getElementById('watermark-image-enabled')?.checked;
-      if (!textEnabled && !imageEnabled) return null;
-
-      const result = {};
-
-      if (textEnabled) {
-        const textVal = document.getElementById('watermark-text')?.value;
-        if (textVal) {
-          const autoScaleEl = document.getElementById('watermark-auto-scale');
-          result.text = {
-            enabled: true,
-            value: textVal,
-            font: document.getElementById('watermark-font')?.value || 'Arial',
-            size: Number(document.getElementById('watermark-size')?.value || 30),
-            color: document.getElementById('watermark-color')?.value || '#000000',
-            opacity: Number(document.getElementById('watermark-opacity')?.value || 50) / 100,
-            position: document.getElementById('watermark-position')?.value || 'center',
-            autoScale: autoScaleEl ? autoScaleEl.checked : false
-          };
-        }
-      }
-
-      if (imageEnabled && watermarkImagePreview) {
-        result.image = {
-          enabled: true,
-          img: watermarkImagePreview,
-          opacity: Number(document.getElementById('watermark-image-opacity')?.value || 50) / 100,
-          sizeOption: document.getElementById('watermark-image-size')?.value || 'medium',
-          position: document.getElementById('watermark-image-position')?.value || 'center',
-          customWidth: parseInt(document.getElementById('watermark-image-width')?.value) || 100,
-          customHeight: parseInt(document.getElementById('watermark-image-height')?.value) || 100
-        };
-      }
-
-      return Object.keys(result).length > 0 ? result : null;
-    }
-
-    async function processBatch() {
-      if (batchImages.length === 0) {
-        UIManager.showError('Agrega imágenes al lote primero');
-        return;
-      }
-
-      const processBtn = document.getElementById('batch-process-btn');
-      const downloadBtn = document.getElementById('batch-download-btn');
-
-      // UI feedback
-      if (processBtn) processBtn.disabled = true;
-
-      // v3.5.14: estado por archivo + cancelación cooperativa
-      batchImages.forEach(img => { img.status = 'pendiente'; img.errorMsg = null; });
-      batchUIProcessing = true; // v3.7.0: habilita cancelación individual
-      updateBatchImagesList();
-
-      showProgressBar('Procesando lote (' + batchImages.length + ' imágenes)...', {
-        onCancel: () => {
-          if (batchManager) batchManager.requestCancel();
-        }
-      });
-
-      try {
-        // Sincronizar batchImages → batchManager.imageQueue
-        // v3.7.0: sin decodificar aquí — la cola guarda File + dimensiones
-        // (medidas al añadir) y BatchManager decodifica bajo demanda.
-        batchManager.clearQueue();
-        for (const img of batchImages) {
-          batchManager.imageQueue.push({
-            id: img.id,
-            file: img.file,
-            name: img.name,
-            size: img.size,
-            type: img.file.type,
-            width: img.width,
-            height: img.height,
-            processed: false,
-            error: null,
-            cancelled: false
-          });
-        }
-
-        // La previsualización manda: pasar una función de render que aplica
-        // EXACTAMENTE lo mismo que se ve en la preview a cada imagen del lote.
-        // Capturamos las referencias actuales una sola vez (closure).
-        const filterString = getCurrentFilters();
-        const wmTextEnabled = document.getElementById('watermark-text-enabled')?.checked;
-        const wmImageEnabled = document.getElementById('watermark-image-enabled')?.checked;
-        const wmText = document.getElementById('watermark-text')?.value || '';
-        const wmFont = document.getElementById('watermark-font')?.value || 'Arial';
-        const wmSize = Number(document.getElementById('watermark-size')?.value || 30);
-        const wmColor = document.getElementById('watermark-color')?.value || '#000000';
-        const wmOpacity = Number(document.getElementById('watermark-opacity')?.value || 50) / 100;
-        const wmPosition = document.getElementById('watermark-position')?.value || 'center';
-        const wmAutoScale = document.getElementById('watermark-auto-scale')?.checked || false;
-        const wmImgRef = watermarkImagePreview; // Image element o null
-        const wmImgOpacity = Number(document.getElementById('watermark-image-opacity')?.value || 50) / 100;
-        const wmImgSizeOpt = document.getElementById('watermark-image-size')?.value || 'medium';
-        const wmImgPosition = document.getElementById('watermark-image-position')?.value || 'center';
-        const wmImgCustomW = parseInt(document.getElementById('watermark-image-width')?.value) || 100;
-        const wmImgCustomH = parseInt(document.getElementById('watermark-image-height')?.value) || 100;
-        const allLayers = textLayerManager ? textLayerManager.getAllLayers() : [];
-
-        // Calcular posición de watermark relativa a un canvas dado
-        // Escala proporcional de preview → batch
-        const previewW = canvas.width;
-        const previewH = canvas.height;
-
-        function batchWmPos(position, width, height, cw, ch) {
-          const m = 20;
-          switch (position) {
-            case 'top-left':      return { x: m, y: m + height };
-            case 'top-center':    return { x: (cw - width) / 2, y: m + height };
-            case 'top-right':     return { x: cw - width - m, y: m + height };
-            case 'center-left':   return { x: m, y: (ch + height) / 2 };
-            case 'center':        return { x: (cw - width) / 2, y: (ch + height) / 2 };
-            case 'center-right':  return { x: cw - width - m, y: (ch + height) / 2 };
-            case 'bottom-left':   return { x: m, y: ch - m };
-            case 'bottom-center': return { x: (cw - width) / 2, y: ch - m };
-            case 'bottom-right':  return { x: cw - width - m, y: ch - m };
-            case 'custom':
-              if (customTextPosition && previewW > 0) {
-                const sx = cw / previewW;
-                const sy = ch / previewH;
-                return { x: customTextPosition.x * sx - width / 2, y: customTextPosition.y * sy };
-              }
-              return { x: (cw - width) / 2, y: (ch + height) / 2 };
-            default:              return { x: (cw - width) / 2, y: (ch + height) / 2 };
-          }
-        }
-        function batchImgPos(position, width, height, cw, ch) {
-          const m = 20;
-          switch (position) {
-            case 'top-left':      return { x: m, y: m };
-            case 'top-center':    return { x: (cw - width) / 2, y: m };
-            case 'top-right':     return { x: cw - width - m, y: m };
-            case 'center-left':   return { x: m, y: (ch - height) / 2 };
-            case 'center':        return { x: (cw - width) / 2, y: (ch - height) / 2 };
-            case 'center-right':  return { x: cw - width - m, y: (ch - height) / 2 };
-            case 'bottom-left':   return { x: m, y: ch - height - m };
-            case 'bottom-center': return { x: (cw - width) / 2, y: ch - height - m };
-            case 'bottom-right':  return { x: cw - width - m, y: ch - height - m };
-            case 'custom':
-              if (customImagePosition && previewW > 0) {
-                const sx = cw / previewW;
-                const sy = ch / previewH;
-                return { x: customImagePosition.x * sx - width / 2, y: customImagePosition.y * sy - height / 2 };
-              }
-              return { x: (cw - width) / 2, y: (ch - height) / 2 };
-            default:              return { x: (cw - width) / 2, y: (ch - height) / 2 };
-          }
-        }
-
-        function renderImageForBatch(ctx, cvs, img) {
-          const cw = cvs.width;
-          const ch = cvs.height;
-
-          // 1. Filtros CSS
-          if (filterString) ctx.filter = filterString;
-          ctx.drawImage(img, 0, 0, cw, ch);
-          ctx.filter = 'none';
-
-          // 2. Watermark de texto
-          if (wmTextEnabled && wmText) {
-            let sz = wmSize;
-            if (wmAutoScale && cw > 0) {
-              sz = Math.max(8, Math.round(sz * (cw / 1000)));
-            }
-            ctx.save();
-            ctx.font = sz + 'px ' + wmFont;
-            ctx.fillStyle = wmColor;
-            ctx.globalAlpha = wmOpacity;
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-            ctx.shadowBlur = 2;
-            ctx.shadowOffsetX = 1;
-            ctx.shadowOffsetY = 1;
-            const tw = ctx.measureText(wmText).width;
-            const pos = batchWmPos(wmPosition, tw, sz, cw, ch);
-            ctx.fillText(wmText, pos.x, pos.y);
-            ctx.restore();
-          }
-
-          // 3. Watermark de imagen
-          if (wmImageEnabled && wmImgRef) {
-            let w, h;
-            switch (wmImgSizeOpt) {
-              case 'small':  w = Math.min(wmImgRef.width, cw * 0.15); h = (w / wmImgRef.width) * wmImgRef.height; break;
-              case 'medium': w = Math.min(wmImgRef.width, cw * 0.25); h = (w / wmImgRef.width) * wmImgRef.height; break;
-              case 'large':  w = Math.min(wmImgRef.width, cw * 0.4);  h = (w / wmImgRef.width) * wmImgRef.height; break;
-              case 'custom': w = wmImgCustomW; h = wmImgCustomH; break;
-              default:       w = wmImgRef.width; h = wmImgRef.height;
-            }
-            const ipos = batchImgPos(wmImgPosition, w, h, cw, ch);
-            ctx.save();
-            ctx.globalAlpha = wmImgOpacity;
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
-            ctx.shadowBlur = 4;
-            ctx.shadowOffsetX = 2;
-            ctx.shadowOffsetY = 2;
-            ctx.drawImage(wmImgRef, ipos.x, ipos.y, w, h);
-            ctx.restore();
-          }
-
-          // 4. Capas de texto — delegar a textLayerManager (z-index, baseline,
-          //    sombras reales, stroke, gradientes) con escalado proporcional
-          //    para que las coordenadas del preview se mapeen al tamaño del lote.
-          if (textLayerManager && allLayers.length > 0) {
-            const previewW = canvas.width;
-            const previewH = canvas.height;
-            if (previewW > 0 && previewH > 0) {
-              const sx = cw / previewW;
-              const sy = ch / previewH;
-              ctx.save();
-              ctx.scale(sx, sy);
-              textLayerManager.renderLayers(ctx, canvas);
-              ctx.restore();
-            }
-          }
-        }
-
-        batchManager.captureCurrentConfig(filterString, null, null, null, renderImageForBatch);
-
-        // Procesar — el callback actualiza el progress overlay global y el
-        // estado por archivo. minDelay garantiza al menos 3s de barra visible.
-        const minDelay = new Promise(resolve => setTimeout(resolve, 3000));
-        const processPromise = batchManager.processQueue((progress) => {
-          updateProgress(
-            progress.percentage,
-            'Procesando imagen ' + progress.current + ' de ' + progress.total + '...'
-          );
-          // v3.5.14: reflejar el resultado por archivo en la cola visible
-          // (v3.7.0: distinguir cancelación individual de error real)
-          const done = batchImages.find(i => i.id === progress.id);
-          if (done) {
-            done.status = progress.lastSuccess
-              ? 'ok'
-              : (progress.lastCancelled ? 'cancelada' : 'error');
-            done.errorMsg = (progress.lastSuccess || progress.lastCancelled)
-              ? null
-              : (progress.lastError || null);
-          }
-          // v3.7.0: re-pintar la lista en cada avance para que los estados
-          // y los botones de cancelación individual estén al día.
-          updateBatchImagesList();
-        });
-        const result = await Promise.all([processPromise, minDelay]).then(r => r[0]);
-
-        hideProgressBar();
-        updateBatchImagesList();
-
-        // v3.5.14: resumen fiel al resultado — éxito, parcial o cancelado
-        if (result.cancelled) {
-          UIManager.showInfo(
-            '⏹️ Lote cancelado: ' + result.processed + ' de ' + result.total + ' imágenes procesadas'
-          );
-        } else if (result.failed > 0) {
-          // El detalle por archivo queda en la lista (badges + Reintentar);
-          // BatchManager ya emitió el warning con el recuento de fallos.
-          MNEMOTAG_DEBUG && console.warn('Lote con fallos:', result.errors);
-        } else {
-          UIManager.showSuccess(result.processed + ' imágenes procesadas correctamente');
-        }
-
-        // Mostrar botón de descarga si hay al menos una imagen procesada
-        if (downloadBtn && result.processed > 0) downloadBtn.style.display = 'flex';
-
-      } catch (error) {
-        console.error('Error procesando lote:', error);
-        hideProgressBar();
-        UIManager.showError('Error al procesar el lote: ' + error.message);
-      } finally {
-        batchUIProcessing = false; // v3.7.0
-        if (processBtn) processBtn.disabled = false;
-        updateBatchImagesList();
-      }
-    }
-
-    async function downloadBatchZip() {
-      try {
-        showProgressBar('Generando ZIP...');
-        const steps = [
-          { message: 'Recopilando imágenes procesadas...', duration: 600 },
-          { message: 'Comprimiendo imágenes...', duration: 900 },
-          { message: 'Generando archivo ZIP...', duration: 900 },
-          { message: 'Preparando descarga...', duration: 600 }
-        ];
-        // Generar ZIP sin descarga automática — el guardado lo hacemos aquí
-        const zipPromise = batchManager.exportToZip(null, { skipDownload: true });
-        const [, result] = await Promise.all([simulateProgressSteps(steps, 3000), zipPromise]);
-        hideProgressBar();
-
-        // Guardar con showSaveFilePicker (Escritorio por defecto) o fallback <a download>
-        if ('showSaveFilePicker' in window) {
-          try {
-            const handle = await window.showSaveFilePicker({
-              suggestedName: result.fileName,
-              startIn: 'desktop',
-              types: [{
-                description: 'Archivo ZIP',
-                accept: { 'application/zip': ['.zip'] }
-              }]
-            });
-            const writable = await handle.createWritable();
-            await writable.write(result.blob);
-            await writable.close();
-            UIManager.showSuccess('ZIP guardado correctamente (' + result.imageCount + ' imágenes)');
-          } catch (pickerError) {
-            // Usuario canceló el diálogo — no es un error
-            if (pickerError.name !== 'AbortError') {
-              throw pickerError;
-            }
-          }
-        } else {
-          // Fallback: descarga clásica con <a download>
-          batchManager.downloadBlob(result.blob, result.fileName);
-          UIManager.showSuccess('ZIP descargado (' + result.imageCount + ' imágenes)');
-        }
-      } catch (error) {
-        MNEMOTAG_DEBUG && console.error('Error descargando ZIP:', error);
-        hideProgressBar();
-        UIManager.showError('Error al descargar el archivo ZIP');
-      }
-    }
-
-    function loadImageFromFile(file) {
-      return new Promise((resolve, reject) => {
-        const img = new Image();
-        const objectUrl = URL.createObjectURL(file);
-        // Revocar siempre el ObjectURL: sin esto se fugaba uno por llamada
-        img.onload = () => {
-          URL.revokeObjectURL(objectUrl);
-          resolve(img);
-        };
-        img.onerror = (err) => {
-          URL.revokeObjectURL(objectUrl);
-          reject(err);
-        };
-        img.src = objectUrl;
-      });
-    }
-
-    function formatFileSize(bytes) {
-      if (bytes < 1024) return bytes + ' B';
-      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-    }
-
-    /**
-     * ====================================
-     * TEXT LAYERS UI
-     * ====================================
-     */
-
-    let activeLayerId = null;
-
-    function openTextLayersPanel() {
-      const panel = document.getElementById('text-layers-panel');
-      if (panel) {
-        panel.style.display = 'flex'; // Quitar display: none inline
-        setTimeout(() => {
-          panel.classList.add('active'); // Activar transición
-        }, 10);
-        updateTextLayersList();
-      }
-    }
-
-    function closeTextLayersPanel() {
-      const panel = document.getElementById('text-layers-panel');
-      if (panel) {
-        panel.classList.remove('active');
-        setTimeout(() => {
-          panel.style.display = 'none'; // Ocultar después de transición
-        }, 300);
-        activeLayerId = null;
-        if (textLayerManager) textLayerManager.clearActiveLayer();
-      }
-    }
-
-    async function applyTextTemplate(templateName) {
-      if (!currentImage) {
-        UIManager.showError('Carga una imagen primero');
-        return;
-      }
-
-      try {
-        await textLayerManager.applyTemplate(templateName, canvas.width, canvas.height);
-        updateTextLayersList();
-        renderCanvasWithLayers();
-        UIManager.showSuccess('✅ Plantilla "' + templateName + '" aplicada');
-      } catch (error) {
-        console.error('Error aplicando plantilla:', error);
-        UIManager.showError('Error al aplicar la plantilla');
-      }
-    }
-
-    async function addNewTextLayer() {
-      if (!currentImage) {
-        UIManager.showError('Carga una imagen primero');
-        return;
-      }
-
-      // addLayer es async (carga la fuente de Google Fonts).
-      // Sin await, newLayer sería una Promise y newLayer.id = undefined.
-      const newLayer = await textLayerManager.addLayer({
-        text: 'Nuevo texto',
-        position: { x: Math.round(canvas.width / 2), y: Math.round(canvas.height / 2) }
-      });
-
-      updateTextLayersList();
-      selectTextLayer(newLayer.id);
-      renderCanvasWithLayers();
-    }
-
-    function updateTextLayersList() {
-      const container = document.getElementById('text-layers-list');
-      if (!container) return;
-
-      const layers = textLayerManager.getAllLayers();
-
-      if (layers.length === 0) {
-        container.replaceChildren();
-        const empty = document.createElement('div');
-        empty.className = 'empty-state';
-        const message = document.createElement('p');
-        message.textContent = 'No hay capas de texto.';
-        const action = document.createElement('button');
-        action.type = 'button';
-        action.id = 'text-layer-empty-cta';
-        action.className = 'empty-state__action';
-        action.textContent = 'Añadir primera capa';
-        action.addEventListener('click', addNewTextLayer);
-        empty.append(message, action);
-        container.appendChild(empty);
-        return;
-      }
-
-      // Construir la lista con DOM API segura (evita XSS por layer.text)
-      container.replaceChildren();
-      layers.forEach(function (layer) {
-        const item = document.createElement('div');
-        item.className = 'text-layer-item' + (layer.id === activeLayerId ? ' active' : '');
-        item.addEventListener('click', function () { selectTextLayer(layer.id); });
-
-        const preview = document.createElement('div');
-        preview.className = 'text-layer-preview';
-
-        const textDiv = document.createElement('div');
-        textDiv.className = 'text-layer-text';
-        textDiv.textContent = layer.text || '';
-        // Doble-click para edición inline directa
-        textDiv.addEventListener('dblclick', (function (layerRef, divRef) {
-          return function (ev) {
-            ev.stopPropagation();
-            divRef.contentEditable = 'true';
-            divRef.focus();
-            // Seleccionar todo el texto
-            const range = document.createRange();
-            range.selectNodeContents(divRef);
-            const sel = window.getSelection();
-            sel.removeAllRanges();
-            sel.addRange(range);
-            // Al perder foco o pulsar Enter, guardar
-            const save = function () {
-              divRef.contentEditable = 'false';
-              const newText = divRef.textContent.trim();
-              if (newText && newText !== layerRef.text) {
-                layerRef.text = newText;
-                renderCanvasWithLayers();
-                // Actualizar el editor si esta capa está seleccionada
-                const el = document.getElementById('text-layer-text');
-                if (el && activeLayerId === layerRef.id) el.value = newText;
-              }
-              divRef.removeEventListener('blur', save);
-              divRef.removeEventListener('keydown', onKey);
-            };
-            const onKey = function (ke) {
-              if (ke.key === 'Enter') {
-                ke.preventDefault();
-                divRef.blur();
-              } else if (ke.key === 'Escape') {
-                divRef.textContent = layerRef.text || '';
-                divRef.blur();
-              }
-            };
-            divRef.addEventListener('blur', save);
-            divRef.addEventListener('keydown', onKey);
-          };
-        })(layer, textDiv));
-        preview.appendChild(textDiv);
-
-        const fontDiv = document.createElement('div');
-        fontDiv.className = 'text-layer-font';
-        const family = (layer.font && layer.font.family) || '?';
-        const size = (layer.font && layer.font.size) || '?';
-        fontDiv.textContent = family + ' - ' + size + 'px';
-        preview.appendChild(fontDiv);
-
-        item.appendChild(preview);
-
-        const visBtn = document.createElement('button');
-        visBtn.className = 'text-layer-visibility';
-        visBtn.addEventListener('click', function (ev) {
-          ev.stopPropagation();
-          toggleLayerVisibility(layer.id);
-        });
-        const icon = document.createElement('i');
-        icon.className = 'fas fa-' + (layer.visible ? 'eye' : 'eye-slash');
-        visBtn.appendChild(icon);
-        item.appendChild(visBtn);
-
-        container.appendChild(item);
-      });
-    }
-
-    function selectTextLayer(layerId) {
-      const layer = textLayerManager.getLayer(layerId);
-      if (!layer) return;
-      activeLayerId = layerId;
-      textLayerManager.setActiveLayer(layerId);
-
-      // Actualizar lista
-      updateTextLayersList();
-
-      // Mostrar editor (tiene style="display:none" inline, no una clase)
-      const editor = document.getElementById('text-layer-editor');
-      if (editor) {
-        editor.style.display = 'block';
-      }
-
-      // Cargar valores en el editor. La estructura del layer es anidada:
-      // layer.font.family, layer.font.size, layer.position.x, layer.effects.shadow, etc.
-      let el;
-      el = document.getElementById('text-layer-text');     if (el) el.value = layer.text || '';
-      el = document.getElementById('text-layer-font');     if (el) el.value = (layer.font && layer.font.family) || 'Roboto';
-      el = document.getElementById('text-layer-size');     if (el) el.value = (layer.font && layer.font.size) || 40;
-      el = document.getElementById('text-layer-color');    if (el) el.value = layer.color || '#ffffff';
-      el = document.getElementById('text-layer-x');        if (el) el.value = Math.round((layer.position && layer.position.x) || 0);
-      el = document.getElementById('text-layer-y');        if (el) el.value = Math.round((layer.position && layer.position.y) || 0);
-      el = document.getElementById('text-layer-rotation'); if (el) el.value = layer.rotation || 0;
-      el = document.getElementById('text-layer-opacity');  if (el) el.value = Math.round((layer.opacity ?? 1) * 100);
-      el = document.getElementById('text-layer-shadow');   if (el) el.checked = !!(layer.effects && layer.effects.shadow);
-      el = document.getElementById('text-layer-stroke');   if (el) el.checked = !!(layer.effects && layer.effects.stroke);
-      el = document.getElementById('text-layer-gradient'); if (el) el.checked = !!(layer.effects && layer.effects.gradient);
-    }
-
-    function getTextLayerControl(id) {
-      return document.getElementById('text-layer-' + id);
-    }
-
-    async function updateActiveTextLayer() {
-      if (!activeLayerId) return;
-
-      // Construir el objeto updates con la estructura anidada que espera
-      // textLayerManager.updateLayer(): font.{family,size}, position.{x,y},
-      // effects.{shadow,stroke,gradient}.
-      const textEl = getTextLayerControl('text');
-      const fontEl = getTextLayerControl('font');
-      const sizeEl = getTextLayerControl('size');
-      const colorEl = getTextLayerControl('color');
-      const xEl = getTextLayerControl('x');
-      const yEl = getTextLayerControl('y');
-      const rotationEl = getTextLayerControl('rotation');
-      const opacityEl = getTextLayerControl('opacity');
-      const shadowEl = getTextLayerControl('shadow');
-      const strokeEl = getTextLayerControl('stroke');
-      const gradientEl = getTextLayerControl('gradient');
-
-      const parsedFontSize = sizeEl ? parseInt(sizeEl.value, 10) : NaN;
-      const parsedX = xEl ? parseInt(xEl.value, 10) : NaN;
-      const parsedY = yEl ? parseInt(yEl.value, 10) : NaN;
-      const parsedRotation = rotationEl ? parseInt(rotationEl.value, 10) : NaN;
-      const parsedOpacity = opacityEl ? parseInt(opacityEl.value, 10) : NaN;
-      const fontFamily = fontEl ? fontEl.value : 'Roboto';
-      const hasShadow = shadowEl ? shadowEl.checked : false;
-      const hasStroke = strokeEl ? strokeEl.checked : false;
-      const hasGradient = gradientEl ? gradientEl.checked : false;
-
-      // Para shadow/stroke/gradient: si el checkbox está activo pero el
-      // layer ya tenía un objeto previo, lo reutilizamos. Si no tenía,
-      // creamos uno con defaults razonables.
-      const currentLayer = textLayerManager.getLayer(activeLayerId);
-      const shadowVal = hasShadow
-        ? (currentLayer && currentLayer.effects && currentLayer.effects.shadow) || { offsetX: 2, offsetY: 2, blur: 4, color: 'rgba(0,0,0,0.3)' }
-        : null;
-      const strokeVal = hasStroke
-        ? (currentLayer && currentLayer.effects && currentLayer.effects.stroke) || { width: 2, color: '#000000' }
-        : null;
-      const gradientVal = hasGradient
-        ? (currentLayer && currentLayer.effects && currentLayer.effects.gradient) || { type: 'linear', colors: ['#ff0000', '#0000ff'], angle: 0 }
-        : null;
-
-      const updates = {
-        text: textEl ? textEl.value : '',
-        font: { family: fontFamily, size: Number.isFinite(parsedFontSize) ? parsedFontSize : 40 },
-        position: {
-          x: Number.isFinite(parsedX) ? parsedX : 0,
-          y: Number.isFinite(parsedY) ? parsedY : 0
-        },
-        color: colorEl ? colorEl.value : '#ffffff',
-        rotation: Number.isFinite(parsedRotation) ? parsedRotation : 0,
-        opacity: Number.isFinite(parsedOpacity) ? parsedOpacity / 100 : 1,
-        effects: { shadow: shadowVal, stroke: strokeVal, gradient: gradientVal }
-      };
-
-      await textLayerManager.updateLayer(activeLayerId, updates);
-      updateTextLayersList();
-      renderCanvasWithLayers();
-    }
-
-    function toggleLayerVisibility(layerId) {
-      const layer = textLayerManager.getLayer(layerId);
-      if (layer) {
-        textLayerManager.updateLayer(layerId, { visible: !layer.visible });
-        updateTextLayersList();
-        renderCanvasWithLayers();
-      }
-    }
-
-    function deleteActiveTextLayer() {
-      if (!activeLayerId) return;
-
-      textLayerManager.removeLayer(activeLayerId);
-      activeLayerId = null;
-
-      const editor = document.getElementById('text-layer-editor');
-      if (editor) {
-        editor.style.display = 'none';
-      }
-
-      updateTextLayersList();
-      renderCanvasWithLayers();
-      UIManager.showSuccess('✅ Capa eliminada');
-    }
+    function addBatchImages(files) { return BatchUIManager.addImages(files); }
+    function processBatch() { return BatchUIManager.process(); }
+    function downloadBatchZip() { return BatchUIManager.downloadZip(); }
+
+    // BatchUIManager posee cola, validación, estados, reintentos y descarga.
+
+    /** UI de capas delegada; wrappers para conservar contratos públicos. */
+    function openTextLayersPanel() { TextLayerUIManager.open(); }
+    function closeTextLayersPanel() { TextLayerUIManager.close(); }
+    function applyTextTemplate(name) { return TextLayerUIManager.applyTemplate(name); }
+    function addNewTextLayer() { return TextLayerUIManager.add(); }
+    function updateTextLayersList() { TextLayerUIManager.updateList(); }
+    function selectTextLayer(id) { TextLayerUIManager.select(id); }
+    function updateActiveTextLayer() { return TextLayerUIManager.updateActive(); }
+    function toggleLayerVisibility(id) { TextLayerUIManager.toggleVisibility(id); }
+    function deleteActiveTextLayer() { TextLayerUIManager.removeActive(); }
 
     // Render ligero para el drag: solo imagen base + capas de texto.
     // Salta watermarks y filters (son pesados y causan interferencias
     // async con requestAnimationFrame durante el drag).
     function renderCanvasWithLayersLightweight() {
-      if (!currentImage || !canvas || !ctx) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
-
-      // Dibujar las capas de texto directamente (sin pasar por el
-      // manager's renderLayers que puede fallar silenciosamente).
-      // Es un render simplificado: solo texto con fuente, color y
-      // posición. Los efectos (shadow, stroke, gradient) se aplican
-      // en el render completo al soltar el drag.
-      try {
-        if (textLayerManager) {
-          const layers = textLayerManager.getAllLayers();
-          for (var i = 0; i < layers.length; i++) {
-            const layer = layers[i];
-            if (!layer || !layer.visible) continue;
-            ctx.save();
-            ctx.globalAlpha = (typeof layer.opacity === 'number') ? layer.opacity : 1;
-            const family = (layer.font && layer.font.family) || 'Roboto';
-            const size = (layer.font && layer.font.size) || 40;
-            const weight = (layer.font && layer.font.weight) || 'normal';
-            ctx.font = weight + ' ' + size + 'px "' + family + '", sans-serif';
-            ctx.textBaseline = 'top';
-            ctx.fillStyle = layer.color || '#ffffff';
-            const px = (layer.position && layer.position.x) || 0;
-            const py = (layer.position && layer.position.y) || 0;
-            ctx.fillText(layer.text || '', px, py);
-            ctx.restore();
-          }
-        }
-      } catch (err) {
-        console.error('[MnemoTag] Error en render ligero de capas:', err);
-      }
-
-      _updateTextLayerBounds();
-    }
-
-    function _updateTextLayerBounds() {
-      textLayerBounds = [];
-      const layers = textLayerManager.getAllLayers();
-      for (var i = 0; i < layers.length; i++) {
-        const layer = layers[i];
-        if (!layer.visible) continue;
-        const family = (layer.font && layer.font.family) || 'Roboto';
-        const size = (layer.font && layer.font.size) || 40;
-        const weight = (layer.font && layer.font.weight) || 'normal';
-        ctx.font = weight + ' ' + size + 'px "' + family + '", sans-serif';
-        const metrics = ctx.measureText(layer.text || '');
-        const posX = (layer.position && layer.position.x) || 0;
-        const posY = (layer.position && layer.position.y) || 0;
-        textLayerBounds.push({
-          layerId: layer.id,
-          x: posX, y: posY,
-          width: metrics.width,
-          height: size * 1.2
-        });
-      }
+      renderMainDocument({ watermarks: false, cssFilters: 'none', textLayers: 'light' });
     }
 
     function renderCanvasWithLayers() {
-      if (!currentImage || !canvas || !ctx) return;
-
-      // Redibujar imagen base
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(currentImage, 0, 0, canvas.width, canvas.height);
-
-      // Aplicar marcas de agua (watermark) si hay
-      applyWatermarkOptimized();
-
-      // Aplicar filtros actuales si existen
-      applyCanvasFilters();
-
-      // Renderizar capas de texto — requiere ctx Y canvas
-      textLayerManager.renderLayers(ctx, canvas);
-
-      // Calcular bounds para hit-testing del drag
-      _updateTextLayerBounds();
+      renderMainDocument({ watermarks: true, cssFilters: 'full', textLayers: 'full' });
     }
 
     /**
@@ -7946,7 +4599,7 @@
         UIManager.showError('Carga una imagen primero');
         return;
       }
-      
+
       if (!cropManager) {
         console.error('❌ CropManager no inicializado');
         UIManager.showError('El sistema de recorte no está disponible');
@@ -7960,10 +4613,10 @@
         panel.style.display = 'flex';
         requestAnimationFrame(() => panel.classList.add('active'));
         cropActive = true;
-        
+
         // Inicializar crop mode
         cropManager.initCropMode(currentImage);
-        
+
         // Actualizar info
         updateCropInfo();
       }
@@ -8003,7 +4656,7 @@
 
     function updateCropInfo() {
       if (!cropManager || !cropManager.cropArea) return;
-      
+
       const cropData = cropManager.cropArea;
 
       const widthEl = document.getElementById('crop-width');
@@ -8022,7 +4675,7 @@
       if (!cropManager) return;
       const checkbox = document.getElementById('crop-show-grid');
       cropManager.showGrid = checkbox ? checkbox.checked : !cropManager.showGrid;
-      
+
       // Redibujar si está activo
       if (cropManager.isActive) {
         cropManager.draw();
@@ -8050,20 +4703,20 @@
     function applyCrop() {
       try {
         const croppedCanvas = cropManager.applyCrop();
-        
+
         if (croppedCanvas) {
           // Actualizar canvas principal con la imagen recortada
           canvas.width = croppedCanvas.width;
           canvas.height = croppedCanvas.height;
           ctx.drawImage(croppedCanvas, 0, 0);
-          
+
           // Crear nueva imagen del resultado
           const croppedImage = new Image();
           croppedImage.onload = () => {
             currentImage = croppedImage;
             // El recorte define el nuevo "original" para resetRotation
             transformResetImage = croppedImage;
-            comparisonNeedsUpdate = true;
+            ComparisonManager.invalidate();
             // Reacotar posiciones custom de marcas al nuevo tamaño
             if (customImagePosition) {
               customImagePosition.x = Math.min(customImagePosition.x, croppedImage.width);
@@ -8102,87 +4755,8 @@
       }
     }
 
-    /**
-     * ====================================
-     * SHORTCUTS UI
-     * ====================================
-     */
-
-    // Orden de categorías en el modal de atajos
-    const SHORTCUT_CATEGORIES = ['Edición', 'Archivo', 'Herramientas', 'Vista', 'Otros'];
-
-    /**
-     * Renderiza el grid de atajos desde los registros reales:
-     * KeyboardShortcutManager.getAllShortcuts() + ZoomPanManager.getKeyboardShortcuts().
-     * Así lo mostrado nunca puede divergir del comportamiento (el grid estático
-     * anterior documentaba 5 combinaciones incorrectas).
-     */
-    function renderShortcutsGrid() {
-      const grid = document.getElementById('shortcuts-grid');
-      if (!grid || !keyboardShortcuts) return;
-
-      const entries = keyboardShortcuts.getAllShortcuts();
-
-      // Atajos de zoom: los gestiona ZoomPanManager con su propio listener;
-      // su módulo expone la lista para documentarlos junto al resto.
-      if (typeof ZoomPanManager !== 'undefined' && ZoomPanManager.getKeyboardShortcuts) {
-        ZoomPanManager.getKeyboardShortcuts().forEach(z => {
-          entries.push({
-            combo: keyboardShortcuts.getDisplayCombo(z.key, z.modifiers),
-            description: z.description,
-            category: z.category
-          });
-        });
-      }
-
-      grid.textContent = '';
-      SHORTCUT_CATEGORIES.forEach(cat => {
-        const items = entries.filter(e => e.category === cat && e.description);
-        if (!items.length) return;
-
-        const section = document.createElement('div');
-        section.className = 'shortcut-section';
-
-        const title = document.createElement('h3');
-        title.className = 'shortcut-section-title';
-        title.textContent = cat;
-        section.appendChild(title);
-
-        items.forEach(item => {
-          const row = document.createElement('div');
-          row.className = 'shortcut-item';
-
-          const kbd = document.createElement('kbd');
-          kbd.className = 'shortcut-keys';
-          kbd.textContent = item.combo;
-
-          const desc = document.createElement('span');
-          desc.className = 'shortcut-desc';
-          desc.textContent = item.description;
-
-          row.appendChild(kbd);
-          row.appendChild(desc);
-          section.appendChild(row);
-        });
-
-        grid.appendChild(section);
-      });
-    }
-
-    function openShortcutsModal() {
-      const modal = document.getElementById('shortcuts-modal');
-      if (modal) {
-        renderShortcutsGrid();
-        _openAccessibleModal(modal, null, 'display');
-      }
-    }
-
-    function closeShortcutsModal() {
-      const modal = document.getElementById('shortcuts-modal');
-      if (modal) {
-        _closeAccessibleModal(modal);
-      }
-    }
+    function openShortcutsModal() { EditorShortcutManager.openModal(); }
+    function closeShortcutsModal() { EditorShortcutManager.closeModal(); }
 
     /**
      * ====================================
@@ -8219,20 +4793,7 @@
       window.openShortcutsModal = openShortcutsModal;
       window.closeShortcutsModal = closeShortcutsModal;
 
-      // Agregar event listeners para inputs de texto (con debounce)
-      const textInput = document.getElementById('text-layer-text');
-      if (textInput) {
-        textInput.addEventListener('input', debounce(updateActiveTextLayer, 300));
-      }
-
-      // Event listeners para otros controles de texto
-      ['font', 'size', 'color', 'x', 'y',
-       'rotation', 'opacity', 'shadow', 'stroke', 'gradient'].forEach(id => {
-        const el = getTextLayerControl(id);
-        if (el) {
-          el.addEventListener('change', updateActiveTextLayer);
-        }
-      });
+      TextLayerUIManager.initializeControls();
 
       // Event listener para aspect ratio
       const aspectRatioSelect = document.getElementById('crop-aspect-ratio');
@@ -8247,272 +4808,13 @@
 
     }
 
-    // ===== COMPARISON MODE - ANTES/DESPUÉS CON SLIDER =====
+    // Comparación antes/después extraída a ComparisonManager (v3.7.1).
+    function initializeComparisonMode() { ComparisonManager.initialize(); }
+    function toggleComparisonMode() { ComparisonManager.toggle(); }
 
-    let comparisonMode = false;
-    let comparisonSliderPosition = 50; // Porcentaje (0-100)
-    let comparisonOriginalCanvas = null; // Canvas de imagen original
-    let comparisonNeedsUpdate = true; // Control de caché para comparación
-    let isDraggingSlider = false;
 
-    /**
-     * Inicializa el modo de comparación
-     */
-    function initializeComparisonMode() {
-      const toggleBtn = document.getElementById('compare-toggle-btn');
-      const overlay = document.getElementById('comparison-overlay');
-      const slider = document.getElementById('comparison-slider');
-      
-      if (!toggleBtn || !overlay || !slider) {
-        console.error('❌ Elementos de comparación no encontrados');
-        return;
-      }
-      
-      // Event: Toggle button
-      toggleBtn.addEventListener('click', toggleComparisonMode);
-      
-      // Event: Slider drag
-      slider.addEventListener('mousedown', startDraggingSlider);
-      slider.addEventListener('touchstart', startDraggingSlider, { passive: false });
-      
-      // Event: Click en overlay para mover slider
-      overlay.addEventListener('click', (e) => {
-        if (e.target === slider || slider.contains(e.target)) return;
-        moveSliderToClick(e);
-      });
-      
-      // Event: Doble click en handle para resetear
-      const handle = slider.querySelector('.comparison-slider-handle');
-      if (handle) {
-        handle.addEventListener('dblclick', (e) => {
-          e.stopPropagation();
-          comparisonSliderPosition = 50;
-          updateSliderPosition();
-        });
-      }
-      
-      // Event: Teclado (flechas)
-      document.addEventListener('keydown', (e) => {
-        if (!comparisonMode) return;
-        
-        if (e.key === 'ArrowLeft') {
-          e.preventDefault();
-          comparisonSliderPosition = Math.max(0, comparisonSliderPosition - 5);
-          updateSliderPosition();
-        } else if (e.key === 'ArrowRight') {
-          e.preventDefault();
-          comparisonSliderPosition = Math.min(100, comparisonSliderPosition + 5);
-          updateSliderPosition();
-        } else if (e.key === 'Escape') {
-          if (comparisonMode) toggleComparisonMode();
-        }
-      });
-      
-      // Event: Mouse/Touch move global
-      document.addEventListener('mousemove', dragSlider);
-      document.addEventListener('touchmove', dragSlider, { passive: false });
-      document.addEventListener('mouseup', stopDraggingSlider);
-      document.addEventListener('touchend', stopDraggingSlider);
-      
-    }
-
-    /**
-     * Toggle entre modo normal y modo comparación
-     */
-    function toggleComparisonMode() {
-      if (!currentImage) {
-        UIManager.showError('CARGA UNA IMAGEN PRIMERO');
-        return;
-      }
-      
-      comparisonMode = !comparisonMode;
-      const overlay = document.getElementById('comparison-overlay');
-      const toggleBtn = document.getElementById('compare-toggle-btn');
-      const mainCanvas = document.getElementById('preview-canvas');
-      const originalCanvas = document.getElementById('comparison-canvas-original');
-      const editedCanvas = document.getElementById('comparison-canvas-edited');
-      
-      if (comparisonMode) {
-        // 1. Capturar imagen original
-        saveOriginalImageForComparison();
-
-        // 2. Mostrar overlay PRIMERO (necesario para que tenga dimensiones)
-        overlay.style.display = 'block';
-
-        // 3. Renderizar en el siguiente frame (cuando el overlay ya tiene layout)
-        requestAnimationFrame(() => {
-          renderComparisonCanvases();
-        });
-
-        toggleBtn.classList.add('active');
-        toggleBtn.innerHTML = '<i class="fas fa-times" aria-hidden="true"></i> Cerrar';
-
-        UIManager.showInfo('Arrastra el slider o usa \u2190 \u2192 para comparar');
-
-      } else {
-        // Desactivar: ocultar overlay, limpiar memoria
-        overlay.style.display = 'none';
-        toggleBtn.classList.remove('active');
-        toggleBtn.innerHTML = '<i class="fas fa-sliders-h" aria-hidden="true"></i> Comparar';
-
-        if (originalCanvas) { originalCanvas.width = 0; originalCanvas.height = 0; }
-        if (editedCanvas) { editedCanvas.width = 0; editedCanvas.height = 0; }
-
-        if (comparisonOriginalCanvas) {
-          const pixels = comparisonOriginalCanvas.width * comparisonOriginalCanvas.height;
-          if (pixels > 4000000) {
-            comparisonOriginalCanvas.width = 0;
-            comparisonOriginalCanvas.height = 0;
-            comparisonOriginalCanvas = null;
-            comparisonNeedsUpdate = true;
-          }
-        }
-
-        comparisonSliderPosition = 50;
-      }
-    }
-
-    /**
-     * Guarda copia de la imagen original sin ediciones
-     */
-    function saveOriginalImageForComparison() {
-      // Si ya tenemos el canvas y no necesita actualización, usar el caché
-      if (comparisonOriginalCanvas && !comparisonNeedsUpdate) return;
-      if (!currentImage) return;
-      
-      // Crear o dimensionar canvas temporal con imagen original
-      if (!comparisonOriginalCanvas) {
-        comparisonOriginalCanvas = document.createElement('canvas');
-      }
-      
-      comparisonOriginalCanvas.width = currentImage.width;
-      comparisonOriginalCanvas.height = currentImage.height;
-      const ctx = comparisonOriginalCanvas.getContext('2d');
-      ctx.drawImage(currentImage, 0, 0);
-      
-      // Resetear bandera de actualización
-      comparisonNeedsUpdate = false;
-    }
-
-    /**
-     * Renderiza ambos canvas (original y editado)
-     */
-    function renderComparisonCanvases() {
-      const originalCanvas = document.getElementById('comparison-canvas-original');
-      const editedCanvas = document.getElementById('comparison-canvas-edited');
-      const mainCanvas = document.getElementById('preview-canvas');
-      
-      if (!originalCanvas || !editedCanvas || !mainCanvas || !currentImage) return;
-      
-      // Canvas original (sin filtros)
-      originalCanvas.width = comparisonOriginalCanvas.width;
-      originalCanvas.height = comparisonOriginalCanvas.height;
-      const ctxOriginal = originalCanvas.getContext('2d');
-      ctxOriginal.drawImage(comparisonOriginalCanvas, 0, 0);
-      
-      // Canvas editado (con filtros CSS renderizados en los píxeles)
-      editedCanvas.width = mainCanvas.width;
-      editedCanvas.height = mainCanvas.height;
-      const ctxEdited = editedCanvas.getContext('2d');
-      const filterString = mainCanvas.style.filter || '';
-      if (filterString) {
-        ctxEdited.filter = filterString;
-      }
-      ctxEdited.drawImage(mainCanvas, 0, 0);
-      ctxEdited.filter = 'none';
-      
-      // Aplicar clipping según posición del slider
-      updateSliderPosition();
-    }
-
-    /**
-     * Actualiza la posición visual del slider
-     */
-    function updateSliderPosition() {
-      const slider = document.getElementById('comparison-slider');
-      const editedCanvas = document.getElementById('comparison-canvas-edited');
-      const overlay = document.getElementById('comparison-overlay');
-      
-      if (!slider || !editedCanvas || !overlay) return;
-      
-      // Mover slider
-      slider.style.left = `${comparisonSliderPosition}%`;
-      
-      // Aplicar clipping al canvas editado
-      const overlayWidth = overlay.offsetWidth;
-      const clipWidth = (comparisonSliderPosition / 100) * overlayWidth;
-      editedCanvas.style.clipPath = `inset(0 ${overlayWidth - clipWidth}px 0 0)`;
-    }
-
-    /**
-     * Inicia el arrastre del slider
-     */
-    function startDraggingSlider(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      isDraggingSlider = true;
-      document.body.style.cursor = 'ew-resize';
-    }
-
-    /**
-     * Detiene el arrastre del slider
-     */
-    function stopDraggingSlider() {
-      isDraggingSlider = false;
-      document.body.style.cursor = '';
-    }
-
-    /**
-     * Arrastra el slider según posición del mouse/touch
-     */
-    function dragSlider(e) {
-      if (!isDraggingSlider || !comparisonMode) return;
-      
-      e.preventDefault();
-      
-      const overlay = document.getElementById('comparison-overlay');
-      if (!overlay) return;
-      
-      const rect = overlay.getBoundingClientRect();
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const x = clientX - rect.left;
-      
-      comparisonSliderPosition = (x / rect.width) * 100;
-      comparisonSliderPosition = Math.max(0, Math.min(100, comparisonSliderPosition));
-      
-      updateSliderPosition();
-    }
-
-    /**
-     * Mueve el slider a la posición del click
-     */
-    function moveSliderToClick(e) {
-      const overlay = document.getElementById('comparison-overlay');
-      if (!overlay) return;
-      
-      const rect = overlay.getBoundingClientRect();
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const x = clientX - rect.left;
-      
-      comparisonSliderPosition = (x / rect.width) * 100;
-      comparisonSliderPosition = Math.max(0, Math.min(100, comparisonSliderPosition));
-      
-      updateSliderPosition();
-    }
-
-    // ===== FIN COMPARISON MODE =====
-
-    function debounce(func, wait) {
-      let timeout;
-      return function executedFunction(...args) {
-        const later = () => {
-          clearTimeout(timeout);
-          func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
-      };
-    }
+    // v3.7.1: debounce eliminado de main.js — era un duplicado byte a byte
+    // del debounce canónico de js/utils/helpers.js (mismo ámbito de script).
 
     // Inicializar UI avanzada cuando el DOM esté listo
     if (document.readyState === 'loading') {
@@ -8572,4 +4874,4 @@
         });
       }
     }
-    
+

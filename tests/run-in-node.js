@@ -161,8 +161,18 @@ load('js/utils/app-state.js');
 load('js/managers/security-manager.js');
 load('js/managers/metadata-manager.js');
 load('js/managers/history-manager.js');
+load('js/managers/text-layer-manager.js');
+load('js/managers/text-layer-ui-manager.js');
 load('js/managers/batch-manager.js');
+load('js/managers/watermark-manager.js');
+load('js/managers/document-renderer.js');
+load('js/managers/ruler-manager.js');
+load('js/managers/comparison-manager.js');
+load('js/managers/mobile-manager.js');
+load('js/managers/editor-shortcut-manager.js');
+load('js/managers/batch-ui-manager.js');
 load('js/managers/session-manager.js');
+load('js/managers/session-coordinator.js');
 load('js/managers/preset-manager.js');
 load('js/managers/analysis-manager.js');
 load('js/managers/curves-manager.js');
@@ -216,6 +226,7 @@ const specs = [
   'tests/specs/history-manager.spec.js',
   'tests/specs/regression.spec.js',
   'tests/specs/v370.spec.js',
+  'tests/specs/v371.spec.js',
 ];
 
 for (const spec of specs) {

@@ -1,116 +1,124 @@
 'use strict';
 
-// ===== ZOOM & PAN MANAGER (v3.5.0 Fase 3) =====
-// Zoom con botones/teclado/rueda + pan con mouse/touch.
-// Accede a las variables globales de main.js por nombre:
-//   canvas, currentZoom, minZoom, maxZoom, zoomStep, isZoomed,
-//   panX, panY, isPanning, startPanX, startPanY, startOffsetX, startOffsetY,
-//   currentImage, UIManager
-
+// ZoomPanManager v3.7.1: todo el estado compartido se lee y muta mediante
+// AppState. Las coordenadas transitorias del gesto son privadas del manager.
 window.ZoomPanManager = (function () {
+  const gesture = {
+    startX: 0,
+    startY: 0,
+    startOffsetX: 0,
+    startOffsetY: 0
+  };
+
+  function limits() {
+    return {
+      min: AppConfig.minZoom,
+      max: AppConfig.maxZoom,
+      step: AppConfig.zoomStep,
+      wheelStep: AppConfig.wheelZoomStep || 0.1
+    };
+  }
 
   function zoomIn() {
-    if (currentZoom < maxZoom) {
-      currentZoom = Math.min(currentZoom + zoomStep, maxZoom);
-      applyZoom();
-      updateZoomLevel();
-      UIManager.showSuccess('Zoom: ' + Math.round(currentZoom * 100) + '%');
-    }
+    const cfg = limits();
+    if (AppState.currentZoom >= cfg.max) return;
+    AppState.currentZoom = Math.min(AppState.currentZoom + cfg.step, cfg.max);
+    applyZoom();
+    updateZoomLevel();
+    UIManager.showSuccess('Zoom: ' + Math.round(AppState.currentZoom * 100) + '%');
   }
 
   function zoomOut() {
-    if (currentZoom > minZoom) {
-      currentZoom = Math.max(currentZoom - zoomStep, minZoom);
-      applyZoom();
-      updateZoomLevel();
-      UIManager.showSuccess('Zoom: ' + Math.round(currentZoom * 100) + '%');
-    }
+    const cfg = limits();
+    if (AppState.currentZoom <= cfg.min) return;
+    AppState.currentZoom = Math.max(AppState.currentZoom - cfg.step, cfg.min);
+    applyZoom();
+    updateZoomLevel();
+    UIManager.showSuccess('Zoom: ' + Math.round(AppState.currentZoom * 100) + '%');
   }
 
   function zoomInWheel() {
-    if (currentZoom < maxZoom) {
-      const wheelStep = AppConfig.wheelZoomStep;
-      currentZoom = Math.min(currentZoom + wheelStep, maxZoom);
-      applyZoom();
-      updateZoomLevel();
-    }
+    const cfg = limits();
+    if (AppState.currentZoom >= cfg.max) return;
+    AppState.currentZoom = Math.min(AppState.currentZoom + cfg.wheelStep, cfg.max);
+    applyZoom();
+    updateZoomLevel();
   }
 
   function zoomOutWheel() {
-    if (currentZoom > minZoom) {
-      const wheelStep = AppConfig.wheelZoomStep;
-      currentZoom = Math.max(currentZoom - wheelStep, minZoom);
-      applyZoom();
-      updateZoomLevel();
-    }
+    const cfg = limits();
+    if (AppState.currentZoom <= cfg.min) return;
+    AppState.currentZoom = Math.max(AppState.currentZoom - cfg.wheelStep, cfg.min);
+    applyZoom();
+    updateZoomLevel();
   }
 
   function resetZoom() {
-    currentZoom = 1.0;
-    isZoomed = false;
+    AppState.currentZoom = 1;
+    AppState.isZoomed = false;
     resetPan();
     applyZoom();
     updateZoomLevel();
     UIManager.showSuccess('Zoom reseteado');
   }
 
-  // Re-acotar el pan a los límites del zoom actual. Sin esto, hacer zoom-out
-  // tras un pan al extremo deja la imagen fuera del contenedor.
   function clampPan() {
-    if (!canvas || currentZoom <= 1) {
-      panX = 0;
-      panY = 0;
+    const canvas = AppState.canvas;
+    const zoom = AppState.currentZoom;
+    if (!canvas || zoom <= 1) {
+      AppState.panX = 0;
+      AppState.panY = 0;
       return;
     }
-    const maxPX = (canvas.offsetWidth * (currentZoom - 1)) / 2;
-    const maxPY = (canvas.offsetHeight * (currentZoom - 1)) / 2;
-    panX = Math.max(-maxPX, Math.min(maxPX, panX));
-    panY = Math.max(-maxPY, Math.min(maxPY, panY));
+    const maxPX = (canvas.offsetWidth * (zoom - 1)) / 2;
+    const maxPY = (canvas.offsetHeight * (zoom - 1)) / 2;
+    AppState.panX = Math.max(-maxPX, Math.min(maxPX, AppState.panX));
+    AppState.panY = Math.max(-maxPY, Math.min(maxPY, AppState.panY));
   }
 
   function applyZoom() {
+    const canvas = AppState.canvas;
     if (!canvas) return;
-    if (currentZoom !== 1.0) {
-      isZoomed = true;
+
+    const zoom = AppState.currentZoom;
+    if (zoom !== 1) {
+      AppState.isZoomed = true;
       clampPan();
       canvas.classList.add('zoomed');
-      canvas.style.transform = 'scale(' + currentZoom + ') translate(' + panX + 'px, ' + panY + 'px)';
+      canvas.style.transform = 'scale(' + zoom + ') translate(' + AppState.panX + 'px, ' + AppState.panY + 'px)';
       canvas.style.transformOrigin = 'center center';
       canvas.style.cursor = 'grab';
     } else {
-      isZoomed = false;
+      AppState.isZoomed = false;
       canvas.classList.remove('zoomed');
       canvas.style.transform = 'scale(1)';
       canvas.style.cursor = 'default';
-      panX = 0;
-      panY = 0;
+      AppState.panX = 0;
+      AppState.panY = 0;
     }
+
     const previewContainer = document.querySelector('.preview__container');
-    if (previewContainer) {
-      previewContainer.style.overflow = 'hidden';
-    }
+    if (previewContainer) previewContainer.style.overflow = 'hidden';
   }
 
   function updateZoomLevel() {
+    const zoom = AppState.currentZoom;
+    const cfg = limits();
     const zoomLevelElement = document.getElementById('zoom-level');
-    if (zoomLevelElement) {
-      zoomLevelElement.textContent = Math.round(currentZoom * 100) + '%';
-    }
+    if (zoomLevelElement) zoomLevelElement.textContent = Math.round(zoom * 100) + '%';
+
     const zoomInBtn = document.getElementById('zoom-in-btn');
     const zoomOutBtn = document.getElementById('zoom-out-btn');
     if (zoomInBtn) {
-      zoomInBtn.disabled = currentZoom >= maxZoom;
-      zoomInBtn.style.opacity = currentZoom >= maxZoom ? '0.5' : '1';
+      zoomInBtn.disabled = zoom >= cfg.max;
+      zoomInBtn.style.opacity = zoom >= cfg.max ? '0.5' : '1';
     }
     if (zoomOutBtn) {
-      zoomOutBtn.disabled = currentZoom <= minZoom;
-      zoomOutBtn.style.opacity = currentZoom <= minZoom ? '0.5' : '1';
+      zoomOutBtn.disabled = zoom <= cfg.min;
+      zoomOutBtn.style.opacity = zoom <= cfg.min ? '0.5' : '1';
     }
   }
 
-  // Fuente de verdad para el modal de atajos: estas entradas describen
-  // EXACTAMENTE lo que maneja el switch de initZoomKeyboardShortcuts().
-  // Si cambias el switch, cambia esta lista.
   function getKeyboardShortcuts() {
     return [
       { key: '+', modifiers: ['ctrl'], description: 'Aumentar zoom', category: 'Vista' },
@@ -120,129 +128,122 @@ window.ZoomPanManager = (function () {
   }
 
   function initZoomKeyboardShortcuts() {
-    document.addEventListener('keydown', function (e) {
-      // No interceptar atajos mientras se escribe en un campo de texto
-      const tag = e.target && e.target.tagName;
+    document.addEventListener('keydown', function (event) {
+      const tag = event.target && event.target.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-      if (e.ctrlKey || e.metaKey) {
-        switch (e.key) {
-          case '+': case '=':
-            e.preventDefault(); zoomIn(); break;
-          case '-':
-            e.preventDefault(); zoomOut(); break;
-          case '0':
-            e.preventDefault(); resetZoom(); break;
-        }
+      if (!event.ctrlKey && !event.metaKey) return;
+      switch (event.key) {
+        case '+':
+        case '=':
+          event.preventDefault();
+          zoomIn();
+          break;
+        case '-':
+          event.preventDefault();
+          zoomOut();
+          break;
+        case '0':
+          event.preventDefault();
+          resetZoom();
+          break;
       }
     });
   }
 
   function initMouseWheelZoom() {
     const previewContainer = document.querySelector('.preview__container');
-    const cv = document.getElementById('preview-canvas');
+    const canvas = document.getElementById('preview-canvas');
     if (!previewContainer) return;
 
-    const handleWheelZoom = function (e) {
-      if (!currentImage || !cv) return;
-      if (window.innerWidth >= 768) return; // Solo móvil
-      e.preventDefault();
-      if (e.deltaY < 0) zoomInWheel();
-      else if (e.deltaY > 0) zoomOutWheel();
+    const handleWheelZoom = function (event) {
+      if (!AppState.currentImage || !canvas) return;
+      if (window.innerWidth >= 768) return;
+      event.preventDefault();
+      if (event.deltaY < 0) zoomInWheel();
+      else if (event.deltaY > 0) zoomOutWheel();
     };
 
     previewContainer.addEventListener('wheel', handleWheelZoom, { passive: false });
-    if (cv) cv.addEventListener('wheel', handleWheelZoom, { passive: false });
+    if (canvas) canvas.addEventListener('wheel', handleWheelZoom, { passive: false });
+  }
+
+  function beginPan(clientX, clientY) {
+    AppState.isPanning = true;
+    gesture.startX = clientX;
+    gesture.startY = clientY;
+    gesture.startOffsetX = AppState.panX;
+    gesture.startOffsetY = AppState.panY;
+  }
+
+  function movePan(clientX, clientY, canvas) {
+    const zoom = AppState.currentZoom;
+    const maxPX = (canvas.offsetWidth * (zoom - 1)) / 2;
+    const maxPY = (canvas.offsetHeight * (zoom - 1)) / 2;
+    AppState.panX = Math.max(-maxPX, Math.min(maxPX, gesture.startOffsetX + (clientX - gesture.startX) / zoom));
+    AppState.panY = Math.max(-maxPY, Math.min(maxPY, gesture.startOffsetY + (clientY - gesture.startY) / zoom));
+    applyZoom();
+  }
+
+  function endPan(canvas) {
+    if (!AppState.isPanning) return;
+    AppState.isPanning = false;
+    if (canvas && AppState.isZoomed) canvas.style.cursor = 'grab';
   }
 
   function initPanNavigation() {
-    const cv = document.getElementById('preview-canvas');
-    if (!cv) return;
+    const canvas = document.getElementById('preview-canvas');
+    if (!canvas) return;
 
-    cv.addEventListener('mousedown', function (e) {
-      if (!isZoomed || !currentImage) return;
-      isPanning = true;
-      startPanX = e.clientX;
-      startPanY = e.clientY;
-      startOffsetX = panX;
-      startOffsetY = panY;
-      cv.style.cursor = 'grabbing';
-      e.preventDefault();
+    canvas.addEventListener('mousedown', function (event) {
+      if (!AppState.isZoomed || !AppState.currentImage) return;
+      beginPan(event.clientX, event.clientY);
+      canvas.style.cursor = 'grabbing';
+      event.preventDefault();
     });
 
-    document.addEventListener('mousemove', function (e) {
-      if (!isPanning || !isZoomed) return;
-      const maxPX = (cv.offsetWidth * (currentZoom - 1)) / 2;
-      const maxPY = (cv.offsetHeight * (currentZoom - 1)) / 2;
-      panX = Math.max(-maxPX, Math.min(maxPX, startOffsetX + (e.clientX - startPanX) / currentZoom));
-      panY = Math.max(-maxPY, Math.min(maxPY, startOffsetY + (e.clientY - startPanY) / currentZoom));
-      applyZoom();
-      e.preventDefault();
+    document.addEventListener('mousemove', function (event) {
+      if (!AppState.isPanning || !AppState.isZoomed) return;
+      movePan(event.clientX, event.clientY, canvas);
+      event.preventDefault();
     });
+    document.addEventListener('mouseup', function () { endPan(canvas); });
+    document.addEventListener('mouseleave', function () { endPan(canvas); });
 
-    document.addEventListener('mouseup', function () {
-      if (isPanning) {
-        isPanning = false;
-        if (cv && isZoomed) cv.style.cursor = 'grab';
-      }
-    });
-
-    document.addEventListener('mouseleave', function () {
-      if (isPanning) {
-        isPanning = false;
-        if (cv && isZoomed) cv.style.cursor = 'grab';
-      }
-    });
-
-    // Touch
-    cv.addEventListener('touchstart', function (e) {
-      if (!isZoomed || !currentImage) return;
-      const touch = e.touches[0];
-      isPanning = true;
-      startPanX = touch.clientX;
-      startPanY = touch.clientY;
-      startOffsetX = panX;
-      startOffsetY = panY;
-      e.preventDefault();
+    canvas.addEventListener('touchstart', function (event) {
+      if (!AppState.isZoomed || !AppState.currentImage || !event.touches[0]) return;
+      beginPan(event.touches[0].clientX, event.touches[0].clientY);
+      event.preventDefault();
     }, { passive: false });
 
-    document.addEventListener('touchmove', function (e) {
-      if (!isPanning || !isZoomed) return;
-      const touch = e.touches[0];
-      const maxPX = (cv.offsetWidth * (currentZoom - 1)) / 2;
-      const maxPY = (cv.offsetHeight * (currentZoom - 1)) / 2;
-      panX = Math.max(-maxPX, Math.min(maxPX, startOffsetX + (touch.clientX - startPanX) / currentZoom));
-      panY = Math.max(-maxPY, Math.min(maxPY, startOffsetY + (touch.clientY - startPanY) / currentZoom));
-      applyZoom();
-      e.preventDefault();
+    document.addEventListener('touchmove', function (event) {
+      if (!AppState.isPanning || !AppState.isZoomed || !event.touches[0]) return;
+      movePan(event.touches[0].clientX, event.touches[0].clientY, canvas);
+      event.preventDefault();
     }, { passive: false });
-
-    document.addEventListener('touchend', function () {
-      if (isPanning) isPanning = false;
-    });
+    document.addEventListener('touchend', function () { endPan(canvas); });
   }
 
   function resetPan() {
-    panX = 0;
-    panY = 0;
-    isPanning = false;
-    if (canvas) {
-      canvas.style.cursor = isZoomed ? 'grab' : 'default';
-    }
+    AppState.panX = 0;
+    AppState.panY = 0;
+    AppState.isPanning = false;
+    const canvas = AppState.canvas;
+    if (canvas) canvas.style.cursor = AppState.isZoomed ? 'grab' : 'default';
   }
 
   return {
-    zoomIn: zoomIn,
-    zoomOut: zoomOut,
-    zoomInWheel: zoomInWheel,
-    zoomOutWheel: zoomOutWheel,
-    resetZoom: resetZoom,
-    applyZoom: applyZoom,
-    updateZoomLevel: updateZoomLevel,
-    initZoomKeyboardShortcuts: initZoomKeyboardShortcuts,
-    getKeyboardShortcuts: getKeyboardShortcuts,
-    initMouseWheelZoom: initMouseWheelZoom,
-    initPanNavigation: initPanNavigation,
-    resetPan: resetPan
+    zoomIn,
+    zoomOut,
+    zoomInWheel,
+    zoomOutWheel,
+    resetZoom,
+    applyZoom,
+    updateZoomLevel,
+    initZoomKeyboardShortcuts,
+    getKeyboardShortcuts,
+    initMouseWheelZoom,
+    initPanNavigation,
+    resetPan
   };
 })();
 

@@ -264,29 +264,43 @@ class BatchManager {
    * @param {Object} watermarks - Config de watermarks (text + image)
    * @param {Array} textLayers - Capas de texto
    * @param {Object} metadata - Metadatos
-   * @param {Function} renderFn - Función que renderiza una imagen en un canvas
-   *   con todas las capas (watermarks, filtros, text layers). Recibe (ctx, canvas, img).
+   * El quinto argumento legacy se ignora desde v3.7.1: DocumentRenderer es la
+   * única ruta de composición para preview, export y lote.
    */
-  captureCurrentConfig(filterString, watermarks, textLayers, metadata, renderFn) {
-    // Formato/calidad de salida: respetar la configuración global del editor
-    // (select #output-format y slider de calidad, variables de main.js
-    // accesibles por scope de script). Si no son accesibles (tests, uso
-    // aislado), mantener JPEG 0.9 como default documentado.
-    const globalFormat = (typeof outputFormat !== 'undefined' && outputFormat)
-      ? outputFormat
-      : 'jpeg';
-    const globalQuality = (typeof outputQuality === 'number')
-      ? outputQuality
-      : 0.9;
+  captureCurrentConfig(filterString, watermarks, textLayers, metadata) {
+    const sourceCanvas = AppState.canvas;
+    const layerManager = typeof window !== 'undefined' ? window.textLayerManager : null;
+    const capturedLayers = textLayers || (
+      layerManager && typeof layerManager.getAllLayers === 'function'
+        ? layerManager.getAllLayers()
+        : []
+    );
+    const documentState = DocumentRenderer.snapshot({
+      sourceImage: null,
+      referenceWidth: sourceCanvas ? sourceCanvas.width : 0,
+      referenceHeight: sourceCanvas ? sourceCanvas.height : 0,
+      filterString: filterString || '',
+      watermarks: watermarks || WatermarkManager.captureConfig(),
+      textLayers: capturedLayers.map(layer => ({
+        ...layer,
+        font: { ...layer.font },
+        position: { ...layer.position },
+        effects: {
+          shadow: layer.effects?.shadow ? { ...layer.effects.shadow } : null,
+          stroke: layer.effects?.stroke ? { ...layer.effects.stroke } : null,
+          gradient: layer.effects?.gradient
+            ? { ...layer.effects.gradient, colors: [...(layer.effects.gradient.colors || [])] }
+            : null
+        }
+      })),
+      showPositioningBorders: false
+    });
 
     this.currentConfig = {
-      filterString: filterString || '',
-      watermarks: watermarks || null,
-      textLayers: textLayers || null,
+      documentState,
       metadata: metadata ? { ...metadata } : null,
-      renderFn: renderFn || null,
-      outputFormat: globalFormat,
-      outputQuality: globalQuality,
+      outputFormat: AppState.outputFormat || 'jpeg',
+      outputQuality: typeof AppState.outputQuality === 'number' ? AppState.outputQuality : 0.9,
       timestamp: Date.now()
     };
 
@@ -591,14 +605,13 @@ class BatchManager {
       canvas.width = imageItem.width || img.width;
       canvas.height = imageItem.height || img.height;
 
-      // Usar la función de render de main.js que aplica EXACTAMENTE
-      // lo mismo que la previsualización: filtros, watermarks, text layers.
-      if (this.currentConfig.renderFn) {
-        this.currentConfig.renderFn(ctx, canvas, img);
-      } else {
-        // Fallback: render básico sin efectos
-        ctx.drawImage(img, 0, 0);
-      }
+      DocumentRenderer.renderDocument(
+        Object.assign({}, this.currentConfig.documentState, {
+          sourceImage: img,
+          showPositioningBorders: false
+        }),
+        canvas
+      );
 
       const mime = this.currentConfig.outputMime
         || ('image/' + (this.currentConfig.outputFormat || 'jpeg'));

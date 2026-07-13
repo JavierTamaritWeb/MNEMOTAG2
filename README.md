@@ -4,7 +4,7 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos. 100% cliente, sin backend.
 
-![Version](https://img.shields.io/badge/version-3.7.0-blue.svg)
+![Version](https://img.shields.io/badge/version-3.7.1-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 [![Deploy to GitHub Pages](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml)
@@ -14,6 +14,15 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 ---
 
 ## NOVEDADES v3.7
+
+### Arquitectura (v3.7.1)
+- **Estado observable**: `AppState.subscribe()` publica mutaciones explícitas y desacopla exportación, historial, zoom/pan, lote y autosave de las variables sueltas de `main.js`.
+- **Compositor único**: `DocumentRenderer.renderDocument(state, targetCanvas)` es la única secuencia imagen → filtros → watermarks → capas de texto para preview, export y lote.
+- **WatermarkManager completo**: configuración, persistencia, render, bounds, cache, posicionamiento y drag viven en un módulo propio.
+- **Orquestador reducido**: `main.js` queda en 4.877 líneas; UI de lote/capas, reglas, comparación, móvil, atajos y sesión se delegan en managers conservando contratos públicos.
+- **PWA consolidada**: un solo manifest canónico con iconos maskable 192/512 y precache sincronizado.
+- **Release verificable**: Lighthouse móvil 96/100 (producción gzip), accesibilidad 100/100, Axe sin incidencias serias/críticas, 8 regresiones visuales y E2E en Chromium/Firefox/WebKit.
+- Documentación técnica: [arquitectura](docs/ARQUITECTURA_V3_7_1.md) y [postmortem](docs/POSTMORTEM_V3_7_1.md).
 
 ### Funcionalidad (v3.7.0)
 - **Estimación en vivo de exportación**: la pestaña Exportar muestra tamaño aproximado, dimensiones y formato REAL del archivo final (tras fallback), actualizado con cada cambio.
@@ -36,7 +45,7 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 
 ### Build system (v3.5.0)
 - **Gulp 5** con JS bundle (concat + terser), SCSS (sass + cleanCSS), imagenes (sharp → WebP + AVIF), HTML minificado.
-- **24 scripts** → 1 `<script src="dist/js/app.min.js">`.
+- **36 scripts** → 1 `<script src="dist/js/app.min.js">`.
 - **SCSS** en subcarpetas: `abstracts/`, `base/`, `layout/`, `components/`, `pages/`, `modules/`.
 
 ### Carpeta dist/ de produccion (v3.5.3 – v3.5.5)
@@ -51,10 +60,10 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 
 ### Verificacion
 - `npm run build` genera `dist/` completo
-- `node tests/run-in-node.js` → **267/267 OK**
+- `node tests/run-in-node.js` → **283/283 OK**
 - `node tests/binary-validation.js` → **92/92 OK**
-- `npm run test:e2e` → **35/35 desarrollo** (Chromium completo + fallback de formatos en Firefox y WebKit)
-- `npm run test:e2e:dist` → **35/35 produccion**
+- `npm run test:e2e` → **81 OK + 18 omisiones deliberadas** (Chromium, Firefox y WebKit)
+- `npm run test:e2e:dist` → la misma matriz contra producción
 
 > Versiones anteriores: [CHANGELOG.md](CHANGELOG.md)
 
@@ -98,7 +107,7 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 
 ### ⚙️ Infraestructura
 - **PWA real** con Service Worker (offline tras primera visita, instalable).
-- **Tests**: 267 Node + 92 binarias (PNG/WebP/AVIF) + 35 E2E Playwright (smoke, axe, área de trabajo, regresión visual, pruebas v3.7.0 y fallback de formatos en 3 motores).
+- **Tests**: 283 Node + 92 binarias (PNG/WebP/AVIF) + 99 casos E2E Playwright (81 ejecutados y 18 omisiones deliberadas por motor).
 - **CI/CD**: GitHub Actions con deploy automático a GitHub Pages.
 - **Seguridad**: CSP endurecida (sin CDNs de estilo/fuentes), SRI en los scripts diferidos, sanitización XSS en toasts y batch processor.
 - **Rendimiento (v3.6.0)**: sin CSS externo bloqueante — Tailwind purgado local (2.93 MB → 17 KB) + subset de Font Awesome (58 iconos, 4.9 KB). CSS inicial total: 27 KB gzip.
@@ -145,10 +154,10 @@ npm run serve   # solo servidor (sin watch)
 
 ```bash
 npm test                         # ejecuta ambos runners
-node tests/run-in-node.js        # 267/267 aserciones de regresion
+node tests/run-in-node.js        # 283/283 aserciones de regresion
 node tests/binary-validation.js  # 92/92 aserciones binarias PNG/WebP/AVIF
-npm run test:e2e                 # Chromium + Firefox/WebKit (fallback) contra desarrollo
-npm run test:e2e:dist            # Chromium contra dist/ de produccion
+npm run test:e2e                 # Matriz Chromium + Firefox + WebKit contra desarrollo
+npm run test:e2e:dist            # Misma matriz contra dist/ de produccion
 npm run lint:js                  # ESLint local
 npm run lint:css                 # Stylelint local
 ```

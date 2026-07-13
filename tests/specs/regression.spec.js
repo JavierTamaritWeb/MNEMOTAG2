@@ -11,9 +11,9 @@ async function fetchSource(path) {
   return res.text();
 }
 
-describe('Regresión — XSS en updateBatchImagesList (main.js)', function () {
+describe('Regresión — XSS en BatchUIManager', function () {
   it('ya no usa innerHTML con interpolación de img.name / img.dataUrl', async function () {
-    const src = await fetchSource('../js/main.js');
+    const src = await fetchSource('../js/managers/batch-ui-manager.js');
 
     // Patrón vulnerable que existía antes de la corrección
     expect(src).not.toContain('innerHTML = batchImages.map');
@@ -22,13 +22,13 @@ describe('Regresión — XSS en updateBatchImagesList (main.js)', function () {
   });
 
   it('construye el listado del batch con DOM API segura', async function () {
-    const src = await fetchSource('../js/main.js');
+    const src = await fetchSource('../js/managers/batch-ui-manager.js');
 
     // Después de la corrección debe haber createElement/appendChild/textContent
-    expect(src).toContain('replaceChildren()');
+    expect(src).toContain('grid.replaceChildren');
     expect(src).toContain("createElement('div')");
     expect(src).toContain('textContent');
-    expect(src).toContain('removeBtn.addEventListener');
+    expect(src).toContain("addEventListener('click'");
   });
 });
 
@@ -195,17 +195,19 @@ describe('Regresión — Mejoras de UX (v3.3.5)', function () {
     expect(src).toContain('flattenCanvasForJpeg(canvas, flattenColor');
   });
 
-  it('main.js incluye lógica de auto-escala del texto del watermark', async function () {
-    const src = await fetchSource('../js/main.js');
+  it('watermark-manager.js incluye lógica de auto-escala del texto del watermark', async function () {
+    // v3.7.1: el render de watermarks vive en watermark-manager.js
+    const src = await fetchSource('../js/managers/watermark-manager.js');
     expect(src).toContain("getElementById('watermark-auto-scale')");
-    expect(src).toContain('canvas.width / 1000');
+    expect(src).toContain('targetCanvas.width / 1000');
   });
 
-  it('main.js maneja hover state del borde guía con hoveredWatermark', async function () {
-    const src = await fetchSource('../js/main.js');
-    expect(src).toContain('let hoveredWatermark');
-    expect(src).toContain("hoveredWatermark === 'text'");
-    expect(src).toContain("hoveredWatermark === 'image'");
+  it('el hover state del borde guía usa hoveredWatermark (estado en main.js, uso en el manager)', async function () {
+    const mainSrc = await fetchSource('../js/main.js');
+    expect(mainSrc).toContain('let hoveredWatermark');
+    const wmSrc = await fetchSource('../js/managers/watermark-manager.js');
+    expect(wmSrc).toContain("hoveredWatermark === 'text'");
+    expect(wmSrc).toContain("hoveredWatermark === 'image'");
   });
 
   it('metadata-manager.js define setupAutoSave y persistencia ampliada', async function () {
@@ -630,10 +632,10 @@ describe('Regresión — 18 quick wins de v3.5.13', function () {
 
   it('ofrece lote temprano y estados vacíos accionables', async function () {
     const html = await fetchSource('../index.html');
-    const main = await fetchSource('../js/main.js');
+    const textLayerUI = await fetchSource('../js/managers/text-layer-ui-manager.js');
     expect(html).toContain('id="open-batch-btn"');
     expect(html).toContain('id="preset-empty-cta"');
-    expect(main).toContain("action.textContent = 'Añadir primera capa'");
+    expect(textLayerUI).toContain("action.textContent = 'Añadir primera capa'");
   });
 
   it('incluye metadatos sociales y cache offline tolerante a query strings', async function () {
@@ -679,7 +681,7 @@ describe('Regresión — 18 quick wins de v3.5.13', function () {
     const lock = JSON.parse(await fetchSource('../package-lock.json'));
     const sw = await fetchSource('../service-worker.js');
     const readme = await fetchSource('../README.md');
-    expect(pkg.version).toBe('3.7.0');
+    expect(pkg.version).toMatch(/^\d+\.\d+\.\d+$/);
     expect(lock.version).toBe(pkg.version);
     expect(lock.packages[''].version).toBe(pkg.version);
     expect(sw).toContain(`mnemotag-v${pkg.version}`);
@@ -1270,65 +1272,45 @@ describe('Regresión — Code audit moderado (v3.5.2)', function () {
 
 describe('Regresión — Batch ZIP download (v3.5.6+)', function () {
   it('downloadBatchZip usa exportToZip con skipDownload y showSaveFilePicker', async function () {
-    const src = await fetchSource('../js/main.js');
-    // Extraer solo la función downloadBatchZip
-    const fnStart = src.indexOf('function downloadBatchZip');
-    const fnBlock = src.substring(fnStart, fnStart + 1200);
-    expect(fnBlock).toContain('exportToZip');
-    expect(fnBlock).toContain('skipDownload: true');
-    expect(fnBlock).toContain('showSaveFilePicker');
-    expect(fnBlock).toContain("startIn: 'desktop'");
+    const src = await fetchSource('../js/managers/batch-ui-manager.js');
+    expect(src).toContain('exportToZip');
+    expect(src).toContain('skipDownload: true');
+    expect(src).toContain('showSaveFilePicker');
+    expect(src).toContain("startIn: 'desktop'");
   });
 });
 
-describe('Regresión — Batch renderFn desde previsualización (v3.5.6)', function () {
-  it('processBatch crea renderImageForBatch y la pasa al batch manager', async function () {
-    const src = await fetchSource('../js/main.js');
-    expect(src).toContain('function renderImageForBatch(ctx, cvs, img)');
-    expect(src).toContain('captureCurrentConfig(filterString, null, null, null, renderImageForBatch)');
+describe('Regresión — compositor único para preview/export/batch (v3.7.1)', function () {
+  it('processBatch captura estado y ya no crea un render duplicado', async function () {
+    const main = await fetchSource('../js/main.js');
+    const src = await fetchSource('../js/managers/batch-ui-manager.js');
+    expect(src).toContain('batchManager.captureCurrentConfig(');
+    expect(main).not.toContain('function renderImageForBatch');
+    expect(main).not.toContain('function batchWmPos');
+    expect(main).not.toContain('function batchImgPos');
   });
 
-  it('renderImageForBatch usa funciones locales batchWmPos/batchImgPos (no globales)', async function () {
-    const src = await fetchSource('../js/main.js');
-    // Debe tener funciones locales que reciben cw, ch
-    expect(src).toContain('function batchWmPos(position, width, height, cw, ch)');
-    expect(src).toContain('function batchImgPos(position, width, height, cw, ch)');
-
-    // Dentro de renderImageForBatch NO debe llamar a las funciones globales
-    const fnStart = src.indexOf('function renderImageForBatch');
-    const fnBlock = src.substring(fnStart, fnStart + 2000);
-    expect(fnBlock).not.toContain('getTextWatermarkPosition(');
-    expect(fnBlock).not.toContain('getImageWatermarkPosition(');
-    // Debe usar las locales con las dimensiones del canvas batch
-    expect(fnBlock).toContain('batchWmPos(wmPosition, tw, sz, cw, ch)');
-    expect(fnBlock).toContain('batchImgPos(wmImgPosition, w, h, cw, ch)');
-  });
-
-  it('renderImageForBatch aplica filtros CSS vía ctx.filter y los resetea', async function () {
-    const src = await fetchSource('../js/main.js');
-    const fnStart = src.indexOf('function renderImageForBatch');
-    const fnBlock = src.substring(fnStart, fnStart + 2000);
-    expect(fnBlock).toContain('ctx.filter = filterString');
-    expect(fnBlock).toContain("ctx.filter = 'none'");
+  it('DocumentRenderer aplica filtros y delega watermarks/capas', async function () {
+    const src = await fetchSource('../js/managers/document-renderer.js');
+    expect(src).toContain('ctx.filter = documentState.filterString');
+    expect(src).toContain('WatermarkManager.renderConfig(');
+    expect(src).toContain('TextLayerManager.renderLayerCollection(');
   });
 
   it('getCurrentFilters devuelve FilterManager.getFilterString() (no reimplementación)', async function () {
-    const src = await fetchSource('../js/main.js');
-    const fnStart = src.indexOf('function getCurrentFilters');
-    const fnBlock = src.substring(fnStart, fnStart + 300);
-    expect(fnBlock).toContain('FilterManager.getFilterString()');
+    const src = await fetchSource('../js/managers/batch-ui-manager.js');
+    expect(src).toContain('FilterManager.getFilterString()');
     // No debe tener la implementación antigua con Number(b.value) + 100
-    expect(fnBlock).not.toContain('Number(b.value)');
-    expect(fnBlock).not.toContain('+ 100');
+    expect(src).not.toContain('Number(b.value)');
+    expect(src).not.toContain('+ 100');
   });
 });
 
-describe('Regresión — Batch IDs de watermark correctos (v3.5.6)', function () {
-  it('processBatch lee watermark-text (no watermarkText)', async function () {
-    const src = await fetchSource('../js/main.js');
-    // Dentro del bloque de processBatch, los IDs deben ser con guión
-    const fnStart = src.indexOf('async function processBatch');
-    const fnBlock = src.substring(fnStart, fnStart + 4000);
+describe('Regresión — Batch captura los IDs de watermark correctos (v3.7.1)', function () {
+  it('WatermarkManager captura watermark-text (no watermarkText)', async function () {
+    const src = await fetchSource('../js/managers/watermark-manager.js');
+    const fnStart = src.indexOf('function captureConfig');
+    const fnBlock = src.substring(fnStart, fnStart + 3000);
     expect(fnBlock).toContain("getElementById('watermark-text')");
     expect(fnBlock).toContain("getElementById('watermark-size')");
     expect(fnBlock).toContain("getElementById('watermark-font')");
@@ -1339,21 +1321,20 @@ describe('Regresión — Batch IDs de watermark correctos (v3.5.6)', function ()
     expect(fnBlock).not.toContain("getElementById('watermarkSize')");
   });
 
-  it('processBatch lee controles separados para watermark de imagen', async function () {
-    const src = await fetchSource('../js/main.js');
-    const fnStart = src.indexOf('async function processBatch');
-    const fnBlock = src.substring(fnStart, fnStart + 4000);
+  it('WatermarkManager captura controles separados para watermark de imagen', async function () {
+    const src = await fetchSource('../js/managers/watermark-manager.js');
+    const fnStart = src.indexOf('function captureConfig');
+    const fnBlock = src.substring(fnStart, fnStart + 3000);
     expect(fnBlock).toContain("getElementById('watermark-image-opacity')");
     expect(fnBlock).toContain("getElementById('watermark-image-size')");
     expect(fnBlock).toContain("getElementById('watermark-image-position')");
   });
 });
 
-describe('Regresión — batch-manager.js usa renderFn (v3.5.6)', function () {
-  it('processImage delega en renderFn en vez de reimplementar filtros', async function () {
+describe('Regresión — batch-manager.js usa DocumentRenderer (v3.7.1)', function () {
+  it('processImage delega en el compositor canónico', async function () {
     const src = await fetchSource('../js/managers/batch-manager.js');
-    // Debe usar renderFn
-    expect(src).toContain('this.currentConfig.renderFn');
+    expect(src).toContain('DocumentRenderer.renderDocument(');
     // NO debe tener implementación propia (código muerto eliminado)
     expect(src).not.toContain('this.applyFilters(');
     expect(src).not.toContain('getImageData(0, 0');
@@ -1363,9 +1344,10 @@ describe('Regresión — batch-manager.js usa renderFn (v3.5.6)', function () {
     expect(src).not.toContain('_getImagePosition(');
   });
 
-  it('captureCurrentConfig acepta renderFn como parámetro', async function () {
+  it('captureCurrentConfig no conserva callbacks de render legacy', async function () {
     const src = await fetchSource('../js/managers/batch-manager.js');
-    expect(src).toContain('renderFn: renderFn || null');
+    expect(src).not.toContain('renderFn:');
+    expect(src).toContain('documentState');
   });
 });
 
@@ -1407,11 +1389,13 @@ describe('Regresión — Auditoría severa v3.5.11', function () {
   });
 
   it('selección de capas se sincroniza y los atajos usan el estado visual', async function () {
-    const main = await fetchSource('../js/main.js');
-    expect(main).toContain('textLayerManager.setActiveLayer(layerId)');
-    expect(main).toContain('textLayerManager.clearActiveLayer()');
-    expect(main).toContain('textLayerManager.getLayer(activeLayerId)');
-    expect(main).toContain('textLayerManager.duplicateLayer(activeLayerId)');
+    const ui = await fetchSource('../js/managers/text-layer-ui-manager.js');
+    const shortcuts = await fetchSource('../js/managers/editor-shortcut-manager.js');
+    expect(ui).toContain('manager.setActiveLayer(layerId)');
+    expect(ui).toContain('manager.clearActiveLayer()');
+    expect(ui).toContain('AppState.activeLayerId');
+    expect(ui).toContain('manager.duplicateLayer(AppState.activeLayerId)');
+    expect(shortcuts).toContain('TextLayerUIManager.duplicateActive()');
   });
 
   it('piexif se sirve localmente y solo hay un manejador global de cada tipo', async function () {
@@ -1450,12 +1434,13 @@ describe('Regresión — Auditoría severa v3.5.11', function () {
   });
 
   it('main.js no registra el handler legacy de atajos ni listeners layer-* inexistentes', async function () {
-    const src = await fetchSource('../js/main.js');
-    expect(src).not.toContain('document.addEventListener(\'keydown\', handleKeyboardShortcuts)');
-    expect(src).not.toContain("getElementById('layer-text')");
-    expect(src).not.toContain("'layer-font'");
-    expect(src).toContain("getElementById('text-layer-text')");
-    expect(src).toContain('getTextLayerControl');
+    const main = await fetchSource('../js/main.js');
+    const ui = await fetchSource('../js/managers/text-layer-ui-manager.js');
+    expect(main).not.toContain('document.addEventListener(\'keydown\', handleKeyboardShortcuts)');
+    expect(ui).not.toContain("getElementById('layer-text')");
+    expect(ui).not.toContain("'layer-font'");
+    expect(ui).toContain("getElementById('text-layer-text')");
+    expect(ui).toContain("'text-layer-' + id");
   });
 
   it('crop usa deactivate/updatePreview y fullscreenchange sí está registrado', async function () {
@@ -1486,7 +1471,8 @@ describe('Regresión — getCanvasContentRect existe y se usa', function () {
   });
 
   it('handleDragStart usa getCanvasContentRect en vez de getBoundingClientRect', async function () {
-    const src = await fetchSource('../js/main.js');
+    // v3.7.1: el sistema drag & drop vive en watermark-manager.js
+    const src = await fetchSource('../js/managers/watermark-manager.js');
     // Buscar el patrón dentro de handleDragStart
     const fnMatch = src.match(/function handleDragStart[\s\S]*?const rect = (get\w+)\(\)/);
     expect(fnMatch).not.toBe(null);
@@ -1494,23 +1480,24 @@ describe('Regresión — getCanvasContentRect existe y se usa', function () {
   });
 
   it('handleDragMove usa getCanvasContentRect', async function () {
-    const src = await fetchSource('../js/main.js');
+    const src = await fetchSource('../js/managers/watermark-manager.js');
     const fnMatch = src.match(/function handleDragMove[\s\S]*?const rect = (get\w+)\(\)/);
     expect(fnMatch).not.toBe(null);
     expect(fnMatch[1]).toBe('getCanvasContentRect');
   });
 
   it('handleRulerMouseMove usa getCanvasContentRect', async function () {
-    const src = await fetchSource('../js/main.js');
-    const fnMatch = src.match(/function handleRulerMouseMove[\s\S]*?const rect = (get\w+)\(\)/);
+    const src = await fetchSource('../js/managers/ruler-manager.js');
+    const fnMatch = src.match(/function handleRulerMouseMove[\s\S]*?const rect = (\w+)\(\)/);
     expect(fnMatch).not.toBe(null);
-    expect(fnMatch[1]).toBe('getCanvasContentRect');
+    expect(fnMatch[1]).toBe('contentRect');
   });
 });
 
 describe('Regresión — Marcadores de posición con offset del canvas', function () {
   it('showPositionMarker calcula offsetLeft/offsetTop del canvas en su container', async function () {
-    const src = await fetchSource('../js/main.js');
+    // v3.7.1: los marcadores viven en watermark-manager.js
+    const src = await fetchSource('../js/managers/watermark-manager.js');
     const fnMatch = src.match(/function showPositionMarker\(\)[\s\S]*?container\.appendChild\(marker\)/);
     expect(fnMatch).not.toBe(null);
     const fnBody = fnMatch[0];
@@ -1521,7 +1508,7 @@ describe('Regresión — Marcadores de posición con offset del canvas', functio
   });
 
   it('showTextPositionMarker calcula offsetLeft/offsetTop del canvas en su container', async function () {
-    const src = await fetchSource('../js/main.js');
+    const src = await fetchSource('../js/managers/watermark-manager.js');
     const fnMatch = src.match(/function showTextPositionMarker\(\)[\s\S]*?container\.appendChild\(marker\)/);
     expect(fnMatch).not.toBe(null);
     const fnBody = fnMatch[0];
@@ -1533,7 +1520,7 @@ describe('Regresión — Marcadores de posición con offset del canvas', functio
 
 describe('Regresión — Resize recalcula canvas en desktop', function () {
   it('el resize handler llama setupCanvas + updatePreview cuando hay imagen', async function () {
-    const src = await fetchSource('../js/main.js');
+    const src = await fetchSource('../js/managers/mobile-manager.js');
     // Buscar el handler de resize que incluye setupCanvas
     const resizeBlock = src.match(/addEventListener\('resize'[\s\S]*?setupCanvas\(\)[\s\S]*?updatePreview\(\)/);
     expect(resizeBlock).not.toBe(null);

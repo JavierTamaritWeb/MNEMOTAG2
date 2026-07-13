@@ -903,6 +903,7 @@
       box-shadow: var(--shadow-lg);
       z-index: 5;
       animation: bounce 1s ease-in-out;
+      pointer-events: none;
     }
 
     .custom-position-marker::after {
@@ -2395,4 +2396,3 @@
     .btn i:only-child {
       margin: 0;
     }
-

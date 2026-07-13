@@ -392,12 +392,21 @@ class TextLayerManager {
    * Renderizar todas las capas en canvas
    */
   renderLayers(ctx, canvas) {
+    TextLayerManager.renderLayerCollection(ctx, canvas, this.layers);
+  }
+
+  /**
+   * Renderiza un snapshot de capas sin depender de la instancia activa.
+   * DocumentRenderer lo usa para que preview, export y batch compartan la
+   * misma implementación incluso si la cola se procesa después.
+   */
+  static renderLayerCollection(ctx, canvas, layers) {
     if (!ctx || !canvas) {
       throw new Error('Canvas context requerido');
     }
 
     // Ordenar por z-index
-    const sortedLayers = [...this.layers].sort((a, b) => a.zIndex - b.zIndex);
+    const sortedLayers = [...(layers || [])].sort((a, b) => a.zIndex - b.zIndex);
 
     for (const layer of sortedLayers) {
       if (!layer.visible) continue;
@@ -405,7 +414,7 @@ class TextLayerManager {
       // Una capa con error (gradiente mal formado, fuente rara, etc.)
       // no debe abortar el render del resto de capas.
       try {
-        this.renderLayer(ctx, layer, canvas);
+        TextLayerManager.prototype.renderLayer(ctx, layer, canvas);
       } catch (error) {
         MNEMOTAG_DEBUG && console.warn(`TextLayerManager: error renderizando la capa ${layer.id}, se omite:`, error);
       }

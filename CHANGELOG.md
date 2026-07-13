@@ -4,6 +4,43 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.7.1] - 2026-07-13
+
+Quinta fase del roadmap: **arquitectura y release verificable**.
+
+### Added
+- **`WatermarkManager` completo**: concentra configuración, persistencia, cache por identidad, render, bounds, posicionamiento y drag de marcas de agua.
+- **`AppState` observable**: `subscribe(key, listener)`, comodín `*`, desuscripción, aislamiento de listeners defectuosos y eventos explícitos desde setters.
+- **Compositor canónico** `DocumentRenderer.renderDocument(state, targetCanvas)`, compartido por preview, exportación y batch; contrato público en `window.renderDocument`.
+- Managers de coordinación extraídos: `BatchUIManager`, `TextLayerUIManager`, `RulerManager`, `ComparisonManager`, `MobileManager`, `EditorShortcutManager` y `SessionCoordinator`.
+- Manifest PWA único con iconos maskable dedicados de 192 y 512 px.
+- Pruebas v3.7.1 de arquitectura, memoria precisa con lote de 20 JPEG y regresión visual real en ocho combinaciones viewport/tema.
+- Documentos `docs/ARQUITECTURA_V3_7_1.md` y `docs/POSTMORTEM_V3_7_1.md`.
+
+### Changed
+- `ExportManager`, `HistoryManager`, `ZoomPanManager` y `BatchManager` consumen `AppState` en lugar de leer globals de `main.js`.
+- `main.js` baja a 4.877 líneas, conservando los contratos públicos históricos mediante adaptadores finos.
+- Playwright ejecuta la cobertura funcional en Chromium, Firefox y WebKit; las ocho capturas visuales se comparan en Chromium para evitar baselines dependientes del motor.
+- La sesión guarda los bytes de la imagen como `ArrayBuffer` y reconstruye el `File`, compatible con IndexedDB en WebKit.
+
+### Removed
+- `downloadImageEnhanced`, la ruta duplicada de render batch, helpers locales duplicados y rutas legacy de composición.
+- El manifest duplicado `images/favicon_io/site.webmanifest`.
+
+### Fixed
+- El área visible de selección de watermarks coincide con su hit-testing y los marcadores DOM ya no interceptan el puntero.
+- El autosave espera `IDBTransaction.complete`; `flushAutoSave()` permite confirmar el commit antes de una recarga controlada.
+- Los tres botones de carga comparten altura, padding, color y comportamiento responsive; móvil ya no recorta ni superpone sus etiquetas.
+
+### Verification
+- Lighthouse móvil sobre servidor gzip equivalente a producción: rendimiento **96**, accesibilidad **100**, FCP 2,0 s, LCP 2,4 s, TBT 0 ms, CLS 0.
+- Axe: cero incidencias serias o críticas en página y modal de atajos, en los tres motores.
+- Playwright desarrollo: **81 passed, 18 skipped deliberados**; 8/8 capturas visuales.
+- Memoria batch de 20 JPEG: pico +620.713 bytes; cola sin imágenes/dataURL decodificados retenidos; delta posterior +1.460.970 bytes, muy por debajo del límite de 128 MB.
+- Node **283/283**, binario **92/92**, ESLint sin errores y Stylelint en verde.
+
+---
+
 ## [3.7.0] - 2026-07-13
 
 Cuarta fase del roadmap: **funcionalidad**.
