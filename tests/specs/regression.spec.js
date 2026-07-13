@@ -630,10 +630,11 @@ describe('Regresión — 18 quick wins de v3.5.13', function () {
     expect(curves).toContain("setAttribute('aria-pressed'");
   });
 
-  it('ofrece lote temprano y estados vacíos accionables', async function () {
+  it('ofrece lote dentro del editor y estados vacíos accionables', async function () {
     const html = await fetchSource('../index.html');
     const textLayerUI = await fetchSource('../js/managers/text-layer-ui-manager.js');
-    expect(html).toContain('id="open-batch-btn"');
+    expect(html).not.toContain('id="open-batch-btn"');
+    expect(html).toContain('id="editor-batch-btn"');
     expect(html).toContain('id="preset-empty-cta"');
     expect(textLayerUI).toContain("action.textContent = 'Añadir primera capa'");
   });
@@ -666,14 +667,13 @@ describe('Regresión — 18 quick wins de v3.5.13', function () {
     expect(gulp).toContain('series(jsBundleDev, copyAssets)');
   });
 
-  it('mantiene el botón de lote con las dimensiones de upload__button', async function () {
+  it('no reintroduce el lote en la carga inicial', async function () {
+    const html = await fetchSource('../index.html');
+    const main = await fetchSource('../js/main.js');
     const scss = await fetchSource('../src/scss/modules/_modals.scss');
-    const buttonRule = scss.match(/#open-batch-btn\s*\{[\s\S]*?\}/);
-    expect(buttonRule).not.toBe(null);
-    expect(buttonRule[0]).toContain('min-height: 56px');
-    expect(buttonRule[0]).toContain('min-width: 200px');
-    expect(buttonRule[0]).toContain('padding: 16px 36px');
-    expect(buttonRule[0]).not.toContain('min-height: 0');
+    expect(html).not.toContain('id="open-batch-btn"');
+    expect(main).not.toContain("getElementById('open-batch-btn')");
+    expect(scss).not.toContain('#open-batch-btn');
   });
 
   it('mantiene sincronizadas las versiones de la aplicación y el cache PWA', async function () {

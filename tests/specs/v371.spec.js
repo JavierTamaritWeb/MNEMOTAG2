@@ -185,7 +185,7 @@ describe('v3.7.1 — regresiones de fuente (consumo de AppState y código muerto
   it('el PWA tiene un manifest canónico e iconos maskable dedicados', async function () {
     const html = await fetchV371Source('../index.html');
     const manifest = await fetchV371Source('../images/site.webmanifest');
-    expect(html.includes('images/site.webmanifest?v=3.7.2')).toBe(true);
+    expect(html.includes('images/site.webmanifest?v=3.7.3')).toBe(true);
     expect(html.includes('favicon_io/site.webmanifest')).toBe(false);
     expect(manifest.includes('maskable-192x192.png')).toBe(true);
     expect(manifest.includes('maskable-512x512.png')).toBe(true);

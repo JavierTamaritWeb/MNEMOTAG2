@@ -903,13 +903,6 @@
         if (pasteBtn) {
           pasteBtn.addEventListener('click', handlePasteButtonClick);
         }
-
-
-        const openBatchBtn = document.getElementById('open-batch-btn');
-        if (openBatchBtn) {
-          openBatchBtn.addEventListener('click', openBatchModal);
-        }
-
         // v3.3.11 / v3.4.10: extraído a ExportManager.
         const multisizeBtn = document.getElementById('download-multisize-btn');
         if (multisizeBtn) {

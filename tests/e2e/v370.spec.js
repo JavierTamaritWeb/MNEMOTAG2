@@ -229,8 +229,8 @@ test.describe('v3.7.0 — Pruebas obligatorias', () => {
   test('batch mixto: válidas + corrupta + formatos mezclados, con resumen previo', async ({ page }) => {
     await page.goto('/index.html');
     await page.waitForLoadState('networkidle');
-
-    await page.locator('#open-batch-btn').click();
+    await cargarImagen(page);
+    await page.locator('#editor-batch-btn').click();
     await page.waitForSelector('#batch-modal', { state: 'visible' });
 
     // Mezcla: JPEG válido, corrupta (magic JPEG + basura), PNG y WebP
@@ -260,8 +260,8 @@ test.describe('v3.7.0 — Pruebas obligatorias', () => {
   test('cancelación a mitad de lote: sin decodificados retenidos en la cola', async ({ page }) => {
     await page.goto('/index.html');
     await page.waitForLoadState('networkidle');
-
-    await page.locator('#open-batch-btn').click();
+    await cargarImagen(page);
+    await page.locator('#editor-batch-btn').click();
     await page.waitForSelector('#batch-modal', { state: 'visible' });
 
     // Llenar la cola con varias tandas de fixtures (12 imágenes)

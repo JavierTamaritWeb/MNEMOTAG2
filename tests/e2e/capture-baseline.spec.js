@@ -3,6 +3,10 @@
 // Regresión visual de las 8 combinaciones obligatorias (4 viewports × tema).
 
 const { test, expect } = require('@playwright/test');
+const path = require('path');
+
+const REFERENCE_IMAGE = path.join(__dirname, 'fixtures', 'foto-exif.jpg');
+const SECOND_IMAGE = path.join(__dirname, 'fixtures', 'transparente.png');
 
 const VIEWPORTS = [
   { name: '1440x900', width: 1440, height: 900 },
@@ -31,3 +35,30 @@ for (const vp of VIEWPORTS) {
     });
   }
 }
+
+test('captura del lote con miniaturas reales', async ({ page, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Una baseline canónica evita triplicar snapshots por motor.');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.addInitScript(() => localStorage.setItem('theme', 'dark'));
+  await page.goto('/index.html');
+  await page.waitForLoadState('networkidle');
+  await page.setInputFiles('#file-input', REFERENCE_IMAGE);
+  await page.locator('.preview-confirm').click();
+  await page.waitForSelector('#editor-container:not(.editor-container--hidden)');
+  await page.locator('#editor-batch-btn').click();
+  await page.setInputFiles('#batch-file-input', [REFERENCE_IMAGE, SECOND_IMAGE]);
+  await expect(page.locator('.batch-item-thumbnail')).toHaveCount(2);
+  await expect.poll(() => page.locator('.batch-item-thumbnail').evaluateAll(images =>
+    images.every(image => image.complete && image.naturalWidth > 0)
+  )).toBe(true);
+  await page.evaluate(() => {
+    UIManager.config.animations = false;
+    UIManager.clearAllToasts();
+  });
+  await page.waitForTimeout(350);
+  await page.addStyleTag({ content: '*, *::before, *::after { animation: none !important; transition: none !important; }' });
+  await expect(page).toHaveScreenshot('batch-1440x900-dark.png', {
+    fullPage: false,
+    animations: 'disabled'
+  });
+});

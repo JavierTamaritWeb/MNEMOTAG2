@@ -1,6 +1,6 @@
 # MNEMOTAG - DOCUMENTACION TECNICA
 
-**Version:** 3.7.2
+**Version:** 3.7.3
 **Ultima actualizacion:** 13 de julio de 2026
 
 ---
@@ -28,6 +28,7 @@
 - [**ARQUITECTURA_V3_7_1.md**](ARQUITECTURA_V3_7_1.md) — Estado observable, compositor unico y propietarios de subsistema
 - [**POSTMORTEM_V3_7_1.md**](POSTMORTEM_V3_7_1.md) — Fallos encontrados, causas raiz, metricas y checklist de release
 - [**POSTMORTEM_V3_7_2.md**](POSTMORTEM_V3_7_2.md) — Marca de imagen invisible, lote incoherente y barreras de no regresion
+- [**POSTMORTEM_V3_7_3.md**](POSTMORTEM_V3_7_3.md) — Acceso contextual, miniaturas ligeras del lote y ciclo de vida de Object URLs
 - [**DRAG_DROP_SYSTEM.md**](DRAG_DROP_SYSTEM.md) — Implementacion tecnica del sistema de arrastre
 - [**ZOOM_OPTIMIZADO.md**](ZOOM_OPTIMIZADO.md) — Sistema de zoom diferenciado por dispositivo
 
@@ -70,10 +71,10 @@ MNEMOTAG2/
 
 ## Estadisticas
 
-- **Version:** 3.7.2
+- **Version:** 3.7.3
 - **Archivos JS:** 36 (bundled en app.min.js)
 - **Managers:** 27 modulos especializados
-- **Tests:** 286 Node + 92 binarias + 102 casos E2E (84 ejecutados, 18 omisiones deliberadas)
+- **Tests:** 286 Node + 92 binarias + 105 casos E2E (85 ejecutados, 20 omisiones deliberadas)
 - **Build:** Gulp 5 (SCSS + JS concat + terser)
 
 ---

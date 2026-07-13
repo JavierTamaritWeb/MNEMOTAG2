@@ -197,11 +197,13 @@
 
     .batch-item-thumbnail {
       width: 100%;
-      aspect-ratio: 1;
-      object-fit: cover;
+      aspect-ratio: 2 / 1;
+      display: block;
+      object-fit: contain;
+      background: var(--bg-tertiary);
     }
 
-    /* v3.7.0: sin previews base64 — icono de archivo en lugar de miniatura */
+    /* Fallback si el navegador no puede generar la miniatura reducida. */
     .batch-item-icon {
       width: 100%;
       aspect-ratio: 2 / 1;
@@ -1617,20 +1619,6 @@
 }
 
 /* Quick wins v3.5.13: overrides aislados para botones nuevos. */
-#open-batch-btn {
-  width: auto;
-  min-width: 200px;
-  min-height: 56px;
-  height: auto;
-  padding: 16px 36px;
-  gap: 12px;
-  line-height: 1.4;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin: 0 auto;
-}
-
 #preset-empty-cta,
 #text-layer-empty-cta {
   width: auto;
@@ -2328,9 +2316,7 @@
 }
 
 .upload__actions .upload__button,
-.upload__actions #open-batch-btn,
-[data-theme="dark"] .upload__actions .upload__button,
-[data-theme="dark"] .upload__actions #open-batch-btn {
+[data-theme="dark"] .upload__actions .upload__button {
   flex: 0 1 240px;
   width: auto;
   min-width: 0;
@@ -2343,9 +2329,7 @@
 }
 
 .upload__actions .upload__button:hover,
-.upload__actions #open-batch-btn:hover,
-[data-theme="dark"] .upload__actions .upload__button:hover,
-[data-theme="dark"] .upload__actions #open-batch-btn:hover {
+[data-theme="dark"] .upload__actions .upload__button:hover {
   background: #1d4ed8;
   box-shadow: 0 6px 18px rgba(37, 99, 235, 0.35);
 }
@@ -2393,8 +2377,7 @@
     flex-direction: column;
   }
 
-  .upload__actions .upload__button,
-  .upload__actions #open-batch-btn {
+  .upload__actions .upload__button {
     flex: none;
     width: 100%;
     min-width: 0;

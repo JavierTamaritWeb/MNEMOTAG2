@@ -76,6 +76,12 @@ test.describe('MnemoTag smoke test', () => {
   test('botones principales existen y son clicables', async ({ page }) => {
     await page.goto('/index.html', { waitUntil: 'networkidle' });
 
+    const uploadActions = page.locator('.upload__actions .upload__button');
+    await expect(uploadActions).toHaveCount(2);
+    await expect(page.locator('#file-selector')).toBeVisible();
+    await expect(page.locator('#paste-image-btn')).toBeVisible();
+    await expect(page.locator('#open-batch-btn')).toHaveCount(0);
+
     const buttons = [
       '#file-selector',
       '#paste-image-btn',

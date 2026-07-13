@@ -31,6 +31,7 @@ window.BatchUIManager = (function () {
   }
 
   function clear() {
+    images.forEach(releasePreview);
     images = [];
     if (batchManager) batchManager.clearQueue();
     updateList();
@@ -73,21 +74,34 @@ window.BatchUIManager = (function () {
         UIManager.showError((file.name || 'Archivo') + ': ' + validation.error);
         continue;
       }
+      let previewUrl = null;
+      if (validation.previewBlob && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+        previewUrl = URL.createObjectURL(validation.previewBlob);
+      }
       images.push({
         id: Date.now() + Math.random(),
         file,
         name: file.name,
         size: file.size,
         width: validation.width,
-        height: validation.height
+        height: validation.height,
+        previewUrl: previewUrl
       });
     }
     updateList();
   }
 
   function remove(imageId) {
+    const image = images.find(item => item.id === imageId);
+    if (image) releasePreview(image);
     images = images.filter(image => image.id !== imageId);
     updateList();
+  }
+
+  function releasePreview(image) {
+    if (!image || !image.previewUrl) return;
+    URL.revokeObjectURL(image.previewUrl);
+    image.previewUrl = null;
   }
 
   function appendStatus(info, image) {
@@ -115,16 +129,36 @@ window.BatchUIManager = (function () {
     return button;
   }
 
+  function createFallbackIcon() {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'batch-item-icon';
+    const icon = document.createElement('i');
+    icon.className = 'fas fa-file-image';
+    icon.setAttribute('aria-hidden', 'true');
+    wrapper.appendChild(icon);
+    return wrapper;
+  }
+
+  function createPreview(image) {
+    if (!image.previewUrl) return createFallbackIcon();
+    const preview = document.createElement('img');
+    preview.className = 'batch-item-thumbnail';
+    preview.src = image.previewUrl;
+    preview.alt = 'Miniatura de ' + image.name;
+    preview.loading = 'lazy';
+    preview.decoding = 'async';
+    preview.draggable = false;
+    preview.addEventListener('error', () => {
+      releasePreview(image);
+      preview.replaceWith(createFallbackIcon());
+    }, { once: true });
+    return preview;
+  }
+
   function createItem(image) {
     const item = document.createElement('div');
     item.className = 'batch-item';
-    const thumbnail = document.createElement('div');
-    thumbnail.className = 'batch-item-icon';
-    const imageIcon = document.createElement('i');
-    imageIcon.className = 'fas fa-file-image';
-    imageIcon.setAttribute('aria-hidden', 'true');
-    thumbnail.appendChild(imageIcon);
-    item.appendChild(thumbnail);
+    item.appendChild(createPreview(image));
 
     const info = document.createElement('div');
     info.className = 'batch-item-info';

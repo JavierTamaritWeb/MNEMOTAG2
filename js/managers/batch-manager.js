@@ -8,6 +8,8 @@
  * original más sus dimensiones (medidas al validar). Nada de previews base64
  * ni elementos Image retenidos: la decodificación ocurre bajo demanda en
  * processImage y el canvas/imagen se liberan inmediatamente al terminar.
+ * v3.7.3: la validación genera además un JPEG reducido para la UI. Ese Blob
+ * nunca entra en imageQueue y su ObjectURL pertenece a BatchUIManager.
  * El procesamiento corre con concurrencia acotada (AppConfig.batchConcurrency,
  * máx. 2) y soporta cancelación del lote y por imagen individual.
  * @version 2.0.0
@@ -155,27 +157,30 @@ class BatchManager {
     // Intentar cargar imagen para validar dimensiones (check propio del batch)
     try {
       const img = await this.loadImageElement(file);
-      const width = img.width;
-      const height = img.height;
-      // v3.7.0: soltar la referencia decodificada YA — la cola solo guarda
-      // File + dimensiones; la decodificación real es bajo demanda.
-      img.src = '';
+      try {
+        const width = img.width;
+        const height = img.height;
 
-      if (width < 1 || height < 1) {
-        return {
-          valid: false,
-          error: 'Dimensiones inválidas'
-        };
+        if (width < 1 || height < 1) {
+          return {
+            valid: false,
+            error: 'Dimensiones inválidas'
+          };
+        }
+
+        if (width * height > this.maxPixelsPerImage) {
+          return {
+            valid: false,
+            error: `Imagen demasiado grande: ${width}x${height} (máx: 36 megapíxeles)`
+          };
+        }
+
+        const previewBlob = await this.createPreviewBlob(img, width, height);
+        return { valid: true, width: width, height: height, previewBlob: previewBlob };
+      } finally {
+        // La UI recibe solo un Blob reducido; nunca conserva el Image original.
+        img.src = '';
       }
-
-      if (width * height > this.maxPixelsPerImage) {
-        return {
-          valid: false,
-          error: `Imagen demasiado grande: ${width}x${height} (máx: 36 megapíxeles)`
-        };
-      }
-
-      return { valid: true, width: width, height: height };
 
     } catch (error) {
       return {
@@ -204,6 +209,52 @@ class BatchManager {
       };
       
       img.src = url;
+    });
+  }
+
+  /**
+   * Genera una vista previa pequeña sin base64 y sin conservar el bitmap
+   * original. El límite fijo evita que 20 tarjetas reintroduzcan el pico de
+   * memoria que se eliminó en v3.7.0.
+   * @returns {Promise<Blob|null>}
+   */
+  createPreviewBlob(img, width, height) {
+    if (typeof document === 'undefined') return Promise.resolve(null);
+    const maxWidth = 320;
+    const maxHeight = 180;
+    const scale = Math.min(maxWidth / width, maxHeight / height, 1);
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
+    const context = canvas.getContext('2d');
+    if (!context || typeof canvas.toBlob !== 'function') {
+      canvas.width = 0;
+      canvas.height = 0;
+      return Promise.resolve(null);
+    }
+
+    try {
+      context.fillStyle = '#f3f4f6';
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(img, 0, 0, canvas.width, canvas.height);
+    } catch (error) {
+      canvas.width = 0;
+      canvas.height = 0;
+      return Promise.resolve(null);
+    }
+
+    return new Promise(resolve => {
+      try {
+        canvas.toBlob(blob => {
+          canvas.width = 0;
+          canvas.height = 0;
+          resolve(blob || null);
+        }, 'image/jpeg', 0.72);
+      } catch (error) {
+        canvas.width = 0;
+        canvas.height = 0;
+        resolve(null);
+      }
     });
   }
 

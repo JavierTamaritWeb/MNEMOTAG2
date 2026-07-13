@@ -30,7 +30,7 @@ test.describe('v3.7.1 — arquitectura y memoria', () => {
       watermark: true,
       exportState: true,
       batch: true,
-      manifest: 'images/site.webmanifest?v=3.7.2'
+      manifest: 'images/site.webmanifest?v=3.7.3'
     });
   });
 
@@ -38,7 +38,8 @@ test.describe('v3.7.1 — arquitectura y memoria', () => {
     test.skip(browserName !== 'chromium', 'performance.memory es una métrica específica de Chromium.');
     await page.goto('/index.html');
     await page.waitForLoadState('networkidle');
-    await page.locator('#open-batch-btn').click();
+    await cargarImagen(page);
+    await page.locator('#editor-batch-btn').click();
     await page.setInputFiles('#batch-file-input', Array(20).fill(FIXTURE));
     await expect(page.locator('#batch-count')).toHaveText('20', { timeout: 20000 });
     if (typeof page.requestGC === 'function') await page.requestGC();
@@ -106,6 +107,12 @@ test.describe('v3.7.1 — arquitectura y memoria', () => {
     await page.locator('#editor-batch-btn').click();
     await page.setInputFiles('#batch-file-input', FIXTURE);
     await expect(page.locator('#batch-count')).toHaveText('1');
+    const thumbnail = page.locator('.batch-item-thumbnail');
+    await expect(thumbnail).toBeVisible();
+    await expect.poll(() => thumbnail.evaluate(image => ({
+      blob: image.src.startsWith('blob:'),
+      loaded: image.complete && image.naturalWidth > 0 && image.naturalHeight > 0
+    }))).toEqual({ blob: true, loaded: true });
     await page.locator('#batch-apply-watermarks').check();
     await page.locator('#batch-process-btn').click();
     await page.waitForSelector('#batch-download-btn:visible', { timeout: 30000 });

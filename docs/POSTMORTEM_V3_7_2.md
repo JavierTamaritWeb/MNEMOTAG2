@@ -25,7 +25,11 @@ La marca de agua de imagen podía mostrar su miniatura en el formulario sin apar
 3. Una casilla visible debe gobernar el estado real que describe. No se aceptan controles decorativos.
 4. Las pruebas de marcas de agua deben validar píxeles del canvas o del archivo, no solo buscar nombres de funciones.
 5. El flujo crítico se prueba en Chromium, Firefox y WebKit con la casilla de lote activa y desactiva.
-6. «Procesar en lote» debe ser visible tanto antes como después de cargar una imagen y no puede depender de desplegar herramientas avanzadas.
+6. «Procesar en lote» debe aparecer en la barra del editor después de cargar una referencia; no debe competir con las acciones de carga de la pantalla inicial.
+
+## Ajuste de jerarquía UI en v3.7.3
+
+La primera corrección mantuvo también el acceso inicial al lote. Esa decisión añadía una acción sin contexto antes de existir una imagen de referencia o ajustes que reutilizar. En v3.7.3 se elimina `#open-batch-btn` de la zona de carga y se conserva `#editor-batch-btn` como acceso principal. El multi-drop continúa disponible para abrir un lote directamente al soltar varios archivos.
 
 ## Prueba protectora
 

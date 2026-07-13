@@ -4,6 +4,34 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.7.3] - 2026-07-13
+
+Corrección de jerarquía UI y revisión visual del procesamiento por lotes.
+
+### Changed
+- La pantalla inicial muestra solo «Seleccionar archivo» y «Pegar imagen»; se elimina «Procesar en lote» porque todavía no existe una imagen de referencia ni una configuración que aplicar.
+- El acceso principal al lote permanece en la barra del editor, junto a «Descargar imagen», una vez cargada la imagen de referencia.
+- El multi-drop global se conserva: soltar varias imágenes sigue abriendo el lote directamente.
+
+### Fixed
+- Las tarjetas del lote vuelven a mostrar miniaturas reales en lugar de un icono genérico.
+- Las miniaturas son JPEG reducidos a un máximo de 320×180, servidos mediante URLs `blob:`; no se reintroducen previews base64 ni imágenes originales retenidas.
+- Las URLs temporales se revocan al quitar una imagen, limpiar la cola o cerrar el modal.
+
+### Regression prevention
+- Las pruebas exigen que `#open-batch-btn` no exista en HTML, JavaScript ni SCSS y que `#editor-batch-btn` siga presente.
+- Los E2E de memoria y robustez del lote entran ahora desde el editor después de cargar una referencia, igual que el flujo visible.
+- El E2E exige miniaturas `blob:` realmente decodificadas en los tres motores y añade una captura visual específica del modal de lote.
+- Causas raíz y reglas obligatorias registradas en `docs/POSTMORTEM_V3_7_3.md`.
+
+### Verification
+- Node **286/286** y validación binaria **92/92**.
+- ESLint sin errores y Stylelint en verde.
+- Playwright completo en desarrollo y `dist`: **85 passed, 20 skipped** deliberados; Chromium, Firefox y WebKit.
+- Nueve referencias visuales: ocho combinaciones viewport/tema y el modal oscuro de lote con miniaturas; Axe sin incidencias serias/críticas.
+
+---
+
 ## [3.7.2] - 2026-07-13
 
 Versión de parche centrada en el flujo principal de **marcas de agua**.

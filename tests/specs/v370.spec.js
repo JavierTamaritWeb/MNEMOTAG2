@@ -236,10 +236,14 @@ describe('v3.7.0 — BatchManager (cola con representación única)', function (
 });
 
 describe('v3.7.0 — Regresión: cola batch sin previews base64 ni Image retenidas', function () {
-  it('batch-manager.js ya no genera thumbnails base64 (createThumbnail/toDataURL)', async function () {
+  it('usa previews Blob reducidas sin introducirlas en la cola', async function () {
     const src = await fetchV370Source('../js/managers/batch-manager.js');
-    expect(src).not.toContain('createThumbnail');
+    const ui = await fetchV370Source('../js/managers/batch-ui-manager.js');
     expect(src).not.toContain("toDataURL('image/jpeg'");
+    expect(src).toContain('createPreviewBlob');
+    expect(src).toContain("'image/jpeg', 0.72");
+    expect(ui).toContain('URL.createObjectURL(validation.previewBlob)');
+    expect(ui).toContain('URL.revokeObjectURL(image.previewUrl)');
     // La cola guarda dimensiones, no imageData decodificado
     expect(src).not.toContain('imageData: imageData');
     expect(src).toContain('width: validation.width');

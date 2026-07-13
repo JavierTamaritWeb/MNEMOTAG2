@@ -4,7 +4,7 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos. 100% cliente, sin backend.
 
-![Version](https://img.shields.io/badge/version-3.7.2-blue.svg)
+![Version](https://img.shields.io/badge/version-3.7.3-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 [![Deploy to GitHub Pages](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml)
@@ -14,6 +14,12 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 ---
 
 ## NOVEDADES v3.7
+
+### Flujo de lote contextual (v3.7.3)
+- La pantalla inicial se concentra en cargar o pegar una imagen; ya no muestra una acción de lote sin configuración previa.
+- «Procesar en lote» aparece en la barra del editor después de cargar la imagen de referencia.
+- Soltar varias imágenes a la vez sigue abriendo el lote como atajo directo.
+- Las tarjetas muestran miniaturas reales reducidas, sin volver a retener imágenes originales ni previews base64.
 
 ### Marcas de agua críticas (v3.7.2)
 - **Previsualización fiable**: la marca de imagen se decodifica y se guarda en `AppState` antes de componer el canvas.
@@ -33,7 +39,7 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 ### Funcionalidad (v3.7.0)
 - **Estimación en vivo de exportación**: la pestaña Exportar muestra tamaño aproximado, dimensiones y formato REAL del archivo final (tras fallback), actualizado con cada cambio.
 - **Web Share API**: botón Compartir en móvil (visible solo si el navegador soporta compartir archivos), con fallback automático a descarga.
-- **Cola batch reescrita**: una única representación por imagen (File + dimensiones, sin previews base64), decodificación bajo demanda, concurrencia máxima de 2, liberación inmediata de canvas/imágenes, cancelación del lote y por imagen individual.
+- **Cola batch reescrita**: una única representación procesable por imagen (File + dimensiones, sin previews base64), miniaturas JPEG reducidas separadas de la cola, decodificación bajo demanda, concurrencia máxima de 2, liberación inmediata de canvas/imágenes, cancelación del lote y por imagen individual.
 - **Resumen previo al lote**: archivos, megapíxeles totales y memoria decodificada estimada antes de procesar.
 - **Restauración de sesión (IndexedDB)**: la imagen y toda la configuración del panel se guardan automáticamente; al volver, la app ofrece restaurar la sesión.
 - **Presets completos**: los presets de filtros guardan el estado íntegro (incluidos sepia/tono de los filtros preestablecidos), con retrocompatibilidad con presets antiguos.
@@ -113,7 +119,7 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 
 ### ⚙️ Infraestructura
 - **PWA real** con Service Worker (offline tras primera visita, instalable).
-- **Tests**: 286 Node + 92 binarias (PNG/WebP/AVIF) + 102 casos E2E Playwright (84 ejecutados y 18 omisiones deliberadas por motor).
+- **Tests**: 286 Node + 92 binarias (PNG/WebP/AVIF) + 105 casos E2E Playwright (85 ejecutados y 20 omisiones deliberadas por motor).
 - **CI/CD**: GitHub Actions con deploy automático a GitHub Pages.
 - **Seguridad**: CSP endurecida (sin CDNs de estilo/fuentes), SRI en los scripts diferidos, sanitización XSS en toasts y batch processor.
 - **Rendimiento (v3.6.0)**: sin CSS externo bloqueante — Tailwind purgado local (2.93 MB → 17 KB) + subset de Font Awesome (58 iconos, 4.9 KB). CSS inicial total: 27 KB gzip.
