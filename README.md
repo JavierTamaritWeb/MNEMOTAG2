@@ -4,7 +4,7 @@
 
 Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográficos, marcas de agua personalizadas y optimizar imágenes con soporte universal de formatos. 100% cliente, sin backend.
 
-![Version](https://img.shields.io/badge/version-3.7.1-blue.svg)
+![Version](https://img.shields.io/badge/version-3.7.2-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Status](https://img.shields.io/badge/status-stable-success.svg)
 [![Deploy to GitHub Pages](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml/badge.svg)](https://github.com/JavierTamaritWeb/MNEMOTAG2/actions/workflows/deploy.yml)
@@ -14,6 +14,12 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 ---
 
 ## NOVEDADES v3.7
+
+### Marcas de agua críticas (v3.7.2)
+- **Previsualización fiable**: la marca de imagen se decodifica y se guarda en `AppState` antes de componer el canvas.
+- **Lote coherente**: «Marcas de agua» aplica la misma configuración visible en el editor y, al desmarcarla, la excluye del lote.
+- **Acceso permanente al lote**: «Procesar en lote» permanece visible en la barra del editor después de cargar una imagen.
+- **Regresión real**: Playwright comprueba los píxeles de la previsualización y del archivo procesado en Chromium, Firefox y WebKit.
 
 ### Arquitectura (v3.7.1)
 - **Estado observable**: `AppState.subscribe()` publica mutaciones explícitas y desacopla exportación, historial, zoom/pan, lote y autosave de las variables sueltas de `main.js`.
@@ -60,9 +66,9 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 
 ### Verificacion
 - `npm run build` genera `dist/` completo
-- `node tests/run-in-node.js` → **283/283 OK**
+- `node tests/run-in-node.js` → **286/286 OK**
 - `node tests/binary-validation.js` → **92/92 OK**
-- `npm run test:e2e` → **81 OK + 18 omisiones deliberadas** (Chromium, Firefox y WebKit)
+- `npm run test:e2e` → **84 OK + 18 omisiones deliberadas** (Chromium, Firefox y WebKit)
 - `npm run test:e2e:dist` → la misma matriz contra producción
 
 > Versiones anteriores: [CHANGELOG.md](CHANGELOG.md)
@@ -107,7 +113,7 @@ Aplicación web completa para editar metadatos EXIF, aplicar filtros fotográfic
 
 ### ⚙️ Infraestructura
 - **PWA real** con Service Worker (offline tras primera visita, instalable).
-- **Tests**: 283 Node + 92 binarias (PNG/WebP/AVIF) + 99 casos E2E Playwright (81 ejecutados y 18 omisiones deliberadas por motor).
+- **Tests**: 286 Node + 92 binarias (PNG/WebP/AVIF) + 102 casos E2E Playwright (84 ejecutados y 18 omisiones deliberadas por motor).
 - **CI/CD**: GitHub Actions con deploy automático a GitHub Pages.
 - **Seguridad**: CSP endurecida (sin CDNs de estilo/fuentes), SRI en los scripts diferidos, sanitización XSS en toasts y batch processor.
 - **Rendimiento (v3.6.0)**: sin CSS externo bloqueante — Tailwind purgado local (2.93 MB → 17 KB) + subset de Font Awesome (58 iconos, 4.9 KB). CSS inicial total: 27 KB gzip.
@@ -154,7 +160,7 @@ npm run serve   # solo servidor (sin watch)
 
 ```bash
 npm test                         # ejecuta ambos runners
-node tests/run-in-node.js        # 283/283 aserciones de regresion
+node tests/run-in-node.js        # 286/286 aserciones de regresion
 node tests/binary-validation.js  # 92/92 aserciones binarias PNG/WebP/AVIF
 npm run test:e2e                 # Matriz Chromium + Firefox + WebKit contra desarrollo
 npm run test:e2e:dist            # Misma matriz contra dist/ de produccion

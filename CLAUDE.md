@@ -212,7 +212,7 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 
 ## Versioning and commits
 
-**Current version: v3.7.1**.
+**Current version: v3.7.2**.
 - **v3.5.0**: Gulp 5 build system (SCSS + JS bundle + minification + browser-sync), zoom-pan-manager extracted.
 - **v3.5.1–v3.5.2**: Code audit — 4 critical + 14 moderate fixes (onclick→data-action, console guards, var→const/let, null guards).
 - **v3.5.3**: Output movido a `dist/`, SCSS reorganizado en subcarpetas (`abstracts/`, `base/`, `layout/`, `components/`, `pages/`, `modules/`).
@@ -230,8 +230,9 @@ Mouse-wheel/trackpad zoom is **intentionally disabled on desktop (>767px)** to a
 - **v3.6.2**: Fix de contenido entrecortado en el panel de pestañas — las rejillas legadas (config-grid/metadata-grid/geo-grid y Tailwind md:/sm:) usan breakpoints de viewport y forzaban multicolumna dentro del panel de 380px; colapsadas a una columna, compactacion del panel/toolbar con !important para ganar a los overrides legacy por ID, fix del selector .btn:has(i:only-child) que aplastaba botones icono+texto a 48px (icon-only reales marcados con .btn-icon), presets de tamaño en columna, y barrera de regresion anti-desborde en workspace.spec.js.
 - **v3.7.0**: Fase "funcionalidad" — estimación en vivo de export (ExportManager.updateExportEstimate, sonda 480px extrapolada), Web Share API con fallback a descarga (#mobile-share-btn gateado por Capabilities), cola batch reescrita (File+dimensiones, sin base64, decodificación bajo demanda, concurrencia 2, cancelación individual), resumen previo al lote, restauración de sesión con IndexedDB (session-manager.js, autosave debounced + toast con acción Restaurar), presets completos v2 (estado íntegro de FilterManager, retrocompatible v1), detección de capacidades (capabilities.js), fix de historial (customTextPosition no se capturaba y las posiciones custom se guardaban por referencia viva), y pruebas obligatorias: EXIF byte a byte, undo tras crop/watermark, batch mixto, cancelación sin memoria retenida, fallback AVIF/WebP en Chromium+Firefox+WebKit (proyectos nuevos de Playwright).
 - **v3.7.1**: Fase "arquitectura" — WatermarkManager completo, AppState observable, compositor único DocumentRenderer para preview/export/batch, managers compartidos desacoplados de globals, main.js en 4.877 líneas, manifest único con maskable, sesión compatible con WebKit y release validado con Lighthouse/Axe/visual/memoria/E2E en tres motores.
+- **v3.7.2**: Fix crítico de marcas de agua — decodificación previa al render, preview y lote coherentes, casillas batch efectivas, acceso permanente al lote y E2E de píxeles en Chromium/Firefox/WebKit. Ver `docs/POSTMORTEM_V3_7_2.md`.
 - **v3.4.x** (15 releases): CSP/SRI, ESLint/Stylelint CI, accessibility, curves live preview, filter presets, ImageBitmap undo/redo, 5 managers extracted, Web Worker for autoBalance, Playwright E2E, AVIF EXIF injection.
 
-**Tests**: 283/283 Node + 92/92 binarios + 99 casos E2E (81 ejecutados, 18 omisiones deliberadas) en desarrollo y `dist`, con Chromium, Firefox y WebKit. Quick smoke check: `npm test`; release check: build + lint + ambos E2E. `git log` remains the authoritative source for the actual commit version.
+**Tests**: 286/286 Node + 92/92 binarios + 102 casos E2E (84 ejecutados, 18 omisiones deliberadas) en desarrollo y `dist`, con Chromium, Firefox y WebKit. Quick smoke check: `npm test`; release check: build + lint + ambos E2E. `git log` remains the authoritative source for the actual commit version.
 
 Commit messages follow `Versión X.Y.Z - <descripción>` in Spanish — match this style. `CHANGELOG.md` and the docs under `docs/` are kept hand-updated per release.

@@ -312,8 +312,13 @@ body.has-image #drop-area {
   }
 
   // Descargar destaca como acción primaria de la barra
+  #editor-batch-btn,
   #download-image {
+    min-width: 0 !important;
     min-height: var(--control-md);
+    height: auto !important;
+    padding: var(--space-2) var(--space-3) !important;
+    white-space: nowrap;
   }
 
   // El override legacy de #fullscreen-btn fija min-width:280px !important

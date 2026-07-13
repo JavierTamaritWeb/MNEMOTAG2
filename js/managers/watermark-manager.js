@@ -40,12 +40,71 @@ window.WatermarkManager = (function () {
     lastWatermarkConfig: null,
     lastWatermarkFileKey: null
   };
+  let imageLoadSequence = 0;
+  let pendingImageLoad = null;
+  let pendingImageFileKey = null;
 
   function clearCache() {
+    imageLoadSequence++;
+    pendingImageLoad = null;
+    pendingImageFileKey = null;
     cache.watermarkImage = null;
     cache.lastWatermarkConfig = null;
     cache.lastWatermarkFileKey = null;
     AppState.watermarkImagePreview = null;
+  }
+
+  function watermarkFileKey(file) {
+    return file ? file.name + '|' + file.size + '|' + file.lastModified : null;
+  }
+
+  function loadWatermarkImage(file) {
+    if (!file) return Promise.resolve(null);
+    const fileKey = watermarkFileKey(file);
+    if (cache.watermarkImage && cache.lastWatermarkFileKey === fileKey) {
+      AppState.watermarkImagePreview = cache.watermarkImage;
+      return Promise.resolve(cache.watermarkImage);
+    }
+    if (pendingImageLoad && pendingImageFileKey === fileKey) return pendingImageLoad;
+
+    const sequence = ++imageLoadSequence;
+    const objectUrl = URL.createObjectURL(file);
+    const rawLoad = new Promise(function (resolve, reject) {
+      const watermarkImg = new Image();
+      watermarkImg.onload = function () {
+        URL.revokeObjectURL(objectUrl);
+        if (sequence !== imageLoadSequence) return resolve(null);
+        AppState.watermarkImagePreview = watermarkImg;
+        cache.watermarkImage = watermarkImg;
+        cache.lastWatermarkFileKey = fileKey;
+        cache.lastWatermarkConfig = captureConfig();
+        resolve(watermarkImg);
+      };
+      watermarkImg.onerror = function () {
+        URL.revokeObjectURL(objectUrl);
+        if (sequence !== imageLoadSequence) return resolve(null);
+        reject(new Error('No se pudo decodificar la imagen de marca de agua'));
+      };
+      watermarkImg.src = objectUrl;
+    });
+    const trackedLoad = rawLoad.finally(function () {
+      if (pendingImageLoad === trackedLoad) {
+        pendingImageLoad = null;
+        pendingImageFileKey = null;
+      }
+    });
+    pendingImageLoad = trackedLoad;
+    pendingImageFileKey = fileKey;
+    return trackedLoad;
+  }
+
+  function ensureImageReady() {
+    const enabled = document.getElementById('watermark-image-enabled')?.checked || false;
+    if (!enabled) return Promise.resolve(null);
+    const input = document.getElementById('watermark-image');
+    const file = input?.files?.[0] || null;
+    if (!file) return Promise.resolve(null);
+    return loadWatermarkImage(file);
   }
 
   // ================================================================
@@ -277,7 +336,7 @@ window.WatermarkManager = (function () {
   // Cambio de archivo de imagen de watermark
   // ================================================================
 
-  function handleWatermarkImageChange() {
+  async function handleWatermarkImageChange() {
     // Clear cache when new image is selected
     clearCache();
 
@@ -289,6 +348,11 @@ window.WatermarkManager = (function () {
 
     if (watermarkInput && labelSpan) {
       if (watermarkInput.files && watermarkInput.files[0]) {
+        const imageEnabled = document.getElementById('watermark-image-enabled');
+        if (imageEnabled && !imageEnabled.checked) {
+          imageEnabled.checked = true;
+          toggleWatermarkType();
+        }
         const fileName = watermarkInput.files[0].name;
         const shortName = fileName.length > 25 ? fileName.substring(0, 22) + '...' : fileName;
         labelSpan.textContent = shortName;
@@ -307,6 +371,13 @@ window.WatermarkManager = (function () {
           };
           reader.readAsDataURL(watermarkInput.files[0]);
         }
+
+        try {
+          await loadWatermarkImage(watermarkInput.files[0]);
+          updatePreview();
+        } catch (error) {
+          UIManager.showError('No se pudo cargar la imagen de la marca de agua. Comprueba que el archivo no esté corrupto.');
+        }
       } else {
         labelSpan.textContent = 'Seleccionar archivo';
 
@@ -320,10 +391,9 @@ window.WatermarkManager = (function () {
           thumbnailElement.style.display = 'none';
           thumbnailElement.src = '';
         }
+        debouncedUpdatePreview();
       }
     }
-
-    debouncedUpdatePreview();
   }
 
   // ================================================================
@@ -645,35 +715,21 @@ window.WatermarkManager = (function () {
     AppState.textWatermarkBounds = bounds.text;
   }
 
-  function applyImageWatermarkOptimized() {
-    const input = document.getElementById('watermark-image');
-    const file = input && input.files && input.files[0];
-    if (!file) return;
-    const fileKey = file.name + '|' + file.size + '|' + file.lastModified;
-    if (cache.watermarkImage && cache.lastWatermarkFileKey === fileKey) {
-      AppState.watermarkImagePreview = cache.watermarkImage;
+  async function applyImageWatermarkOptimized() {
+    try {
+      const watermarkImg = await ensureImageReady();
+      if (!watermarkImg) return;
       const config = captureConfig();
       config.text.enabled = false;
+      config.image.element = watermarkImg;
       const bounds = renderConfig(AppState.ctx, AppState.canvas, config);
       AppState.imageWatermarkBounds = bounds.image;
-      return;
-    }
-
-    const objectUrl = URL.createObjectURL(file);
-    const watermarkImg = new Image();
-    watermarkImg.onload = function () {
-      URL.revokeObjectURL(objectUrl);
-      AppState.watermarkImagePreview = watermarkImg;
-      cache.watermarkImage = watermarkImg;
-      cache.lastWatermarkFileKey = fileKey;
-      cache.lastWatermarkConfig = captureConfig();
       updatePreview();
-    };
-    watermarkImg.onerror = function () {
-      URL.revokeObjectURL(objectUrl);
+      return bounds.image;
+    } catch (error) {
       UIManager.showError('No se pudo cargar la imagen de la marca de agua. Comprueba que el archivo no esté corrupto.');
-    };
-    watermarkImg.src = objectUrl;
+      return null;
+    }
   }
 
   function drawCachedWatermark(watermarkImg, legacyConfig) {
@@ -1272,7 +1328,7 @@ window.WatermarkManager = (function () {
   // Submit del formulario de watermark
   // ================================================================
 
-  function handleWatermarkSubmit(e) {
+  async function handleWatermarkSubmit(e) {
     e.preventDefault();
 
     if (!currentImage) {
@@ -1316,6 +1372,8 @@ window.WatermarkManager = (function () {
         const watermarkImageInput = document.getElementById('watermark-image');
         if (!watermarkImageInput || !watermarkImageInput.files[0]) {
           UIManager.showWarning('No hay imagen de marca de agua seleccionada. Se aplicará solo el texto.');
+        } else {
+          await ensureImageReady();
         }
       }
 
@@ -1348,6 +1406,7 @@ window.WatermarkManager = (function () {
     clearWatermarkState,
     setupWatermarkSliderSync,
     handleWatermarkImageChange,
+    ensureImageReady,
     getImageWatermarkPosition,
     getTextWatermarkPosition,
     getWatermarkPosition,

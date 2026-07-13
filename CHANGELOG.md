@@ -4,6 +4,29 @@ Todos los cambios notables en este proyecto serán documentados en este archivo.
 
 ---
 
+## [3.7.2] - 2026-07-13
+
+Versión de parche centrada en el flujo principal de **marcas de agua**.
+
+### Fixed
+- La marca de agua de imagen vuelve a visualizarse: `WatermarkManager` decodifica el archivo antes de publicar `AppState.watermarkImagePreview` y solicitar el render canónico.
+- El lote espera a que la marca de imagen esté lista antes de capturar la configuración; la salida procesada coincide con la previsualización.
+- Las casillas «Filtros actuales», «Marcas de agua», «Capas de texto» y «Metadatos» controlan ahora qué estado se captura para el lote.
+- «Procesar en lote» permanece visible en la barra del editor después de cargar una imagen, además del acceso de la pantalla inicial.
+
+### Regression prevention
+- Prueba E2E con imagen de marca real: valida píxeles en preview y en el `Blob` del lote, y verifica la exclusión al desmarcar «Marcas de agua».
+- La prueba se ejecuta en Chromium, Firefox y WebKit; `npm test` protege el orden carga → `AppState` → captura de lote y el acceso visible del editor.
+- Postmortem y reglas obligatorias en `docs/POSTMORTEM_V3_7_2.md`.
+
+### Verification
+- Node **286/286** y validación binaria **92/92**.
+- ESLint sin errores y Stylelint en verde.
+- Playwright completo en desarrollo y `dist`: **84 passed, 18 skipped** deliberados; Chromium, Firefox y WebKit.
+- Ocho regresiones visuales, Axe sin incidencias serias/críticas e inspección del editor sin scroll horizontal.
+
+---
+
 ## [3.7.1] - 2026-07-13
 
 Quinta fase del roadmap: **arquitectura y release verificable**.

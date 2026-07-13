@@ -4,6 +4,13 @@ const { test, expect } = require('@playwright/test');
 const path = require('path');
 
 const FIXTURE = path.join(__dirname, 'fixtures', 'foto-exif.jpg');
+const WATERMARK = path.join(__dirname, 'fixtures', 'transparente.png');
+
+async function cargarImagen(page) {
+  await page.setInputFiles('#file-input', FIXTURE);
+  await page.locator('.preview-confirm').click();
+  await page.waitForSelector('#editor-container:not(.editor-container--hidden)');
+}
 
 test.describe('v3.7.1 — arquitectura y memoria', () => {
   test('los módulos de arquitectura están operativos en cada motor', async ({ page }) => {
@@ -23,7 +30,7 @@ test.describe('v3.7.1 — arquitectura y memoria', () => {
       watermark: true,
       exportState: true,
       batch: true,
-      manifest: 'images/site.webmanifest?v=3.7.1'
+      manifest: 'images/site.webmanifest?v=3.7.2'
     });
   });
 
@@ -70,5 +77,65 @@ test.describe('v3.7.1 — arquitectura y memoria', () => {
     if (measurement.peakDeltaBytes !== null) {
       expect(measurement.peakDeltaBytes).toBeLessThan(128 * 1024 * 1024);
     }
+  });
+
+  test('v3.7.2: la marca de imagen se visualiza y queda horneada en el lote', async ({ page }) => {
+    await page.goto('/index.html');
+    await page.waitForLoadState('networkidle');
+    await cargarImagen(page);
+    await page.locator('#tab-marca').click();
+    await page.locator('#watermark-image-enabled').check();
+    await page.locator('#watermark-image-size').selectOption('custom');
+    await page.locator('#watermark-image-width').fill('100');
+    await page.locator('#watermark-image-height').fill('100');
+    await page.locator('#watermark-image-position').selectOption('top-left');
+    await page.locator('#watermark-image-opacity').fill('100');
+    await page.setInputFiles('#watermark-image', WATERMARK);
+
+    await page.waitForFunction(() =>
+      AppState.watermarkImagePreview?.complete && AppState.watermarkImagePreview.naturalWidth > 0
+    );
+    await page.waitForFunction(() => AppState.imageWatermarkBounds?.width > 0);
+    const previewPixel = await page.evaluate(() =>
+      Array.from(AppState.ctx.getImageData(60, 60, 1, 1).data)
+    );
+    expect(previewPixel[0]).toBeGreaterThan(180);
+    expect(previewPixel[0]).toBeGreaterThan(previewPixel[1] * 2);
+
+    await expect(page.locator('#editor-batch-btn')).toBeVisible();
+    await page.locator('#editor-batch-btn').click();
+    await page.setInputFiles('#batch-file-input', FIXTURE);
+    await expect(page.locator('#batch-count')).toHaveText('1');
+    await page.locator('#batch-apply-watermarks').check();
+    await page.locator('#batch-process-btn').click();
+    await page.waitForSelector('#batch-download-btn:visible', { timeout: 30000 });
+
+    const result = await page.evaluate(async () => {
+      const processed = window.batchManager.processedImages[0];
+      const bitmap = await createImageBitmap(processed.blob);
+      const sample = document.createElement('canvas');
+      sample.width = bitmap.width;
+      sample.height = bitmap.height;
+      const sampleCtx = sample.getContext('2d');
+      sampleCtx.drawImage(bitmap, 0, 0);
+      const pixel = Array.from(sampleCtx.getImageData(60, 60, 1, 1).data);
+      bitmap.close();
+      sample.width = 0;
+      sample.height = 0;
+      return {
+        pixel,
+        hasElement: !!window.batchManager.currentConfig.documentState.watermarks?.image?.element
+      };
+    });
+    expect(result.hasElement).toBe(true);
+    expect(result.pixel[0]).toBeGreaterThan(180);
+    expect(result.pixel[0]).toBeGreaterThan(result.pixel[1] * 2);
+
+    await page.locator('#batch-apply-watermarks').uncheck();
+    await page.locator('#batch-process-btn').click();
+    await expect.poll(() => page.evaluate(() => ({
+      mode: window.batchManager.currentConfig?.documentState?.watermarkMode,
+      watermarks: window.batchManager.currentConfig?.documentState?.watermarks
+    }))).toEqual({ mode: 'none', watermarks: null });
   });
 });

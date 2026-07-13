@@ -264,10 +264,15 @@ class BatchManager {
    * @param {Object} watermarks - Config de watermarks (text + image)
    * @param {Array} textLayers - Capas de texto
    * @param {Object} metadata - Metadatos
-   * El quinto argumento legacy se ignora desde v3.7.1: DocumentRenderer es la
-   * única ruta de composición para preview, export y lote.
+   * @param {Object} applyOptions - Qué grupos aplicar al lote.
    */
-  captureCurrentConfig(filterString, watermarks, textLayers, metadata) {
+  captureCurrentConfig(filterString, watermarks, textLayers, metadata, applyOptions = {}) {
+    const apply = Object.assign({
+      filters: true,
+      watermarks: true,
+      textLayers: true,
+      metadata: true
+    }, applyOptions || {});
     const sourceCanvas = AppState.canvas;
     const layerManager = typeof window !== 'undefined' ? window.textLayerManager : null;
     const capturedLayers = textLayers || (
@@ -279,9 +284,12 @@ class BatchManager {
       sourceImage: null,
       referenceWidth: sourceCanvas ? sourceCanvas.width : 0,
       referenceHeight: sourceCanvas ? sourceCanvas.height : 0,
-      filterString: filterString || '',
-      watermarks: watermarks || WatermarkManager.captureConfig(),
-      textLayers: capturedLayers.map(layer => ({
+      filterString: apply.filters ? (filterString || '') : '',
+      watermarks: apply.watermarks
+        ? (watermarks || WatermarkManager.captureConfig())
+        : null,
+      watermarkMode: apply.watermarks ? 'full' : 'none',
+      textLayers: (apply.textLayers ? capturedLayers : []).map(layer => ({
         ...layer,
         font: { ...layer.font },
         position: { ...layer.position },
@@ -298,7 +306,7 @@ class BatchManager {
 
     this.currentConfig = {
       documentState,
-      metadata: metadata ? { ...metadata } : null,
+      metadata: apply.metadata && metadata ? { ...metadata } : null,
       outputFormat: AppState.outputFormat || 'jpeg',
       outputQuality: typeof AppState.outputQuality === 'number' ? AppState.outputQuality : 0.9,
       timestamp: Date.now()

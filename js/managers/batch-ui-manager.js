@@ -242,11 +242,19 @@ window.BatchUIManager = (function () {
         error: null,
         cancelled: false
       })));
+      const applyOptions = {
+        filters: document.getElementById('batch-apply-filters')?.checked !== false,
+        watermarks: document.getElementById('batch-apply-watermarks')?.checked !== false,
+        textLayers: document.getElementById('batch-apply-text-layers')?.checked !== false,
+        metadata: document.getElementById('batch-apply-metadata')?.checked === true
+      };
+      if (applyOptions.watermarks) await WatermarkManager.ensureImageReady();
       batchManager.captureCurrentConfig(
-        FilterManager.getFilterString() || '',
-        WatermarkManager.captureConfig(),
-        textLayerManager ? textLayerManager.getAllLayers() : [],
-        MetadataManager.getFormData ? MetadataManager.getFormData() : null
+        applyOptions.filters ? (FilterManager.getFilterString() || '') : '',
+        applyOptions.watermarks ? WatermarkManager.captureConfig() : null,
+        applyOptions.textLayers && textLayerManager ? textLayerManager.getAllLayers() : [],
+        applyOptions.metadata && MetadataManager.getFormData ? MetadataManager.getFormData() : null,
+        applyOptions
       );
       const result = await batchManager.processQueue(progress => {
         dependencies.updateProgress(progress.percentage, 'Procesando imagen ' + progress.current + ' de ' + progress.total + '...');

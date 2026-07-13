@@ -185,10 +185,40 @@ describe('v3.7.1 — regresiones de fuente (consumo de AppState y código muerto
   it('el PWA tiene un manifest canónico e iconos maskable dedicados', async function () {
     const html = await fetchV371Source('../index.html');
     const manifest = await fetchV371Source('../images/site.webmanifest');
-    expect(html.includes('images/site.webmanifest?v=3.7.1')).toBe(true);
+    expect(html.includes('images/site.webmanifest?v=3.7.2')).toBe(true);
     expect(html.includes('favicon_io/site.webmanifest')).toBe(false);
     expect(manifest.includes('maskable-192x192.png')).toBe(true);
     expect(manifest.includes('maskable-512x512.png')).toBe(true);
     expect(manifest.includes('"purpose": "maskable"')).toBe(true);
+  });
+});
+
+describe('v3.7.2 — marcas de agua como flujo crítico', function () {
+  it('decodifica la marca de imagen antes de refrescar preview o capturar el lote', async function () {
+    const watermark = await fetchV371Source('../js/managers/watermark-manager.js');
+    const batchUi = await fetchV371Source('../js/managers/batch-ui-manager.js');
+    expect(watermark.includes('async function handleWatermarkImageChange()')).toBe(true);
+    expect(watermark.includes('await loadWatermarkImage(watermarkInput.files[0])')).toBe(true);
+    expect(watermark.includes('AppState.watermarkImagePreview = watermarkImg')).toBe(true);
+    expect(batchUi.indexOf('await WatermarkManager.ensureImageReady()'))
+      .toBeLessThan(batchUi.indexOf('batchManager.captureCurrentConfig('));
+  });
+
+  it('la casilla Marcas de agua controla el estado capturado por el lote', async function () {
+    const batchUi = await fetchV371Source('../js/managers/batch-ui-manager.js');
+    const batch = await fetchV371Source('../js/managers/batch-manager.js');
+    expect(batchUi.includes("getElementById('batch-apply-watermarks')")).toBe(true);
+    expect(batch.includes("watermarkMode: apply.watermarks ? 'full' : 'none'")).toBe(true);
+    expect(batch.includes('watermarks: apply.watermarks')).toBe(true);
+  });
+
+  it('el editor mantiene un acceso visible y conectado al procesamiento por lotes', async function () {
+    const html = await fetchV371Source('../index.html');
+    const main = await fetchV371Source('../js/main.js');
+    const styles = await fetchV371Source('../src/scss/pages/_workspace.scss');
+    expect(html.includes('id="editor-batch-btn"')).toBe(true);
+    expect(main.includes("getElementById('editor-batch-btn')")).toBe(true);
+    expect(main.includes("editorBatchBtn.addEventListener('click'")).toBe(true);
+    expect(styles.includes('#editor-batch-btn')).toBe(true);
   });
 });

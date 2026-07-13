@@ -1281,6 +1281,7 @@
 
         // Advanced Tools buttons (v3.1)
         const batchModeBtn = document.getElementById('batch-mode-btn');
+        const editorBatchBtn = document.getElementById('editor-batch-btn');
         const textLayersBtn = document.getElementById('text-layers-btn');
         const cropModeBtn = document.getElementById('crop-mode-btn');
         const shortcutsHelpBtn = document.getElementById('shortcuts-help-btn');
@@ -1289,6 +1290,10 @@
           // v3.4.20: llamada directa en lugar de via window.openBatchModal
           // para evitar timing issue si initializeAdvancedUI() aún no se ejecutó.
           batchModeBtn.addEventListener('click', () => openBatchModal());
+        }
+
+        if (editorBatchBtn) {
+          editorBatchBtn.addEventListener('click', () => openBatchModal());
         }
 
         if (textLayersBtn) {
@@ -4874,4 +4879,3 @@
         });
       }
     }
-

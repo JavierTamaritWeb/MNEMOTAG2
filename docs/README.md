@@ -1,6 +1,6 @@
 # MNEMOTAG - DOCUMENTACION TECNICA
 
-**Version:** 3.7.1
+**Version:** 3.7.2
 **Ultima actualizacion:** 13 de julio de 2026
 
 ---
@@ -27,6 +27,7 @@
 - [**REGISTRO_ERRORES_V3_5_13.md**](REGISTRO_ERRORES_V3_5_13.md) — Errores de integracion de quick wins y barreras para que no se repitan
 - [**ARQUITECTURA_V3_7_1.md**](ARQUITECTURA_V3_7_1.md) — Estado observable, compositor unico y propietarios de subsistema
 - [**POSTMORTEM_V3_7_1.md**](POSTMORTEM_V3_7_1.md) — Fallos encontrados, causas raiz, metricas y checklist de release
+- [**POSTMORTEM_V3_7_2.md**](POSTMORTEM_V3_7_2.md) — Marca de imagen invisible, lote incoherente y barreras de no regresion
 - [**DRAG_DROP_SYSTEM.md**](DRAG_DROP_SYSTEM.md) — Implementacion tecnica del sistema de arrastre
 - [**ZOOM_OPTIMIZADO.md**](ZOOM_OPTIMIZADO.md) — Sistema de zoom diferenciado por dispositivo
 
@@ -61,7 +62,7 @@ MNEMOTAG2/
 │   ├── utils/                  # Utilidades y AppState observable
 │   └── managers/               # 27 managers (IIFE)
 ├── images/                     # Imagenes fuente
-├── tests/                      # 283 Node + 92 binarias + Playwright en 3 motores
+├── tests/                      # 286 Node + 92 binarias + Playwright en 3 motores
 └── docs/                       # Esta documentacion
 ```
 
@@ -69,10 +70,10 @@ MNEMOTAG2/
 
 ## Estadisticas
 
-- **Version:** 3.7.1
+- **Version:** 3.7.2
 - **Archivos JS:** 36 (bundled en app.min.js)
 - **Managers:** 27 modulos especializados
-- **Tests:** 283 Node + 92 binarias + 99 casos E2E (81 ejecutados, 18 omisiones deliberadas)
+- **Tests:** 286 Node + 92 binarias + 102 casos E2E (84 ejecutados, 18 omisiones deliberadas)
 - **Build:** Gulp 5 (SCSS + JS concat + terser)
 
 ---

@@ -1,4 +1,4 @@
-# Indice de Documentacion - MNEMOTAG v3.7.1
+# Indice de Documentacion - MNEMOTAG v3.7.2
 
 **Fecha**: 13 de julio de 2026
 
@@ -20,6 +20,7 @@
 | [**RESUMEN_VERSIONES.md**](RESUMEN_VERSIONES.md) | Tabla comparativa de todas las versiones |
 | [**ARQUITECTURA_V3_7_1.md**](ARQUITECTURA_V3_7_1.md) | Estado observable, compositor canonico, propietarios y contratos |
 | [**POSTMORTEM_V3_7_1.md**](POSTMORTEM_V3_7_1.md) | Errores detectados durante la migracion y barreras de no regresion |
+| [**POSTMORTEM_V3_7_2.md**](POSTMORTEM_V3_7_2.md) | Marca de imagen invisible, lote incoherente y pruebas protectoras de pixeles |
 | [**AUDITORIA_V3_5_11_SOLUCIONES.md**](AUDITORIA_V3_5_11_SOLUCIONES.md) | Postmortem de auditoria/reauditoria, causas raiz, contratos, despliegue y reglas de no regresion |
 | [**REGISTRO_ERRORES_V3_5_13.md**](REGISTRO_ERRORES_V3_5_13.md) | Errores de integracion detectados, causas raiz y barreras para evitar regresiones |
 | [**DRAG_DROP_SYSTEM.md**](DRAG_DROP_SYSTEM.md) | Implementacion del sistema de arrastre |

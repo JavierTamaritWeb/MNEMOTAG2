@@ -1,7 +1,7 @@
 # 🚀 Resumen Ejecutivo de Versiones - MNEMOTAG
 
 **Documento**: Resumen de evolucion del proyecto
-**Ultima actualizacion**: 13 de julio de 2026 (v3.7.1)
+**Ultima actualizacion**: 13 de julio de 2026 (v3.7.2)
 
 ---
 
@@ -9,7 +9,8 @@
 
 | Version | Fecha | Caracteristicas Principales | Estado |
 |---------|-------|----------------------------|--------|
-| **v3.7.1** | 13 Jul 2026 | Arquitectura: AppState observable, WatermarkManager completo, compositor unico preview/export/batch, managers desacoplados, main menor de 5000 lineas, manifest maskable y release validado en 3 motores | **Actual** |
+| **v3.7.2** | 13 Jul 2026 | Marcas de agua: imagen visible en preview y lote, casillas de aplicacion efectivas, acceso permanente al lote y E2E de pixeles en 3 motores | **Actual** |
+| **v3.7.1** | 13 Jul 2026 | Arquitectura: AppState observable, WatermarkManager completo, compositor unico preview/export/batch, managers desacoplados, main menor de 5000 lineas, manifest maskable y release validado en 3 motores | Estable |
 | **v3.7.0** | 13 Jul 2026 | Funcionalidad: estimacion en vivo de export, Web Share API, cola batch sin base64 con concurrencia 2 y cancelacion individual, resumen previo al lote, sesion restaurable con IndexedDB, presets completos, deteccion de capacidades, fix undo de watermark, E2E en 3 motores | Estable |
 | **v3.6.2** | 12 Jul 2026 | Fix UI del panel: rejillas legadas colapsadas a una columna dentro del panel de 380px, compactacion sobre overrides !important, fix del selector icon-only que aplastaba botones, barrera anti-desborde en E2E | Estable |
 | **v3.6.1** | 12 Jul 2026 | Area de trabajo: panel con pestañas + canvas sticky, toolbar con Descargar siempre visible, sheet movil, secciones con indicador de modificacion y restauracion | Estable |
